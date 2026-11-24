@@ -37,6 +37,7 @@ const utcDate = (d: Date): string => d.toISOString().slice(0, 10);
 export async function banUser(deps: AppDeps, userId: number): Promise<void> {
   await deps.db.update(users).set({ isBanned: true }).where(eq(users.id, userId));
   await evictUserSessionCache(deps, userId);
+  deps.realtime?.disconnectUser(userId);
 }
 
 export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<MeDto> {

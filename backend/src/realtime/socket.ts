@@ -15,6 +15,10 @@ export interface RealtimeHub {
   close(): Promise<void>;
 }
 
+const logErr = (err: unknown): void => {
+  console.error('[realtime] adapter error', err);
+};
+
 const userRoom = (id: number) => `user:${id}`;
 const sessionRoom = (hash: string) => `sess:${hash}`;
 
@@ -37,6 +41,7 @@ export function attachRealtime(
   const io = new Server(httpServer, {
     cors: { origin: deps.env.PUBLIC_BASE_URL, credentials: true },
     // Захист від cross-site WebSocket hijacking: Origin, якщо є, має збігатися.
+    // Відсутній Origin дозволено свідомо (не-браузерні клієнти); автентифікує кука.
     allowRequest: (req, cb) => {
       const origin = req.headers.origin;
       cb(null, !origin || origin === allowedOrigin);
@@ -44,6 +49,7 @@ export function attachRealtime(
     adapter: createAdapter(pub, sub),
   });
 
+  // TODO(План 4): сокети не перевіряються повторно після природного спливу сесії.
   io.use((socket, next) => {
     void (async () => {
       const token = parseCookie(socket.handshake.headers.cookie ?? '')[SESSION_COOKIE];
@@ -59,8 +65,20 @@ export function attachRealtime(
   return {
     toUser: (userId, event, payload) => void io.to(userRoom(userId)).emit(event, payload),
     toRoom: (room, event, payload) => void io.to(room).emit(event, payload),
-    disconnectUser: (userId) => void io.in(userRoom(userId)).disconnectSockets(true),
-    disconnectSession: (hash) => void io.in(sessionRoom(hash)).disconnectSockets(true),
+    disconnectUser: (userId) => {
+      try {
+        io.in(userRoom(userId)).disconnectSockets(true);
+      } catch (err) {
+        logErr(err);
+      }
+    },
+    disconnectSession: (hash) => {
+      try {
+        io.in(sessionRoom(hash)).disconnectSockets(true);
+      } catch (err) {
+        logErr(err);
+      }
+    },
     close: async () => {
       await io.close();
       pub.disconnect();

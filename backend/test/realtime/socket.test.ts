@@ -4,6 +4,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from '../../src/app.js';
 import { createSession, revokeAllUserSessions, revokeSession } from '../../src/auth/session.service.js';
+import { banUser } from '../../src/users/users.service.js';
 import { attachRealtime, type RealtimeHub } from '../../src/realtime/socket.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
@@ -79,6 +80,25 @@ describe('realtime', () => {
     const got = waitFor<{ x: number }>(c, 'ping');
     hub.toUser(u.id, 'ping', { x: 1 });
     expect(await got).toEqual({ x: 1 });
+  });
+
+  it('allows absent Origin (non-browser clients) but rejects foreign one', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = client({ cookie: `nri_sid=${token}` });
+    await waitFor(c, 'connect');
+    expect(c.connected).toBe(true);
+  });
+
+  it('banUser disconnects an open socket', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = client({ cookie: `nri_sid=${token}` });
+    await waitFor(c, 'connect');
+    const gone = waitFor(c, 'disconnect');
+    await banUser(deps, u.id);
+    await gone;
+    expect(c.connected).toBe(false);
   });
 
   it('logout-all disconnects an open socket', async () => {
