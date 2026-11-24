@@ -1,9 +1,10 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
   localDate,
   type CompleteProfileInput,
+  type GameStatus,
   type MeDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -32,6 +33,8 @@ import { AppError } from '../http/errors.js';
 type Provider = typeof authIdentities.$inferSelect.provider;
 
 const DAY_MS = 86_400_000;
+/** Ігри майстра, які видалення акаунта скасовує. */
+const ACTIVE_GAME_STATUSES: GameStatus[] = ['draft', 'recruiting', 'started'];
 export type Clock = () => Date;
 /**
  * Ставить is_banned і скидає Redis-кеш сесій, тож бан діє з наступного ж запиту:
@@ -221,19 +224,39 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   const now = new Date();
   // Хеші токенів збираємо в транзакції (до видалення рядків), щоб відкликання
   // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
-  // FK-каскади не спрацьовують: профіль, календар і членства в іграх видаляємо явно,
-  // а активні ігри майстра скасовуємо (рішення R8).
+  // FK-каскади не спрацьовують: профіль і календар видаляємо явно, членства в активних
+  // іграх завершуємо (`account_deleted`, історія присутності лишається), а активні ігри
+  // майстра скасовуємо (рішення R8).
   // Порядок блокувань той самий, що в заявках/затвердженні: спершу рядки ігор, потім
-  // рядок користувача (див. `lockUser` у applications.rules.ts) — інакше видалення й
-  // затвердження в тій самій грі блокують одне одного по колу.
+  // рядок користувача (див. `lockUser` у applications.rules.ts), потім заявки/членства —
+  // інакше видалення й затвердження в тій самій грі блокують одне одного по колу.
+  // Ігри блокуємо одним запитом за зростанням id: свої активні (скасуємо) і ті, куди є
+  // своя `pending`-заявка (відкличемо). Тоді два одночасні видалення з перехресними
+  // заявками (кожен подався в гру іншого) серіалізуються на рядках ігор, а не
+  // зустрічаються по колу на заявках. Кандидатів читаємо до транзакції: неблокувальне
+  // читання всередині зафіксувало б знімок REPEATABLE READ ще до блокувань, і членство,
+  // затверджене, поки ми чекали на `users`, лишилось би непоміченим.
+  const own = await db
+    .select({ id: games.id })
+    .from(games)
+    .where(and(eq(games.gmUserId, userId), inArray(games.status, ACTIVE_GAME_STATUSES)));
+  const appliedTo = await db
+    .select({ id: gameApplications.gameId })
+    .from(gameApplications)
+    .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')));
+  const lockIds = [...new Set([...own, ...appliedTo].map((g) => g.id))];
   const result = await db.transaction(async (tx) => {
-    const active = await tx
-      .select({ id: games.id, status: games.status })
-      .from(games)
-      .where(
-        and(eq(games.gmUserId, userId), inArray(games.status, ['draft', 'recruiting', 'started'])),
-      )
-      .for('update');
+    const locked = lockIds.length
+      ? await tx
+          .select({ id: games.id, status: games.status, gmUserId: games.gmUserId })
+          .from(games)
+          .where(inArray(games.id, lockIds))
+          .orderBy(asc(games.id))
+          .for('update')
+      : [];
+    const active = locked
+      .filter((g) => g.gmUserId === userId && ACTIVE_GAME_STATUSES.includes(g.status))
+      .map(({ id, status }) => ({ id, status }));
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -266,16 +289,26 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     // видалений користувач показується анонімно. Виходимо лише з активних ігор.
     // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри):
     // нові членства/заявки неможливі — затвердження й заявка чекають на X рядка `users`.
+    // Членство не видаляється, а завершується: присутність на сесіях лишається в історії.
     const memberIds = (
       await tx
         .select({ id: gameMembers.id })
         .from(gameMembers)
         .innerJoin(games, eq(games.id, gameMembers.gameId))
         .where(
-          and(eq(gameMembers.userId, userId), inArray(games.status, ['recruiting', 'started'])),
+          and(
+            eq(gameMembers.userId, userId),
+            isNull(gameMembers.leftAt),
+            inArray(games.status, ['recruiting', 'started']),
+          ),
         )
     ).map((m) => m.id);
-    if (memberIds.length) await tx.delete(gameMembers).where(inArray(gameMembers.id, memberIds));
+    if (memberIds.length) {
+      await tx
+        .update(gameMembers)
+        .set({ leftAt: now, leftReason: 'account_deleted' })
+        .where(and(inArray(gameMembers.id, memberIds), isNull(gameMembers.leftAt)));
+    }
     // Свої `pending`-заявки — відкликано (FK-каскад на надгробку не спрацює).
     const withdrawn = await tx
       .select({ id: gameApplications.id, gameId: gameApplications.gameId })

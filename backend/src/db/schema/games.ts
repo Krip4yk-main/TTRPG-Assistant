@@ -131,7 +131,12 @@ export const gameContentWarnings = mysqlTable(
 );
 
 const MEMBER_ROLES = ['player'] as const satisfies MemberRole[];
-const MEMBER_LEFT_REASONS = ['left', 'kicked', 'banned'] as const satisfies MemberLeftReason[];
+const MEMBER_LEFT_REASONS = [
+  'left',
+  'kicked',
+  'banned',
+  'account_deleted',
+] as const satisfies MemberLeftReason[];
 
 /**
  * Членства в грі (історія): активне — `left_at IS NULL`. Записи не видаляються при виході,

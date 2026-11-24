@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leaveGameInputSchema } from './members.js';
+import { leaveGameInputSchema, MEMBER_LEFT_REASONS } from './members.js';
 
 const NOTE = 'Переїжджаю в інше місто';
 
@@ -21,5 +21,11 @@ describe('leaveGameInputSchema', () => {
     expect(
       leaveGameInputSchema.parse({ noteForGm: NOTE, noteForAdmin: 'Грубість' }).noteForAdmin,
     ).toBe('Грубість');
+  });
+});
+
+describe('MEMBER_LEFT_REASONS', () => {
+  it('includes account deletion', () => {
+    expect(MEMBER_LEFT_REASONS).toEqual(['left', 'kicked', 'banned', 'account_deleted']);
   });
 });

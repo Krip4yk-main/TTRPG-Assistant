@@ -430,7 +430,7 @@ describe('DELETE /api/me', () => {
     return r!.id;
   }
 
-  it('removes profile, availability and active memberships (no FK cascade on a tombstone)', async () => {
+  it('removes profile and availability, ends active memberships (no FK cascade on a tombstone)', async () => {
     const u = await createUser(db, { nickname: 'Hero' });
     const other = await createUser(db, { nickname: 'Other' });
     const theirGame = await insertGame(other.id);
@@ -458,9 +458,19 @@ describe('DELETE /api/me', () => {
     expect(
       await db.select().from(availabilityBusyDates).where(eq(availabilityBusyDates.userId, u.id)),
     ).toHaveLength(0);
-    // Активні ігри покинуто; склад завершених/скасованих (історія інших) збережено.
-    const left = await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id));
-    expect(left.map((m) => m.gameId).sort()).toEqual([finishedGame, cancelledGame].sort());
+    // Активні ігри покинуто (членство завершено, не видалено — історія присутності);
+    // склад завершених/скасованих (історія інших) не змінюється.
+    const rows = await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id));
+    const byGame = new Map(rows.map((m) => [m.gameId, m]));
+    expect(rows).toHaveLength(4);
+    for (const gid of [theirGame, startedGame]) {
+      expect(byGame.get(gid)!.leftAt).not.toBeNull();
+      expect(byGame.get(gid)!.leftReason).toBe('account_deleted');
+    }
+    for (const gid of [finishedGame, cancelledGame]) {
+      expect(byGame.get(gid)!.leftAt).toBeNull();
+      expect(byGame.get(gid)!.leftReason).toBeNull();
+    }
     // Чужа гра не зачеплена.
     const [g] = await db.select().from(games).where(eq(games.id, theirGame));
     expect(g!.status).toBe('recruiting');
@@ -486,6 +496,40 @@ describe('DELETE /api/me', () => {
     expect(ev[0]).toMatchObject({ userId: u.id, entityType: 'application' });
     expect(ev[0]!.payload).toMatchObject({ gameId: g1 });
   });
+
+  it('ends an already-left membership only once (keeps the original left reason)', async () => {
+    const u = await createUser(db, { nickname: 'Hero' });
+    const other = await createUser(db, { nickname: 'Other' });
+    const g = await insertGame(other.id);
+    const leftAt = new Date(Date.now() - 86_400_000);
+    leftAt.setMilliseconds(0);
+    await db.insert(gameMembers).values({ gameId: g, userId: u.id, leftAt, leftReason: 'kicked' });
+    await deleteAccount(deps, u.id);
+    const [m] = await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id));
+    expect(m).toMatchObject({ leftReason: 'kicked', leftAt });
+  });
+
+  it('two users deleting at once with cross pending applications: no deadlock', async () => {
+    const base = { answers: [], constraints: [], warningsAcceptedAt: new Date() };
+    for (let i = 0; i < 5; i++) {
+      await resetDb(db);
+      const a = await createUser(db, { nickname: 'Aaa' });
+      const b = await createUser(db, { nickname: 'Bbb' });
+      const ga = await insertGame(a.id);
+      const gb = await insertGame(b.id);
+      await db.insert(gameApplications).values([
+        { ...base, gameId: gb, userId: a.id },
+        { ...base, gameId: ga, userId: b.id },
+      ]);
+      const res = await Promise.allSettled([deleteAccount(deps, a.id), deleteAccount(deps, b.id)]);
+      expect(res.map((r) => (r.status === 'rejected' ? String(r.reason) : 'ok'))).toEqual([
+        'ok',
+        'ok',
+      ]);
+      const apps = await db.select().from(gameApplications);
+      expect(apps.every((x) => x.status !== 'pending')).toBe(true);
+    }
+  }, 30_000);
 
   it("cancels pending applications to the deleted GM's games", async () => {
     const gm = await createUser(db, { nickname: 'GoneGm' });

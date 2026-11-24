@@ -5,6 +5,7 @@ import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { AppError } from '../http/errors.js';
 import { searchGames } from './games.search.js';
 import {
+  changeScheduleRule,
   createGame,
   getGameView,
   listMyGames,
@@ -41,6 +42,14 @@ export function gamesRouter(deps: AppDeps): Router {
   });
   router.patch('/:id', auth, requireActive, async (req, res) => {
     res.json(await updateGame(deps, req.user!.userId, gameId(req.params.id), req.body));
+  });
+  router.put('/:id/schedule', auth, requireActive, async (req, res) => {
+    const id = gameId(req.params.id);
+    res.json(await changeScheduleRule(deps, req.user!.userId, id, req.body, 'schedule'));
+  });
+  router.post('/:id/convert-to-campaign', auth, requireActive, async (req, res) => {
+    const id = gameId(req.params.id);
+    res.json(await changeScheduleRule(deps, req.user!.userId, id, req.body, 'convert'));
   });
   for (const action of GAME_ACTIONS) {
     router.post(`/:id/${action}`, auth, requireActive, async (req, res) => {

@@ -22,6 +22,7 @@ import {
 } from './applications/applications.routes.js';
 import { gameMembersRouter } from './members/members.routes.js';
 import { blacklistRouter } from './members/blacklist.routes.js';
+import { gameSessionsRouter, sessionsRouter } from './sessions/sessions.routes.js';
 import { ogRouter, seoRootRouter } from './seo/seo.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
@@ -69,8 +70,10 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/catalog', catalogRouter(deps));
   app.use('/api/games/:id/applications', gameApplicationsRouter(deps));
   app.use('/api/games/:id', gameMembersRouter(deps));
+  app.use('/api/games/:id', gameSessionsRouter(deps));
   app.use('/api/games', gamesRouter(deps));
   app.use('/api/applications', applicationsRouter(deps));
+  app.use('/api/sessions', sessionsRouter(deps));
   app.use('/api/og', ogRouter(deps));
   app.use('/api/internal', internalRouter(deps));
 

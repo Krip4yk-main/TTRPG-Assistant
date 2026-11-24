@@ -1,0 +1,1 @@
+ALTER TABLE `game_members` MODIFY COLUMN `left_reason` enum('left','kicked','banned','account_deleted');

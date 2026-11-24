@@ -5,6 +5,7 @@ import {
   gameInputSchema,
   gamePatchSchema,
   meetsAgeRating,
+  scheduleRuleInputSchema,
   type GameAction,
   type GameCardDto,
   type GameDto,
@@ -22,6 +23,7 @@ import {
   gameContentWarnings,
   gameMembers,
   games,
+  gameSessions,
   gameSystems,
   genres,
   users,
@@ -35,6 +37,7 @@ import {
   type Tx,
 } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
+import { materializeForRow, replaceRuleSessions } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
 
@@ -357,6 +360,8 @@ export async function updateGame(
     throw new AppError(422, 'GAME_IN_PAST');
   }
   await patchHooks.beforeWrite?.(id);
+  // Зміна розкладу опублікованої гри — те саме, що нове правило (`PUT /schedule`).
+  const ruleChanged = row.status !== 'draft' && isRuleChanged(current, next);
   const cancelled = await db.transaction(async (tx) => {
     // Умова за прочитаним статусом: якщо гру тим часом опублікували/скасували, заблоковані
     // поля чи завершена гра не змінюються — 409, транзакція відкочується.
@@ -377,6 +382,7 @@ export async function updateGame(
           .values(next.contentWarningIds.map((warningId) => ({ gameId: id, warningId })));
       }
     }
+    if (ruleChanged) await replaceRuleSessions(tx, { ...row, ...columns(next) }, now);
     // Після UPDATE рядок гри заблоковано (X), тож паралельні заявки/затвердження чекають.
     return row.status !== 'draft' && isRatingRaised(current.ageRating, next.ageRating)
       ? applyAgeRatingRaise(tx, id, next.ageRating, now)
@@ -392,6 +398,98 @@ export async function updateGame(
       fields: Object.keys(patch).filter((k) => patch[k as keyof typeof patch] !== undefined),
     },
   });
+  if (ruleChanged) await logRuleChanged(deps, userId, id, current, next);
+  return gmView(deps, id);
+}
+
+// ---------- правило розкладу ----------
+
+const RULE_FIELDS = ['startsAt', 'durationMinutes', 'recurrence', 'weekdays'] as const;
+type Rule = Pick<GameInput, (typeof RULE_FIELDS)[number]>;
+
+const pickRule = (g: Rule): Rule => ({
+  startsAt: g.startsAt,
+  durationMinutes: g.durationMinutes,
+  recurrence: g.recurrence,
+  weekdays: g.weekdays,
+});
+
+function isRuleChanged(a: Rule, b: Rule): boolean {
+  return RULE_FIELDS.some((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f]));
+}
+
+async function logRuleChanged(
+  deps: AppDeps,
+  userId: number,
+  gameId: number,
+  from: Rule,
+  to: Rule,
+  type: 'game.rule_changed' | 'game.converted_to_campaign' = 'game.rule_changed',
+): Promise<void> {
+  await logEvent(deps.db, {
+    type,
+    userId,
+    entityType: 'game',
+    entityId: gameId,
+    payload: { from: pickRule(from), to: pickRule(to) },
+  });
+}
+
+/**
+ * Нове правило розкладу для майбутніх сесій (`PUT /api/games/:id/schedule`, лише кампанія)
+ * або «перетворити на кампанію» (`POST /api/games/:id/convert-to-campaign`, лише ваншот;
+ * єдиний шлях змінити заблоковане `kind`). Гра — `recruiting|started`; перша сесія нового
+ * правила — у майбутньому. Майбутні неперенесені сесії правила замінюються новими;
+ * перенесені, скасовані й завершені лишаються.
+ */
+export async function changeScheduleRule(
+  deps: AppDeps,
+  userId: number,
+  id: number,
+  body: unknown,
+  mode: 'schedule' | 'convert',
+): Promise<GameDto> {
+  const { db } = deps;
+  const input = scheduleRuleInputSchema.parse(body);
+  const { row } = await loadOwned(deps, userId, id);
+  if (row.status !== 'recruiting' && row.status !== 'started') {
+    throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  }
+  if (row.kind !== (mode === 'convert' ? 'oneshot' : 'campaign')) {
+    throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  }
+  if (mode === 'convert' && input.recurrence === 'none') {
+    throw new AppError(400, 'VALIDATION', { reason: 'RECURRENCE_REQUIRED' });
+  }
+  const current = toInput(row, await warningIdsOf(deps, id));
+  const next = gameInputSchema(row.timezone).parse({
+    ...current,
+    kind: 'campaign',
+    startsAt: input.startsAt,
+    durationMinutes: input.durationMinutes ?? current.durationMinutes,
+    recurrence: input.recurrence,
+    weekdays: input.weekdays,
+  });
+  const now = new Date();
+  if (new Date(next.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
+  const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(next.startsAt) };
+  await db.transaction(async (tx) => {
+    // Умова за прочитаними статусом і видом: паралельний перехід чи перетворення → 409.
+    const [res] = await tx
+      .update(games)
+      .set(set)
+      .where(and(eq(games.id, id), eq(games.status, row.status), eq(games.kind, row.kind)));
+    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    await replaceRuleSessions(tx, { ...row, ...set }, now);
+  });
+  await logRuleChanged(
+    deps,
+    userId,
+    id,
+    current,
+    next,
+    mode === 'convert' ? 'game.converted_to_campaign' : 'game.rule_changed',
+  );
   return gmView(deps, id);
 }
 
@@ -426,6 +524,26 @@ async function activeCount(tx: Tx, gameId: number): Promise<number> {
 }
 
 /**
+ * «Завершити гру» для ваншота завершує й його єдину сесію (`scheduled` → `done`). Сесію,
+ * якої ще немає (гру опубліковано до матеріалізації), спершу створюємо з правила.
+ */
+async function finishOneshotSession(tx: Tx, row: GameRow, now: Date): Promise<number[]> {
+  await materializeForRow(tx, row, now, row.startsAt);
+  const open = await tx
+    .select({ id: gameSessions.id })
+    .from(gameSessions)
+    .where(and(eq(gameSessions.gameId, row.id), eq(gameSessions.status, 'scheduled')))
+    .for('update');
+  if (open.length === 0) return [];
+  const ids = open.map((s) => s.id);
+  await tx
+    .update(gameSessions)
+    .set({ status: 'done', doneAt: now })
+    .where(and(inArray(gameSessions.id, ids), eq(gameSessions.status, 'scheduled')));
+  return ids;
+}
+
+/**
  * Перехід статусу. Старт з меншою за мінімум кількістю учасників дозволено — у відповіді
  * `warning: 'BELOW_MIN_PLAYERS'`. Скасування й завершення скасовують `pending`-заявки
  * (`game_cancelled` / `game_finished`).
@@ -442,13 +560,19 @@ export async function transitionGame(
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
-  const { cancelled, belowMin } = await db.transaction(async (tx) => {
+  const { cancelled, belowMin, doneSessionIds } = await db.transaction(async (tx) => {
     // Умова за поточним статусом захищає від гонки двох переходів.
     const [res] = await tx
       .update(games)
       .set({ status: t.to, [t.stamp]: now })
       .where(and(eq(games.id, id), eq(games.status, row.status)));
     if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    // Публікація й старт зсувають вікно сесій (рядок гри вже під X-блокуванням).
+    if (action === 'publish' || action === 'start') {
+      await materializeForRow(tx, { ...row, status: t.to }, now);
+    }
+    const doneSessionIds =
+      action === 'finish' && row.kind === 'oneshot' ? await finishOneshotSession(tx, row, now) : [];
     const belowMin = action === 'start' && (await activeCount(tx, id)) < row.minPlayers;
     const cancelled: CancelledApplication[] =
       action === 'cancel'
@@ -456,7 +580,7 @@ export async function transitionGame(
         : action === 'finish'
           ? await cancelPendingForGames(tx, [id], now, 'game_finished')
           : [];
-    return { cancelled, belowMin };
+    return { cancelled, belowMin, doneSessionIds };
   });
   await logEvent(db, {
     type: EVENT[action],
@@ -466,6 +590,15 @@ export async function transitionGame(
     payload: { from: row.status, to: t.to },
   });
   await logCancelled(db, cancelled, 'application.cancelled_game');
+  for (const sessionId of doneSessionIds) {
+    await logEvent(db, {
+      type: 'session.done',
+      userId,
+      entityType: 'session',
+      entityId: sessionId,
+      payload: { gameId: id, present: [], absent: [], reason: 'game_finished' },
+    });
+  }
   const view = await gmView(deps, id);
   return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
 }

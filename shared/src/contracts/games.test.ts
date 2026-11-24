@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { gameInputSchema, gamePatchSchema, searchFiltersSchema } from './games.js';
+import {
+  gameInputSchema,
+  gamePatchSchema,
+  scheduleRuleInputSchema,
+  searchFiltersSchema,
+} from './games.js';
 
 const TZ = 'Europe/Kyiv';
 // 2027-01-04 — понеділок; 17:00Z = 19:00 за Києвом.
@@ -106,6 +111,33 @@ describe('gamePatchSchema', () => {
   it('validates field shapes', () => {
     expect(gamePatchSchema.safeParse({ coverUrl: 'http://a.test' }).success).toBe(false);
     expect(gamePatchSchema.safeParse({ nope: 1 }).success).toBe(false);
+  });
+});
+
+describe('scheduleRuleInputSchema', () => {
+  it('normalizes startsAt, defaults weekdays, keeps duration optional', () => {
+    expect(
+      scheduleRuleInputSchema.parse({
+        startsAt: '2027-01-07T19:00:00+02:00',
+        recurrence: 'monthly',
+      }),
+    ).toEqual({ startsAt: '2027-01-07T17:00:00.000Z', recurrence: 'monthly', weekdays: [] });
+    expect(
+      scheduleRuleInputSchema.parse({
+        startsAt: '2027-01-07T17:00:00Z',
+        recurrence: 'weekly',
+        weekdays: [3, 1, 3],
+        durationMinutes: 180,
+      }),
+    ).toMatchObject({ weekdays: [1, 3], durationMinutes: 180 });
+  });
+  it('rejects unknown keys, odd durations and non-whole minutes', () => {
+    const base = { startsAt: '2027-01-07T17:00:00Z', recurrence: 'weekly', weekdays: [3] };
+    expect(scheduleRuleInputSchema.safeParse({ ...base, kind: 'campaign' }).success).toBe(false);
+    expect(scheduleRuleInputSchema.safeParse({ ...base, durationMinutes: 45 }).success).toBe(false);
+    expect(
+      scheduleRuleInputSchema.safeParse({ ...base, startsAt: '2027-01-07T17:00:10Z' }).success,
+    ).toBe(false);
   });
 });
 

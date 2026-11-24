@@ -171,6 +171,22 @@ export function gameInputSchema(timezone: string) {
 }
 
 /**
+ * Нове правило розкладу: тіло `PUT /api/games/:id/schedule` і
+ * `POST /api/games/:id/convert-to-campaign`. Без `durationMinutes` — лишається поточна.
+ * Узгодженість із грою (дні тижня, `oneshot` → лише `none`) бекенд перевіряє через
+ * `gameInputSchema` після злиття з поточною грою.
+ */
+export const scheduleRuleInputSchema = z
+  .object({
+    startsAt,
+    durationMinutes: shape.durationMinutes.optional(),
+    recurrence: shape.recurrence,
+    weekdays: shape.weekdays.default([]),
+  })
+  .strict();
+export type ScheduleRuleInput = z.input<typeof scheduleRuleInputSchema>;
+
+/**
  * Часткове оновлення (`PATCH`): перевіряє лише форму переданих полів. Бекенд зливає
  * патч із поточною грою й валідує результат через `gameInputSchema`.
  */
