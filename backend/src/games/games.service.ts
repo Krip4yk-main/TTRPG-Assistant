@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, type SQL } from 'drizzle-orm';
 import {
   expandOccurrences,
   GAME_LOCKED_AFTER_PUBLISH,
@@ -465,7 +465,8 @@ export async function listProfileGames(
 }> {
   const now = new Date();
   const order = [desc(games.startsAt), desc(games.id)];
-  const visible = inArray(games.status, PROFILE_STATUSES);
+  // Лише опубліковані: неопублікована гра (навіть скасована) іншим не показується.
+  const visible = and(inArray(games.status, PROFILE_STATUSES), isNotNull(games.publishedAt));
   const memberOf = deps.db
     .select({ id: gameMembers.gameId })
     .from(gameMembers)

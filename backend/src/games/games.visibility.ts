@@ -43,7 +43,8 @@ function isRestrictedFor(
 
 /**
  * Єдине місце правил видимості гри (`GET /api/games/:id`):
- * - чернетка — лише майстру (іншим `null` → 404);
+ * - неопублікована гра (чернетка або скасована чернетка, `publishedAt === null`) — лише
+ *   майстру (іншим `null` → 404);
  * - майстер — повний вид;
  * - вікова позначка, якої глядач не проходить (гість — завжди для 18+/21+) — рівно
  *   `{ id, title, gm, ageRating, restricted: true }`;
@@ -58,7 +59,7 @@ export function toGameView(
   now: Date = new Date(),
 ): GameViewDto | null {
   const isGm = viewer?.userId === gmUserId;
-  if (game.status === 'draft' && !isGm) return null;
+  if ((game.status === 'draft' || game.publishedAt === null) && !isGm) return null;
   if (isGm) return game;
   if (isRestrictedFor(game, gmUserId, viewer, now)) return restrictedView(game);
   if (isMember) return game;

@@ -35,6 +35,30 @@ describe('games visibility — drafts and private fields (Review Focus 4)', () =
     expect(own.body.status).toBe('draft');
   });
 
+  it('a cancelled never-published draft stays private: 404 for guest/stranger, 200 for GM', async () => {
+    const gm = await userWithAge(30);
+    const other = await userWithAge(30);
+    const id = await createGame(gm.cookie, { title: 'Таємна чернетка' });
+    expect((await call('post', `/api/games/${id}/cancel`, gm.cookie)).status).toBe(200);
+    const guest = await call('get', `/api/games/${id}`);
+    expect(guest.status).toBe(404);
+    expect(JSON.stringify(guest.body)).not.toContain('Таємна');
+    expect((await call('get', `/api/games/${id}`, other.cookie)).status).toBe(404);
+    const own = await call('get', `/api/games/${id}`, gm.cookie);
+    expect(own.status).toBe(200);
+    expect(own.body.status).toBe('cancelled');
+    expect(own.body.publishedAt).toBeNull();
+  });
+
+  it('a cancelled published game is still readable by others', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    expect((await call('post', `/api/games/${id}/cancel`, gm.cookie)).status).toBe(200);
+    const guest = await call('get', `/api/games/${id}`);
+    expect(guest.status).toBe(200);
+    expect(guest.body.status).toBe('cancelled');
+  });
+
   it('address/channelLinks: absent for outsiders, present for GM and members', async () => {
     const gm = await userWithAge(30);
     const outsider = await userWithAge(30);

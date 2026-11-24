@@ -378,10 +378,18 @@ describe('DELETE /api/me', () => {
     return r!.id;
   }
 
-  it('removes profile, availability and memberships (no FK cascade on a tombstone)', async () => {
+  it('removes profile, availability and active memberships (no FK cascade on a tombstone)', async () => {
     const u = await createUser(db, { nickname: 'Hero' });
     const other = await createUser(db, { nickname: 'Other' });
     const theirGame = await insertGame(other.id);
+    const startedGame = await insertGame(other.id, { status: 'started' });
+    const finishedGame = await insertGame(other.id, { status: 'finished' });
+    const cancelledGame = await insertGame(other.id, { status: 'cancelled' });
+    await db.insert(gameMembers).values([
+      { gameId: startedGame, userId: u.id },
+      { gameId: finishedGame, userId: u.id },
+      { gameId: cancelledGame, userId: u.id },
+    ]);
     await db.insert(userProfiles).values({ userId: u.id, bio: 'secret bio', city: 'Київ' });
     await db
       .insert(availabilitySlots)
@@ -398,7 +406,9 @@ describe('DELETE /api/me', () => {
     expect(
       await db.select().from(availabilityBusyDates).where(eq(availabilityBusyDates.userId, u.id)),
     ).toHaveLength(0);
-    expect(await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id))).toHaveLength(0);
+    // Активні ігри покинуто; склад завершених/скасованих (історія інших) збережено.
+    const left = await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id));
+    expect(left.map((m) => m.gameId).sort()).toEqual([finishedGame, cancelledGame].sort());
     // Чужа гра не зачеплена.
     const [g] = await db.select().from(games).where(eq(games.id, theirGame));
     expect(g!.status).toBe('recruiting');

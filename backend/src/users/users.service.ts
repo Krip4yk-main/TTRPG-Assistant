@@ -226,7 +226,20 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
     await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
-    await tx.delete(gameMembers).where(eq(gameMembers.userId, userId));
+    // Склад завершених/скасованих ігор лишаємо: історія інших гравців зберігається, а
+    // видалений користувач показується анонімно. Виходимо лише з активних ігор.
+    await tx.delete(gameMembers).where(
+      and(
+        eq(gameMembers.userId, userId),
+        inArray(
+          gameMembers.gameId,
+          tx
+            .select({ id: games.id })
+            .from(games)
+            .where(inArray(games.status, ['recruiting', 'started'])),
+        ),
+      ),
+    );
     const active = await tx
       .select({ id: games.id, status: games.status })
       .from(games)
