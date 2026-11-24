@@ -63,7 +63,12 @@ export function harness(deps: AppDeps, app: Express) {
     };
   }
 
-  const call = (method: 'get' | 'post' | 'patch', path: string, cookie?: string, body?: object) => {
+  const call = (
+    method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+    path: string,
+    cookie?: string,
+    body?: object,
+  ) => {
     const r = request(app)[method](path).set('X-CSRF-Token', 't');
     if (cookie) r.set('Cookie', cookie);
     else r.set('Cookie', 'nri_csrf=t');

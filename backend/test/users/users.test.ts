@@ -9,6 +9,7 @@ import {
   availabilityBusyDates,
   availabilitySlots,
   events,
+  gameApplications,
   gameMembers,
   games,
   gameSystems,
@@ -463,6 +464,41 @@ describe('DELETE /api/me', () => {
     // Чужа гра не зачеплена.
     const [g] = await db.select().from(games).where(eq(games.id, theirGame));
     expect(g!.status).toBe('recruiting');
+  });
+
+  it('withdraws the pending applications of the deleted user (no FK cascade on a tombstone)', async () => {
+    const u = await createUser(db, { nickname: 'Applicant' });
+    const other = await createUser(db, { nickname: 'Gm2' });
+    const g1 = await insertGame(other.id);
+    const g2 = await insertGame(other.id);
+    const base = { answers: [], constraints: [], warningsAcceptedAt: new Date() };
+    await db.insert(gameApplications).values([
+      { ...base, gameId: g1, userId: u.id },
+      { ...base, gameId: g2, userId: u.id, status: 'rejected' },
+    ]);
+    await deleteAccount(deps, u.id);
+    const rows = await db.select().from(gameApplications).where(eq(gameApplications.userId, u.id));
+    const byGame = new Map(rows.map((r) => [r.gameId, r.status]));
+    expect(byGame.get(g1)).toBe('withdrawn');
+    expect(byGame.get(g2)).toBe('rejected');
+  });
+
+  it("cancels pending applications to the deleted GM's games", async () => {
+    const gm = await createUser(db, { nickname: 'GoneGm' });
+    const p = await createUser(db, { nickname: 'P' });
+    const g = await insertGame(gm.id);
+    await db
+      .insert(gameApplications)
+      .values({
+        gameId: g,
+        userId: p.id,
+        answers: [],
+        constraints: [],
+        warningsAcceptedAt: new Date(),
+      });
+    await deleteAccount(deps, gm.id);
+    const [row] = await db.select().from(gameApplications).where(eq(gameApplications.gameId, g));
+    expect(row).toMatchObject({ status: 'cancelled', cancelReason: 'game_cancelled' });
   });
 
   it("cancels the GM's active games; they leave search and the sitemap (R8)", async () => {

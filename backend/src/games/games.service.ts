@@ -25,6 +25,13 @@ import {
   genres,
   users,
 } from '../db/schema/index.js';
+import {
+  applyAgeRatingRaise,
+  cancelPendingForGames,
+  isRatingRaised,
+  logCancelled,
+  type CancelledApplication,
+} from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
@@ -221,7 +228,7 @@ async function gmView(deps: AppDeps, id: number): Promise<GameDto> {
 // ---------- перевірки ----------
 
 /** Глядач за id користувача; пояс і дата народження — свіжі з БД. */
-async function viewerById(deps: AppDeps, userId: number): Promise<Viewer> {
+export async function viewerById(deps: AppDeps, userId: number): Promise<Viewer> {
   const [u] = await deps.db
     .select({ birthDate: users.birthDate, timezone: users.timezone })
     .from(users)
@@ -348,7 +355,7 @@ export async function updateGame(
     throw new AppError(422, 'GAME_IN_PAST');
   }
   await patchHooks.beforeWrite?.(id);
-  await db.transaction(async (tx) => {
+  const cancelled = await db.transaction(async (tx) => {
     // Умова за прочитаним статусом: якщо гру тим часом опублікували/скасували, заблоковані
     // поля чи завершена гра не змінюються — 409, транзакція відкочується.
     const [res] = await tx
@@ -364,7 +371,12 @@ export async function updateGame(
           .values(next.contentWarningIds.map((warningId) => ({ gameId: id, warningId })));
       }
     }
+    // Після UPDATE рядок гри заблоковано (X), тож паралельні заявки/затвердження чекають.
+    return row.status !== 'draft' && isRatingRaised(current.ageRating, next.ageRating)
+      ? applyAgeRatingRaise(tx, id, next.ageRating, now)
+      : [];
   });
+  await logCancelled(db, cancelled, 'application.cancelled_age');
   await logEvent(db, {
     type: 'game.updated',
     userId,
@@ -410,12 +422,15 @@ export async function transitionGame(
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
-  // Умова за поточним статусом захищає від гонки двох переходів.
-  const [res] = await db
-    .update(games)
-    .set({ status: t.to, [t.stamp]: now })
-    .where(and(eq(games.id, id), eq(games.status, row.status)));
-  if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  const cancelled: CancelledApplication[] = await db.transaction(async (tx) => {
+    // Умова за поточним статусом захищає від гонки двох переходів.
+    const [res] = await tx
+      .update(games)
+      .set({ status: t.to, [t.stamp]: now })
+      .where(and(eq(games.id, id), eq(games.status, row.status)));
+    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    return action === 'cancel' ? cancelPendingForGames(tx, [id], now) : [];
+  });
   await logEvent(db, {
     type: EVENT[action],
     userId,
@@ -423,6 +438,7 @@ export async function transitionGame(
     entityId: id,
     payload: { from: row.status, to: t.to },
   });
+  await logCancelled(db, cancelled, 'application.cancelled_game');
   return gmView(deps, id);
 }
 

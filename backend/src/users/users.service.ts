@@ -17,6 +17,7 @@ import {
   authIdentities,
   availabilityBusyDates,
   availabilitySlots,
+  gameApplications,
   gameMembers,
   games,
   identityTombstones,
@@ -24,6 +25,7 @@ import {
   userProfiles,
   users,
 } from '../db/schema/index.js';
+import { cancelPendingForGames, logCancelled } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 
@@ -221,7 +223,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
   // FK-каскади не спрацьовують: профіль, календар і членства в іграх видаляємо явно,
   // а активні ігри майстра скасовуємо (рішення R8).
-  const { tokenHashes, cancelledGameIds } = await db.transaction(async (tx) => {
+  const { tokenHashes, cancelledGameIds, cancelledApps } = await db.transaction(async (tx) => {
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -264,6 +266,11 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         ),
       ),
     );
+    // Свої `pending`-заявки — відкликано (FK-каскад на надгробку не спрацює).
+    await tx
+      .update(gameApplications)
+      .set({ status: 'withdrawn', decidedAt: now })
+      .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')));
     const active = await tx
       .select({ id: games.id, status: games.status })
       .from(games)
@@ -294,7 +301,12 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         deletedAt: now,
       })
       .where(eq(users.id, userId));
-    return { tokenHashes: sess.map((r) => r.tokenHash), cancelledGameIds: active };
+    const cancelledApps = await cancelPendingForGames(
+      tx,
+      active.map((g) => g.id),
+      now,
+    );
+    return { tokenHashes: sess.map((r) => r.tokenHash), cancelledGameIds: active, cancelledApps };
   });
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
@@ -307,5 +319,6 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       payload: { from: g.status, to: 'cancelled', reason: 'account_deleted' },
     });
   }
+  await logCancelled(db, cancelledApps, 'application.cancelled_game');
   await logEvent(db, { type: 'user.deleted', userId });
 }

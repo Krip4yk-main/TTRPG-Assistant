@@ -150,6 +150,7 @@ export const gameMembers = mysqlTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     role: mysqlEnum('role', MEMBER_ROLES).notNull().default('player'),
     /** Заявка, з якої з'явилось членство (`game_applications.id`). */
+    // FK свідомо не оголошено: applications.ts імпортує games.ts (циклічний імпорт схеми); рядки прибирають ті самі каскади гри/користувача.
     applicationId: id('application_id'),
     joinedAt: datetime('joined_at')
       .notNull()

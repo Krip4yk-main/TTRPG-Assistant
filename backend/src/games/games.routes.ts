@@ -13,7 +13,8 @@ import {
   updateGame,
 } from './games.service.js';
 
-function gameId(raw: unknown): number {
+/** Числовий id з параметра маршруту; інакше 404. */
+export function gameId(raw: unknown): number {
   const s = String(raw);
   if (!/^\d{1,15}$/.test(s)) throw new AppError(404, 'NOT_FOUND');
   return Number(s);

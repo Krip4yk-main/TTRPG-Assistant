@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GameCardDto, GameGmDto } from './games.js';
+import type { GameCardDto, GameGmDto, RestrictedGameDto } from './games.js';
 
 export const APPLICATION_STATUSES = [
   'pending',
@@ -84,9 +84,9 @@ export interface ApplicationDto {
   decidedAt: string | null;
 }
 
-/** `GET /api/me/applications`. */
+/** `GET /api/me/applications`: картка гри — через ті самі вікові правила (`toCardView`). */
 export interface MyApplicationDto extends ApplicationDto {
-  game: GameCardDto;
+  game: GameCardDto | RestrictedGameDto;
 }
 
 /** `GET /api/games/:id/applications` (майстер): вік заявника не розкривається. */
