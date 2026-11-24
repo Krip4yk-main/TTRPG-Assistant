@@ -6,7 +6,9 @@
   "engines": {
     "node": ">=24"
   },
-  "workspaces": [],
+  "workspaces": [
+    "shared"
+  ],
   "scripts": {
     "dev:db": "docker compose up -d",
     "lint": "eslint .",
