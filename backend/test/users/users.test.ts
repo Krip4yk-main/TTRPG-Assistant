@@ -240,6 +240,15 @@ describe('DELETE /api/me', () => {
     await expect(resolveLogin(deps, ident)).rejects.toMatchObject({ code: 'IDENTITY_BANNED' });
   });
 
+  it('owner cannot self-delete: 409 OWNER_CANNOT_DELETE', async () => {
+    const u = await createUser(db, { nickname: 'Boss', role: 'owner' });
+    const res = await call('delete', '/api/me', await login(u.id));
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('OWNER_CANNOT_DELETE');
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.status).toBe('active');
+  });
+
   it('re-deleting an identity keeps an earlier ban', async () => {
     const hash = subjectHash('telegram', '777', deps.env.IDENTITY_PEPPER);
     await db

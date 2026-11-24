@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { createDb } from '../db/client.js';
 import type { Db } from '../db/client.js';
 import { users } from '../db/schema/index.js';
@@ -15,7 +15,11 @@ export async function seedOwner(db: Db, nickname: string): Promise<number> {
       .for('update');
     if (!target) throw new Error(`user "${nickname}" not found`);
     if (target.status !== 'active') throw new Error(`user "${nickname}" is not active`);
-    const [owner] = await tx.select({ id: users.id }).from(users).where(eq(users.role, 'owner'));
+    const [owner] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.role, 'owner'), ne(users.status, 'deleted')))
+      .for('update');
     if (owner) throw new Error('owner already exists');
     await tx.update(users).set({ role: 'owner' }).where(eq(users.id, target.id));
     return target.id;

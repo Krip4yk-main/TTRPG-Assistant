@@ -16,6 +16,7 @@ export const ERROR_CODES = [
   'NICKNAME_TAKEN',
   'PROFILE_INCOMPLETE',
   'ACCOUNT_BANNED',
+  'OWNER_CANNOT_DELETE',
   'INTERNAL',
 ] as const;
 

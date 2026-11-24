@@ -20,6 +20,14 @@ describe('seedOwner', () => {
     await expect(seedOwner(db, 'Other')).rejects.toThrow('owner already exists');
   });
 
+  it('a deleted owner row does not block seeding another user', async () => {
+    await createUser(db, { status: 'deleted', role: 'owner' });
+    const b = await createUser(db, { nickname: 'Next' });
+    await seedOwner(db, 'Next');
+    const [row] = await db.select().from(users).where(eq(users.id, b.id));
+    expect(row!.role).toBe('owner');
+  });
+
   it('refuses unknown or non-active users', async () => {
     await createUser(db, { nickname: 'Pend', status: 'pending' });
     await expect(seedOwner(db, 'Nobody')).rejects.toThrow(/not found/);

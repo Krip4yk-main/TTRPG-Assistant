@@ -75,9 +75,10 @@ export async function completeProfile(
 ): Promise<CompleteResult> {
   const { db } = deps;
   if (!canRegister(input.birthDate, utcDate(now()))) {
-    await db.transaction(async (tx) => {
-      await tx.delete(users).where(and(eq(users.id, userId), eq(users.status, 'pending')));
-    });
+    const [del] = await db.transaction(async (tx) =>
+      tx.delete(users).where(and(eq(users.id, userId), eq(users.status, 'pending'))),
+    );
+    if (del.affectedRows === 0) throw new AppError(400, 'VALIDATION', { reason: 'ALREADY_ACTIVE' });
     await revokeAllUserSessions(deps, userId);
     return { ok: false, rejected: 'AGE_TOO_LOW' };
   }
@@ -162,6 +163,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   await db.transaction(async (tx) => {
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
+    if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
     const identities = await tx
       .select()
       .from(authIdentities)
@@ -184,6 +186,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       .update(users)
       .set({
         status: 'deleted',
+        role: 'user',
         nickname: null,
         avatarUrl: null,
         birthDate: null,
