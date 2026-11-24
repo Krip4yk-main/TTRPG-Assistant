@@ -30,6 +30,8 @@ export const hashToken = (token: string): string =>
 
 const sessKey = (hash: string) => `sess:${hash}`;
 const slideKey = (hash: string) => `slide:${hash}`;
+const revokedKey = (hash: string) => `revoked:${hash}`;
+const REVOKED_TTL_SEC = 300;
 const userSetKey = (userId: number) => `usess:${userId}`;
 
 export async function createSession(
@@ -49,6 +51,7 @@ export async function createSession(
   });
   // Щойно створена сесія не потребує одразу «ковзання».
   await redis.set(slideKey(tokenHash), '1', 'EX', SLIDE_INTERVAL_SEC);
+  await redis.sadd(userSetKey(userId), tokenHash);
   return { token, expiresAt };
 }
 
@@ -65,6 +68,9 @@ export async function resolveSessionDetailed(
 ): Promise<ResolvedSession | null> {
   const hash = hashToken(token);
   let user: SessionUser | null = null;
+
+  // Надгробок відкликаної сесії: не довіряємо кешу й нічого не пишемо в нього.
+  if (await redis.exists(revokedKey(hash))) return null;
 
   const cached = await redis.get(sessKey(hash));
   if (cached) {
@@ -102,6 +108,20 @@ export async function resolveSessionDetailed(
       .sadd(userSetKey(user.userId), hash)
       .expire(userSetKey(user.userId), env.SESSION_TTL_DAYS * 86400)
       .exec();
+    // Гонка: відкликання/бан могли відбутися між читанням БД і записом кешу.
+    if (await redis.exists(revokedKey(hash))) {
+      await redis.del(sessKey(hash));
+      return null;
+    }
+    const [fresh] = await db
+      .select({ isBanned: users.isBanned })
+      .from(users)
+      .where(eq(users.id, user.userId));
+    if (!fresh || fresh.isBanned !== user.isBanned) {
+      await redis.del(sessKey(hash));
+      if (!fresh) return null;
+      user = { ...user, isBanned: fresh.isBanned };
+    }
   }
 
   // Ковзне продовження — не частіше ніж раз на 10 хв.
@@ -110,12 +130,21 @@ export async function resolveSessionDetailed(
   if (acquired === 'OK') {
     const now = new Date();
     slidTo = new Date(now.getTime() + env.SESSION_TTL_DAYS * DAY_MS);
-    await db
+    const [res] = await db
       .update(sessions)
       .set({ lastSeenAt: now, expiresAt: slidTo })
-      .where(eq(sessions.id, user.sessionId));
+      .where(and(eq(sessions.id, user.sessionId), gt(sessions.expiresAt, now)));
+    if (res.affectedRows === 0) {
+      // Сесію видалено/протерміновано — не воскрешаємо кеш і не перевидаємо куку.
+      await redis.del(sessKey(hash));
+      return null;
+    }
     const entry: CacheEntry = { user, exp: slidTo.getTime() };
     await redis.set(sessKey(hash), JSON.stringify(entry), 'EX', CACHE_TTL_SEC);
+    if (await redis.exists(revokedKey(hash))) {
+      await redis.del(sessKey(hash));
+      return null;
+    }
   }
   return { user, slidTo };
 }
@@ -124,15 +153,17 @@ export async function resolveSession(deps: Deps, token: string): Promise<Session
   return (await resolveSessionDetailed(deps, token))?.user ?? null;
 }
 
-export async function revokeSession({ db, redis }: Deps, token: string): Promise<void> {
+export async function revokeSession(
+  { db, redis }: Deps,
+  token: string,
+  userId?: number,
+): Promise<void> {
   const hash = hashToken(token);
-  const cached = await redis.get(sessKey(hash));
   await db.delete(sessions).where(eq(sessions.tokenHash, hash));
+  // Порядок важливий: спершу надгробок, потім видалення кешу (див. resolveSessionDetailed).
+  await redis.set(revokedKey(hash), '1', 'EX', REVOKED_TTL_SEC);
   const multi = redis.multi().del(sessKey(hash), slideKey(hash));
-  if (cached) {
-    const { user } = JSON.parse(cached) as CacheEntry;
-    multi.srem(userSetKey(user.userId), hash);
-  }
+  if (userId !== undefined) multi.srem(userSetKey(userId), hash);
   await multi.exec();
 }
 
@@ -151,6 +182,7 @@ export async function revokeAllUserSessions({ db, redis }: Deps, userId: number)
   await db.delete(sessions).where(eq(sessions.userId, userId));
   const members = await redis.smembers(userSetKey(userId));
   const hashes = new Set([...members, ...rows.map((r) => r.tokenHash)]);
+  for (const h of hashes) await redis.set(revokedKey(h), '1', 'EX', REVOKED_TTL_SEC);
   const keys = [...hashes].flatMap((h) => [sessKey(h), slideKey(h)]);
   keys.push(userSetKey(userId));
   await redis.del(...keys);

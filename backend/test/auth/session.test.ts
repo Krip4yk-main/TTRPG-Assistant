@@ -108,4 +108,39 @@ describe('sessions', () => {
     expect(await redis.keys('sess:*')).toHaveLength(0);
     expect(await redis.exists(`usess:${u.id}`)).toBe(0);
   });
+
+  it('stale sess: entry re-injected after logout does not authenticate', async () => {
+    const u = await createUser(db);
+    const { token } = await createSession(deps, u.id, {});
+    await get(token).expect(200);
+    const stale = await redis.get(`sess:${sha(token)}`);
+    expect(stale).toBeTruthy();
+    const { revokeSession } = await import('../../src/auth/session.service.js');
+    await revokeSession(deps, token, u.id);
+    await redis.set(`sess:${sha(token)}`, stale!, 'EX', 300);
+    await get(token).expect(401);
+  });
+
+  it('slide of a session revoked mid-flight does not resurrect cache or cookie', async () => {
+    const u = await createUser(db);
+    const { token } = await createSession(deps, u.id, {});
+    await get(token).expect(200); // кеш прогрітий
+    // Імітуємо відкликання рядка БД без надгробка/очищення кешу (гонка), слайд дозволений.
+    await db.delete(sessions).where(eq(sessions.userId, u.id));
+    await redis.del(`slide:${sha(token)}`);
+    const res = await get(token).expect(401);
+    expect(String(res.headers['set-cookie'] ?? '')).not.toMatch(/nri_sid=/);
+    expect(await redis.exists(`sess:${sha(token)}`)).toBe(0);
+  });
+
+  it('logout-all tombstones every session hash', async () => {
+    const u = await createUser(db);
+    const a = await createSession(deps, u.id, {});
+    await get(a.token).expect(200);
+    const stale = (await redis.get(`sess:${sha(a.token)}`))!;
+    const { revokeAllUserSessions } = await import('../../src/auth/session.service.js');
+    await revokeAllUserSessions(deps, u.id);
+    await redis.set(`sess:${sha(a.token)}`, stale, 'EX', 300);
+    await get(a.token).expect(401);
+  });
 });

@@ -56,7 +56,7 @@ export const requireActive: RequestHandler = (req, _res, next) => {
 export function logoutHandlers(deps: AppDeps): { logout: RequestHandler; logoutAll: RequestHandler } {
   return {
     logout: async (req: Request, res) => {
-      await revokeSession(deps, req.sessionToken!);
+      await revokeSession(deps, req.sessionToken!, req.user!.userId);
       clearSessionCookie(res);
       res.status(204).end();
     },
