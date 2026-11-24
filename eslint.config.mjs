@@ -13,7 +13,7 @@ export default tseslint.config(
         'error',
         {
           selector:
-            "Decorator[expression.callee.name='Component'] Property[key.name=/^(template|styles)$/]",
+            "Decorator[expression.callee.name='Component'] > CallExpression > ObjectExpression > Property[key.name=/^(template|styles)$/], Decorator[expression.callee.name='Component'] > CallExpression > ObjectExpression > Property[key.value=/^(template|styles)$/]",
           message: 'Шаблони й стилі — лише в окремих .html/.less',
         },
       ],
