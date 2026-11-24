@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs';
 import { loadEnv } from './config/env.js';
-import { createServer } from 'node:http';
-import { attachRealtime } from './realtime/socket.js';
-import { createApp, type AppDeps } from './app.js';
+import type { AppDeps } from './app.js';
+import { createHttpServer } from './http-server.js';
 import { createDb } from './db/client.js';
 import { createRedis } from './redis/client.js';
 
@@ -12,9 +11,7 @@ const env = loadEnv();
 const { db, pool } = createDb(env.DATABASE_URL);
 const redis = createRedis(env.REDIS_URL);
 const deps: AppDeps = { env, db, redis };
-const httpServer = createServer();
-deps.realtime = attachRealtime(httpServer, deps);
-httpServer.on('request', createApp(deps));
+const httpServer = createHttpServer(deps);
 
 httpServer.listen(env.PORT, () => {
   console.log(`API listening on :${env.PORT}`);

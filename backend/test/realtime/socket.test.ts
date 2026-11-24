@@ -1,11 +1,12 @@
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from '../../src/app.js';
 import { createSession, revokeAllUserSessions, revokeSession } from '../../src/auth/session.service.js';
 import { banUser } from '../../src/users/users.service.js';
-import { attachRealtime, type RealtimeHub } from '../../src/realtime/socket.js';
+import { createHttpServer } from '../../src/http-server.js';
+import type { RealtimeHub } from '../../src/realtime/socket.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 let deps: AppDeps;
@@ -17,9 +18,8 @@ const clients: Socket[] = [];
 beforeEach(async () => {
   deps = await testDeps();
   await resetDb(deps.db);
-  server = createServer();
-  hub = attachRealtime(server, deps);
-  deps.realtime = hub;
+  server = createHttpServer(deps);
+  hub = deps.realtime!;
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -99,6 +99,28 @@ describe('realtime', () => {
     await banUser(deps, u.id);
     await gone;
     expect(c.connected).toBe(false);
+  });
+
+  it('polling transport works and never reaches express', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = connect(url, {
+      transports: ['polling'],
+      reconnection: false,
+      extraHeaders: { cookie: `nri_sid=${token}` },
+    });
+    clients.push(c);
+    await waitFor(c, 'connect');
+    for (let i = 0; i < 3; i++) {
+      const got = waitFor<{ i: number }>(c, 'ping');
+      hub.toUser(u.id, 'ping', { i });
+      expect(await got).toEqual({ i });
+    }
+    // Сервер живий, а Express не бачив /socket.io (інакше був би 404 NOT_FOUND з тілом JSON).
+    const res = await fetch(`${url}/socket.io/?EIO=4&transport=polling`);
+    expect(res.status).not.toBe(404);
+    expect(await res.text()).not.toContain('NOT_FOUND');
+    expect((await fetch(`${url}/api/health`)).status).toBe(200);
   });
 
   it('logout-all disconnects an open socket', async () => {

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/1/AppData/Roaming/nvm/v25.8.1/node_modules/npm/bin/npm-cli.js", "run", "dev", "-w", "backend"],
+      "port": 3000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/1/AppData/Roaming/nvm/v25.8.1/node_modules/npm/bin/npm-cli.js", "run", "start", "-w", "frontend"],
+      "port": 4200
+    }
+  ]
+}
