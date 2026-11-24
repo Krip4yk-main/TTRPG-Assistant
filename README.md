@@ -30,7 +30,7 @@ npm run dev -w bot
 
 ### Збірка образів
 
-Усі образи збираються з кореня репозиторію (базовий образ `node:26-alpine`, процес працює не від root):
+Усі образи збираються з кореня репозиторію (базовий образ `node:26-alpine`, процеси працюють не від root; фронтенд — `nginxinc/nginx-unprivileged`):
 
 ```bash
 docker build -f backend/Dockerfile -t nri-backend .
@@ -38,7 +38,7 @@ docker build -f bot/Dockerfile -t nri-bot .
 docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRAM_BOT_USERNAME=<bot_username>   --build-arg NG_APP_GOOGLE_LOGIN=true .
 ```
 
-Фронтенд налаштовується на етапі збірки (build args `NG_APP_TELEGRAM_BOT_USERNAME`, `NG_APP_GOOGLE_LOGIN`, `NG_APP_DEV_LOGIN`, останній за замовчуванням `false`), образ — nginx зі статикою на порту 80 (SPA: `try_files … /index.html`). Бекенд слухає порт 3000.
+Фронтенд налаштовується на етапі збірки (build args `NG_APP_TELEGRAM_BOT_USERNAME`, `NG_APP_GOOGLE_LOGIN`, `NG_APP_DEV_LOGIN`, останній за замовчуванням `false`), образ — nginx зі статикою на порту 8080 (SPA: `try_files … /index.html`). Бекенд слухає порт 3000. Запускайте контейнери з `docker run --init` (або `init: true` у compose), щоб сигнали та зомбі-процеси оброблялися коректно.
 
 ### Змінні середовища
 
@@ -58,15 +58,47 @@ docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRA
 Фронтенд і API мають бути на **одному origin** за reverse proxy:
 
 - `/api` і `/socket.io` (із заголовками WebSocket upgrade: `Upgrade`, `Connection`) → backend:3000;
-- усе інше → frontend:80;
+- усе інше → frontend:8080;
 - `/api/internal/*` має **блокуватися** для публічного інтернету (повертати 404/403): бот звертається до бекенду напряму по внутрішній мережі.
+
+Приклад для nginx:
+
+```nginx
+location /api/internal/ { return 404; }   # має стояти перед /api/
+
+location /api/ {
+  proxy_pass http://backend:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /socket.io/ {
+  proxy_pass http://backend:3000;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location / {
+  proxy_pass http://frontend:8080;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+`TRUST_PROXY` має дорівнювати кількості проксі-хопів перед бекендом: хибне значення ламає IP у rate-limit і secure-cookie.
 
 ### Міграції
 
 Бекенд не виконує міграції при старті. Запускайте перед першим стартом і після кожного оновлення:
 
 ```bash
-docker run --rm --env-file backend/.env nri-backend npm run db:migrate
+docker run --rm --env-file backend/.env nri-backend node --import tsx src/db/migrate.ts
 # або з вихідного коду: npm run db:migrate -w backend
 ```
 
@@ -81,6 +113,8 @@ docker run --rm --env-file backend/.env nri-backend npm run db:migrate
 
 ```bash
 npm run seed:owner -w backend -- --nickname <nick>
+# або в контейнері:
+docker run --rm --env-file backend/.env nri-backend node --import tsx src/cli/seed-owner.ts --nickname <nick>
 ```
 
 ### Відомі обмеження

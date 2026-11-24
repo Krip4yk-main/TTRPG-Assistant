@@ -1,6 +1,6 @@
 # Збірка з кореня репозиторію: docker build -f backend/Dockerfile .
 # Міграції — окремий крок (не при старті):
-#   docker run --rm --env-file backend/.env <image> npm run db:migrate
+#   docker run --rm --env-file backend/.env <image> node --import tsx src/db/migrate.ts
 # Бекенд виконується через tsx (окремого кроку компіляції немає), shared збирається в dist.
 FROM node:26-alpine AS build
 WORKDIR /app
@@ -26,4 +26,4 @@ COPY tsconfig.base.json ./
 USER node
 WORKDIR /app/backend
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "--import", "tsx", "src/server.ts"]

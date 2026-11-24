@@ -18,7 +18,7 @@ ENV NG_APP_TELEGRAM_BOT_USERNAME=${NG_APP_TELEGRAM_BOT_USERNAME} \
 RUN npm run build -w shared && npm run build -w frontend
 
 # Статика за nginx; /api і /socket.io проксіює зовнішній reverse proxy на бекенд.
-FROM nginx:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist/frontend/browser /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080
