@@ -5,12 +5,8 @@ import { createApp } from '../../src/app.js';
 import { resolveLogin, subjectHash } from '../../src/auth/identity.service.js';
 import { createSession, hashToken } from '../../src/auth/session.service.js';
 import { authIdentities, identityTombstones, sessions, users } from '../../src/db/schema/index.js';
-import {
-  changeBirthDate,
-  completeProfile,
-  deleteAccount,
-  localDate,
-} from '../../src/users/users.service.js';
+import { changeBirthDate, completeProfile, deleteAccount } from '../../src/users/users.service.js';
+import { localDate } from '@nri/shared';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps();

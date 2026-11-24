@@ -18,15 +18,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { MIN_REGISTRATION_AGE, type ErrorCode } from '@nri/shared';
+import { MIN_REGISTRATION_AGE, type ErrorCode, type IdentityProvider } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import type { IdentityProvider } from '@nri/shared';
 import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
-import { eagerErrorState, minAgeValidator } from '../../../shared/forms/profile-validators';
+import { eagerErrorState, minAgeValidatorFor } from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
@@ -103,7 +102,7 @@ export class AccountSettings {
 
   protected readonly birthDate = new FormControl<Date | null>(null, [
     Validators.required,
-    minAgeValidator,
+    minAgeValidatorFor(() => this.me()?.timezone),
   ]);
 
   constructor() {

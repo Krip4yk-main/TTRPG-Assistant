@@ -1,8 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { CompleteProfileInput, DevLoginInput } from '@nri/shared';
-import type { IdentityDto, IdentityProvider, MeDto } from '@nri/shared';
+import type {
+  CompleteProfileInput,
+  DevLoginInput,
+  IdentityDto,
+  IdentityProvider,
+  MeDto,
+} from '@nri/shared';
 
 /** Дані Telegram Login Widget (передаються бекенду як є для перевірки підпису). */
 export type TelegramAuthData = Record<string, string | number>;

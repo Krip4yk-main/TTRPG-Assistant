@@ -249,6 +249,16 @@ describe('AuthStore', () => {
       expect(store.me()?.nickname).toBe('Gandalf');
     });
 
+    it('auth-error + 200 після 5xx скидає банер loadFailed', async () => {
+      await login();
+      lost$.next('auth-error');
+      http.expectOne('/api/me').flush({}, { status: 500, statusText: 'Server Error' });
+      await vi.waitFor(() => expect(store.loadFailed()).toBe(true));
+      lost$.next('auth-error');
+      http.expectOne('/api/me').flush(me());
+      await vi.waitFor(() => expect(store.loadFailed()).toBe(false));
+    });
+
     it('запізніла 200 після виходу не воскрешає користувача', async () => {
       await login();
       lost$.next('revoked');

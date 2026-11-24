@@ -13,10 +13,6 @@ export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-export function todayIso(): string {
-  return toIsoDate(new Date());
-}
-
 /** `YYYY-MM-DD` → локальна північ цієї дати. */
 export function fromIsoDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number];

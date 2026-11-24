@@ -6,6 +6,19 @@ import type { OAuthProvider } from '../../src/auth/providers/oauth.js';
 import { authIdentities, sessions, users } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { sign, TEST_BOT_TOKEN } from './telegram-sign.js';
+import { AppError } from '../../src/http/errors.js';
+
+const linkCtl = vi.hoisted(() => ({ fail: false }));
+vi.mock('../../src/auth/identity.service.js', async (orig) => {
+  const mod = await orig<typeof import('../../src/auth/identity.service.js')>();
+  return {
+    ...mod,
+    linkIdentity: (...args: Parameters<typeof mod.linkIdentity>) => {
+      if (linkCtl.fail) throw new AppError(404, 'NOT_FOUND');
+      return mod.linkIdentity(...args);
+    },
+  };
+});
 
 const base = await testDeps({ TELEGRAM_BOT_TOKEN: TEST_BOT_TOKEN });
 let subject = 'g-1';
@@ -29,6 +42,7 @@ const { db, redis } = deps;
 beforeEach(async () => {
   subject = 'g-1';
   authUrlFails = false;
+  linkCtl.fail = false;
   lastExchange = null;
   await resetDb(db);
   await redis.flushdb();
@@ -221,6 +235,9 @@ describe('google oauth', () => {
       const c = await agent.get('/api/auth/google/callback?code=c&state=x');
       expect(c.headers.location).toBe('/login?error=RATE_LIMITED');
       // Звичайні (не навігаційні) маршрути й далі отримують JSON 429.
+      const upper = await agent.get('/API/auth/google/start');
+      expect(upper.status).toBe(302);
+      expect(upper.headers.location).toBe('/login?error=RATE_LIMITED');
       const ping = await agent.get('/api/auth/ping');
       expect(ping.status).toBe(429);
       expect(ping.body.error.code).toBe('RATE_LIMITED');
@@ -350,7 +367,17 @@ describe('google oauth', () => {
     it('link start requires a session', async () => {
       const res = await request(createApp(deps)).get('/api/auth/google/start?mode=link');
       expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/account?error=UNAUTHENTICATED');
+      expect(res.headers.location).toBe('/login?error=UNAUTHENTICATED');
+    });
+
+    it('any AppError from linkIdentity redirects to /account?error=CODE', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1020');
+      const { state } = await startFlow(a.agent, '?mode=link');
+      linkCtl.fail = true;
+      const res = await a.agent.get(`/api/auth/google/callback?code=c&state=${state}`);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/account?error=NOT_FOUND');
     });
 
     it('callback session must match initiating user', async () => {

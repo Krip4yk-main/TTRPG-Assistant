@@ -84,6 +84,7 @@ export class AuthStore {
             // Рукостискання відхилене, а /api/me каже «живий»: оновлюємо лише стан,
             // без перепідключення й без скидання лічильника (інакше цикл на швидкості мережі).
             this.state.set(me);
+            this.failed.set(false);
             return;
           }
           this.reconnectAttempts = 0;

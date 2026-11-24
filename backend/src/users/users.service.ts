@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
+  localDate,
   type CompleteProfileInput,
   type MeDto,
 } from '@nri/shared';
@@ -20,30 +21,6 @@ type Provider = typeof authIdentities.$inferSelect.provider;
 
 const DAY_MS = 86_400_000;
 export type Clock = () => Date;
-const DEFAULT_TZ = 'Europe/Kyiv';
-
-/**
- * Календарна дата `YYYY-MM-DD` у часовому поясі користувача (як її бачить фронтенд).
- * Невідомий/некоректний пояс — Europe/Kyiv.
- */
-export function localDate(d: Date, timeZone: string | null | undefined): string {
-  const fmt = (tz: string) =>
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  if (timeZone) {
-    try {
-      return fmt(timeZone);
-    } catch {
-      // RangeError: Invalid time zone — падаємо на типовий пояс.
-    }
-  }
-  return fmt(DEFAULT_TZ);
-}
-
 /**
  * Ставить is_banned і скидає Redis-кеш сесій, тож бан діє з наступного ж запиту:
  * requireAuth бачить isBanned -> 403 ACCOUNT_BANNED і викликає revokeAllUserSessions
