@@ -1,5 +1,5 @@
 # Збірка з кореня репозиторію: docker build -f bot/Dockerfile .
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/
@@ -9,7 +9,7 @@ COPY shared shared
 COPY bot bot
 RUN npm run build -w shared && npm run build -w bot
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
