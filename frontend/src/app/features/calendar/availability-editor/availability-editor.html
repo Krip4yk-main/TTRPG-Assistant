@@ -13,15 +13,16 @@
     <div class="tz">
       <p class="tz-line">
         <mat-icon aria-hidden="true">schedule</mat-icon>
-        <span>{{ 'calendar.timezone' | translate: { tz: timezone() } }}</span>
+        @if (custom) {
+          <span>{{ 'calendar.timezone' | translate: { tz: timezone() } }}</span>
+        } @else {
+          <span>{{ 'calendar.accountTimezone' | translate: { tz: timezone() } }}</span>
+        }
       </p>
       @if (!custom) {
-        <p class="nri-muted hint">{{ 'calendar.timezoneHint' | translate }}</p>
-        @if (otherBrowserTz()) {
-          <button mat-button type="button" class="use-browser-tz" (click)="useBrowserTimezone()">
-            {{ 'calendar.useBrowserTz' | translate: { tz: browserTz } }}
-          </button>
-        }
+        <p class="nri-muted hint">
+          <a routerLink="/account">{{ 'calendar.accountTimezoneLink' | translate }}</a>
+        </p>
       }
     </div>
 

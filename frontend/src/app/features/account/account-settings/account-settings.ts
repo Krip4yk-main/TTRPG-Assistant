@@ -15,12 +15,14 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   MIN_REGISTRATION_AGE,
   changeNicknameSchema,
+  changeTimezoneSchema,
   type ErrorCode,
   type IdentityProvider,
 } from '@nri/shared';
@@ -28,12 +30,19 @@ import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
+import {
+  browserTimeZone,
+  differentZones,
+  fromIsoDate,
+  provideUkDates,
+  toIsoDate,
+} from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
 import {
   eagerErrorState,
   minAgeValidatorFor,
   nicknameValidator,
+  timezoneValidator,
 } from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
 import { runtimeConfig } from '../../../../environments/runtime-config';
@@ -45,6 +54,17 @@ const PROFILE_ERROR_CODES = new Set<ErrorCode>([
   'BIRTH_DATE_COOLDOWN',
   'NICKNAME_TAKEN',
 ]);
+
+/** Найбільше варіантів поясу в списку автодоповнення. */
+const MAX_TZ_OPTIONS = 50;
+
+function supportedTimezones(): string[] {
+  try {
+    return Intl.supportedValuesOf('timeZone');
+  } catch {
+    return ['Europe/Kyiv'];
+  }
+}
 
 /** Повідомлення секції: ключ i18n + параметри. */
 interface Message {
@@ -62,6 +82,7 @@ interface Message {
     MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
+    MatAutocompleteModule,
     MatInputModule,
     MatTooltipModule,
     TranslatePipe,
@@ -106,6 +127,8 @@ export class AccountSettings {
   protected readonly birthDateMessage = signal<Message | null>(null);
   protected readonly birthDateSaved = signal(false);
   protected readonly dangerMessage = signal<Message | null>(null);
+  protected readonly timezoneMessage = signal<Message | null>(null);
+  protected readonly timezoneSaved = signal(false);
   protected readonly queryErrorKey = computed(() => {
     const code = this.error();
     if (!code) return null;
@@ -126,10 +149,39 @@ export class AccountSettings {
 
   protected readonly birthDateForm = new FormGroup({ birthDate: this.birthDate });
 
+  protected readonly timezone = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, timezoneValidator],
+  });
+
+  protected readonly timezoneForm = new FormGroup({ timezone: this.timezone });
+
+  private readonly allTimezones = supportedTimezones();
+  private readonly timezoneQuery = signal('');
+  /** Пошук поясу: збіг за підрядком (без регістру), не більше `MAX_TZ_OPTIONS`. */
+  protected readonly timezoneOptions = computed(() => {
+    const q = this.timezoneQuery().trim().toLowerCase().replace(/\s+/g, '_');
+    const list = q
+      ? this.allTimezones.filter((tz) => tz.toLowerCase().includes(q))
+      : this.allTimezones;
+    return list.slice(0, MAX_TZ_OPTIONS);
+  });
+  private readonly deviceTz = browserTimeZone();
+  /** Пояс пристрою, якщо він відрізняється від введеного; інакше `null`. */
+  protected readonly deviceZone = computed(() =>
+    differentZones(this.deviceTz, this.timezoneQuery()) ? this.deviceTz : null,
+  );
+
   constructor() {
     this.nickname.setValue(this.me()?.nickname ?? '');
     const current = this.me()?.birthDate;
     if (current) this.birthDate.setValue(fromIsoDate(current));
+    this.timezone.setValue(this.me()?.timezone ?? '');
+    this.timezoneQuery.set(this.timezone.value);
+    this.timezone.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => {
+      this.timezoneQuery.set(v);
+      this.timezoneSaved.set(false);
+    });
 
     // Бот підтвердив прив'язку Telegram → оновлюємо профіль.
     inject(SocketService)
@@ -214,6 +266,28 @@ export class AccountSettings {
       const me = await firstValueFrom(this.api.changeBirthDate(toIsoDate(value)));
       this.auth.setMe(me);
       this.birthDateSaved.set(true);
+    });
+  }
+
+  protected useDeviceZone(): void {
+    const device = this.deviceZone();
+    if (!device) return;
+    this.timezone.setValue(device);
+    this.timezone.markAsDirty();
+  }
+
+  protected async saveTimezone(): Promise<void> {
+    const parsed = changeTimezoneSchema.safeParse({ timezone: this.timezone.value.trim() });
+    if (this.timezone.invalid || !parsed.success) {
+      this.timezone.markAsTouched();
+      return;
+    }
+    this.timezoneSaved.set(false);
+    await this.run(this.timezoneMessage, async () => {
+      const me = await firstValueFrom(this.api.changeTimezone(parsed.data.timezone));
+      this.auth.setMe(me);
+      this.timezone.setValue(me.timezone);
+      this.timezoneSaved.set(true);
     });
   }
 

@@ -16,12 +16,13 @@ import { MatDatepickerModule, type MatDatepickerInputEvent } from '@angular/mate
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import type { AvailabilityDto } from '@nri/shared';
 import { firstValueFrom, map } from 'rxjs';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { AvailabilityApi } from '../../../core/availability/availability.api';
-import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
+import { browserTimeZone, fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import {
   CELLS_PER_DAY,
   CELL_MINUTES,
@@ -53,19 +54,6 @@ interface Drag {
 
 let nextId = 0;
 
-function browserTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-/** Канонічна назва поясу (`Europe/Kyiv` і `Europe/Kiev` — той самий пояс). */
-function canonicalZone(tz: string): string {
-  try {
-    return new Intl.DateTimeFormat('en', { timeZone: tz }).resolvedOptions().timeZone;
-  } catch {
-    return tz;
-  }
-}
-
 function inRect(d: Drag, day: number, cell: number): boolean {
   return (
     day >= Math.min(d.from.day, d.to.day) &&
@@ -82,7 +70,8 @@ function inRect(d: Drag, day: number, cell: number): boolean {
  *   Дотик: торкання перемикає клітинку (протягування пальцем лишається прокруткою).
  * - Клавіатура: стрілки, Home/End, PageUp/PageDown — рух; пробіл/Enter — перемкнути;
  *   Shift+стрілка — протягнути те саме значення далі.
- * - `save`: кнопка «Зберегти» → `PUT /api/me/availability` (змінює й пояс акаунта).
+ * - `save`: кнопка «Зберегти» → `PUT /api/me/availability`. Сітка — у поясі акаунта (R5),
+ *   змінити його можна лише в налаштуваннях акаунта; календар пояс не змінює.
  *   `custom`: «Застосувати до пошуку» лише віддає календар через `changed`, нічого не зберігає.
  */
 @Component({
@@ -93,6 +82,7 @@ function inRect(d: Drag, day: number, cell: number): boolean {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    RouterLink,
     TranslatePipe,
   ],
   providers: [provideUkDates()],
@@ -122,14 +112,6 @@ export class AvailabilityEditor {
   protected readonly rows = Array.from({ length: CELLS_PER_DAY }, (_, c) => c);
   protected readonly times = Array.from({ length: CELLS_PER_DAY + 1 }, (_, c) =>
     formatMinutes(c * CELL_MINUTES),
-  );
-  protected readonly browserTz = browserTimezone();
-  /** Пояс пристрою відрізняється від поясу календаря — пропонуємо перейти на нього. */
-  protected readonly otherBrowserTz = computed(
-    () =>
-      !!this.browserTz &&
-      !!this.timezone() &&
-      canonicalZone(this.browserTz) !== canonicalZone(this.timezone()),
   );
   protected readonly today = new Date(new Date().setHours(0, 0, 0, 0));
   protected readonly maxBusy = MAX_BUSY_DATES;
@@ -195,7 +177,8 @@ export class AvailabilityEditor {
   private apply(a: AvailabilityDto): void {
     this.cells.set(slotsToCells(a.slots));
     this.busyDates.set([...a.busyDates].sort());
-    this.timezone.set(a.timezone || this.auth.me()?.timezone || this.browserTz);
+    // `save`: відповідь GET/PUT містить пояс акаунта. `custom`: пояс переданого календаря.
+    this.timezone.set(a.timezone || this.auth.me()?.timezone || browserTimeZone());
     this.snapshot.set(this.serialize());
     this.state.set('ready');
   }
@@ -340,11 +323,6 @@ export class AvailabilityEditor {
     this.message.set(null);
   }
 
-  protected useBrowserTimezone(): void {
-    this.timezone.set(this.browserTz);
-    this.message.set(null);
-  }
-
   protected applyCustom(): void {
     this.changed.emit(this.value());
     this.snapshot.set(this.serialize());
@@ -356,12 +334,11 @@ export class AvailabilityEditor {
     this.saving.set(true);
     this.message.set(null);
     try {
-      const saved = await firstValueFrom(this.api.put(this.value()));
+      const { slots, busyDates } = this.value();
+      const saved = await firstValueFrom(this.api.put({ slots, busyDates }));
       this.apply(saved);
       this.message.set({ kind: 'info', key: 'calendar.saved' });
       this.changed.emit(saved);
-      // PUT змінює й пояс акаунта (R5) — оновлюємо /api/me.
-      void this.auth.load();
     } catch {
       this.message.set({ kind: 'error', key: 'calendar.saveError' });
     } finally {

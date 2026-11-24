@@ -51,6 +51,11 @@ export class AuthApi {
     return this.http.patch<MeDto>('/api/me/birth-date', { birthDate });
   }
 
+  /** Пояс акаунта; слоти календаря лишаються тим самим «настінним» часом (R5). */
+  changeTimezone(timezone: string): Observable<MeDto> {
+    return this.http.patch<MeDto>('/api/me/timezone', { timezone });
+  }
+
   unlinkIdentity(provider: IdentityProvider): Observable<{ identities: IdentityDto[] }> {
     return this.http.delete<{ identities: IdentityDto[] }>(
       `/api/me/identities/${encodeURIComponent(provider)}`,

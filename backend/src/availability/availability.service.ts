@@ -1,5 +1,5 @@
 import { asc, eq } from 'drizzle-orm';
-import type { AvailabilityDto, Weekday } from '@nri/shared';
+import type { AvailabilityDto, AvailabilityUpdate, Weekday } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { availabilityBusyDates, availabilitySlots, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
@@ -32,15 +32,17 @@ export async function getAvailability(deps: AppDeps, userId: number): Promise<Av
   };
 }
 
-/** Атомарно замінює весь календар; пояс гравця оновлюється разом із ним. */
+/**
+ * Атомарно замінює весь календар. Пояс — завжди пояс акаунта (`users.timezone`): календар
+ * його не змінює (R5), це робить лише `PATCH /api/me/timezone`.
+ */
 export async function replaceAvailability(
   deps: AppDeps,
   userId: number,
-  input: AvailabilityDto,
+  input: AvailabilityUpdate,
 ): Promise<AvailabilityDto> {
   const { db } = deps;
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ timezone: input.timezone }).where(eq(users.id, userId));
     await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
     if (input.slots.length) {

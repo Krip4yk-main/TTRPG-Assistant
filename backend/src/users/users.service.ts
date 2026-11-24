@@ -137,6 +137,30 @@ export async function changeNickname(
   return getMe(deps, userId);
 }
 
+/**
+ * Змінює пояс акаунта. Слоти календаря не перераховуються — лишаються тим самим «настінним»
+ * часом у новому поясі (R5). Сесійний кеш пояса не містить (`SessionUser`), тож не чіпаємо.
+ */
+export async function changeTimezone(
+  deps: AppDeps,
+  userId: number,
+  timezone: string,
+): Promise<MeDto> {
+  const { db } = deps;
+  const from = await db.transaction(async (tx) => {
+    const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+    if (!u || u.status !== 'active') throw new AppError(401, 'UNAUTHENTICATED');
+    if (u.timezone !== timezone) {
+      await tx.update(users).set({ timezone }).where(eq(users.id, userId));
+    }
+    return u.timezone;
+  });
+  if (from !== timezone) {
+    await logEvent(db, { type: 'user.timezone_changed', userId, payload: { from, to: timezone } });
+  }
+  return getMe(deps, userId);
+}
+
 export async function changeBirthDate(
   deps: AppDeps,
   userId: number,

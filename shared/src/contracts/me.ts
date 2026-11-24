@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { ianaTimezone } from '../schemas/common.js';
+
 export type UserStatus = 'pending' | 'active' | 'deleted';
 export type UserRole = 'owner' | 'admin' | 'moderator' | 'user';
 export type IdentityProvider = 'telegram' | 'google' | 'discord' | 'dev';
@@ -21,3 +24,10 @@ export interface MeDto {
   locale: string;
   identities: IdentityDto[];
 }
+
+/**
+ * `PATCH /api/me/timezone` → `MeDto`. Пояс акаунта визначає календар доступності (R5);
+ * слоти календаря при зміні поясу не перераховуються — лишаються тим самим «настінним» часом.
+ */
+export const changeTimezoneSchema = z.object({ timezone: ianaTimezone }).strict();
+export type ChangeTimezoneInput = z.infer<typeof changeTimezoneSchema>;

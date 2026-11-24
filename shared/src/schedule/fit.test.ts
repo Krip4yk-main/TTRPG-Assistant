@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { availabilityInputSchema, type AvailabilityDto } from '../contracts/availability.js';
+import {
+  availabilityInputSchema,
+  availabilityUpdateSchema,
+  type AvailabilityDto,
+} from '../contracts/availability.js';
+import { changeTimezoneSchema } from '../contracts/me.js';
 import { availabilityFit, FIT_HORIZON_DAYS } from './fit.js';
 
 const occ = (startIso: string, minutes: number) => {
@@ -184,5 +189,42 @@ describe('availabilityInputSchema', () => {
     expect(
       availabilityInputSchema.safeParse({ ...base, busyDates: ['2026-02-30'], slots: [] }).success,
     ).toBe(false);
+  });
+});
+
+describe('availabilityUpdateSchema (PUT /api/me/availability)', () => {
+  it('ignores a timezone in the body (read-only) and normalizes', () => {
+    const r = availabilityUpdateSchema.parse({
+      timezone: 'Asia/Tokyo',
+      busyDates: ['2026-12-05', '2026-12-05'],
+      slots: [
+        { weekday: 0, startMin: 720, endMin: 840 },
+        { weekday: 0, startMin: 600, endMin: 720 },
+      ],
+    });
+    expect(r).toEqual({
+      slots: [{ weekday: 0, startMin: 600, endMin: 840 }],
+      busyDates: ['2026-12-05'],
+    });
+  });
+  it('still rejects overlaps', () => {
+    expect(
+      availabilityUpdateSchema.safeParse({
+        busyDates: [],
+        slots: [
+          { weekday: 0, startMin: 600, endMin: 780 },
+          { weekday: 0, startMin: 720, endMin: 840 },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('changeTimezoneSchema', () => {
+  it('accepts IANA zones only, no extra keys', () => {
+    expect(changeTimezoneSchema.safeParse({ timezone: 'America/New_York' }).success).toBe(true);
+    expect(changeTimezoneSchema.safeParse({ timezone: 'Nope/Zone' }).success).toBe(false);
+    expect(changeTimezoneSchema.safeParse({}).success).toBe(false);
+    expect(changeTimezoneSchema.safeParse({ timezone: 'UTC', x: 1 }).success).toBe(false);
   });
 });

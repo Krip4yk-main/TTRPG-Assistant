@@ -182,6 +182,55 @@
     </div>
   </section>
 
+  <!-- Часовий пояс -->
+  <section class="nri-card" aria-labelledby="timezone-title">
+    <h2 id="timezone-title">{{ 'account.timezone.title' | translate }}</h2>
+    <p class="nri-muted" id="timezone-hint">{{ 'account.timezone.hint' | translate }}</p>
+    <form class="timezone" [formGroup]="timezoneForm" (ngSubmit)="saveTimezone()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'account.timezone.label' | translate }}</mat-label>
+        <input
+          matInput
+          name="timezone"
+          formControlName="timezone"
+          [matAutocomplete]="tzAuto"
+          [errorStateMatcher]="errorState"
+          aria-describedby="timezone-hint"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <mat-autocomplete #tzAuto="matAutocomplete">
+          @for (tz of timezoneOptions(); track tz) {
+            <mat-option [value]="tz">{{ tz }}</mat-option>
+          }
+        </mat-autocomplete>
+        <mat-hint>{{ 'account.timezone.search' | translate }}</mat-hint>
+        @if (timezone.hasError('timezone')) {
+          <mat-error>{{ 'profile.errors.TIMEZONE' | translate }}</mat-error>
+        } @else if (timezone.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="busy()">
+        {{ 'common.save' | translate }}
+      </button>
+    </form>
+    @if (deviceZone(); as device) {
+      <button mat-button type="button" class="use-device-tz" (click)="useDeviceZone()">
+        {{ 'account.timezone.useDevice' | translate: { tz: device } }}
+      </button>
+    }
+    <div aria-live="polite">
+      @if (timezoneMessage(); as msg) {
+        <p class="nri-alert" role="alert">{{ msg.key | translate: msg.params }}</p>
+      }
+      @if (timezoneSaved()) {
+        <p class="nri-notice">{{ 'account.timezone.saved' | translate }}</p>
+      }
+    </div>
+  </section>
+
   <!-- Небезпечна зона -->
   <section class="nri-card danger-zone" aria-labelledby="danger-title">
     <h2 id="danger-title">{{ 'account.danger.title' | translate }}</h2>

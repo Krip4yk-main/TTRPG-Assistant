@@ -240,6 +240,57 @@ describe('PATCH /api/me/birth-date', () => {
   });
 });
 
+describe('PATCH /api/me/timezone', () => {
+  it('validates and updates the account timezone; slots keep their wall-clock times', async () => {
+    const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Kyiv' });
+    const cookie = await login(u.id);
+    await db
+      .insert(availabilitySlots)
+      .values({ userId: u.id, weekday: 1, startMin: 19 * 60, endMin: 23 * 60 });
+
+    const res = await call('patch', '/api/me/timezone', cookie, { timezone: 'America/New_York' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: u.id,
+      publicId: u.publicId,
+      timezone: 'America/New_York',
+    });
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.timezone).toBe('America/New_York');
+    expect((await call('get', '/api/me', cookie)).body.timezone).toBe('America/New_York');
+
+    const cal = (await call('get', '/api/me/availability', cookie)).body;
+    expect(cal).toEqual({
+      timezone: 'America/New_York',
+      slots: [{ weekday: 1, startMin: 19 * 60, endMin: 23 * 60 }],
+      busyDates: [],
+    });
+    const [e] = await db.select().from(events).where(eq(events.type, 'user.timezone_changed'));
+    expect(e!.payload).toEqual({ from: 'Europe/Kyiv', to: 'America/New_York' });
+  });
+
+  it('400 for an invalid zone or extra keys; 401 without a session; 403 for pending', async () => {
+    const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Kyiv' });
+    const cookie = await login(u.id);
+    for (const body of [{}, { timezone: 'Nope/Zone' }, { timezone: 'UTC', extra: 1 }]) {
+      const res = await call('patch', '/api/me/timezone', cookie, body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION');
+    }
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.timezone).toBe('Europe/Kyiv');
+    const guest = await request(app)
+      .patch('/api/me/timezone')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ timezone: 'UTC' });
+    expect(guest.status).toBe(401);
+    const p = await createUser(db, { status: 'pending' });
+    const res = await call('patch', '/api/me/timezone', await login(p.id), { timezone: 'UTC' });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('DELETE /api/me/identities/:provider', () => {
   it('last identity: 409 LAST_IDENTITY; with two: 200', async () => {
     const u = await createUser(db, { nickname: 'Hero' });

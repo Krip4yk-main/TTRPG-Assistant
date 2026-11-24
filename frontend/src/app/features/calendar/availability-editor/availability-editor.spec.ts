@@ -1,12 +1,14 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import type { AvailabilityDto, MeDto } from '@nri/shared';
 import { AvailabilityEditor } from './availability-editor';
 import { cellsToSlots, slotsToCells } from './availability-grid';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { browserZone } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
 
 const me = {
@@ -60,6 +62,7 @@ describe('AvailabilityEditor', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([]),
         provideTranslateService(),
         {
           provide: SocketService,
@@ -86,7 +89,10 @@ describe('AvailabilityEditor', () => {
     }
   }
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
 
   it('renders an accessible 7 x 48 grid with labelled cells', async () => {
     await setup('save');
@@ -112,16 +118,15 @@ describe('AvailabilityEditor', () => {
     button('save').click();
     await settle();
     const put = http.expectOne((r) => r.method === 'PUT' && r.url === '/api/me/availability');
+    // Пояс — лише для читання (R5): PUT його не надсилає й пояс акаунта не змінює.
     expect(put.request.body).toEqual({
-      timezone: 'Europe/Kyiv',
       slots: [{ weekday: 1, startMin: 1140, endMin: 1380 }],
       busyDates: [],
     });
     const saved = { ...empty, slots: [{ weekday: 1 as const, startMin: 1140, endMin: 1380 }] };
     put.flush(saved);
     await settle();
-    // Пояс акаунта міг змінитися (R5) — оновлюємо /api/me.
-    http.expectOne('/api/me').flush(me);
+    http.expectNone('/api/me');
     expect(emitted).toEqual([saved]);
   });
 
@@ -178,5 +183,41 @@ describe('AvailabilityEditor', () => {
     await setup('custom', empty);
     expect(el().querySelector('button.save')).toBeNull();
     expect(button('apply')).toBeTruthy();
+  });
+
+  it('save mode shows the account time zone with a link to account settings, no device-zone switch', async () => {
+    vi.spyOn(browserZone, 'get').mockReturnValue('Asia/Tokyo');
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    TestBed.inject(AuthStore).setMe({ ...me, timezone: 'America/New_York' });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(AvailabilityEditor);
+    fixture.componentRef.setInput('mode', 'save');
+    await settle();
+    http
+      .expectOne((r) => r.method === 'GET' && r.url === '/api/me/availability')
+      .flush({ ...empty, timezone: 'America/New_York' });
+    await settle();
+    const tz = el().querySelector<HTMLElement>('.tz')!;
+    expect(tz.textContent).toContain('calendar.accountTimezone');
+    expect(tz.querySelector('a[href="/account"]')).not.toBeNull();
+    expect(el().querySelector('.use-browser-tz')).toBeNull();
+    expect(el().textContent).not.toContain('calendar.useBrowserTz');
+    expect(el().textContent).not.toContain('calendar.timezoneHint');
   });
 });

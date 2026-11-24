@@ -7,6 +7,7 @@ import { Subject } from 'rxjs';
 import type { MeDto } from '@nri/shared';
 import { AccountSettings } from './account-settings';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { browserZone } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
 
 const me: MeDto = {
@@ -64,7 +65,10 @@ describe('AccountSettings nickname', () => {
     await fixture.whenStable();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
 
   it('prefills the current nickname; saving PATCHes and updates AuthStore.me()', async () => {
     expect(input().value).toBe('Gandalf');
@@ -122,19 +126,84 @@ describe('AccountSettings nickname', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     bdForm.dispatchEvent(new Event('submit'));
-    http
-      .expectOne('/api/me/birth-date')
-      .flush(
-        {
-          error: {
-            code: 'BIRTH_DATE_COOLDOWN',
-            details: { availableAt: '2027-01-01T00:00:00.000Z' },
-          },
+    http.expectOne('/api/me/birth-date').flush(
+      {
+        error: {
+          code: 'BIRTH_DATE_COOLDOWN',
+          details: { availableAt: '2027-01-01T00:00:00.000Z' },
         },
-        { status: 409, statusText: 'Conflict' },
-      );
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
     await fixture.whenStable();
     fixture.detectChanges();
     expect(el.textContent).toContain('profile.errors.BIRTH_DATE_COOLDOWN');
+  });
+
+  describe('time zone', () => {
+    const tzInput = () =>
+      el.querySelector<HTMLInputElement>('form.timezone input[name="timezone"]')!;
+    const tzForm = () => el.querySelector<HTMLFormElement>('form.timezone')!;
+    const typeTz = async (value: string) => {
+      tzInput().value = value;
+      tzInput().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('prefills the account zone; saving PATCHes /api/me/timezone and refreshes AuthStore.me()', async () => {
+      fixture.detectChanges();
+      expect(tzInput().value).toBe('Europe/Kyiv');
+      // Пояснення: слоти календаря лишаються тим самим «настінним» часом.
+      expect(el.textContent).toContain('account.timezone.hint');
+      await typeTz('America/New_York');
+      tzForm().dispatchEvent(new Event('submit'));
+      const req = http.expectOne('/api/me/timezone');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ timezone: 'America/New_York' });
+      req.flush({ ...me, timezone: 'America/New_York' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(auth.me()?.timezone).toBe('America/New_York');
+      expect(el.textContent).toContain('account.timezone.saved');
+    });
+
+    it('an invalid zone is not sent and shows an error', async () => {
+      fixture.detectChanges();
+      await typeTz('Nope/Zone');
+      tzInput().dispatchEvent(new Event('blur'));
+      tzForm().dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      http.expectNone('/api/me/timezone');
+      expect(el.textContent).toContain('profile.errors.TIMEZONE');
+    });
+
+    const recreate = async () => {
+      fixture = TestBed.createComponent(AccountSettings);
+      el = fixture.nativeElement as HTMLElement;
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it('offers the device zone when it differs', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Asia/Tokyo');
+      await recreate();
+      const useDevice = el.querySelector<HTMLButtonElement>('button.use-device-tz')!;
+      expect(useDevice.textContent).toContain('account.timezone.useDevice');
+      useDevice.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(tzInput().value).toBe('Asia/Tokyo');
+      http.expectNone('/api/me/timezone');
+    });
+
+    it('no device-zone button when the device is already in the account zone', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
+      await recreate();
+      expect(el.querySelector('button.use-device-tz')).toBeNull();
+    });
   });
 });
