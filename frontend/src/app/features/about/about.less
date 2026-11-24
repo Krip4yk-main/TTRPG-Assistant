@@ -1,0 +1,23 @@
+:host {
+  display: block;
+}
+
+.nri-card + h2 {
+  margin-top: var(--nri-space-xl);
+}
+
+.credits {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--nri-space-sm) var(--nri-space-lg);
+  margin: 0;
+
+  dt {
+    color: var(--nri-text-muted);
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}

@@ -1,0 +1,71 @@
+:host {
+  display: block;
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+
+  h1,
+  > p {
+    margin-bottom: 0;
+  }
+}
+
+.identities {
+  list-style: none;
+  margin: 0 0 var(--nri-space-md);
+  padding: 0;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nri-space-sm);
+    padding: var(--nri-space-sm) 0;
+    border-bottom: 1px solid var(--nri-border);
+  }
+}
+
+.identity-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.provider {
+  font-weight: 600;
+}
+
+.link-actions,
+.danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+  margin-bottom: var(--nri-space-md);
+}
+
+.birth-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nri-space-md);
+
+  mat-form-field {
+    flex: 1 1 260px;
+  }
+
+  button {
+    margin-top: var(--nri-space-sm);
+  }
+}
+
+.danger-zone {
+  border-color: var(--nri-danger);
+}
+
+.danger {
+  --mat-button-filled-container-color: var(--nri-danger);
+  --mat-button-filled-label-text-color: var(--nri-on-danger);
+}

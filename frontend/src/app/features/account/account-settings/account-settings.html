@@ -1,0 +1,133 @@
+<section class="nri-page account">
+  <h1>{{ 'account.title' | translate }}</h1>
+  @if (me(); as user) {
+    <p class="nri-muted">
+      {{ 'account.signedInAs' | translate }} <strong><nri-user-name [user]="user" /></strong>
+    </p>
+  }
+  @if (queryErrorKey(); as key) {
+    <p class="nri-alert" role="alert">{{ key | translate }}</p>
+  }
+
+  <!-- Способи входу -->
+  <section class="nri-card" aria-labelledby="identities-title">
+    <h2 id="identities-title">{{ 'account.identities.title' | translate }}</h2>
+    <ul class="identities">
+      @for (identity of identities(); track identity.provider) {
+        <li>
+          <div class="identity-info">
+            <span class="provider">{{ providerKey(identity.provider) | translate }}</span>
+            @if (identity.displayName) {
+              <span class="nri-muted">{{ identity.displayName }}</span>
+            }
+          </div>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="busy()"
+            (click)="unlink(identity.provider)"
+            [attr.aria-label]="
+              'account.identities.unlinkAria'
+                | translate: { provider: (providerKey(identity.provider) | translate) }
+            "
+          >
+            {{ 'account.identities.unlink' | translate }}
+          </button>
+        </li>
+      }
+    </ul>
+
+    <div class="link-actions">
+      @if (!hasTelegram()) {
+        <button mat-flat-button type="button" [disabled]="busy()" (click)="linkTelegram()">
+          {{ 'account.identities.linkTelegram' | translate }}
+        </button>
+      }
+      @if (!hasGoogle()) {
+        <a mat-flat-button [href]="googleLinkUrl">{{
+          'account.identities.linkGoogle' | translate
+        }}</a>
+      }
+    </div>
+
+    <div aria-live="polite">
+      @if (telegramPending()) {
+        <p class="nri-notice">{{ 'account.identities.telegramPending' | translate }}</p>
+      }
+      @if (identityMessage(); as msg) {
+        <p
+          [class.nri-alert]="msg.key.includes('errors.')"
+          [class.nri-notice]="!msg.key.includes('errors.')"
+        >
+          {{ msg.key | translate: msg.params }}
+        </p>
+      }
+    </div>
+  </section>
+
+  <!-- Дата народження -->
+  <section class="nri-card" aria-labelledby="birth-date-title">
+    <h2 id="birth-date-title">{{ 'account.birthDate.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.birthDate.hint' | translate }}</p>
+    <form class="birth-date" (ngSubmit)="saveBirthDate()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.birthDate' | translate }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="picker"
+          [max]="maxBirthDate"
+          [formControl]="birthDate"
+          [errorStateMatcher]="errorState"
+          autocomplete="bday"
+          required
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker startView="multi-year" />
+        @if (birthDate.hasError('ageTooLow')) {
+          <mat-error>{{ 'profile.errors.AGE_TOO_LOW' | translate: { age: minAge } }}</mat-error>
+        } @else if (birthDate.hasError('matDatepickerParse')) {
+          <mat-error>{{ 'profile.errors.INVALID_DATE' | translate }}</mat-error>
+        } @else if (birthDate.hasError('futureDate') || birthDate.hasError('matDatepickerMax')) {
+          <mat-error>{{ 'profile.errors.FUTURE_DATE' | translate }}</mat-error>
+        } @else if (birthDate.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="busy()">
+        {{ 'common.save' | translate }}
+      </button>
+    </form>
+    <div aria-live="polite">
+      @if (birthDateMessage(); as msg) {
+        <p class="nri-alert" role="alert">{{ msg.key | translate: msg.params }}</p>
+      }
+      @if (birthDateSaved()) {
+        <p class="nri-notice">{{ 'account.birthDate.saved' | translate }}</p>
+      }
+    </div>
+  </section>
+
+  <!-- Небезпечна зона -->
+  <section class="nri-card danger-zone" aria-labelledby="danger-title">
+    <h2 id="danger-title">{{ 'account.danger.title' | translate }}</h2>
+    <div class="danger-actions">
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="logoutAll()">
+        {{ 'account.danger.logoutAll' | translate }}
+      </button>
+      <button
+        mat-flat-button
+        class="danger"
+        type="button"
+        [disabled]="busy()"
+        (click)="deleteAccount()"
+      >
+        {{ 'account.delete.button' | translate }}
+      </button>
+    </div>
+    <div aria-live="polite">
+      @if (dangerMessage(); as msg) {
+        <p class="nri-alert" role="alert">{{ msg.key | translate: msg.params }}</p>
+      }
+    </div>
+  </section>
+</section>

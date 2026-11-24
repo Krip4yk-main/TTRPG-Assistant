@@ -1,0 +1,15 @@
+<section class="nri-page">
+  <h1>{{ 'about.title' | translate }}</h1>
+  <div class="nri-card">
+    <p>{{ 'about.description' | translate }}</p>
+    <p class="nri-muted">{{ 'about.status' | translate }}</p>
+  </div>
+
+  <h2>{{ 'about.author.title' | translate }}</h2>
+  <dl class="nri-card credits">
+    @for (link of authorLinks; track link.key) {
+      <dt>{{ link.key | translate }}</dt>
+      <dd>{{ link.value }}</dd>
+    }
+  </dl>
+</section>

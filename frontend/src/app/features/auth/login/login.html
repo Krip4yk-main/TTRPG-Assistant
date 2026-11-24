@@ -1,0 +1,45 @@
+<section class="nri-page login">
+  <div class="nri-card">
+    <h1>{{ 'login.title' | translate }}</h1>
+    <p class="nri-muted">{{ 'login.intro' | translate }}</p>
+
+    @if (errorKey(); as key) {
+      <p class="nri-alert" role="alert">{{ key | translate }}</p>
+    }
+
+    <div class="providers">
+      @if (telegramBot) {
+        <div
+          class="telegram"
+          #telegramWidget
+          [attr.aria-label]="'login.telegram' | translate"
+        ></div>
+      }
+      <a mat-flat-button class="google" [href]="googleUrl">{{ 'login.google' | translate }}</a>
+    </div>
+
+    @if (devLoginEnabled) {
+      <form class="dev-login" [formGroup]="devForm" (ngSubmit)="devLogin()" novalidate>
+        <h2>{{ 'login.dev.title' | translate }}</h2>
+        <p class="nri-muted">{{ 'login.dev.hint' | translate }}</p>
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'login.dev.nickname' | translate }}</mat-label>
+          <input matInput formControlName="nickname" autocomplete="off" required />
+          @if (devForm.controls.nickname.hasError('required')) {
+            <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'login.dev.ownerKey' | translate }}</mat-label>
+          <input matInput type="password" formControlName="ownerKey" autocomplete="off" />
+          <mat-hint>{{ 'login.dev.ownerKeyHint' | translate }}</mat-hint>
+        </mat-form-field>
+        <div class="actions">
+          <button mat-stroked-button type="submit" [disabled]="busy()">
+            {{ 'login.dev.submit' | translate }}
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+</section>

@@ -1,0 +1,88 @@
+<section class="nri-page complete-profile">
+  <div class="nri-card">
+    <h1>{{ 'profile.complete.title' | translate }}</h1>
+    <p class="nri-muted">{{ 'profile.complete.intro' | translate }}</p>
+
+    @if (formError(); as code) {
+      <p class="nri-alert" role="alert">{{ 'errors.' + code | translate }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.nickname' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="nickname"
+          autocomplete="nickname"
+          maxlength="32"
+          required
+        />
+        <mat-hint>{{ 'profile.hints.nickname' | translate }}</mat-hint>
+        @let nickname = form.controls.nickname;
+        @if (nickname.hasError('taken')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_TAKEN' | translate }}</mat-error>
+        } @else if (nickname.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        } @else if (nickname.hasError('nicknameFormat')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_FORMAT' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.birthDate' | translate }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="picker"
+          [max]="maxBirthDate"
+          [errorStateMatcher]="errorState"
+          formControlName="birthDate"
+          autocomplete="bday"
+          required
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker startView="multi-year" />
+        <mat-hint>{{ 'profile.hints.birthDate' | translate: { age: minAge } }}</mat-hint>
+        @let birthDate = form.controls.birthDate;
+        @if (birthDate.hasError('ageTooLow')) {
+          <mat-error>{{ 'profile.errors.AGE_TOO_LOW' | translate: { age: minAge } }}</mat-error>
+        } @else if (birthDate.hasError('matDatepickerParse')) {
+          <mat-error>{{ 'profile.errors.INVALID_DATE' | translate }}</mat-error>
+        } @else if (birthDate.hasError('futureDate') || birthDate.hasError('matDatepickerMax')) {
+          <mat-error>{{ 'profile.errors.FUTURE_DATE' | translate }}</mat-error>
+        } @else if (birthDate.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.timezone' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="timezone"
+          list="nri-timezones"
+          autocomplete="off"
+          required
+        />
+        <datalist id="nri-timezones">
+          @for (tz of timezones; track tz) {
+            <option [value]="tz"></option>
+          }
+        </datalist>
+        <mat-hint>{{ 'profile.hints.timezone' | translate }}</mat-hint>
+        @if (form.controls.timezone.hasError('timezone')) {
+          <mat-error>{{ 'profile.errors.TIMEZONE' | translate }}</mat-error>
+        } @else if (form.controls.timezone.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <p class="nri-notice">{{ 'profile.complete.ageNotice' | translate: { age: minAge } }}</p>
+
+      <div class="actions">
+        <button mat-flat-button type="submit" [disabled]="status() !== 'VALID' || submitting()">
+          {{ (submitting() ? 'common.saving' : 'common.save') | translate }}
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
