@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   availabilityInputSchema,
   availabilityUpdateSchema,
+  calendarSettingsPatchSchema,
+  gameBusyQuerySchema,
   type AvailabilityDto,
 } from '../contracts/availability.js';
 import { changeTimezoneSchema } from '../contracts/me.js';
@@ -226,5 +228,59 @@ describe('changeTimezoneSchema', () => {
     expect(changeTimezoneSchema.safeParse({ timezone: 'Nope/Zone' }).success).toBe(false);
     expect(changeTimezoneSchema.safeParse({}).success).toBe(false);
     expect(changeTimezoneSchema.safeParse({ timezone: 'UTC', x: 1 }).success).toBe(false);
+  });
+});
+
+describe('availabilityFit — busyIntervals (game busy time)', () => {
+  const kyivTue: AvailabilityDto = {
+    timezone: 'Europe/Kyiv',
+    slots: [{ weekday: 1, startMin: 1140, endMin: 1380 }],
+    busyDates: [],
+  };
+  const busy = (startIso: string, minutes: number) => occ(startIso, minutes);
+
+  it('a session overlapping a busy interval does not fit', () => {
+    expect(availabilityFit([tue], kyivTue, [])).toBe('full');
+    expect(availabilityFit([tue], kyivTue, [busy('2026-12-01T19:00:00Z', 60)])).toBe('none');
+    // Інтервал повністю охоплює сесію.
+    expect(availabilityFit([tue], kyivTue, [busy('2026-12-01T16:00:00Z', 600)])).toBe('none');
+  });
+
+  it('touching intervals (end === start) do not overlap', () => {
+    expect(availabilityFit([tue], kyivTue, [busy('2026-12-01T21:00:00Z', 60)])).toBe('full');
+    expect(availabilityFit([tue], kyivTue, [busy('2026-12-01T16:00:00Z', 60)])).toBe('full');
+  });
+
+  it('counts towards partial like busy dates', () => {
+    const two = [tue, occ('2026-12-08T17:00:00Z', 240)];
+    expect(availabilityFit(two, kyivTue, [busy('2026-12-08T18:00:00Z', 30)])).toBe('partial');
+  });
+});
+
+describe('calendar contracts', () => {
+  it('settings patch: boolean only, strict', () => {
+    expect(calendarSettingsPatchSchema.safeParse({ calendarAutoBusy: false }).success).toBe(true);
+    expect(calendarSettingsPatchSchema.safeParse({ calendarAutoBusy: 'no' }).success).toBe(false);
+    expect(calendarSettingsPatchSchema.safeParse({}).success).toBe(false);
+    expect(calendarSettingsPatchSchema.safeParse({ calendarAutoBusy: true, x: 1 }).success).toBe(
+      false,
+    );
+  });
+
+  it('game-busy query: ISO instants, from < to, span ≤ 93 days', () => {
+    const ok = gameBusyQuerySchema.safeParse({
+      from: '2026-12-01T00:00:00Z',
+      to: '2026-12-31T00:00:00Z',
+    });
+    expect(ok.success && ok.data.from instanceof Date).toBe(true);
+    expect(gameBusyQuerySchema.safeParse({ from: '2026-12-01' }).success).toBe(false);
+    expect(
+      gameBusyQuerySchema.safeParse({ from: '2026-12-02T00:00:00Z', to: '2026-12-01T00:00:00Z' })
+        .success,
+    ).toBe(false);
+    expect(
+      gameBusyQuerySchema.safeParse({ from: '2026-01-01T00:00:00Z', to: '2026-06-01T00:00:00Z' })
+        .success,
+    ).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ import { usersRouter } from './users/users.routes.js';
 import { catalogRouter } from './catalog/catalog.routes.js';
 import { profileRouter, publicUsersRouter } from './profiles/profiles.routes.js';
 import { availabilityRouter } from './availability/availability.routes.js';
+import { calendarRouter } from './calendar/calendar.routes.js';
 import { gamesRouter } from './games/games.routes.js';
 import {
   applicationsRouter,
@@ -65,6 +66,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/availability', availabilityRouter(deps));
   app.use('/api/me/applications', myApplicationsRouter(deps));
   app.use('/api/me/blacklist', blacklistRouter(deps));
+  app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));
   app.use('/api/catalog', catalogRouter(deps));

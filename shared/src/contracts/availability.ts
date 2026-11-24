@@ -93,3 +93,48 @@ export const availabilityUpdateSchema = z
 
 export type AvailabilityUpdateInput = z.input<typeof availabilityUpdateSchema>;
 export type AvailabilityUpdate = z.output<typeof availabilityUpdateSchema>;
+
+// ---------- автозайнятість від ігор ----------
+
+/** `GET/PATCH /api/me/settings`. */
+export interface CalendarSettingsDto {
+  /**
+   * Сесії ігор, де користувач майстер або активний учасник, автоматично займають час у
+   * календарі. Вимкнено — лише ігри, додані вручну («Додати в мій календар»).
+   */
+  calendarAutoBusy: boolean;
+}
+
+export const calendarSettingsPatchSchema = z.object({ calendarAutoBusy: z.boolean() }).strict();
+export type CalendarSettingsPatch = z.output<typeof calendarSettingsPatchSchema>;
+
+/** `GET /api/me/calendar/pinned-games` — ігри, додані в календар вручну. */
+export interface PinnedGamesDto {
+  gameIds: number[];
+}
+
+/**
+ * Зайнятий час від гри (`GET /api/me/calendar/game-busy`). Миті — ISO UTC; фронтенд
+ * показує їх у поясі акаунта. `sessionId` — `null` для слоту правила, сесію якого ще не
+ * матеріалізовано (далі за вікно матеріалізації).
+ */
+export interface GameBusyDto {
+  gameId: number;
+  gameTitle: string;
+  sessionId: number | null;
+  start: string;
+  end: string;
+}
+
+/** Найбільший проміжок одного запиту зайнятості. */
+export const GAME_BUSY_MAX_SPAN_DAYS = 93;
+
+/** Query `GET /api/me/calendar/game-busy?from&to`: `[from, to)`, ISO-миті, ≤ 93 діб. */
+export const gameBusyQuerySchema = z
+  .object({ from: z.iso.datetime({ offset: true }), to: z.iso.datetime({ offset: true }) })
+  .transform((v) => ({ from: new Date(v.from), to: new Date(v.to) }))
+  .refine((v) => v.from < v.to, { message: 'from must be < to', path: ['to'] })
+  .refine((v) => v.to.getTime() - v.from.getTime() <= GAME_BUSY_MAX_SPAN_DAYS * 86_400_000, {
+    message: 'range too long',
+    path: ['to'],
+  });

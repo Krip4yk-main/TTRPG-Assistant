@@ -39,15 +39,32 @@ function fits(o: Occurrence, slots: AvailabilityDto['slots'], busy: Set<string>,
   return true;
 }
 
+/** Зайнятий проміжок часу (напр. сесія гри, де гравець уже учасник). */
+export interface BusyInterval {
+  start: Date;
+  end: Date;
+}
+
+/** Перетин напіввідкритих `[start, end)`: інтервали, що лише стикуються, не перетинаються. */
+const overlaps = (o: Occurrence, b: BusyInterval): boolean =>
+  o.start.getTime() < b.end.getTime() && b.start.getTime() < o.end.getTime();
+
 /**
  * `full` — підходять усі сесії; `partial` — щонайменше половина (але не всі);
- * інакше `none`. Порожній список → `none`.
+ * інакше `none`. Порожній список → `none`. Сесія, що перетинається з будь-яким із
+ * `busyIntervals` (зайнятість від ігор гравця), не підходить.
  */
-export function availabilityFit(occ: Occurrence[], a: AvailabilityDto): AvailabilityFit {
+export function availabilityFit(
+  occ: Occurrence[],
+  a: AvailabilityDto,
+  busyIntervals: readonly BusyInterval[] = [],
+): AvailabilityFit {
   if (occ.length === 0) return 'none';
   const slots = normalizeSlots(a.slots);
   const busy = new Set(a.busyDates);
-  const ok = occ.filter((o) => fits(o, slots, busy, a.timezone)).length;
+  const ok = occ.filter(
+    (o) => fits(o, slots, busy, a.timezone) && !busyIntervals.some((b) => overlaps(o, b)),
+  ).length;
   if (ok === occ.length) return 'full';
   return ok * 2 >= occ.length ? 'partial' : 'none';
 }

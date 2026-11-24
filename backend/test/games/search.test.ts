@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { toZoned, zonedToUtc } from '@nri/shared';
 import { createApp } from '../../src/app.js';
 import {
@@ -272,6 +273,62 @@ describe('POST /api/games/search — calendar', () => {
       },
     });
     expect(res.body.items).toEqual([expect.objectContaining({ id, fit: 'full' })]);
+  });
+});
+
+describe('POST /api/games/search — busy time from joined games', () => {
+  const slots = [{ weekday: 1, startMin: 18 * 60, endMin: 23 * 60 + 30 }];
+  const tuesday = (hour = 19, patch: Partial<typeof games.$inferInsert> = {}) =>
+    insertGame({
+      startsAt: nextKyiv(1, hour),
+      recurrence: 'weekly',
+      weekdays: [1],
+      durationMinutes: 240,
+      ...patch,
+    });
+  async function playerIn(gameId: number) {
+    const p = await userWithAge(25);
+    await db.insert(availabilitySlots).values(slots.map((s) => ({ userId: p.id, ...s })));
+    await db.insert(gameMembers).values({ gameId, userId: p.id });
+    return p;
+  }
+
+  it("mine: a game overlapping an accepted one gets 'none' (dropped); the joined game itself still fits", async () => {
+    const joined = await tuesday();
+    const other = await tuesday();
+    const p = await playerIn(joined);
+    const res = await search({ calendar: { mode: 'mine', includePartial: true } }, p.cookie);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([expect.objectContaining({ id: joined, fit: 'full' })]);
+    expect(ids(res)).not.toContain(other);
+  });
+
+  it('custom mode for a logged-in user also respects busy time; guests are unaffected', async () => {
+    const joined = await tuesday();
+    const other = await tuesday();
+    const p = await playerIn(joined);
+    const calendar = {
+      mode: 'custom',
+      availability: { timezone: KYIV, slots, busyDates: [] },
+    };
+    expect(ids(await search({ calendar }, p.cookie))).toEqual([joined]);
+    expect(ids(await search({ calendar })).sort()).toEqual([joined, other].sort());
+  });
+
+  it('busy time ignored when the membership ended or autobusy is off (unless pinned)', async () => {
+    const joined = await tuesday();
+    const other = await tuesday();
+    const p = await playerIn(joined);
+    await call('patch', '/api/me/settings', p.cookie, { calendarAutoBusy: false });
+    const body = { calendar: { mode: 'mine' } };
+    expect(ids(await search(body, p.cookie)).sort()).toEqual([joined, other].sort());
+    await call('post', `/api/me/calendar/pinned-games/${joined}`, p.cookie);
+    expect(ids(await search(body, p.cookie))).toEqual([joined]);
+    await db
+      .update(gameMembers)
+      .set({ leftAt: new Date(), leftReason: 'left' })
+      .where(eq(gameMembers.userId, p.id));
+    expect(ids(await search(body, p.cookie)).sort()).toEqual([joined, other].sort());
   });
 });
 

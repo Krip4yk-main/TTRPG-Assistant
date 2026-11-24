@@ -1,7 +1,18 @@
 import { asc, eq } from 'drizzle-orm';
-import type { AvailabilityDto, AvailabilityUpdate, Weekday } from '@nri/shared';
+import type {
+  AvailabilityDto,
+  AvailabilityUpdate,
+  CalendarSettingsDto,
+  CalendarSettingsPatch,
+  Weekday,
+} from '@nri/shared';
 import type { AppDeps } from '../app.js';
-import { availabilityBusyDates, availabilitySlots, users } from '../db/schema/index.js';
+import {
+  availabilityBusyDates,
+  availabilitySlots,
+  userSettings,
+  users,
+} from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 
@@ -62,4 +73,30 @@ export async function replaceAvailability(
     payload: { slots: input.slots.length, busyDates: input.busyDates.length },
   });
   return getAvailability(deps, userId);
+}
+
+// ---------- налаштування календаря ----------
+
+/** Налаштування користувача; рядка може не бути — тоді діють значення за замовчуванням. */
+export async function getCalendarSettings(
+  deps: AppDeps,
+  userId: number,
+): Promise<CalendarSettingsDto> {
+  const [row] = await deps.db
+    .select({ calendarAutoBusy: userSettings.calendarAutoBusy })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  return { calendarAutoBusy: row?.calendarAutoBusy ?? true };
+}
+
+export async function updateCalendarSettings(
+  deps: AppDeps,
+  userId: number,
+  patch: CalendarSettingsPatch,
+): Promise<CalendarSettingsDto> {
+  await deps.db
+    .insert(userSettings)
+    .values({ userId, calendarAutoBusy: patch.calendarAutoBusy })
+    .onDuplicateKeyUpdate({ set: { calendarAutoBusy: patch.calendarAutoBusy } });
+  return getCalendarSettings(deps, userId);
 }

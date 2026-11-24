@@ -38,6 +38,7 @@ import {
 import type { AppDeps } from '../app.js';
 import type { SessionUser } from '../auth/session.service.js';
 import { getAvailability } from '../availability/availability.service.js';
+import { gameBusyIntervals, type GameBusy } from '../calendar/game-busy.service.js';
 import { gameContentWarnings, gameMembers, games } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { loadGames, resolveViewer, toCardDto, type Loaded } from './games.service.js';
@@ -255,6 +256,7 @@ type Check = (l: Loaded) => { pass: boolean; fit?: 'full' | 'partial' };
 function memoryFilter(
   f: SearchFilters,
   availability: AvailabilityDto | null,
+  busy: GameBusy[],
   now: Date,
 ): Check | null {
   const checks: Check[] = [];
@@ -266,7 +268,13 @@ function memoryFilter(
   if (availability) {
     const horizon = new Date(now.getTime() + FIT_HORIZON_DAYS * DAY_MS);
     checks.push((l) => {
-      const fit = availabilityFit(expandOccurrences(schedule(l.row), now, horizon), availability);
+      // Зайнятість від власних ігор глядача; сесії самої гри-кандидата її не займають.
+      const own = busy.filter((b) => b.gameId !== l.row.id);
+      const fit = availabilityFit(
+        expandOccurrences(schedule(l.row), now, horizon),
+        availability,
+        own,
+      );
       if (fit === 'full' || (fit === 'partial' && f.calendar.includePartial)) {
         return { pass: true, fit };
       }
@@ -360,12 +368,22 @@ export async function searchGames(
     const c = decodeCursor(deps, f.cursor, f.sort);
     after = { r: c.r, k: new Date(c.k), id: c.id };
   }
-  const [availability, viewer] = await Promise.all([
+  const now = new Date();
+  const [availability, viewer, busy] = await Promise.all([
     calendarAvailability(deps, f, user),
     resolveViewer(deps, user),
+    // Залогінений з увімкненим календарем (`mine`/`custom`): сесії його ігор — зайнятий час.
+    f.calendar.mode !== 'off' && user
+      ? gameBusyIntervals(
+          deps,
+          user.userId,
+          now,
+          new Date(now.getTime() + FIT_HORIZON_DAYS * DAY_MS),
+          now,
+        )
+      : Promise.resolve([]),
   ]);
-  const now = new Date();
-  const filter = memoryFilter(f, availability, now);
+  const filter = memoryFilter(f, availability, busy, now);
   const { order, after: afterCond } = ordering(f.sort);
   const base = sqlFilters(deps, f, now);
   if (hasDetailFilters(f)) {
