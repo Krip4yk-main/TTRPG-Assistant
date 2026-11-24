@@ -49,6 +49,17 @@ const safeReturnTo = (v: unknown): string => {
 const callbackParamsOf = (req: Request): URLSearchParams =>
   new URL(req.originalUrl, 'http://callback.invalid').searchParams;
 
+/** Безпечне для логів зведення помилки провайдера: без code/verifier/секретів і тіл відповідей. */
+const oauthErrSummary = (err: unknown) => {
+  if (!(err instanceof Error)) return { message: String(err) };
+  const code = (err as { code?: unknown }).code;
+  return {
+    name: err.name,
+    code: typeof code === 'string' ? code : undefined,
+    message: err.message,
+  };
+};
+
 type OAuthState = {
   codeVerifier: string;
   nonce: string;
@@ -169,7 +180,7 @@ export function authRouter(deps: AppDeps): Router {
     try {
       authUrl = await provider.createAuthorizationUrl({ state, codeVerifier, nonce });
     } catch (err) {
-      console.error(`[oauth] ${provider.id}: authorization URL failed`, err);
+      console.error(`[oauth] ${provider.id}: authorization URL failed`, oauthErrSummary(err));
       throw new AppError(502, 'OAUTH_STATE_INVALID');
     }
     const entry: OAuthState = {
@@ -269,7 +280,8 @@ export function authRouter(deps: AppDeps): Router {
         state,
         nonce: st.nonce,
       });
-    } catch {
+    } catch (err) {
+      console.error(`[oauth] ${provider.id}: code exchange failed`, oauthErrSummary(err));
       return invalid();
     }
     const errBase = st.mode === 'link' ? '/account' : '/login';

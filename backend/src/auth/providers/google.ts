@@ -2,6 +2,7 @@ import * as oidc from 'openid-client';
 import type { OAuthProvider } from './oauth.js';
 
 const GOOGLE_ISSUER = new URL('https://accounts.google.com');
+const PROVIDER_TIMEOUT_SEC = 10;
 
 export function createGoogleProvider(opts: {
   clientId: string;
@@ -21,6 +22,8 @@ export function createGoogleProvider(opts: {
         // Перевірка підпису ID Token через JWKS (за замовчуванням oauth4webapi
         // для токенів із token endpoint покладається лише на TLS).
         execute: [oidc.enableNonRepudiationChecks],
+        // Секунди; діє на discovery і на всі подальші запити конфігурації (token, JWKS).
+        timeout: PROVIDER_TIMEOUT_SEC,
         ...(opts.customFetch ? { [oidc.customFetch]: opts.customFetch } : {}),
       })
       .catch((err: unknown) => {

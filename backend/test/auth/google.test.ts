@@ -262,12 +262,26 @@ describe('google oauth', () => {
     expect(res.headers.location).toBe('/games');
   });
 
-  it('failed exchange redirects to OAUTH_STATE_INVALID, no session', async () => {
-    const agent = request.agent(createApp(deps));
-    const { state } = await startFlow(agent);
-    const res = await agent.get(`/api/auth/google/callback?code=bad&state=${state}`);
-    expect(res.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
-    expect(await db.select().from(sessions)).toHaveLength(0);
+  it('failed exchange redirects to OAUTH_STATE_INVALID, no session, logs safely', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const agent = request.agent(createApp(deps));
+      const { state } = await startFlow(agent);
+      const verifier = JSON.parse((await redis.get(`oauth:${state}`))!).codeVerifier as string;
+      const res = await agent.get(`/api/auth/google/callback?code=bad&state=${state}`);
+      expect(res.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+      expect(await db.select().from(sessions)).toHaveLength(0);
+      expect(log).toHaveBeenCalledWith('[oauth] google: code exchange failed', {
+        name: 'Error',
+        code: undefined,
+        message: 'exchange failed',
+      });
+      const logged = JSON.stringify(log.mock.calls);
+      expect(logged).not.toContain(verifier);
+      expect(logged).not.toContain('code=bad');
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('banned user is redirected with ACCOUNT_BANNED', async () => {
@@ -351,11 +365,17 @@ describe('google oauth', () => {
     });
 
     it('failed exchange in link mode -> /account?error=OAUTH_STATE_INVALID', async () => {
-      const app = createApp(deps);
-      const a = await loggedInTelegram(app, '1020');
-      const { state } = await startFlow(a.agent, '?mode=link');
-      const res = await a.agent.get(`/api/auth/google/callback?code=bad&state=${state}`);
-      expect(res.headers.location).toBe('/account?error=OAUTH_STATE_INVALID');
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const app = createApp(deps);
+        const a = await loggedInTelegram(app, '1020');
+        const { state } = await startFlow(a.agent, '?mode=link');
+        const res = await a.agent.get(`/api/auth/google/callback?code=bad&state=${state}`);
+        expect(res.headers.location).toBe('/account?error=OAUTH_STATE_INVALID');
+        expect(log).toHaveBeenCalledTimes(1);
+      } finally {
+        log.mockRestore();
+      }
     });
 
     it('cookie mismatch in link mode -> /account (mode read from the state record)', async () => {

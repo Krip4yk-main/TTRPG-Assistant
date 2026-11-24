@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
+import { createHash, createHmac, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createGoogleProvider } from '../../src/auth/providers/google.js';
 
@@ -62,7 +62,7 @@ const fakeFetch = async (url: string, init?: RequestInit): Promise<Response> => 
       token_type: 'Bearer',
       expires_in: 3600,
       scope: 'openid profile',
-      id_token: idToken,
+      ...(idToken ? { id_token: idToken } : {}),
     });
   }
   throw new Error(`unexpected network call in test: ${url}`);
@@ -143,6 +143,25 @@ describe('google provider (openid-client)', () => {
 
   it('rejects an ID Token signed by a key not in the JWKS', async () => {
     idToken = jwt(goodClaims(), otherKey.privateKey);
+    await expect(
+      mk().exchange({ ...flow, callbackParams: cb({ code: 'c', state: 's-1' }) }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a token response without an id_token', async () => {
+    idToken = '';
+    await expect(
+      mk().exchange({ ...flow, callbackParams: cb({ code: 'c', state: 's-1' }) }),
+    ).rejects.toThrow();
+  });
+
+  it.each(['HS256', 'none'])('rejects an ID Token with alg %s', async (alg) => {
+    const head = b64u(JSON.stringify({ alg, typ: 'JWT', kid: KID }));
+    const body = b64u(JSON.stringify(goodClaims()));
+    // HS256 підписано client secret — класична атака «alg confusion».
+    const sig =
+      alg === 'none' ? '' : b64u(createHmac('sha256', 'secret').update(`${head}.${body}`).digest());
+    idToken = `${head}.${body}.${sig}`;
     await expect(
       mk().exchange({ ...flow, callbackParams: cb({ code: 'c', state: 's-1' }) }),
     ).rejects.toThrow();
