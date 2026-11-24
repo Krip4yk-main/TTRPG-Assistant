@@ -53,7 +53,7 @@
               </p>
               <p class="meta">
                 @if (game.nextSessionAt; as at) {
-                  {{ 'games.my.nextSession' | translate: { date: when(at) } }}
+                  {{ 'games.my.nextSession' | translate: { date: when(game, at) } }}
                 } @else {
                   {{ 'games.my.noNextSession' | translate }}
                 }

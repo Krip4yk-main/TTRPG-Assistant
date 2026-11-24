@@ -137,13 +137,22 @@ function ordering(sort: SearchSort) {
 
 // ---------- фільтри ----------
 
+/**
+ * Гра ще «актуальна»: регулярна (кампанія з повтором) або разова, чия сесія ще попереду.
+ * Разові ігри з `starts_at` у минулому не показуються в пошуку, sitemap і OG-прев'ю.
+ */
+export function openGamePredicate(now: Date): SQL {
+  return or(ne(games.recurrence, 'none'), gt(games.startsAt, now))!;
+}
+
 const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers.gameId} = ${games.id})`;
 
 /** SQL-префільтр за всіма полями, крім календаря (і точної перевірки дат). */
-function sqlFilters(deps: AppDeps, f: SearchFilters): SQL[] {
+function sqlFilters(deps: AppDeps, f: SearchFilters, now: Date): SQL[] {
   const c: (SQL | undefined)[] = [
     // Видимі: набір гравців (повна гра — лише з show_when_full); гра, що йде, — лише з
-    // show_when_full.
+    // show_when_full. Разова гра з початком у минулому — не видима.
+    openGamePredicate(now),
     or(
       and(
         eq(games.status, 'recruiting'),
@@ -323,7 +332,7 @@ export async function searchGames(
   const now = new Date();
   const filter = memoryFilter(f, availability, now);
   const { order, after: afterCond } = ordering(f.sort);
-  const base = sqlFilters(deps, f);
+  const base = sqlFilters(deps, f, now);
   if (hasDetailFilters(f)) {
     const hide = hideRestricted(viewer, now);
     if (hide) base.push(hide);

@@ -138,6 +138,11 @@
                         <li>{{ 'games.weekdaysLong.' + d | translate }}</li>
                       }
                     </ul>
+                    @if (scheduleZone(); as z) {
+                      <span class="schedule-zone">{{
+                        'games.details.scheduleAt' | translate: z
+                      }}</span>
+                    }
                   </dd>
                 </div>
               }

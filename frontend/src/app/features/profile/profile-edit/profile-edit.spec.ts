@@ -114,4 +114,23 @@ describe('ProfileEdit', () => {
     await settle();
     expect(el().textContent).toContain('profileEdit.saved');
   });
+
+  it('VALIDATION UNKNOWN_SYSTEM is shown next to the favorite systems field', async () => {
+    el().querySelector<HTMLButtonElement>('button[type=submit]')!.click();
+    await settle();
+    http
+      .expectOne((r) => r.method === 'PATCH' && r.url === '/api/me/profile')
+      .flush(
+        { error: { code: 'VALIDATION', details: { reason: 'UNKNOWN_SYSTEM' } } },
+        { status: 400, statusText: 'Bad Request' },
+      );
+    await settle();
+    const err = el().querySelector('mat-error.unknown-system');
+    expect(err).not.toBeNull();
+    expect(err!.textContent).toContain('games.form.errors.UNKNOWN_SYSTEM');
+    expect(
+      err!.closest('.field')!.querySelector('[data-privacy="favoriteSystems"]'),
+    ).not.toBeNull();
+    expect(el().textContent).not.toContain('profileEdit.saveError');
+  });
 });

@@ -32,6 +32,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { AvailabilityApi } from '../../../core/availability/availability.api';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { viewerTimeZone } from '../../../core/i18n/dates';
 import { AvailabilityEditor } from '../../calendar/availability-editor/availability-editor';
 import { GameCard } from '../game-card/game-card';
 import { SearchFilters, type EffectiveCalendarMode } from '../search-filters/search-filters';
@@ -60,10 +61,6 @@ function isInvalidCursor(err: unknown): boolean {
   const e = (err.error as { error?: { code?: unknown; details?: { reason?: unknown } } } | null)
     ?.error;
   return e?.code === 'INVALID_CURSOR' || e?.details?.reason === 'INVALID_CURSOR';
-}
-
-function browserTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /**
@@ -131,11 +128,7 @@ export class SearchPage {
         mode === 'custom' && custom
           ? { mode, availability: custom }
           : { mode: mode === 'mine' ? 'mine' : 'off' };
-      return toSearchRequest(
-        this.filters(),
-        calendar,
-        this.auth.me()?.timezone ?? browserTimezone(),
-      );
+      return toSearchRequest(this.filters(), calendar, viewerTimeZone(this.auth.me()));
     },
     { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) },
   );
@@ -205,7 +198,7 @@ export class SearchPage {
   /** «Змінити для цього пошуку»: редактор стартує з копії збереженого календаря. */
   protected openCustomCalendar(): void {
     const start = this.savedCalendar() ?? {
-      timezone: this.auth.me()?.timezone ?? browserTimezone(),
+      timezone: viewerTimeZone(this.auth.me()),
       slots: [],
       busyDates: [],
     };

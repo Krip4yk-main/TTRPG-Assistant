@@ -73,6 +73,20 @@ describe('sitemap.xml / robots.txt', () => {
     expect(res.text).toContain(`${BASE}/users/${gm!.publicId}<`);
   });
 
+  it('past one-shots are not listed; running campaigns are', async () => {
+    const past = await insertGame({ startsAt: new Date(Date.now() - 86_400_000) });
+    const running = await insertGame({
+      recurrence: 'weekly',
+      weekdays: [0],
+      startsAt: new Date(Date.now() - 14 * 86_400_000),
+    });
+    const res = await request(app).get('/sitemap.xml');
+    expect(res.text).not.toContain(`/games/${past}<`);
+    expect(res.text).toContain(`/games/${running}<`);
+    const og = await request(app).get(`/api/og/games/${past}`);
+    expect(og.text).toContain('<meta name="robots" content="noindex">');
+  });
+
   it('robots.txt points to the sitemap', async () => {
     const res = await request(app).get('/robots.txt');
     expect(res.status).toBe(200);

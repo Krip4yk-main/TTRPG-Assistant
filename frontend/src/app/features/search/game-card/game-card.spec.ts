@@ -5,6 +5,8 @@ import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { GameCard } from './game-card';
+import { browserZone } from '../../../core/i18n/dates';
+import { AuthStore } from '../../../core/auth/auth.store';
 
 const game: SearchGameCardDto = {
   id: 5,
@@ -17,6 +19,7 @@ const game: SearchGameCardDto = {
   format: 'offline',
   city: 'Київ',
   nextSessionAt: '2027-03-02T17:00:00.000Z',
+  timezone: 'Europe/Kyiv',
   freeSlots: 2,
   maxPlayers: 5,
   priceUah: 150,
@@ -97,5 +100,27 @@ describe('GameCard', () => {
     const login = el.querySelector<HTMLAnchorElement>('a[href^="/login"]');
     expect(login).not.toBeNull();
     expect(decodeURIComponent(login!.getAttribute('href')!)).toContain('returnTo=/games/6');
+  });
+
+  describe('session time zone', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('guest in Warsaw sees the browser-zone time with a zone label', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
+      TestBed.inject(AuthStore).setMe(null);
+      await render(game, true);
+      const next = el.querySelector('.facts dd')!.textContent!;
+      expect(next).toContain('18:00');
+      expect(next).toContain('GMT+1');
+    });
+
+    it('viewer in the game zone sees no zone label', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
+      TestBed.inject(AuthStore).setMe(null);
+      await render(game, true);
+      const next = el.querySelector('.facts dd')!.textContent!;
+      expect(next).toContain('19:00');
+      expect(next).not.toMatch(/GMT|EET/);
+    });
   });
 });

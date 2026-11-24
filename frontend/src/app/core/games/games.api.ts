@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import type {
+  GameAction,
   GameCardDto,
   GameDto,
   GameInput,
@@ -10,10 +11,6 @@ import type {
   SearchFiltersInput,
   SearchResultDto,
 } from '@nri/shared';
-
-/** Переходи статусу гри (`POST /api/games/:id/<action>`). */
-export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel'] as const;
-export type GameAction = (typeof GAME_ACTIONS)[number];
 
 /** Тонкий шар над HTTP API ігор. */
 @Injectable({ providedIn: 'root' })

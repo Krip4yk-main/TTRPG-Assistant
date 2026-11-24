@@ -4,12 +4,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { GameCardDto, GameStatus } from '@nri/shared';
+import type { GameAction, GameCardDto, GameStatus } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { GamesApi, type GameAction } from '../../../core/games/games.api';
-import { formatDateTime } from '../../../core/i18n/dates';
+import { GamesApi } from '../../../core/games/games.api';
+import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -75,8 +75,9 @@ export class MyGames {
     return g.system?.name ?? g.systemOther ?? '';
   }
 
-  protected when(iso: string): string {
-    return formatDateTime(iso, this.auth.me()?.timezone);
+  protected when(game: GameCardDto, iso: string): string {
+    const tz = viewerTimeZone(this.auth.me());
+    return formatDateTime(iso, tz, { showZone: differentZones(tz, game.timezone) });
   }
 
   /** Перехід статусу — лише після підтвердження в діалозі. */

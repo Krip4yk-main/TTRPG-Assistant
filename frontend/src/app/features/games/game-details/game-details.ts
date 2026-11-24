@@ -25,7 +25,12 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { SeoService } from '../../../core/seo/seo.service';
-import { formatDateTime } from '../../../core/i18n/dates';
+import {
+  differentZones,
+  formatDateTime,
+  formatTime,
+  viewerTimeZone,
+} from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
@@ -97,9 +102,24 @@ export class GameDetails {
       .map((id) => list.find((w) => w.id === id)?.slug)
       .filter((s): s is string => !!s);
   });
+  /**
+   * Найближча сесія — у поясі глядача (як на картці пошуку); назва поясу додається, якщо
+   * він відрізняється від поясу гри.
+   */
   protected readonly nextSession = computed(() => {
-    const at = this.game()?.nextSessionAt;
-    return at ? formatDateTime(at, this.auth.me()?.timezone ?? this.game()?.timezone) : null;
+    const g = this.game();
+    if (!g?.nextSessionAt) return null;
+    const tz = viewerTimeZone(this.auth.me());
+    return formatDateTime(g.nextSessionAt, tz, { showZone: differentZones(tz, g.timezone) });
+  });
+  /**
+   * Дні тижня розкладу задані в поясі гри, тож поруч показуємо час сесії в тому ж поясі з
+   * явною міткою (`о 19:00 за поясом гри (Europe/Kyiv)`), а не конвертуємо: у поясі
+   * глядача сесія може припадати на інший день.
+   */
+  protected readonly scheduleZone = computed(() => {
+    const g = this.game();
+    return g ? { time: formatTime(g.startsAt, g.timezone), tz: g.timezone } : null;
   });
   protected readonly durationHours = computed(() => (this.game()?.durationMinutes ?? 0) / 60);
   protected readonly returnTo = computed(() => `/games/${this.id()}`);

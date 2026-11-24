@@ -1,10 +1,23 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { resolveLogin, subjectHash } from '../../src/auth/identity.service.js';
 import { createSession, hashToken } from '../../src/auth/session.service.js';
-import { authIdentities, identityTombstones, sessions, users } from '../../src/db/schema/index.js';
+import {
+  authIdentities,
+  availabilityBusyDates,
+  availabilitySlots,
+  events,
+  gameMembers,
+  games,
+  gameSystems,
+  genres,
+  identityTombstones,
+  sessions,
+  userProfiles,
+  users,
+} from '../../src/db/schema/index.js';
 import { changeBirthDate, completeProfile, deleteAccount } from '../../src/users/users.service.js';
 import { localDate } from '@nri/shared';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
@@ -332,5 +345,102 @@ describe('DELETE /api/me', () => {
     const rows = await db.select().from(identityTombstones);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.isBanned).toBe(true);
+  });
+
+  async function insertGame(
+    gmUserId: number,
+    patch: Partial<typeof games.$inferInsert> = {},
+  ): Promise<number> {
+    const [sys] = await db.select({ id: gameSystems.id }).from(gameSystems).limit(1);
+    const [gen] = await db.select({ id: genres.id }).from(genres).limit(1);
+    const [r] = await db
+      .insert(games)
+      .values({
+        gmUserId,
+        title: 'Гра',
+        description: '',
+        systemId: sys!.id,
+        genreId: gen!.id,
+        format: 'online',
+        kind: 'campaign',
+        startsAt: new Date(Date.now() + 30 * 86_400_000),
+        durationMinutes: 240,
+        recurrence: 'none',
+        weekdays: [],
+        timezone: 'Europe/Kyiv',
+        minPlayers: 1,
+        maxPlayers: 5,
+        status: 'recruiting',
+        publishedAt: new Date(),
+        ...patch,
+      })
+      .$returningId();
+    return r!.id;
+  }
+
+  it('removes profile, availability and memberships (no FK cascade on a tombstone)', async () => {
+    const u = await createUser(db, { nickname: 'Hero' });
+    const other = await createUser(db, { nickname: 'Other' });
+    const theirGame = await insertGame(other.id);
+    await db.insert(userProfiles).values({ userId: u.id, bio: 'secret bio', city: 'Київ' });
+    await db
+      .insert(availabilitySlots)
+      .values({ userId: u.id, weekday: 1, startMin: 0, endMin: 60 });
+    await db.insert(availabilityBusyDates).values({ userId: u.id, date: '2030-01-01' });
+    await db.insert(gameMembers).values({ gameId: theirGame, userId: u.id });
+    await deleteAccount(deps, u.id);
+    expect(await db.select().from(userProfiles).where(eq(userProfiles.userId, u.id))).toHaveLength(
+      0,
+    );
+    expect(
+      await db.select().from(availabilitySlots).where(eq(availabilitySlots.userId, u.id)),
+    ).toHaveLength(0);
+    expect(
+      await db.select().from(availabilityBusyDates).where(eq(availabilityBusyDates.userId, u.id)),
+    ).toHaveLength(0);
+    expect(await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id))).toHaveLength(0);
+    // Чужа гра не зачеплена.
+    const [g] = await db.select().from(games).where(eq(games.id, theirGame));
+    expect(g!.status).toBe('recruiting');
+  });
+
+  it("cancels the GM's active games; they leave search and the sitemap (R8)", async () => {
+    const u = await createUser(db, { nickname: 'Gm' });
+    const recruiting = await insertGame(u.id);
+    const started = await insertGame(u.id, { status: 'started', showWhenFull: true });
+    const draft = await insertGame(u.id, { status: 'draft', publishedAt: null });
+    const finished = await insertGame(u.id, { status: 'finished' });
+    const before = await request(app)
+      .post('/api/games/search')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({});
+    expect(before.body.items.map((i: { id: number }) => i.id).sort()).toEqual(
+      [recruiting, started].sort(),
+    );
+    await deleteAccount(deps, u.id);
+    const rows = await db.select().from(games).where(eq(games.gmUserId, u.id));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const id of [recruiting, started, draft]) {
+      expect(byId.get(id)!.status).toBe('cancelled');
+      expect(byId.get(id)!.cancelledAt).not.toBeNull();
+    }
+    expect(byId.get(finished)!.status).toBe('finished');
+    const ev = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, 'game.cancelled'), eq(events.userId, u.id)));
+    expect(ev.map((e) => e.entityId).sort()).toEqual([recruiting, started, draft].sort());
+    for (const e of ev) expect(e.payload).toMatchObject({ reason: 'account_deleted' });
+
+    const after = await request(app)
+      .post('/api/games/search')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({});
+    expect(after.body.items).toHaveLength(0);
+    await redis.del('seo:sitemap');
+    const sitemap = await request(app).get('/sitemap.xml');
+    for (const id of [recruiting, started]) expect(sitemap.text).not.toContain(`/games/${id}<`);
   });
 });

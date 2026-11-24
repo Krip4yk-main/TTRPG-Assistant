@@ -5,6 +5,7 @@ import {
   gameInputSchema,
   gamePatchSchema,
   meetsAgeRating,
+  type GameAction,
   type GameCardDto,
   type GameDto,
   type GameInput,
@@ -196,6 +197,7 @@ export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
     format: r.format,
     city: r.city,
     nextSessionAt: nextSessionAt(r, now),
+    timezone: r.timezone,
     freeSlots: freeSlots(l),
     maxPlayers: r.maxPlayers,
     priceUah: r.priceUah,
@@ -370,9 +372,6 @@ export async function updateGame(
   });
   return gmView(deps, id);
 }
-
-export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel'] as const;
-export type GameAction = (typeof GAME_ACTIONS)[number];
 
 const TRANSITIONS: Record<
   GameAction,

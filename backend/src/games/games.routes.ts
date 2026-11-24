@@ -1,11 +1,11 @@
 import { Router } from 'express';
+import { GAME_ACTIONS } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { AppError } from '../http/errors.js';
 import { searchGames } from './games.search.js';
 import {
   createGame,
-  GAME_ACTIONS,
   getGameView,
   listMyGames,
   resolveViewer,

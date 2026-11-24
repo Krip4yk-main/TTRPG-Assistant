@@ -165,6 +165,29 @@ describe('POST /api/games/search — filters', () => {
     expect(ids(await search({}))).toEqual([ok]);
   });
 
+  it('past one-shots disappear; future one-shots and running campaigns stay', async () => {
+    const pastOneShot = await insertGame({
+      kind: 'oneshot',
+      recurrence: 'none',
+      startsAt: new Date(Date.now() - DAY_MS),
+    });
+    const futureOneShot = await insertGame({
+      kind: 'oneshot',
+      recurrence: 'none',
+      startsAt: new Date(Date.now() + DAY_MS),
+    });
+    const runningCampaign = await insertGame({
+      kind: 'campaign',
+      recurrence: 'weekly',
+      weekdays: [1],
+      startsAt: new Date(Date.now() - 14 * DAY_MS),
+    });
+    const soonest = ids(await search({ sort: 'soonest' }));
+    expect(soonest).not.toContain(pastOneShot);
+    expect(soonest).toEqual([runningCampaign, futureOneShot]);
+    expect(ids(await search({ sort: 'newest' }))).not.toContain(pastOneShot);
+  });
+
   it('validates the body', async () => {
     expect((await search({ limit: 0 })).status).toBe(400);
     expect((await search({ nope: 1 })).body.error.code).toBe('VALIDATION');
@@ -408,5 +431,17 @@ describe('POST /api/games/search — paging and visibility', () => {
     const asAdult = await search({}, adult.cookie);
     expect(asAdult.body.items[0]).not.toHaveProperty('restricted');
     expect(asAdult.body.items[0].city).toBe('Київ');
+  });
+
+  it('a logged-in 17-year-old gets exactly the restricted keys for an 18+ game', async () => {
+    const id = await insertGame({ ageRating: '18+', city: 'Київ', priceUah: 200 });
+    const teen = await userWithAge(17);
+    const res = await search({}, teen.cookie);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(1);
+    expect(Object.keys(res.body.items[0]).sort()).toEqual(
+      ['ageRating', 'gm', 'id', 'restricted', 'title'].sort(),
+    );
+    expect(res.body.items[0]).toMatchObject({ id, restricted: true, ageRating: '18+' });
   });
 });

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { games, users } from '../db/schema/index.js';
+import { openGamePredicate } from '../games/games.search.js';
 import { getPublicProfileHead } from '../profiles/profiles.service.js';
 
 const SITE_NAME = 'НРІ Асистент';
@@ -105,7 +106,13 @@ export function seoRootRouter(deps: AppDeps): Router {
     const gameRows = await db
       .select({ id: games.id, updatedAt: games.updatedAt })
       .from(games)
-      .where(and(inArray(games.status, ['recruiting', 'started']), eq(games.ageRating, 'none')))
+      .where(
+        and(
+          inArray(games.status, ['recruiting', 'started']),
+          eq(games.ageRating, 'none'),
+          openGamePredicate(new Date()),
+        ),
+      )
       .orderBy(asc(games.id))
       .limit(SITEMAP_LIMIT);
     const userRows = await db
@@ -147,7 +154,10 @@ export function ogRouter(deps: AppDeps): Router {
       sendHtml(res, neutral(`${base}/games`), 404);
       return;
     }
-    const open = (g.status === 'recruiting' || g.status === 'started') && g.ageRating === 'none';
+    const open =
+      (g.status === 'recruiting' || g.status === 'started') &&
+      g.ageRating === 'none' &&
+      (g.recurrence !== 'none' || g.startsAt > new Date());
     if (!open) {
       sendHtml(res, neutral(`${base}/games/${g.id}`));
       return;

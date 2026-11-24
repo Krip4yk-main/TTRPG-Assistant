@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
@@ -13,7 +13,17 @@ import {
   revokeTokenHashes,
 } from '../auth/session.service.js';
 import { isDuplicateKey, subjectHash } from '../auth/identity.service.js';
-import { authIdentities, identityTombstones, sessions, users } from '../db/schema/index.js';
+import {
+  authIdentities,
+  availabilityBusyDates,
+  availabilitySlots,
+  gameMembers,
+  games,
+  identityTombstones,
+  sessions,
+  userProfiles,
+  users,
+} from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 
@@ -184,8 +194,10 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   const { db, env } = deps;
   const now = new Date();
   // Хеші токенів збираємо в транзакції (до видалення рядків), щоб відкликання
-  // не залежало лише від Redis-сету `usess:`.
-  const tokenHashes = await db.transaction(async (tx) => {
+  // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
+  // FK-каскади не спрацьовують: профіль, календар і членства в іграх видаляємо явно,
+  // а активні ігри майстра скасовуємо (рішення R8).
+  const { tokenHashes, cancelledGameIds } = await db.transaction(async (tx) => {
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -211,6 +223,28 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       .from(sessions)
       .where(eq(sessions.userId, userId));
     await tx.delete(sessions).where(eq(sessions.userId, userId));
+    await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
+    await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
+    await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
+    await tx.delete(gameMembers).where(eq(gameMembers.userId, userId));
+    const active = await tx
+      .select({ id: games.id, status: games.status })
+      .from(games)
+      .where(
+        and(eq(games.gmUserId, userId), inArray(games.status, ['draft', 'recruiting', 'started'])),
+      )
+      .for('update');
+    if (active.length) {
+      await tx
+        .update(games)
+        .set({ status: 'cancelled', cancelledAt: now })
+        .where(
+          inArray(
+            games.id,
+            active.map((g) => g.id),
+          ),
+        );
+    }
     await tx
       .update(users)
       .set({
@@ -223,9 +257,18 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         deletedAt: now,
       })
       .where(eq(users.id, userId));
-    return sess.map((r) => r.tokenHash);
+    return { tokenHashes: sess.map((r) => r.tokenHash), cancelledGameIds: active };
   });
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
+  for (const g of cancelledGameIds) {
+    await logEvent(db, {
+      type: 'game.cancelled',
+      userId,
+      entityType: 'game',
+      entityId: g.id,
+      payload: { from: g.status, to: 'cancelled', reason: 'account_deleted' },
+    });
+  }
   await logEvent(db, { type: 'user.deleted', userId });
 }

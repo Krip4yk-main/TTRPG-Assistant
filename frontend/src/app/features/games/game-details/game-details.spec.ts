@@ -4,12 +4,13 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import type { CatalogDto, MeDto, PublicGameDto } from '@nri/shared';
 import { GameDetails } from './game-details';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { browserZone } from '../../../core/i18n/dates';
 
 const me = {
   id: 1,
@@ -184,5 +185,39 @@ describe('GameDetails', () => {
   it('an 18+ game is not indexed', async () => {
     await open(me, (r) => r.flush({ ...game, ageRating: '18+' }));
     expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');
+  });
+
+  describe('time zones', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const nextSessionText = () => {
+      const dts = [...el().querySelectorAll('dl.facts dt')];
+      const dt = dts.find((d) => d.textContent!.includes('games.details.nextSession'))!;
+      return dt.nextElementSibling!.textContent!;
+    };
+
+    it('guest in Warsaw: same time as the search card (browser zone, labelled)', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
+      await open(null, (r) => r.flush(game));
+      expect(nextSessionText()).toContain('18:00');
+      expect(nextSessionText()).toContain('GMT+1');
+    });
+
+    it('weekdays are labelled with the game time and zone', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
+      await open(null, (r) => r.flush(game));
+      const tr = TestBed.inject(TranslateService);
+      tr.setTranslation('uk', { games: { details: { scheduleAt: 'о {{time}} ({{tz}})' } } }, true);
+      tr.use('uk');
+      await settle();
+      expect(el().querySelector('.schedule-zone')!.textContent).toContain('о 19:00 (Europe/Kyiv)');
+    });
+
+    it('signed-in viewer uses the account zone, not the browser', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
+      await open(me, (r) => r.flush(game));
+      expect(nextSessionText()).toContain('19:00');
+      expect(nextSessionText()).not.toMatch(/GMT|EET/);
+    });
   });
 });

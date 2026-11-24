@@ -5,7 +5,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { isRestrictedGame, type RestrictedGameDto, type SearchGameCardDto } from '@nri/shared';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
-import { formatDateTime } from '../../../core/i18n/dates';
+import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 
 /**
  * Картка гри в пошуку. Для `RestrictedGameDto` — лише назва, майстер і вікова позначка
@@ -45,9 +45,12 @@ export class GameCard {
     const g = this.full();
     return g ? this.catalog.genreKey(g.genreId) : null;
   });
+  /** Час — у поясі глядача; назва поясу додається, якщо він відрізняється від поясу гри. */
   protected readonly nextSession = computed(() => {
-    const at = this.full()?.nextSessionAt;
-    return at ? formatDateTime(at, this.auth.me()?.timezone) : null;
+    const g = this.full();
+    if (!g?.nextSessionAt) return null;
+    const tz = viewerTimeZone(this.auth.me());
+    return formatDateTime(g.nextSessionAt, tz, { showZone: differentZones(tz, g.timezone) });
   });
   protected readonly returnTo = computed(() => `/games/${this.game().id}`);
 }

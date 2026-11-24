@@ -77,6 +77,10 @@
               <mat-error>{{
                 'profileEdit.errors.tooManySystems' | translate: { max: systemsMax }
               }}</mat-error>
+            } @else if (form.controls.favoriteSystemIds.hasError('unknownSystem')) {
+              <mat-error class="unknown-system">{{
+                'games.form.errors.UNKNOWN_SYSTEM' | translate
+              }}</mat-error>
             }
           </mat-form-field>
           <ng-container

@@ -20,6 +20,7 @@ import {
   type ProfilePrivacyKey,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
+import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { ProfileApi } from '../../../core/profile/profile.api';
@@ -147,8 +148,17 @@ export class ProfileEdit {
       );
       this.reset(saved);
       this.message.set({ kind: 'info', key: 'profileEdit.saved' });
-    } catch {
-      this.message.set({ kind: 'error', key: 'profileEdit.saveError' });
+    } catch (err) {
+      const e = toApiError(err);
+      const reason = (e.details as { reason?: unknown } | undefined)?.reason;
+      if (e.code === 'VALIDATION' && reason === 'UNKNOWN_SYSTEM') {
+        // Система зникла з каталогу — помилка біля поля улюблених систем.
+        const c = this.form.controls.favoriteSystemIds;
+        c.setErrors({ ...c.errors, unknownSystem: true });
+        c.markAsTouched();
+      } else {
+        this.message.set({ kind: 'error', key: 'profileEdit.saveError' });
+      }
     } finally {
       this.saving.set(false);
     }

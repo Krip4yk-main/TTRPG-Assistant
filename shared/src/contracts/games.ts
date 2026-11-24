@@ -28,6 +28,10 @@ export type GameLanguage = (typeof GAME_LANGUAGES)[number];
 export const GAME_STATUSES = ['draft', 'recruiting', 'started', 'finished', 'cancelled'] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
+/** Переходи статусу гри (`POST /api/games/:id/<action>`). */
+export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel'] as const;
+export type GameAction = (typeof GAME_ACTIONS)[number];
+
 /** Поля, які в `recruiting`/`started` змінювати не можна (рішення власника). */
 export const GAME_LOCKED_AFTER_PUBLISH = ['systemId', 'systemOther', 'kind'] as const;
 
@@ -198,6 +202,8 @@ export interface GameCardDto {
   city: string | null;
   /** Найближча сесія ≥ зараз (ISO UTC), `null` — немає. */
   nextSessionAt: string | null;
+  /** IANA-пояс гри (у ньому задані `weekdays` і час сесій). */
+  timezone: string;
   /** `maxPlayers − учасники`, не менше 0. */
   freeSlots: number;
   maxPlayers: number;
