@@ -1,8 +1,10 @@
+import type { EventType } from '@nri/shared';
 import type { Db } from '../db/client.js';
 import { events } from '../db/schema/index.js';
 
 export interface LogEventInput {
-  type: string;
+  /** Лише відомі типи (`EVENT_TYPES` у `@nri/shared`). */
+  type: EventType;
   userId?: number;
   entityType?: string;
   entityId?: number;

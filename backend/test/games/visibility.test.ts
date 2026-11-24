@@ -83,6 +83,19 @@ describe('games visibility — drafts and private fields (Review Focus 4)', () =
     expect((await call('get', `/api/games/${id}`, member.cookie)).body.freeSlots).toBe(4);
   });
 
+  it('a former member (left_at set) is an outsider and does not take a slot', async () => {
+    const gm = await userWithAge(30);
+    const former = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    await db
+      .insert(gameMembers)
+      .values({ gameId: id, userId: former.id, leftAt: new Date(), leftReason: 'left' });
+    const body = (await call('get', `/api/games/${id}`, former.cookie)).body;
+    expect('address' in body).toBe(false);
+    expect('channelLinks' in body).toBe(false);
+    expect(body.freeSlots).toBe(5);
+  });
+
   it('unknown id → 404', async () => {
     expect((await call('get', '/api/games/999999')).status).toBe(404);
     expect((await call('get', '/api/games/abc')).status).toBe(404);

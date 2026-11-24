@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import {
   expandOccurrences,
   GAME_LOCKED_AFTER_PUBLISH,
@@ -10,6 +10,7 @@ import {
   type GameDto,
   type GameInput,
   type GameStatus,
+  type EventType,
   type GameViewDto,
   type RestrictedGameDto,
 } from '@nri/shared';
@@ -70,9 +71,12 @@ export async function loadGames(
     .select({ gameId: gameMembers.gameId, n: count() })
     .from(gameMembers)
     .where(
-      inArray(
-        gameMembers.gameId,
-        rows.map((r) => r.row.id),
+      and(
+        inArray(
+          gameMembers.gameId,
+          rows.map((r) => r.row.id),
+        ),
+        isNull(gameMembers.leftAt),
       ),
     )
     .groupBy(gameMembers.gameId);
@@ -387,7 +391,7 @@ const TRANSITIONS: Record<
   cancel: { from: ['draft', 'recruiting', 'started'], to: 'cancelled', stamp: 'cancelledAt' },
 };
 
-const EVENT: Record<GameAction, string> = {
+const EVENT: Record<GameAction, EventType> = {
   publish: 'game.published',
   start: 'game.started',
   finish: 'game.finished',
@@ -430,7 +434,13 @@ export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Pr
     const [m] = await deps.db
       .select({ id: gameMembers.gameId })
       .from(gameMembers)
-      .where(and(eq(gameMembers.gameId, id), eq(gameMembers.userId, viewer.userId)));
+      .where(
+        and(
+          eq(gameMembers.gameId, id),
+          eq(gameMembers.userId, viewer.userId),
+          isNull(gameMembers.leftAt),
+        ),
+      );
     isMember = Boolean(m);
   }
   const now = new Date();
@@ -470,6 +480,7 @@ export async function listProfileGames(
   const order = [desc(games.startsAt), desc(games.id)];
   // Лише опубліковані: неопублікована гра (зокрема скасована чернетка) не показується.
   const visible = and(inArray(games.status, PROFILE_STATUSES), isNotNull(games.publishedAt));
+  // Будь-яке членство — активне чи завершене виходом/виключенням/баном (історія гравця).
   const memberOf = deps.db
     .select({ id: gameMembers.gameId })
     .from(gameMembers)

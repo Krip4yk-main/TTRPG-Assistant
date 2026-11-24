@@ -36,6 +36,16 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 }
 
 const TABLES = [
+  'ban_appeals',
+  'calendar_pinned_games',
+  'user_settings',
+  'notes',
+  'session_attendance',
+  'game_sessions',
+  'application_constraint_responses',
+  'game_applications',
+  'gm_blacklist',
+  'game_bans',
   'game_members',
   'game_content_warnings',
   'games',

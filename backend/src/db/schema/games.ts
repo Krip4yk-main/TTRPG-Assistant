@@ -12,6 +12,7 @@ import {
   smallint,
   text,
   tinyint,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
 import type {
@@ -22,6 +23,8 @@ import type {
   GameKind,
   GameLanguage,
   GameStatus,
+  MemberLeftReason,
+  MemberRole,
   Recurrence,
   Weekday,
 } from '@nri/shared';
@@ -127,9 +130,47 @@ export const gameContentWarnings = mysqlTable(
   (t) => [primaryKey({ columns: [t.gameId, t.warningId] })],
 );
 
-/** Затверджені гравці гри; заповнюється в Плані 3. */
+const MEMBER_ROLES = ['player'] as const satisfies MemberRole[];
+const MEMBER_LEFT_REASONS = ['left', 'kicked', 'banned'] as const satisfies MemberLeftReason[];
+
+/**
+ * Членства в грі (історія): активне — `left_at IS NULL`. Записи не видаляються при виході,
+ * тож одна пара (гра, користувач) може мати кілька рядків, але лише один активний —
+ * унікальність тримає згенерована `active` (1 або NULL; NULL-и в UNIQUE не конфліктують).
+ */
 export const gameMembers = mysqlTable(
   'game_members',
+  {
+    id: id('id').autoincrement().primaryKey(),
+    gameId: id('game_id')
+      .notNull()
+      .references(() => games.id, { onDelete: 'cascade' }),
+    userId: id('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: mysqlEnum('role', MEMBER_ROLES).notNull().default('player'),
+    /** Заявка, з якої з'явилось членство (`game_applications.id`). */
+    applicationId: id('application_id'),
+    joinedAt: datetime('joined_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    leftAt: datetime('left_at'),
+    leftReason: mysqlEnum('left_reason', MEMBER_LEFT_REASONS),
+    leaveNoteGm: text('leave_note_gm'),
+    leaveNoteAdmin: text('leave_note_admin'),
+    active: tinyint('active').generatedAlwaysAs(sql`IF(left_at IS NULL, 1, NULL)`, {
+      mode: 'stored',
+    }),
+  },
+  (t) => [
+    uniqueIndex('game_members_active_uq').on(t.gameId, t.userId, t.active),
+    index('game_members_user_id_idx').on(t.userId),
+  ],
+);
+
+/** Бан у конкретній грі: блокує нові заявки на неї. */
+export const gameBans = mysqlTable(
+  'game_bans',
   {
     gameId: id('game_id')
       .notNull()
@@ -137,12 +178,29 @@ export const gameMembers = mysqlTable(
     userId: id('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    joinedAt: datetime('joined_at')
+    createdAt: datetime('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.userId] })],
+);
+
+/** Чорний список майстра: блокує заявки на всі його ігри. */
+export const gmBlacklist = mysqlTable(
+  'gm_blacklist',
+  {
+    gmUserId: id('gm_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: id('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (t) => [
-    primaryKey({ columns: [t.gameId, t.userId] }),
-    index('game_members_user_id_idx').on(t.userId),
+    primaryKey({ columns: [t.gmUserId, t.userId] }),
+    index('gm_blacklist_user_id_idx').on(t.userId),
   ],
 );

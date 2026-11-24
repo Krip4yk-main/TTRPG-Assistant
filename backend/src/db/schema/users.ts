@@ -5,6 +5,7 @@ import {
   char,
   date,
   datetime,
+  int,
   json,
   mysqlEnum,
   mysqlTable,
@@ -22,6 +23,8 @@ export const users = mysqlTable('users', {
   role: mysqlEnum('role', ['owner', 'admin', 'moderator', 'user']).notNull().default('user'),
   status: mysqlEnum('status', ['pending', 'active', 'deleted']).notNull().default('pending'),
   isBanned: boolean('is_banned').notNull().default(false),
+  /** Лічильник банів: апеляція — одна на період бану (`ban_appeals`). */
+  banEpoch: int('ban_epoch').notNull().default(0),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Kyiv'),
   locale: varchar('locale', { length: 8 }).notNull().default('uk'),
   privacy: json('privacy')

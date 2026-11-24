@@ -176,7 +176,8 @@ export function openGamePredicate(now: Date): SQL {
   return or(ne(games.recurrence, 'none'), gt(games.startsAt, now))!;
 }
 
-const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers.gameId} = ${games.id})`;
+/** Активні учасники (`left_at IS NULL`). */
+const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers.gameId} = ${games.id} and ${gameMembers.leftAt} is null)`;
 
 /** SQL-префільтр за всіма полями, крім календаря (і точної перевірки дат). */
 function sqlFilters(deps: AppDeps, f: SearchFilters, now: Date): SQL[] {

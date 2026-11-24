@@ -13,10 +13,10 @@ afterAll(async () => {
 
 describe('logEvent', () => {
   it('stores payload as a readable object', async () => {
-    await logEvent(db, { type: 'x', payload: { a: 1 } });
+    await logEvent(db, { type: 'user.registered', payload: { a: 1 } });
     const rows = await db.select().from(events);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.type).toBe('x');
+    expect(rows[0]!.type).toBe('user.registered');
     expect(rows[0]!.payload).toEqual({ a: 1 });
   });
 
@@ -27,7 +27,7 @@ describe('logEvent', () => {
         throw new Error('boom');
       },
     } as never;
-    await expect(logEvent(broken, { type: 'x' })).resolves.toBeUndefined();
+    await expect(logEvent(broken, { type: 'user.registered' })).resolves.toBeUndefined();
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });

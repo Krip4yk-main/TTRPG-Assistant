@@ -149,6 +149,17 @@ describe('POST /api/games/search — filters', () => {
     expect(ids(await search({ hasFreeSlots: true }))).toEqual([open]);
   });
 
+  it('former members do not fill a game', async () => {
+    const p1 = await createUser(db);
+    const p2 = await createUser(db);
+    const game = await insertGame({ maxPlayers: 2 });
+    await db.insert(gameMembers).values([
+      { gameId: game, userId: p1.id },
+      { gameId: game, userId: p2.id, leftAt: new Date(), leftReason: 'kicked' },
+    ]);
+    expect(ids(await search({ hasFreeSlots: true }))).toEqual([game]);
+  });
+
   it("experience 'any' is no filter; other levels include 'any' games", async () => {
     const any = await insertGame({ experience: 'any' });
     const beg = await insertGame({ experience: 'beginner' });
