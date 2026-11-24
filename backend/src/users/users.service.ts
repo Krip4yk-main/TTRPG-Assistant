@@ -43,6 +43,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     .orderBy(authIdentities.id);
   return {
     id: u.id,
+    publicId: u.publicId,
     nickname: u.nickname,
     avatarUrl: u.avatarUrl,
     birthDate: u.birthDate,
@@ -104,6 +105,26 @@ export async function completeProfile(
   await evictUserSessionCache(deps, userId);
   await logEvent(db, { type: 'user.activated', userId });
   return { ok: true };
+}
+
+export async function changeNickname(
+  deps: AppDeps,
+  userId: number,
+  nickname: string,
+): Promise<MeDto> {
+  const { db } = deps;
+  try {
+    const [r] = await db
+      .update(users)
+      .set({ nickname })
+      .where(and(eq(users.id, userId), eq(users.status, 'active')));
+    if (r.affectedRows === 0) throw new AppError(401, 'UNAUTHENTICATED');
+  } catch (err) {
+    if (isDuplicateKey(err)) throw new AppError(409, 'NICKNAME_TAKEN');
+    throw err;
+  }
+  await logEvent(db, { type: 'user.nickname_changed', userId });
+  return getMe(deps, userId);
 }
 
 export async function changeBirthDate(

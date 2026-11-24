@@ -40,6 +40,7 @@ describe('authInterceptor', () => {
     >;
     auth.setMe({
       id: 1,
+      publicId: 'abcdefghjk',
       nickname: 'Gandalf',
       avatarUrl: null,
       birthDate: '1990-01-01',

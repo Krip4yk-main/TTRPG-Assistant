@@ -75,6 +75,50 @@
     </div>
   </section>
 
+  <!-- Нік -->
+  <section class="nri-card" aria-labelledby="nickname-title">
+    <h2 id="nickname-title">{{ 'account.nickname.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.nickname.hint' | translate }}</p>
+    <form
+      class="nickname birth-date"
+      [formGroup]="nicknameForm"
+      (ngSubmit)="saveNickname()"
+      novalidate
+    >
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.nickname' | translate }}</mat-label>
+        <input
+          matInput
+          name="nickname"
+          formControlName="nickname"
+          [errorStateMatcher]="errorState"
+          autocomplete="nickname"
+          maxlength="32"
+          required
+        />
+        <mat-hint>{{ 'profile.hints.nickname' | translate }}</mat-hint>
+        @if (nickname.hasError('taken')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_TAKEN' | translate }}</mat-error>
+        } @else if (nickname.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        } @else if (nickname.hasError('nicknameFormat')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_FORMAT' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="busy()">
+        {{ 'common.save' | translate }}
+      </button>
+    </form>
+    <div aria-live="polite">
+      @if (nicknameError(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+      @if (nicknameSaved()) {
+        <p class="nri-notice">{{ 'account.nickname.saved' | translate }}</p>
+      }
+    </div>
+  </section>
+
   <!-- Дата народження -->
   <section class="nri-card" aria-labelledby="birth-date-title">
     <h2 id="birth-date-title">{{ 'account.birthDate.title' | translate }}</h2>

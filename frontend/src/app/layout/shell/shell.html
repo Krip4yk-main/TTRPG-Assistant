@@ -31,6 +31,10 @@
         <nri-user-name [user]="me" />
       </div>
       @if (auth.isActive()) {
+        <a mat-menu-item [routerLink]="['/users', me.publicId]">
+          <mat-icon aria-hidden="true">person</mat-icon>
+          <span>{{ 'shell.myProfile' | translate }}</span>
+        </a>
         <a mat-menu-item routerLink="/account">
           <mat-icon aria-hidden="true">settings</mat-icon>
           <span>{{ 'shell.account' | translate }}</span>

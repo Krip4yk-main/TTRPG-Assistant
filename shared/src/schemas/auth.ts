@@ -27,6 +27,8 @@ export const completeProfileSchema = z.object({
   birthDate: isoDate,
   timezone: ianaTimezone.optional(),
 });
+export const changeNicknameSchema = completeProfileSchema.pick({ nickname: true });
+export type ChangeNicknameInput = z.infer<typeof changeNicknameSchema>;
 export type CompleteProfileInput = z.infer<typeof completeProfileSchema>;
 
 export const devLoginSchema = z.object({

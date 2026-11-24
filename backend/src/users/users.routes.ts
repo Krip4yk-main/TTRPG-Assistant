@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { completeProfileSchema } from '@nri/shared';
+import { changeNicknameSchema, completeProfileSchema } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { clearSessionCookie } from '../auth/session.service.js';
@@ -10,6 +10,7 @@ import { AppError } from '../http/errors.js';
 import { TG_LINK_PREFIX } from '../internal/internal.routes.js';
 import {
   changeBirthDate,
+  changeNickname,
   completeProfile,
   deleteAccount,
   getMe,
@@ -45,6 +46,11 @@ export function usersRouter(deps: AppDeps): Router {
     const { birthDate } = birthDateBody.parse(req.body);
     await changeBirthDate(deps, req.user!.userId, birthDate);
     res.json(await getMe(deps, req.user!.userId));
+  });
+
+  router.patch('/nickname', auth, requireActive, async (req, res) => {
+    const { nickname } = changeNicknameSchema.parse(req.body);
+    res.json(await changeNickname(deps, req.user!.userId, nickname));
   });
 
   router.post('/telegram-link-token', auth, requireActive, async (req, res) => {

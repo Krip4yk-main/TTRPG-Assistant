@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  char,
   date,
   datetime,
   json,
@@ -12,6 +13,8 @@ import {
 
 export const users = mysqlTable('users', {
   id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+  /** Незмінний публічний ідентифікатор (URL профілю `/users/<publicId>`). */
+  publicId: char('public_id', { length: 10 }).notNull().unique(),
   nickname: varchar('nickname', { length: 32 }).unique(),
   avatarUrl: varchar('avatar_url', { length: 512 }),
   birthDate: date('birth_date', { mode: 'string' }),

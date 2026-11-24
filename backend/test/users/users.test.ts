@@ -55,6 +55,7 @@ describe('GET /api/me', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       id: u.id,
+      publicId: u.publicId,
       nickname: 'Hero',
       avatarUrl: null,
       birthDate: '2000-01-01',

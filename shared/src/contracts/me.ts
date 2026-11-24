@@ -10,6 +10,8 @@ export interface IdentityDto {
 /** Відповідь `GET /api/me`. */
 export interface MeDto {
   id: number;
+  /** Незмінний публічний ідентифікатор (`/users/<publicId>`). */
+  publicId: string;
   nickname: string | null;
   avatarUrl: string | null;
   birthDate: string | null;

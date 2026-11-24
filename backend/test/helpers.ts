@@ -4,6 +4,7 @@ import type { AppDeps } from '../src/app.js';
 import { createDb } from '../src/db/client.js';
 import type { Db } from '../src/db/client.js';
 import { users } from '../src/db/schema/index.js';
+import { generatePublicId } from '../src/users/nickname.js';
 import { createRedis } from '../src/redis/client.js';
 
 export const TEST_PEPPER = 'test-pepper-0123456789abcdefghijklmnop';
@@ -54,7 +55,7 @@ export async function createUser(
 ): Promise<typeof users.$inferSelect> {
   const [res] = await db
     .insert(users)
-    .values({ status: 'active', ...overrides })
+    .values({ status: 'active', publicId: generatePublicId(), ...overrides })
     .$returningId();
   const [row] = await db
     .select()

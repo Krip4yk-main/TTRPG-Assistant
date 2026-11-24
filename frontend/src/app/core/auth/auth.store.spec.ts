@@ -10,6 +10,7 @@ import type { MeDto } from '@nri/shared';
 
 const me = (over: Partial<MeDto> = {}): MeDto => ({
   id: 1,
+  publicId: 'abcdefghjk',
   nickname: 'Gandalf',
   avatarUrl: null,
   birthDate: '1990-01-01',

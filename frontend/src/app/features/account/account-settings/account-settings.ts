@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -18,14 +18,23 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { MIN_REGISTRATION_AGE, type ErrorCode, type IdentityProvider } from '@nri/shared';
+import {
+  MIN_REGISTRATION_AGE,
+  changeNicknameSchema,
+  type ErrorCode,
+  type IdentityProvider,
+} from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
-import { eagerErrorState, minAgeValidatorFor } from '../../../shared/forms/profile-validators';
+import {
+  eagerErrorState,
+  minAgeValidatorFor,
+  nicknameValidator,
+} from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
@@ -91,6 +100,8 @@ export class AccountSettings {
   protected readonly busy = signal(false);
   protected readonly identityMessage = signal<Message | null>(null);
   protected readonly telegramPending = signal(false);
+  protected readonly nicknameError = signal<string | null>(null);
+  protected readonly nicknameSaved = signal(false);
   protected readonly birthDateMessage = signal<Message | null>(null);
   protected readonly birthDateSaved = signal(false);
   protected readonly dangerMessage = signal<Message | null>(null);
@@ -100,12 +111,20 @@ export class AccountSettings {
     return isErrorCode(code) ? `errors.${code}` : 'errors.UNKNOWN';
   });
 
+  protected readonly nickname = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, nicknameValidator],
+  });
+
+  protected readonly nicknameForm = new FormGroup({ nickname: this.nickname });
+
   protected readonly birthDate = new FormControl<Date | null>(null, [
     Validators.required,
     minAgeValidatorFor(() => this.me()?.timezone),
   ]);
 
   constructor() {
+    this.nickname.setValue(this.me()?.nickname ?? '');
     const current = this.me()?.birthDate;
     if (current) this.birthDate.setValue(fromIsoDate(current));
 
@@ -151,6 +170,34 @@ export class AccountSettings {
         throw err;
       }
     });
+  }
+
+  protected async saveNickname(): Promise<void> {
+    if (this.busy()) return;
+    const parsed = changeNicknameSchema.safeParse({ nickname: this.nickname.value.trim() });
+    if (this.nickname.invalid || !parsed.success) {
+      this.nickname.markAsTouched();
+      return;
+    }
+    this.nicknameSaved.set(false);
+    this.nicknameError.set(null);
+    this.busy.set(true);
+    try {
+      const me = await firstValueFrom(this.api.changeNickname(parsed.data.nickname));
+      this.auth.setMe(me);
+      this.nickname.setValue(me.nickname ?? '');
+      this.nicknameSaved.set(true);
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code === 'NICKNAME_TAKEN') {
+        this.nickname.setErrors({ ...this.nickname.errors, taken: true });
+        this.nickname.markAsTouched();
+      } else if (code !== 'UNAUTHENTICATED') {
+        this.nicknameError.set(`errors.${code}`);
+      }
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async saveBirthDate(): Promise<void> {

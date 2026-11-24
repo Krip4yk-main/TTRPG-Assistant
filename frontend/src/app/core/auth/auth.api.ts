@@ -43,6 +43,10 @@ export class AuthApi {
     return this.http.post<MeDto>('/api/me/complete-profile', input);
   }
 
+  changeNickname(nickname: string): Observable<MeDto> {
+    return this.http.patch<MeDto>('/api/me/nickname', { nickname });
+  }
+
   changeBirthDate(birthDate: string): Observable<MeDto> {
     return this.http.patch<MeDto>('/api/me/birth-date', { birthDate });
   }
