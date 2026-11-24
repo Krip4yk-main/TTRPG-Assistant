@@ -4,12 +4,13 @@ import {
   Component,
   ElementRef,
   Injector,
-  type OnInit,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -28,6 +29,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
+import type { ErrorStateMatcher } from '@angular/material/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   AGE_RATINGS,
@@ -60,7 +62,7 @@ import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
-import { provideUkDates } from '../../../core/i18n/dates';
+import { fromIsoDate, provideUkDates } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 
 type SystemChoice = number | 'other' | null;
@@ -95,6 +97,48 @@ const REASON_TO_CONTROL: Partial<Record<string, string>> = {
   UNKNOWN_SYSTEM: 'system',
   UNKNOWN_GENRE: 'genreId',
   UNKNOWN_WARNING: 'contentWarningIds',
+};
+
+/** Розділи форми (ключі `games.form.sections.*`) — для підказки біля «Опублікувати». */
+const SECTIONS = [
+  'main',
+  'place',
+  'schedule',
+  'players',
+  'warnings',
+  'channels',
+  'questions',
+] as const;
+type Section = (typeof SECTIONS)[number];
+const CONTROL_SECTION: Record<string, Section> = {
+  title: 'main',
+  description: 'main',
+  system: 'main',
+  systemOther: 'main',
+  genreId: 'main',
+  coverUrl: 'main',
+  format: 'place',
+  city: 'place',
+  address: 'place',
+  platform: 'place',
+  language: 'place',
+  kind: 'schedule',
+  startDate: 'schedule',
+  startTime: 'schedule',
+  durationMinutes: 'schedule',
+  recurrence: 'schedule',
+  weekdays: 'schedule',
+  minPlayers: 'players',
+  maxPlayers: 'players',
+  priceUah: 'players',
+  ageRating: 'players',
+  experience: 'players',
+  requirements: 'players',
+  showWhenFull: 'players',
+  contentWarningIds: 'warnings',
+  customWarnings: 'warnings',
+  channelLinks: 'channels',
+  applicationQuestions: 'questions',
 };
 
 interface ZodLikeIssue {
@@ -132,7 +176,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
   styleUrl: './game-form.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class GameForm implements OnInit {
+export class GameForm {
   private readonly api = inject(GamesApi);
   private readonly catalogStore = inject(CatalogStore);
   private readonly auth = inject(AuthStore);
@@ -153,11 +197,10 @@ export class GameForm implements OnInit {
   protected readonly maxChannels = MAX_CHANNELS;
   protected readonly maxQuestions = MAX_QUESTIONS;
   protected readonly maxCustomWarnings = MAX_CUSTOM_WARNINGS;
-  protected readonly today = new Date();
 
   protected readonly catalog = this.catalogStore.catalog;
   protected readonly game = signal<GameDto | null>(null);
-  private readonly gameId = signal<number | null>(null);
+  protected readonly gameId = signal<number | null>(null);
   protected readonly loadingGame = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly busy = signal(false);
@@ -166,8 +209,12 @@ export class GameForm implements OnInit {
   protected readonly formError = signal<string | null>(null);
   /** Помилки API біля полів: контрол → ключ i18n. */
   protected readonly apiErrors = signal<Readonly<Record<string, string>>>({});
+  /** Значення контролів у момент помилки API: зміна значення прибирає помилку. */
+  private apiErrorValues: Record<string, string> = {};
   /** Результат останньої перевірки схемою. */
   protected readonly valid = signal(false);
+  /** Розділи з помилками (порядок форми). */
+  protected readonly invalidSections = signal<Section[]>([]);
   /** Зміна помилок контролів (вони не сигнали) — для перерахунку шаблону. */
   private readonly tick = signal(0);
 
@@ -181,6 +228,8 @@ export class GameForm implements OnInit {
   protected readonly timezone = computed(
     () => this.game()?.timezone ?? this.auth.me()?.timezone ?? DEFAULT_TZ,
   );
+  /** «Сьогодні» в поясі гри — мінімум datepicker-а (справжня перевірка — GAME_IN_PAST). */
+  protected readonly minDate = computed(() => fromIsoDate(localDate(new Date(), this.timezone())));
   private readonly viewerAge = computed(() => {
     const me = this.auth.me();
     return me?.birthDate ? ageOn(me.birthDate, localDate(new Date(), me.timezone)) : null;
@@ -228,11 +277,19 @@ export class GameForm implements OnInit {
   });
   protected readonly c = this.form.controls;
   protected readonly newCustomWarning = new FormControl('', { nonNullable: true });
+  /** «Максимум гравців»: помилку min > max видно, щойно змінили будь-яке з двох полів. */
+  protected readonly playersErrorState: ErrorStateMatcher = {
+    isErrorState: (control, form) =>
+      !!control?.invalid && (control.touched || this.c.minPlayers.touched || !!form?.submitted),
+  };
   /** Знімок значень для умовних блоків шаблону. */
   protected readonly value = signal(this.form.getRawValue());
 
+  /** Початкові значення — для скидання форми при зміні `id`. */
+  private readonly defaults = this.form.getRawValue();
   private prefilling = false;
   private marked: AbstractControl[] = [];
+  private loadSeq = 0;
 
   constructor() {
     this.catalogStore.load().catch(() => this.loadError.set('errors.INTERNAL'));
@@ -255,16 +312,36 @@ export class GameForm implements OnInit {
     });
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.validate());
     this.validate();
+
+    // Маршрут може перевикористати компонент (`/games/1/edit` → `/games/2/edit`).
+    effect(() => {
+      const raw = this.id();
+      untracked(() => this.open(raw));
+    });
   }
 
-  ngOnInit(): void {
-    const raw = this.id();
+  /** Скидає форму й завантажує гру за параметром маршруту (немає — нова гра). */
+  private open(raw: string | undefined): void {
+    const seq = ++this.loadSeq;
+    this.game.set(null);
+    this.gameId.set(null);
+    this.loadError.set(null);
+    this.formError.set(null);
+    this.setApiErrors({});
+    this.submitted.set(false);
+    this.prefilling = true;
+    this.form.enable({ emitEvent: false });
+    this.c.customWarnings.clear({ emitEvent: false });
+    this.c.channelLinks.clear({ emitEvent: false });
+    this.c.applicationQuestions.clear({ emitEvent: false });
+    this.form.reset(this.defaults);
+    this.prefilling = false;
     if (raw === undefined) return;
     if (!/^\d{1,15}$/.test(raw)) {
       this.loadError.set('errors.NOT_FOUND');
       return;
     }
-    void this.loadGame(Number(raw));
+    void this.loadGame(Number(raw), seq);
   }
 
   // ---------- шаблон ----------
@@ -363,7 +440,7 @@ export class GameForm implements OnInit {
     }
     this.busy.set(true);
     this.formError.set(null);
-    this.apiErrors.set({});
+    this.setApiErrors({});
     try {
       const id = this.gameId();
       let dto: GameDto;
@@ -418,11 +495,31 @@ export class GameForm implements OnInit {
       }
     }
     if (Object.keys(fieldErrors).length > 0) {
-      this.apiErrors.set(fieldErrors);
+      this.setApiErrors(fieldErrors);
       this.focusFirstInvalid();
     } else {
       this.formError.set(`errors.${code}`);
     }
+  }
+
+  private setApiErrors(errors: Record<string, string>): void {
+    this.apiErrorValues = {};
+    for (const name of Object.keys(errors)) this.apiErrorValues[name] = this.snapshot(name);
+    this.apiErrors.set(errors);
+  }
+
+  private snapshot(name: string): string {
+    return JSON.stringify(this.form.get(name)?.getRawValue() ?? null);
+  }
+
+  /** Прибирає помилки API з контролів, значення яких змінилося. */
+  private clearEditedApiErrors(): void {
+    const current = this.apiErrors();
+    const names = Object.keys(current);
+    if (names.length === 0) return;
+    const kept = names.filter((n) => this.snapshot(n) === this.apiErrorValues[n]);
+    if (kept.length === names.length) return;
+    this.apiErrors.set(Object.fromEntries(kept.map((n) => [n, current[n]!])));
   }
 
   // ---------- валідація ----------
@@ -433,34 +530,53 @@ export class GameForm implements OnInit {
    */
   private validate(): GameInput | null {
     this.value.set(this.form.getRawValue());
+    this.clearEditedApiErrors();
     for (const control of this.marked) {
       control.updateValueAndValidity({ onlySelf: true, emitEvent: false });
     }
     this.marked = [];
     const result = gameInputSchema(this.timezone()).safeParse(this.payload());
+    const sections = new Set<Section>();
     if (!result.success) {
-      for (const issue of result.error.issues) this.markIssue(issue);
+      for (const issue of result.error.issues) {
+        const name = this.markIssue(issue);
+        if (name && CONTROL_SECTION[name]) sections.add(CONTROL_SECTION[name]);
+      }
     }
+    // min ≤ max — локально, біля «Максимум»: схема перевіряє це лише коли решта полів валідна.
+    const { minPlayers: min, maxPlayers: max } = this.c;
+    if (typeof min.value === 'number' && typeof max.value === 'number' && min.value > max.value) {
+      if (this.mark(max, 'games.form.errors.players')) sections.add('players');
+    }
+    if (this.c.startDate.errors !== null) sections.add('schedule');
+    this.invalidSections.set(SECTIONS.filter((x) => sections.has(x)));
     this.tick.update((n) => n + 1);
-    const ok = result.success && this.c.startDate.errors === null;
+    const ok = result.success && sections.size === 0;
     this.valid.set(ok);
     return ok ? result.data : null;
   }
 
-  private markIssue(issue: ZodLikeIssue): void {
+  /** Ставить помилку схеми на контрол; повертає назву кореневого контролу. */
+  private markIssue(issue: ZodLikeIssue): string | null {
     const path = issue.path ?? [];
     const field = path[0];
-    if (typeof field !== 'string') return;
-    const control = this.form.get([
-      this.controlName(field),
-      ...(path.slice(1) as (string | number)[]),
-    ]);
-    if (!control || control.disabled || control.errors?.['schema']) return;
-    control.setErrors(
-      { ...control.errors, schema: this.issueKey(field, issue) },
-      { emitEvent: false },
-    );
+    if (typeof field !== 'string') return null;
+    // min > max показуємо біля «Максимум».
+    const name =
+      field === 'minPlayers' && issue.code === 'custom' ? 'maxPlayers' : this.controlName(field);
+    const control = this.form.get([name, ...(path.slice(1) as (string | number)[])]);
+    if (!control || control.disabled) return null;
+    this.mark(control, this.issueKey(field, issue));
+    return name;
+  }
+
+  /** Перша помилка на контролі виграє; `false` — контрол вимкнено. */
+  private mark(control: AbstractControl, key: string): boolean {
+    if (control.disabled) return false;
+    if (control.errors?.['schema']) return true;
+    control.setErrors({ ...control.errors, schema: key }, { emitEvent: false });
     this.marked.push(control);
+    return true;
   }
 
   private issueKey(field: string, issue: ZodLikeIssue): string {
@@ -552,10 +668,11 @@ export class GameForm implements OnInit {
 
   // ---------- завантаження ----------
 
-  private async loadGame(id: number): Promise<void> {
+  private async loadGame(id: number, seq: number): Promise<void> {
     this.loadingGame.set(true);
     try {
       const view = await firstValueFrom(this.api.get(id));
+      if (seq !== this.loadSeq) return; // уже відкрито іншу гру
       const me = this.auth.me();
       if (
         isRestrictedGame(view) ||
@@ -569,10 +686,11 @@ export class GameForm implements OnInit {
       this.game.set(view);
       this.prefill(view);
     } catch (err) {
+      if (seq !== this.loadSeq) return;
       const { code } = toApiError(err);
       if (code !== 'UNAUTHENTICATED') this.loadError.set(`errors.${code}`);
     } finally {
-      this.loadingGame.set(false);
+      if (seq === this.loadSeq) this.loadingGame.set(false);
     }
   }
 

@@ -1,5 +1,10 @@
 <section class="nri-page game-form-page">
-  <h1>{{ (id() === undefined ? 'games.form.titleNew' : 'games.form.titleEdit') | translate }}</h1>
+  <h1>
+    {{
+      (gameId() === null && id() === undefined ? 'games.form.titleNew' : 'games.form.titleEdit')
+        | translate
+    }}
+  </h1>
 
   @if (loadError(); as key) {
     <div class="nri-alert" role="alert">
@@ -19,7 +24,7 @@
         <legend>{{ 'games.form.sections.main' | translate }}</legend>
 
         <div class="field">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ 'games.form.title' | translate }}</mat-label>
             <input matInput formControlName="title" maxlength="120" required />
             @if (errorKey('title'); as key) {
@@ -30,7 +35,7 @@
 
         <div class="row">
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.system' | translate }}</mat-label>
               <select matNativeControl formControlName="system" required>
                 <option [ngValue]="null" disabled>
@@ -55,7 +60,7 @@
 
           @if (value().system === 'other') {
             <div class="field">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.systemOtherName' | translate }}</mat-label>
                 <input matInput formControlName="systemOther" maxlength="80" required />
                 @if (errorKey('systemOther'); as key) {
@@ -69,7 +74,7 @@
           }
 
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.genre' | translate }}</mat-label>
               <select matNativeControl formControlName="genreId" required>
                 <option [ngValue]="null" disabled>
@@ -91,7 +96,7 @@
         </div>
 
         <div class="field">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ 'games.form.description' | translate }}</mat-label>
             <textarea matInput formControlName="description" rows="5" maxlength="5000"></textarea>
             @if (errorKey('description'); as key) {
@@ -101,7 +106,7 @@
         </div>
 
         <div class="field">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ 'games.form.coverUrl' | translate }}</mat-label>
             <input matInput type="url" formControlName="coverUrl" maxlength="512" inputmode="url" />
             <mat-hint>{{ 'games.form.coverUrlHint' | translate }}</mat-hint>
@@ -131,7 +136,7 @@
         @if (value().format === 'offline') {
           <div class="row">
             <div class="field">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.city' | translate }}</mat-label>
                 <input
                   matInput
@@ -146,7 +151,7 @@
               </mat-form-field>
             </div>
             <div class="field">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.address' | translate }}</mat-label>
                 <input
                   matInput
@@ -163,7 +168,7 @@
           </div>
         } @else {
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.platform' | translate }}</mat-label>
               <input matInput formControlName="platform" maxlength="60" />
               <mat-hint>{{ 'games.form.platformHint' | translate }}</mat-hint>
@@ -176,7 +181,7 @@
 
         <div class="row">
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.language' | translate }}</mat-label>
               <select matNativeControl formControlName="language">
                 @for (l of languages; track l) {
@@ -212,12 +217,12 @@
 
         <div class="row">
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.startDate' | translate }}</mat-label>
               <input
                 matInput
                 [matDatepicker]="picker"
-                [min]="isDraft() ? today : null"
+                [min]="isDraft() ? minDate() : null"
                 formControlName="startDate"
                 required
               />
@@ -233,7 +238,7 @@
             }
           </div>
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
               <input matInput type="time" formControlName="startTime" step="60" required />
               <mat-hint>{{ 'games.form.timezoneHint' | translate: { tz: timezone() } }}</mat-hint>
@@ -243,7 +248,7 @@
             </mat-form-field>
           </div>
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
               <select matNativeControl formControlName="durationMinutes">
                 @for (m of durations; track m) {
@@ -258,7 +263,7 @@
 
         @if (value().kind === 'campaign') {
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.recurrence' | translate }}</mat-label>
               <select matNativeControl formControlName="recurrence">
                 @for (r of recurrences; track r) {
@@ -308,7 +313,7 @@
 
         <div class="row">
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.minPlayers' | translate }}</mat-label>
               <input
                 matInput
@@ -324,12 +329,13 @@
             </mat-form-field>
           </div>
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.maxPlayers' | translate }}</mat-label>
               <input
                 matInput
                 type="number"
                 formControlName="maxPlayers"
+                [errorStateMatcher]="playersErrorState"
                 min="1"
                 max="20"
                 required
@@ -340,7 +346,7 @@
             </mat-form-field>
           </div>
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.price' | translate }}</mat-label>
               <input matInput type="number" formControlName="priceUah" min="0" max="100000" />
               <mat-hint>{{ 'games.form.priceHint' | translate }}</mat-hint>
@@ -353,7 +359,7 @@
 
         <div class="row">
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.ageRating' | translate }}</mat-label>
               <select matNativeControl formControlName="ageRating">
                 @for (r of ageRatings; track r) {
@@ -371,7 +377,7 @@
             }
           </div>
           <div class="field">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.experience' | translate }}</mat-label>
               <select matNativeControl formControlName="experience">
                 @for (x of experiences; track x) {
@@ -383,7 +389,7 @@
         </div>
 
         <div class="field">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ 'games.form.requirements' | translate }}</mat-label>
             <textarea matInput formControlName="requirements" rows="3" maxlength="2000"></textarea>
             @if (errorKey('requirements'); as key) {
@@ -436,7 +442,7 @@
           </ul>
         }
         <div class="add-row">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ 'games.form.customWarning' | translate }}</mat-label>
             <input
               matInput
@@ -463,7 +469,7 @@
         @for (link of c.channelLinks.controls; track link; let i = $index) {
           <div class="row channel" [formGroupName]="i">
             <div class="field">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.channelLabel' | translate }}</mat-label>
                 <input matInput formControlName="label" maxlength="40" required />
                 @if (errorKey('channelLinks.' + i + '.label'); as key) {
@@ -472,7 +478,7 @@
               </mat-form-field>
             </div>
             <div class="field grow">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.channelUrl' | translate }}</mat-label>
                 <input matInput type="url" formControlName="url" maxlength="512" required />
                 @if (errorKey('channelLinks.' + i + '.url'); as key) {
@@ -510,7 +516,7 @@
         @for (q of c.applicationQuestions.controls; track q; let i = $index) {
           <div class="row question">
             <div class="field grow">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'games.form.question' | translate: { n: i + 1 } }}</mat-label>
                 <textarea
                   matInput
@@ -574,7 +580,16 @@
         </div>
         @if (isDraft() && !valid()) {
           <p id="publish-hint" class="nri-muted hint publish-hint">
-            {{ 'games.form.publishHint' | translate }}
+            @if (invalidSections().length > 0) {
+              {{ 'games.form.publishHintSections' | translate }}
+              @for (section of invalidSections(); track section; let last = $last) {
+                <strong class="invalid-section">{{
+                  'games.form.sections.' + section | translate
+                }}</strong>{{ last ? '' : ', ' }}
+              }
+            } @else {
+              {{ 'games.form.publishHint' | translate }}
+            }
           </p>
         }
       }

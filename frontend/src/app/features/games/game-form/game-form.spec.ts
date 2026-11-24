@@ -232,6 +232,62 @@ describe('GameForm', () => {
     expect(systemField.textContent).toContain('errors.GAME_FIELD_LOCKED');
   });
 
+  it('recruiting game: locked fields are omitted from the PATCH body', async () => {
+    await setup(5, game({ status: 'recruiting' }));
+    await type('input[formcontrolname="title"]', 'Нова назва');
+    await submit();
+    const req = http.expectOne('/api/games/5');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toMatchObject({ title: 'Нова назва', genreId: 4 });
+    for (const field of ['systemId', 'systemOther', 'kind']) {
+      expect(req.request.body).not.toHaveProperty(field);
+    }
+    req.flush(game({ status: 'recruiting', title: 'Нова назва' }));
+    await settle();
+  });
+
+  it('a server field error clears once the user edits that field', async () => {
+    await setup(5, game({ status: 'draft' }));
+    await submit();
+    http
+      .expectOne('/api/games/5')
+      .flush({ error: { code: 'GAME_IN_PAST' } }, { status: 422, statusText: 'Unprocessable' });
+    await settle();
+    const dateField = () =>
+      q<HTMLInputElement>('input[formcontrolname="startDate"]').closest('.field')!;
+    expect(dateField().textContent).toContain('errors.GAME_IN_PAST');
+    // Редагування іншого поля помилку не прибирає.
+    await type('input[formcontrolname="title"]', 'Інша назва');
+    expect(dateField().textContent).toContain('errors.GAME_IN_PAST');
+    await type('input[formcontrolname="startDate"]', '03.03.2027');
+    expect(dateField().textContent).not.toContain('errors.GAME_IN_PAST');
+  });
+
+  it('min > max players: error next to the max field, publish hint names the section', async () => {
+    await setup();
+    await fillValid();
+    await type('input[formcontrolname="minPlayers"]', '6');
+    const maxField = q<HTMLInputElement>('input[formcontrolname="maxPlayers"]').closest('.field')!;
+    expect(maxField.textContent).toContain('games.form.errors.players');
+    expect(publishButton().disabled).toBe(true);
+    const hint = q<HTMLElement>('#publish-hint');
+    expect(hint.textContent).toContain('games.form.publishHintSections');
+    expect(
+      Array.from(hint.querySelectorAll('.invalid-section')).map((s) => s.textContent!.trim()),
+    ).toEqual(['games.form.sections.players']);
+  });
+
+  it('reloads when the route id changes (component reuse)', async () => {
+    await setup(5, game({ status: 'recruiting' }));
+    fixture.componentRef.setInput('id', '6');
+    await settle();
+    http.expectOne('/api/games/6').flush(game({ id: 6, title: 'Друга гра', status: 'draft' }));
+    await settle();
+    expect(q<HTMLInputElement>('input[formcontrolname="title"]').value).toBe('Друга гра');
+    // Блокування попередньої (recruiting) гри не лишилося.
+    expect(selectOf('system').disabled).toBe(false);
+  });
+
   it('a user under 18 cannot pick 18+/21+ age ratings', async () => {
     const today = new Date();
     const teen = { ...me, birthDate: `${today.getFullYear() - 16}-01-01` };

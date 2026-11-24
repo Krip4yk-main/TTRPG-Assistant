@@ -16,12 +16,14 @@
       >
       <a
         mat-stroked-button
+        class="new-game-link"
         routerLink="/games/new"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
+        [attr.aria-label]="'shell.newGame' | translate"
       >
         <mat-icon aria-hidden="true">add</mat-icon>
-        {{ 'shell.newGame' | translate }}
+        <span class="nav-label">{{ 'shell.newGame' | translate }}</span>
       </a>
     </nav>
   }
@@ -34,10 +36,14 @@
       (change)="setMode($event.value)"
       [attr.aria-label]="'shell.viewMode.label' | translate"
     >
-      <mat-button-toggle value="player">{{
-        'shell.viewMode.player' | translate
-      }}</mat-button-toggle>
-      <mat-button-toggle value="gm">{{ 'shell.viewMode.gm' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="player">
+        <span class="long">{{ 'shell.viewMode.player' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.playerShort' | translate }}</span>
+      </mat-button-toggle>
+      <mat-button-toggle value="gm">
+        <span class="long">{{ 'shell.viewMode.gm' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.gmShort' | translate }}</span>
+      </mat-button-toggle>
     </mat-button-toggle-group>
   }
   @if (auth.me(); as me) {
