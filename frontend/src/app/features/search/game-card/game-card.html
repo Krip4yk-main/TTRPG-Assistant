@@ -32,7 +32,7 @@
       <img class="cover" [src]="g.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" />
     }
     <div class="body">
-      @if (g.fit || g.ageRating !== 'none' || g.status === 'started') {
+      @if (g.fit || g.ageRating !== 'none' || g.status !== 'recruiting') {
         <div class="badges">
           @if (g.fit) {
             <span class="badge fit" [attr.data-fit]="g.fit">
@@ -45,8 +45,10 @@
           @if (g.ageRating !== 'none') {
             <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
           }
-          @if (g.status === 'started') {
-            <span class="badge">{{ 'games.status.started' | translate }}</span>
+          @if (g.status !== 'recruiting') {
+            <span class="badge status" [attr.data-status]="g.status">{{
+              'games.status.' + g.status | translate
+            }}</span>
           }
         </div>
       }

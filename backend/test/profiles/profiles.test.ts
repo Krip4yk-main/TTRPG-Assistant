@@ -182,6 +182,33 @@ describe('profile games', () => {
     expect(playerProfile.gamesAsPlayer.map((g: { id: number }) => g.id)).toEqual([pubId]);
   });
 
+  it('published cancelled games are listed with their status; unpublished cancelled stay private', async () => {
+    const gm = await games.userWithAge(30, 'Master');
+    const player = await games.userWithAge(25, 'Player');
+    const cancelledPub = await games.createGame(gm.cookie, { title: 'Скасована' }, true);
+    await db.insert(gameMembers).values({ gameId: cancelledPub, userId: player.id });
+    expect((await games.call('post', `/api/games/${cancelledPub}/cancel`, gm.cookie)).status).toBe(
+      200,
+    );
+    const cancelledDraft = await games.createGame(gm.cookie, { title: 'Скасована чернетка' });
+    await db.insert(gameMembers).values({ gameId: cancelledDraft, userId: player.id });
+    expect(
+      (await games.call('post', `/api/games/${cancelledDraft}/cancel`, gm.cookie)).status,
+    ).toBe(200);
+
+    const gmProfile = (await request(app).get(`/api/users/${gm.publicId}`)).body;
+    expect(gmProfile.gamesAsGm).toEqual([
+      expect.objectContaining({ id: cancelledPub, status: 'cancelled' }),
+    ]);
+    const playerProfile = (await request(app).get(`/api/users/${player.publicId}`)).body;
+    expect(playerProfile.gamesAsPlayer).toEqual([
+      expect.objectContaining({ id: cancelledPub, status: 'cancelled' }),
+    ]);
+    // Сам майстер теж не бачить скасованої чернетки у своєму публічному профілі (R9).
+    const own = (await request(app).get(`/api/users/${gm.publicId}`).set('Cookie', gm.cookie)).body;
+    expect(own.gamesAsGm.map((g: { id: number }) => g.id)).toEqual([cancelledPub]);
+  });
+
   it('18+ game on a public profile is restricted for a guest', async () => {
     const gm = await games.userWithAge(30);
     await games.createGame(gm.cookie, { ageRating: '18+' }, true);

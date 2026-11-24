@@ -451,10 +451,13 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<GameCa
   return (await loadGames(deps, eq(games.gmUserId, userId))).map((l) => toCardDto(l, now));
 }
 
-/** Статуси, що показуються в історії ігор профілю. */
-const PROFILE_STATUSES: GameStatus[] = ['recruiting', 'started', 'finished'];
+/**
+ * Статуси, що показуються в історії ігор профілю. Скасовані — теж, але лише опубліковані
+ * (умова `publishedAt` нижче): скасована чернетка лишається приватною (R9).
+ */
+const PROFILE_STATUSES: GameStatus[] = ['recruiting', 'started', 'finished', 'cancelled'];
 
-/** Ігри користувача для публічного профілю (без чернеток і скасованих). */
+/** Ігри користувача для публічного профілю (опубліковані; без чернеток). */
 export async function listProfileGames(
   deps: AppDeps,
   userId: number,
@@ -465,7 +468,7 @@ export async function listProfileGames(
 }> {
   const now = new Date();
   const order = [desc(games.startsAt), desc(games.id)];
-  // Лише опубліковані: неопублікована гра (навіть скасована) іншим не показується.
+  // Лише опубліковані: неопублікована гра (зокрема скасована чернетка) не показується.
   const visible = and(inArray(games.status, PROFILE_STATUSES), isNotNull(games.publishedAt));
   const memberOf = deps.db
     .select({ id: gameMembers.gameId })

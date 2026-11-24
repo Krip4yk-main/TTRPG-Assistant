@@ -79,6 +79,21 @@ describe('GameCard', () => {
     expect(el.querySelector('.fit')).toBeNull();
   });
 
+  it('no status badge while recruiting', async () => {
+    await render(game);
+    expect(el.querySelector('.status')).toBeNull();
+  });
+
+  for (const status of ['started', 'finished', 'cancelled'] as const) {
+    it(`shows a translated status badge for ${status}`, async () => {
+      await render({ ...game, fit: undefined, ageRating: 'none', status });
+      const badge = el.querySelector('.badge.status');
+      expect(badge).not.toBeNull();
+      expect(badge!.getAttribute('data-status')).toBe(status);
+      expect(badge!.textContent).toContain(`games.status.${status}`);
+    });
+  }
+
   it('restricted card is blurred and never renders details, even if they leak', async () => {
     await render({
       ...restricted,

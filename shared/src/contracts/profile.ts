@@ -78,7 +78,8 @@ export interface PublicProfileDto {
   preferredFormats?: PreferredFormat[];
   experience?: ExperienceLevel;
   /**
-   * Ігри у статусах recruiting|started|finished (без чернеток і скасованих). Гра 18+/21+,
+   * Опубліковані ігри у статусах recruiting|started|finished|cancelled (без чернеток;
+   * скасована неопублікована гра не показується). Гра 18+/21+,
    * якої глядач не проходить за віком, — у вигляді `RestrictedGameDto`.
    */
   gamesAsGm?: (GameCardDto | RestrictedGameDto)[];
