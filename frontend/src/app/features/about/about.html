@@ -10,7 +10,12 @@
     @for (link of authorLinks; track link.key) {
       <dt>{{ link.key | translate }}</dt>
       <dd>
-        <a [href]="link.href" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+        <a
+          [href]="link.href"
+          [attr.target]="link.href.startsWith('mailto:') ? null : '_blank'"
+          rel="noopener noreferrer"
+          >{{ link.label }}</a
+        >
       </dd>
     }
   </dl>

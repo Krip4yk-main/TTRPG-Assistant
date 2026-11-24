@@ -31,7 +31,10 @@ describe('CompleteProfile', () => {
         provideRouter([]),
         // Без завантажувача перекладів pipe `translate` повертає сам ключ.
         provideTranslateService(),
-        { provide: SocketService, useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() } },
+        {
+          provide: SocketService,
+          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+        },
       ],
     }).compileComponents();
 

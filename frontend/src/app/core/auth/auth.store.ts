@@ -1,10 +1,11 @@
-import { Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthApi } from './auth.api';
 import type { MeDto } from './me.model';
-import { SocketService } from '../realtime/socket.service';
+import { SocketService, type SessionLostReason } from '../realtime/socket.service';
 import { safeReturnTo } from './return-to';
 
 const CHANNEL_NAME = 'nri-auth';
@@ -25,6 +26,9 @@ export class AuthStore {
   private readonly channel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME);
   private revalidating: Promise<void> | null = null;
+  private loggingOut = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly state = signal<MeDto | null>(null);
   private readonly known = signal(false);
@@ -43,8 +47,14 @@ export class AuthStore {
 
   constructor() {
     // Сервер відкликав сесію або інша вкладка вийшла: перевіряємо, чи сесія ще жива.
-    this.socket.sessionLost$.subscribe(() => void this.revalidate());
+    this.socket.sessionLost$
+      .pipe(takeUntilDestroyed())
+      .subscribe((reason) => void this.revalidate(reason));
     if (this.channel) this.channel.onmessage = () => void this.revalidate();
+    inject(DestroyRef).onDestroy(() => {
+      this.channel?.close();
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    });
   }
 
   /** `GET /api/me` (заодно отримує куку CSRF). */
@@ -60,31 +70,55 @@ export class AuthStore {
   }
 
   /**
-   * Перевіряє сесію після сигналу «втрачено». Лише 401 розлогінює й веде на /login;
-   * інші помилки (мережа, 5xx) стан не змінюють. Router береться ліниво (цикл DI).
+   * Перевіряє сесію після сигналу «втрачено». 401 і 403 ACCOUNT_BANNED розлогінюють
+   * і ведуть на /login; 200 оновлює стан; інші помилки (мережа, 5xx) стан не змінюють.
+   * Router береться ліниво (цикл DI). Ігнорується, поки триває власний вихід.
    */
-  revalidate(): Promise<void> {
-    if (!this.isAuthenticated()) return Promise.resolve();
+  revalidate(reason?: SessionLostReason): Promise<void> {
+    if (this.loggingOut || !this.isAuthenticated()) return Promise.resolve();
     this.revalidating ??= firstValueFrom(this.api.me())
       .then(
-        () => undefined,
+        (me) => {
+          if (this.loggingOut) return;
+          this.reconnectAttempts = 0;
+          this.setMe(me);
+        },
         (err: unknown) => {
-          if (err instanceof HttpErrorResponse && err.status === 401) {
+          if (this.loggingOut || !this.isAuthenticated()) return;
+          const banned =
+            err instanceof HttpErrorResponse &&
+            err.status === 403 &&
+            (err.error as { error?: { code?: unknown } } | null)?.error?.code === 'ACCOUNT_BANNED';
+          if (banned || (err instanceof HttpErrorResponse && err.status === 401)) {
             this.setMe(null);
-            const router = this.injector.get(Router);
-            const returnTo = safeReturnTo(router.url);
-            if (!router.url.startsWith('/login')) {
-              void router.navigate(['/login'], {
-                queryParams: { error: 'UNAUTHENTICATED', ...(returnTo ? { returnTo } : {}) },
-              });
-            }
+            this.goToLogin(banned ? 'ACCOUNT_BANNED' : 'UNAUTHENTICATED');
           } else {
             this.failed.set(true);
+            // Сервер розірвав сокет, але перевірити сесію не вдалося: пробуємо перепідключитися.
+            if (reason === 'revoked' || reason === 'server-disconnect') this.scheduleReconnect();
           }
         },
       )
       .finally(() => (this.revalidating = null));
     return this.revalidating;
+  }
+
+  private goToLogin(error: string): void {
+    const router = this.injector.get(Router);
+    if (router.url.startsWith('/login')) return;
+    const returnTo = safeReturnTo(router.url);
+    void router.navigate(['/login'], {
+      queryParams: { error, ...(returnTo ? { returnTo } : {}) },
+    });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.reconnectAttempts >= 3) return;
+    const delay = 1000 * 2 ** this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.isActive()) this.socket.connect();
+    }, delay);
   }
 
   /** Для guard-ів: чекає першого завантаження, не повторюючи запит. */
@@ -113,18 +147,22 @@ export class AuthStore {
   }
 
   async logout(): Promise<void> {
+    this.loggingOut = true;
     try {
       await firstValueFrom(this.api.logout());
     } finally {
+      this.loggingOut = false;
       this.setMe(null);
       this.channel?.postMessage('logout');
     }
   }
 
   async logoutAll(): Promise<void> {
+    this.loggingOut = true;
     try {
       await firstValueFrom(this.api.logoutAll());
     } finally {
+      this.loggingOut = false;
       this.setMe(null);
       this.channel?.postMessage('logout');
     }

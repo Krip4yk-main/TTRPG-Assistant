@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
+import type { SessionLostReason } from '../realtime/socket.service';
 import { AuthStore } from './auth.store';
 import { SocketService } from '../realtime/socket.service';
 import type { MeDto } from './me.model';
@@ -23,7 +24,7 @@ const me = (over: Partial<MeDto> = {}): MeDto => ({
 describe('AuthStore', () => {
   let store: AuthStore;
   let http: HttpTestingController;
-  const lost$ = new Subject<void>();
+  const lost$ = new Subject<SessionLostReason>();
   const socket = { connect: vi.fn(), disconnect: vi.fn(), on: vi.fn(), sessionLost$: lost$ };
   let navigate: ReturnType<typeof vi.fn>;
 
@@ -150,7 +151,7 @@ describe('AuthStore', () => {
 
     it('sessionLost$ → перевіряє /api/me; 401 → очищає стан і веде на /login з returnTo', async () => {
       await login();
-      lost$.next();
+      lost$.next('revoked');
       http.expectOne('/api/me').flush({ error: { code: 'UNAUTHENTICATED' } }, unauthorized);
       await vi.waitFor(() => expect(store.me()).toBeNull());
 
@@ -162,17 +163,98 @@ describe('AuthStore', () => {
 
     it('sessionLost$ з живою сесією (200) → стан лишається, без навігації', async () => {
       await login();
-      lost$.next();
-      http.expectOne('/api/me').flush(me());
-      await vi.waitFor(() => expect(http.match('/api/me')).toEqual([]));
+      lost$.next('revoked');
+      http.expectOne('/api/me').flush(me({ nickname: 'Saruman' }));
+      await store.revalidate();
 
-      expect(store.me()?.nickname).toBe('Gandalf');
+      expect(store.me()?.nickname).toBe('Saruman');
       expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('403 ACCOUNT_BANNED → вихід і /login?error=ACCOUNT_BANNED', async () => {
+      await login();
+      lost$.next('revoked');
+      http
+        .expectOne('/api/me')
+        .flush({ error: { code: 'ACCOUNT_BANNED' } }, { status: 403, statusText: 'Forbidden' });
+      await vi.waitFor(() => expect(store.me()).toBeNull());
+      expect(navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { error: 'ACCOUNT_BANNED', returnTo: '/account' },
+      });
+    });
+
+    it('sessionLost$ під час власного виходу → без /api/me і без навігації з error', async () => {
+      await login();
+      const done = store.logout();
+      lost$.next('revoked');
+      http.expectNone('/api/me');
+      http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+      await done;
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('два сигнали поспіль → один запит /api/me', async () => {
+      await login();
+      lost$.next('revoked');
+      lost$.next('server-disconnect');
+      http.expectOne('/api/me').flush(me());
+      await store.revalidate().catch(() => undefined);
+    });
+
+    it('уже на /login → без навігації', async () => {
+      await login();
+      vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/login');
+      lost$.next('revoked');
+      http.expectOne('/api/me').flush({}, unauthorized);
+      await vi.waitFor(() => expect(store.me()).toBeNull());
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('небезпечний returnTo (//evil) відкидається', async () => {
+      await login();
+      vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('//evil.example');
+      lost$.next('revoked');
+      http.expectOne('/api/me').flush({}, unauthorized);
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalled());
+      expect(navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { error: 'UNAUTHENTICATED' },
+      });
+    });
+
+    it('5xx зберігає користувача; для revoked пробує перепідключити сокет', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        await login();
+        socket.connect.mockClear();
+        lost$.next('revoked');
+        http.expectOne('/api/me').flush({}, { status: 500, statusText: 'Server Error' });
+        await vi.waitFor(() => expect(store.loadFailed()).toBe(true));
+        expect(store.me()?.nickname).toBe('Gandalf');
+        vi.advanceTimersByTime(1000);
+        expect(socket.connect).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('5xx після connect_error не перепідключає сокет', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        await login();
+        socket.connect.mockClear();
+        lost$.next('auth-error');
+        http.expectOne('/api/me').flush({}, { status: 500, statusText: 'Server Error' });
+        await vi.waitFor(() => expect(store.loadFailed()).toBe(true));
+        vi.advanceTimersByTime(10000);
+        expect(socket.connect).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('мережева помилка під час перевірки не розлогінює', async () => {
       await login();
-      lost$.next();
+      lost$.next('revoked');
       http.expectOne('/api/me').error(new ProgressEvent('error'));
       await vi.waitFor(() => expect(store.loadFailed()).toBe(true));
 
@@ -181,7 +263,7 @@ describe('AuthStore', () => {
     });
 
     it('для гостя sessionLost$ нічого не робить', () => {
-      lost$.next();
+      lost$.next('revoked');
       http.expectNone('/api/me');
     });
 
