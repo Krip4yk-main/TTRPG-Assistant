@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+*.env
+!*.env.template
+!.env.template
+dist/
+.angular/
+coverage/
+.DS_Store
+Thumbs.db
