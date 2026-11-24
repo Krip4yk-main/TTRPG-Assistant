@@ -1,7 +1,8 @@
-import { Location } from '@angular/common';
+import { DOCUMENT, Location } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -25,6 +26,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -57,13 +59,24 @@ import {
   weekdayOf,
   zonedToUtc,
 } from '@nri/shared';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, fromEvent, merge } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { fromIsoDate, provideUkDates } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
+import {
+  ConfirmDialog,
+  type ConfirmDialogData,
+} from '../../../shared/confirm-dialog/confirm-dialog';
+import {
+  type StoredGameValues,
+  gameDraftKey,
+  readGameDraft,
+  removeGameDraft,
+  writeGameDraft,
+} from './game-draft-storage';
 
 type SystemChoice = number | 'other' | null;
 
@@ -74,6 +87,8 @@ const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 const MAX_CHANNELS = 5;
 const MAX_QUESTIONS = 10;
 const MAX_CUSTOM_WARNINGS = 10;
+/** Затримка автозбереження незбережених значень у `localStorage`. */
+const AUTOSAVE_DEBOUNCE_MS = 500;
 const LOCKED_STATUSES = new Set<GameStatus>(['recruiting', 'started']);
 const CLOSED_STATUSES = new Set<GameStatus>(['finished', 'cancelled']);
 
@@ -150,10 +165,31 @@ interface ZodLikeIssue {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+const isString = (x: unknown): x is string => typeof x === 'string';
+const isNumber = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+const isStringArray = (x: unknown): x is string[] => Array.isArray(x) && x.every(isString);
+const isNumberArray = (x: unknown): x is number[] => Array.isArray(x) && x.every(isNumber);
+
+/** Календарна дата datepicker-а ↔ `YYYY-MM-DD` для збереження. */
+function dateToStored(d: Date | null): string | null {
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function dateFromStored(x: unknown): Date | null | undefined {
+  if (x === null) return null;
+  const m = isString(x) ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(x) : null;
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : undefined;
+}
+
 /**
  * Форма гри (створення й редагування). Валідація — та сама `gameInputSchema`, що й на бекенді;
  * помилки показуються біля полів. Дата й час — у поясі гри (для нової — користувача) і
  * перетворюються на UTC ISO цілої хвилини.
+ *
+ * Автозбереження: введені значення (із затримкою) лежать у `localStorage` під ключем
+ * користувача й гри і відновлюються після перезавантаження; копія зникає після успішного
+ * збереження чи «Відкинути зміни». Для завершених/скасованих ігор нічого не зберігається.
  */
 @Component({
   selector: 'nri-game-form',
@@ -184,6 +220,7 @@ export class GameForm {
   private readonly location = inject(Location);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly dialog = inject(MatDialog);
 
   /** Параметр маршруту `/games/:id/edit`; немає — нова гра. */
   readonly id = input<string>();
@@ -217,6 +254,10 @@ export class GameForm {
   protected readonly invalidSections = signal<Section[]>([]);
   /** Зміна помилок контролів (вони не сигнали) — для перерахунку шаблону. */
   private readonly tick = signal(0);
+  /** Форму заповнено незбереженими значеннями з `localStorage`. */
+  protected readonly restored = signal(false);
+  /** Значення відрізняються від збережених (сервера чи типових для нової гри). */
+  protected readonly hasChanges = signal(false);
 
   protected readonly status = computed<GameStatus>(() => this.game()?.status ?? 'draft');
   protected readonly isDraft = computed(() => this.status() === 'draft');
@@ -290,6 +331,11 @@ export class GameForm {
   private prefilling = false;
   private marked: AbstractControl[] = [];
   private loadSeq = 0;
+  /** Автозбереження ввімкнено (гру завантажено, вона не завершена/скасована). */
+  private draftReady = false;
+  /** Знімок значень, із якими порівнюємо (сервер/типові). */
+  private baseline = '';
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.catalogStore.load().catch(() => this.loadError.set('errors.INTERNAL'));
@@ -313,6 +359,18 @@ export class GameForm {
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.validate());
     this.validate();
 
+    merge(this.form.valueChanges, this.newCustomWarning.valueChanges)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.onValuesChanged());
+    // Не втрачаємо останні зміни при закритті вкладки чи переході деінде.
+    const win = inject(DOCUMENT).defaultView;
+    if (win) {
+      fromEvent(win, 'pagehide')
+        .pipe(takeUntilDestroyed())
+        .subscribe(() => this.flushDraft());
+    }
+    inject(DestroyRef).onDestroy(() => this.flushDraft());
+
     // Маршрут може перевикористати компонент (`/games/1/edit` → `/games/2/edit`).
     effect(() => {
       const raw = this.id();
@@ -322,6 +380,10 @@ export class GameForm {
 
   /** Скидає форму й завантажує гру за параметром маршруту (немає — нова гра). */
   private open(raw: string | undefined): void {
+    this.flushDraft();
+    this.draftReady = false;
+    this.restored.set(false);
+    this.hasChanges.set(false);
     const seq = ++this.loadSeq;
     this.game.set(null);
     this.gameId.set(null);
@@ -335,8 +397,12 @@ export class GameForm {
     this.c.channelLinks.clear({ emitEvent: false });
     this.c.applicationQuestions.clear({ emitEvent: false });
     this.form.reset(this.defaults);
+    this.newCustomWarning.setValue('', { emitEvent: false });
     this.prefilling = false;
-    if (raw === undefined) return;
+    if (raw === undefined) {
+      this.startDraft();
+      return;
+    }
     if (!/^\d{1,15}$/.test(raw)) {
       this.loadError.set('errors.NOT_FOUND');
       return;
@@ -446,6 +512,7 @@ export class GameForm {
       let dto: GameDto;
       if (id === null) {
         dto = await firstValueFrom(this.api.create(input));
+        this.discardStored();
         // Чернетку вже створено: повторне збереження (напр. після помилки публікації) — PATCH.
         this.gameId.set(dto.id);
         this.game.set(dto);
@@ -454,6 +521,9 @@ export class GameForm {
         dto = await firstValueFrom(this.api.update(id, this.patchFor(input)));
         this.game.set(dto);
       }
+      // Значення вже на сервері — локальна копія більше не потрібна.
+      this.discardStored();
+      this.baseline = this.snapshotValues();
       if (publish) await firstValueFrom(this.api.transition(dto.id, 'publish'));
       await this.router.navigateByUrl('/my-games');
     } catch (err) {
@@ -739,12 +809,165 @@ export class GameForm {
     this.prefilling = false;
     if (CLOSED_STATUSES.has(g.status)) {
       this.form.disable();
-    } else if (LOCKED_STATUSES.has(g.status)) {
-      this.c.system.disable();
-      this.c.systemOther.disable();
-      this.c.kind.disable();
+      this.discardStored();
+    } else {
+      if (LOCKED_STATUSES.has(g.status)) {
+        this.c.system.disable();
+        this.c.systemOther.disable();
+        this.c.kind.disable();
+      }
+      this.startDraft();
     }
     this.validate();
+  }
+
+  // ---------- автозбереження ----------
+
+  /** Ключ `localStorage` поточної гри; без користувача — `null`. */
+  private draftKey(): string | null {
+    const me = this.auth.me();
+    return me ? gameDraftKey(me.id, this.gameId()) : null;
+  }
+
+  private storedValues(): StoredGameValues {
+    const v = this.form.getRawValue();
+    return {
+      ...v,
+      startDate: dateToStored(v.startDate),
+      newCustomWarning: this.newCustomWarning.value,
+    };
+  }
+
+  private snapshotValues(): string {
+    return JSON.stringify(this.storedValues());
+  }
+
+  /** Форма готова: запам'ятовуємо «чисті» значення й відновлюємо незбережені. */
+  private startDraft(): void {
+    this.baseline = this.snapshotValues();
+    this.draftReady = true;
+    const key = this.draftKey();
+    const values = key ? readGameDraft(key) : null;
+    if (!values) return;
+    this.prefilling = true;
+    this.applyStored(values);
+    this.prefilling = false;
+    this.validate();
+    const changed = this.snapshotValues() !== this.baseline;
+    this.hasChanges.set(changed);
+    this.restored.set(changed);
+    if (!changed && key) removeGameDraft(key);
+  }
+
+  /** Підставляє збережені значення; некоректні й заблоковані поля пропускаються. */
+  private applyStored(values: StoredGameValues): void {
+    const c = this.c;
+    const set = <T>(control: FormControl<T>, value: unknown, ok: (x: unknown) => boolean) => {
+      if (value !== undefined && !control.disabled && ok(value)) control.setValue(value as T);
+    };
+    const nullableNumber = (x: unknown) => x === null || isNumber(x);
+    for (const name of [
+      'title',
+      'description',
+      'systemOther',
+      'format',
+      'city',
+      'address',
+      'platform',
+      'kind',
+      'startTime',
+      'recurrence',
+      'ageRating',
+      'experience',
+      'language',
+      'requirements',
+      'coverUrl',
+    ] as const) {
+      set(c[name] as FormControl<string>, values[name], isString);
+    }
+    set(c.system, values['system'], (x) => x === 'other' || nullableNumber(x));
+    set(c.genreId, values['genreId'], nullableNumber);
+    if (isNumber(values['genreId'])) c.genreId.markAsDirty();
+    for (const name of ['minPlayers', 'maxPlayers', 'priceUah'] as const) {
+      set(c[name], values[name], nullableNumber);
+    }
+    set(c.durationMinutes, values['durationMinutes'], isNumber);
+    set(c.weekdays, values['weekdays'], isNumberArray);
+    set(c.contentWarningIds, values['contentWarningIds'], isNumberArray);
+    set(c.showWhenFull, values['showWhenFull'], (x) => typeof x === 'boolean');
+    const date = dateFromStored(values['startDate']);
+    if (date !== undefined) c.startDate.setValue(date);
+    set(this.newCustomWarning, values['newCustomWarning'], isString);
+    const strings = (list: FormArray<FormControl<string>>, value: unknown) => {
+      if (!isStringArray(value)) return;
+      list.clear();
+      for (const x of value) list.push(new FormControl(x, { nonNullable: true }));
+    };
+    strings(c.customWarnings, values['customWarnings']);
+    strings(c.applicationQuestions, values['applicationQuestions']);
+    const links = values['channelLinks'];
+    if (
+      Array.isArray(links) &&
+      links.every((l: unknown) => {
+        const link = l as Partial<ChannelLink> | null;
+        return isString(link?.label) && isString(link?.url);
+      })
+    ) {
+      c.channelLinks.clear();
+      for (const link of links as ChannelLink[]) c.channelLinks.push(this.channelGroup(link));
+    }
+  }
+
+  private onValuesChanged(): void {
+    if (!this.draftReady || this.prefilling || this.closed()) return;
+    this.hasChanges.set(this.snapshotValues() !== this.baseline);
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.flushDraft(true), AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  /** Записує відкладене збереження зараз (`force` — з таймера). */
+  private flushDraft(force = false): void {
+    if (this.saveTimer === null && !force) return;
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    const key = this.draftKey();
+    if (!key || !this.draftReady || this.closed()) return;
+    const snapshot = this.storedValues();
+    if (JSON.stringify(snapshot) === this.baseline) {
+      removeGameDraft(key);
+      this.restored.set(false);
+    } else {
+      writeGameDraft(key, snapshot);
+    }
+  }
+
+  /** Прибирає локальну копію поточної гри й відкладене збереження. */
+  private discardStored(): void {
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    const key = this.draftKey();
+    if (key) removeGameDraft(key);
+    this.restored.set(false);
+    this.hasChanges.set(false);
+  }
+
+  /** «Відкинути зміни»: після підтвердження — значення з сервера чи типові для нової гри. */
+  protected async discardChanges(): Promise<void> {
+    if (this.busy()) return;
+    const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
+      data: {
+        title: 'games.form.discardConfirm.title',
+        text: 'games.form.discardConfirm.text',
+        confirm: 'games.form.discardConfirm.confirm',
+        danger: true,
+      },
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+    if (!(await firstValueFrom(ref.afterClosed()))) return;
+    this.discardStored();
+    const id = this.gameId();
+    this.open(id === null ? undefined : String(id));
   }
 
   private channelGroup(link: ChannelLink) {

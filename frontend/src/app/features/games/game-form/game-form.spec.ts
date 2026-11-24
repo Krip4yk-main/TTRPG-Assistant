@@ -2,8 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
-import { Subject } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import type { CatalogDto, GameDto, MeDto } from '@nri/shared';
 import { GameForm } from './game-form';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -83,6 +84,8 @@ function game(overrides: Partial<GameDto> = {}): GameDto {
   };
 }
 
+const open = vi.fn();
+
 describe('GameForm', () => {
   let fixture: ComponentFixture<GameForm>;
   let http: HttpTestingController;
@@ -125,6 +128,7 @@ describe('GameForm', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideTranslateService(),
+        { provide: MatDialog, useValue: { open } },
         {
           provide: SocketService,
           useValue: {
@@ -154,7 +158,15 @@ describe('GameForm', () => {
     await type('input[formcontrolname="startTime"]', '19:00');
   }
 
-  afterEach(() => http.verify());
+  beforeEach(() => {
+    open.mockReset();
+    localStorage.clear();
+  });
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
 
   it('choosing cyberpunk-red sets the default genre cyberpunk', async () => {
     await setup();
@@ -295,5 +307,156 @@ describe('GameForm', () => {
     const options = Array.from(selectOf('ageRating').options);
     const disabled = options.filter((o) => o.disabled).map((o) => o.textContent!.trim());
     expect(disabled).toEqual(['games.ageRating.18+', 'games.ageRating.21+']);
+  });
+
+  describe('autosave', () => {
+    const NEW_KEY = 'nri.gameDraft.1.new';
+    const debounce = () => new Promise((r) => setTimeout(r, 600));
+    const stored = (key: string) => {
+      const raw = localStorage.getItem(key);
+      return raw === null ? null : (JSON.parse(raw) as { values: Record<string, unknown> });
+    };
+    const titleInput = () => q<HTMLInputElement>('input[formcontrolname="title"]');
+    const discardButton = () => el.querySelector<HTMLButtonElement>('button.discard');
+
+    it('persists entered values per user and game after a debounce', async () => {
+      await setup();
+      await type('input[formcontrolname="title"]', 'Чернетка');
+      await choose('system', 'Cyberpunk RED');
+      expect(localStorage.getItem(NEW_KEY)).toBeNull();
+      await debounce();
+      expect(stored(NEW_KEY)!.values).toMatchObject({ title: 'Чернетка', system: 7, genreId: 4 });
+    });
+
+    it('restores a new game draft on reload and shows a notice', async () => {
+      localStorage.setItem(
+        NEW_KEY,
+        JSON.stringify({
+          v: 1,
+          values: {
+            title: 'Збережена назва',
+            startDate: '2027-03-02',
+            startTime: '19:00',
+            channelLinks: [{ label: 'Discord', url: 'https://discord.gg/x' }],
+            applicationQuestions: ['Чому ви?'],
+          },
+        }),
+      );
+      await setup();
+      expect(titleInput().value).toBe('Збережена назва');
+      expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').value).toBe('19:00');
+      expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').value).toBe('02.03.2027');
+      expect(q<HTMLInputElement>('input[formcontrolname="url"]').value).toBe(
+        'https://discord.gg/x',
+      );
+      expect(q<HTMLElement>('.restored-notice').textContent).toContain('games.form.restored');
+    });
+
+    it('restores stored values on top of an existing game', async () => {
+      localStorage.setItem(
+        'nri.gameDraft.1.5',
+        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+      );
+      await setup(5, game({ status: 'draft' }));
+      expect(titleInput().value).toBe('Незбережена назва');
+      expect(el.querySelector('.restored-notice')).not.toBeNull();
+    });
+
+    it('a stored copy of another user is not used', async () => {
+      localStorage.setItem(
+        'nri.gameDraft.2.new',
+        JSON.stringify({ v: 1, values: { title: 'Чуже' } }),
+      );
+      await setup();
+      expect(titleInput().value).toBe('');
+      expect(el.querySelector('.restored-notice')).toBeNull();
+    });
+
+    it('never restores or persists for finished/cancelled games', async () => {
+      localStorage.setItem(
+        'nri.gameDraft.1.5',
+        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+      );
+      await setup(5, game({ status: 'finished' }));
+      expect(titleInput().value).toBe('Тіні Найт-Сіті');
+      expect(el.querySelector('.restored-notice')).toBeNull();
+      expect(discardButton()).toBeNull();
+      await debounce();
+      expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+    });
+
+    it('a successful save clears the stored copy', async () => {
+      await setup();
+      await fillValid();
+      await debounce();
+      expect(localStorage.getItem(NEW_KEY)).not.toBeNull();
+      await submit();
+      http.expectOne('/api/games').flush(game());
+      await settle();
+      await debounce();
+      expect(localStorage.getItem(NEW_KEY)).toBeNull();
+      expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+    });
+
+    it('a failed save keeps the stored copy', async () => {
+      await setup(5, game({ status: 'draft' }));
+      await type('input[formcontrolname="title"]', 'Нова назва');
+      await submit();
+      http
+        .expectOne('/api/games/5')
+        .flush({ error: { code: 'INTERNAL' } }, { status: 500, statusText: 'Error' });
+      await settle();
+      await debounce();
+      expect(stored('nri.gameDraft.1.5')!.values).toMatchObject({ title: 'Нова назва' });
+    });
+
+    it('discard asks for confirmation; a new game resets to defaults', async () => {
+      await setup();
+      await type('input[formcontrolname="title"]', 'Чернетка');
+      await debounce();
+      open.mockReturnValueOnce({ afterClosed: () => of(false) });
+      discardButton()!.click();
+      await settle();
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(titleInput().value).toBe('Чернетка');
+      expect(localStorage.getItem(NEW_KEY)).not.toBeNull();
+
+      open.mockReturnValueOnce({ afterClosed: () => of(true) });
+      discardButton()!.click();
+      await settle();
+      expect(titleInput().value).toBe('');
+      expect(localStorage.getItem(NEW_KEY)).toBeNull();
+      await debounce();
+      expect(localStorage.getItem(NEW_KEY)).toBeNull();
+    });
+
+    it('discard on an existing game reloads the server values', async () => {
+      localStorage.setItem(
+        'nri.gameDraft.1.5',
+        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+      );
+      await setup(5, game({ status: 'draft' }));
+      open.mockReturnValueOnce({ afterClosed: () => of(true) });
+      q<HTMLButtonElement>('.restored-notice button').click();
+      await settle();
+      http.expectOne('/api/games/5').flush(game({ status: 'draft' }));
+      await settle();
+      expect(titleInput().value).toBe('Тіні Найт-Сіті');
+      expect(el.querySelector('.restored-notice')).toBeNull();
+      expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+    });
+
+    it('storage failures never break the form', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('denied');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('quota');
+      });
+      await setup();
+      await type('input[formcontrolname="title"]', 'Назва');
+      await debounce();
+      expect(titleInput().value).toBe('Назва');
+    });
   });
 });
