@@ -20,6 +20,7 @@ import {
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
+  AGE_RATINGS,
   availabilityFit,
   expandOccurrences,
   FIT_HORIZON_DAYS,
@@ -256,7 +257,7 @@ async function calendarAvailability(
   }
 }
 
-const RESTRICTED_RATINGS: AgeRating[] = ['18+', '21+'];
+const RESTRICTED_RATINGS: AgeRating[] = AGE_RATINGS.filter((r) => r !== 'none');
 
 /** Чи задано хоч один фільтр за атрибутами гри (усе, крім `ageRatings`/`sort`/`cursor`/`limit`). */
 function hasDetailFilters(f: SearchFilters): boolean {

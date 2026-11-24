@@ -379,6 +379,19 @@ describe('POST /api/games/search — paging and visibility', () => {
     );
   });
 
+  it('GM keeps their own restricted game under detail filters', async () => {
+    const gmUser = await userWithAge(19);
+    const own = await insertGame({
+      ageRating: '21+',
+      format: 'offline',
+      city: 'Київ',
+      gmUserId: gmUser.id,
+    });
+    const other = await insertGame({ ageRating: '21+', format: 'offline', city: 'Київ' });
+    expect(ids(await search({ city: 'Київ' }, gmUser.cookie))).toEqual([own]);
+    expect(ids(await search({ city: 'Київ' }))).not.toContain(other);
+  });
+
   it('18+ game for a guest has exactly the restricted keys (Review Focus 3)', async () => {
     const id = await insertGame({ ageRating: '18+', city: 'Київ' });
     const res = await search({});
