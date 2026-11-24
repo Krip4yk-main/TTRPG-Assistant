@@ -1,0 +1,93 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--nri-space-md);
+  top: -100px;
+  z-index: 1000;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  background: var(--nri-accent);
+  color: var(--nri-on-accent);
+  border-radius: var(--nri-radius-sm);
+  text-decoration: none;
+  font-weight: 600;
+
+  &:focus {
+    top: var(--nri-space-sm);
+  }
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: var(--nri-space-sm);
+  background: var(--nri-surface-raised);
+  border-bottom: 1px solid var(--nri-border);
+}
+
+.brand {
+  font-family: var(--nri-font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--nri-accent-text);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--nri-text);
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.menu-header {
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  font-weight: 600;
+  border-bottom: 1px solid var(--nri-border);
+}
+
+.main {
+  flex: 1 0 auto;
+  outline: none;
+  // Якір пропуску навігації не ховається під липким тулбаром.
+  scroll-margin-top: 72px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--nri-space-lg);
+  padding: var(--nri-space-lg) var(--nri-space-md);
+  border-top: 1px solid var(--nri-border);
+  background: var(--nri-surface-sunken);
+}
+
+@media (max-width: 599px) {
+  .brand {
+    font-size: 1.25rem;
+  }
+
+  .view-mode {
+    font-size: 0.8rem;
+  }
+}
+
+.connection-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nri-space-md);
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  background: var(--nri-danger-surface);
+  border-bottom: 1px solid var(--nri-danger);
+  color: var(--nri-text);
+}

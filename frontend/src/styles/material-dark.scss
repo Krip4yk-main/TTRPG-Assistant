@@ -1,0 +1,89 @@
+// ЄДИНИЙ .scss у проєкті: Angular Material генерує токени теми лише через Sass API.
+// Усе інше — LESS (src/styles/themes/*.less) і CSS-змінні (--mat-sys-*, --nri-*).
+// Палітра й шрифти — з design-system/nri-assistant/MASTER.md (felt green + gold on dark).
+//
+// Відображення MASTER.md → системні токени Material (темна тема):
+//   - Тон 80 вбудованої green-палітри — неоновий (~#00e000), тому кольорові ролі задано
+//     явно через theme-overrides.
+//   - `primary` = #4ADE80 — колір ТЕКСТУ/акцентів на темному фоні (outlined/text-кнопки,
+//     фокус полів, вибраний день у календарі): 10:1 до фону #0F172A.
+//   - `primary-container` = #15803D (Primary з MASTER) з білим текстом (5:1) — заливка
+//     filled-кнопок (button-overrides нижче) і вибраного перемикача.
+//   - `tertiary-container` = #D97706 (Accent/CTA) з чорним текстом (6.6:1).
+//   - `error-container` = #DC2626 (Destructive) з білим текстом (4.8:1).
+@use '@angular/material' as mat;
+
+$master-primary: #15803d;
+$on-master-primary: #ffffff;
+
+html {
+  color-scheme: dark;
+
+  @include mat.theme(
+    (
+      color: (
+        theme-type: dark,
+        primary: mat.$green-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: "'Lora', Georgia, 'Times New Roman', serif",
+        brand-family: "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+      ),
+      density: 0,
+    )
+  );
+
+  @include mat.theme-overrides(
+    (
+      // Поверхні — фон і картки з MASTER.md (#0F172A / #192134).
+      surface: #0f172a,
+      background: #0f172a,
+      surface-container-lowest: #0b1222,
+      surface-container-low: #131c2f,
+      surface-container: #192134,
+      surface-container-high: #1f293d,
+      surface-container-highest: #263247,
+      surface-bright: #2b3850,
+      surface-dim: #0f172a,
+      on-surface: #f8fafc,
+      on-surface-variant: #b6c2d3,
+      inverse-surface: #e2e8f0,
+      inverse-on-surface: #0f172a,
+      outline: #8391a7,
+      outline-variant: #334155,
+      // Primary (felt green).
+      primary: #4ade80,
+      on-primary: #052e16,
+      primary-container: $master-primary,
+      on-primary-container: $on-master-primary,
+      inverse-primary: $master-primary,
+      // Secondary — нейтральний сланцевий; контейнер = зелений (вибраний перемикач, чіпи).
+      secondary: #cbd5e1,
+      on-secondary: #1e293b,
+      secondary-container: $master-primary,
+      on-secondary-container: $on-master-primary,
+      // Tertiary (gold accent).
+      tertiary: #fbbf24,
+      on-tertiary: #1c1300,
+      tertiary-container: #d97706,
+      on-tertiary-container: #000000,
+      // Error (destructive).
+      error: #f87171,
+      on-error: #450a0a,
+      error-container: #dc2626,
+      on-error-container: #ffffff,
+    )
+  );
+
+  // Filled-кнопки — темно-зелена заливка MASTER (#15803D) зі світлим текстом.
+  @include mat.button-overrides(
+    (
+      filled-container-color: $master-primary,
+      filled-label-text-color: $on-master-primary,
+      filled-state-layer-color: $on-master-primary,
+      filled-ripple-color: rgba(255, 255, 255, 0.16),
+      outlined-outline-color: #8391a7,
+    )
+  );
+}

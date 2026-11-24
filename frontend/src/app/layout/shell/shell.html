@@ -1,0 +1,65 @@
+<a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | translate }}</a>
+
+<mat-toolbar class="toolbar" role="banner">
+  <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
+  <span class="spacer"></span>
+
+  @if (auth.isActive()) {
+    <mat-button-toggle-group
+      class="view-mode"
+      hideSingleSelectionIndicator
+      [value]="viewMode.mode()"
+      (change)="setMode($event.value)"
+      [attr.aria-label]="'shell.viewMode.label' | translate"
+    >
+      <mat-button-toggle value="player">{{
+        'shell.viewMode.player' | translate
+      }}</mat-button-toggle>
+      <mat-button-toggle value="gm">{{ 'shell.viewMode.gm' | translate }}</mat-button-toggle>
+    </mat-button-toggle-group>
+  }
+  @if (auth.me(); as me) {
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="accountMenu"
+      [attr.aria-label]="'shell.accountMenu' | translate"
+    >
+      <mat-icon aria-hidden="true">account_circle</mat-icon>
+    </button>
+    <mat-menu #accountMenu="matMenu" xPosition="before">
+      <div class="menu-header" role="presentation">
+        <nri-user-name [user]="me" />
+      </div>
+      @if (auth.isActive()) {
+        <a mat-menu-item routerLink="/account">
+          <mat-icon aria-hidden="true">settings</mat-icon>
+          <span>{{ 'shell.account' | translate }}</span>
+        </a>
+      }
+      <button mat-menu-item type="button" (click)="logout()">
+        <mat-icon aria-hidden="true">logout</mat-icon>
+        <span>{{ 'shell.logout' | translate }}</span>
+      </button>
+    </mat-menu>
+  } @else {
+    <a mat-stroked-button routerLink="/login">{{ 'shell.login' | translate }}</a>
+  }
+</mat-toolbar>
+
+@if (auth.loadFailed()) {
+  <div class="connection-banner" role="alert">
+    <span>{{ 'shell.connectionError' | translate }}</span>
+    <button mat-stroked-button type="button" [disabled]="retrying()" (click)="retry()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+}
+
+<main id="main-content" class="main" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <span class="nri-muted">© {{ 'app.title' | translate }}</span>
+  <a routerLink="/about">{{ 'shell.about' | translate }}</a>
+</footer>

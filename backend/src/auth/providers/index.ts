@@ -1,0 +1,16 @@
+import type { Env } from '../../config/env.js';
+import { createGoogleProvider } from './google.js';
+import type { OAuthProvider } from './oauth.js';
+
+/** Провайдери за замовчуванням з env: Google — лише коли задано обидва ключі. */
+export function defaultOAuthProviders(env: Env): Record<string, OAuthProvider> {
+  const out: Record<string, OAuthProvider> = {};
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    out.google = createGoogleProvider({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      publicBaseUrl: env.PUBLIC_BASE_URL,
+    });
+  }
+  return out;
+}

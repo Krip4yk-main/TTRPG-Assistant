@@ -1,0 +1,6 @@
+package-lock.json
+.superpowers/
+dist/
+coverage/
+.angular/
+node_modules/

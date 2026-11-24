@@ -1,0 +1,8 @@
+@let u = user();
+@if (u.status === 'deleted') {
+  <span class="deleted">{{ 'user.deleted' | translate }}</span>
+} @else if (u.nickname) {
+  <span>{{ u.nickname }}</span>
+} @else {
+  <span class="placeholder">{{ 'user.noNickname' | translate }}</span>
+}
