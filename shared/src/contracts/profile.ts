@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { GameCardDto, RestrictedGameDto } from './games.js';
 import type { UserStatus } from './me.js';
 
 export const EXPERIENCE_LEVELS = ['none', 'beginner', 'intermediate', 'veteran'] as const;
@@ -76,7 +77,11 @@ export interface PublicProfileDto {
   favoriteSystemIds?: number[];
   preferredFormats?: PreferredFormat[];
   experience?: ExperienceLevel;
-  // TODO(Task 7): замінити `unknown[]` на `GameCardDto[]`.
-  gamesAsGm?: unknown[];
-  gamesAsPlayer?: unknown[];
+  /**
+   * Ігри у статусах recruiting|started|finished (без чернеток і скасованих). Гра 18+/21+,
+   * якої глядач не проходить за віком, — у вигляді `RestrictedGameDto`.
+   */
+  gamesAsGm?: (GameCardDto | RestrictedGameDto)[];
+  /** Ігри, де користувач — учасник (`game_members`); ті самі правила. */
+  gamesAsPlayer?: (GameCardDto | RestrictedGameDto)[];
 }

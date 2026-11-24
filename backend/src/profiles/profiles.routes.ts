@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { profileInputSchema } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
+import { resolveViewer } from '../games/games.service.js';
 import { getOwnProfile, getPublicProfile, updateProfile } from './profiles.service.js';
 
 /** Монтується на `/api/me/profile`. */
@@ -22,7 +23,8 @@ export function profileRouter(deps: AppDeps): Router {
 export function publicUsersRouter(deps: AppDeps): Router {
   const router = Router();
   router.get('/:publicId', async (req, res) => {
-    res.json(await getPublicProfile(deps, String(req.params.publicId)));
+    const viewer = await resolveViewer(deps, req.user);
+    res.json(await getPublicProfile(deps, String(req.params.publicId), viewer));
   });
   return router;
 }

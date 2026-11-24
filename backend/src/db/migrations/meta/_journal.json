@@ -50,6 +50,13 @@
       "when": 1795536254229,
       "tag": "0006_profiles_availability",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1795536629832,
+      "tag": "0007_games",
+      "breakpoints": true
     }
   ]
 }

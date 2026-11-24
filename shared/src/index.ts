@@ -10,3 +10,4 @@ export * from './schedule/occurrences.js';
 export * from './schedule/fit.js';
 export * from './contracts/catalog.js';
 export * from './contracts/profile.js';
+export * from './contracts/games.js';

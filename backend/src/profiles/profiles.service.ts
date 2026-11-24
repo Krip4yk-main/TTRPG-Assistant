@@ -11,6 +11,8 @@ import type { AppDeps } from '../app.js';
 import { gameSystems, userProfiles, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
+import { listProfileGames } from '../games/games.service.js';
+import type { Viewer } from '../games/games.visibility.js';
 
 type ProfileRow = Omit<typeof userProfiles.$inferSelect, 'userId'>;
 export type ProfilePatch = z.output<typeof profileInputSchema>;
@@ -86,12 +88,18 @@ export async function updateProfile(
     userId,
     entityType: 'user',
     entityId: userId,
-    payload: { fields: Object.keys(patch) },
+    payload: {
+      fields: Object.keys(patch).filter((k) => patch[k as keyof ProfilePatch] !== undefined),
+    },
   });
   return toDto(next);
 }
 
-export async function getPublicProfile(deps: AppDeps, publicId: string): Promise<PublicProfileDto> {
+export async function getPublicProfile(
+  deps: AppDeps,
+  publicId: string,
+  viewer: Viewer,
+): Promise<PublicProfileDto> {
   const [u] = await deps.db.select().from(users).where(eq(users.publicId, publicId));
   if (!u || u.status === 'pending') throw new AppError(404, 'NOT_FOUND');
   if (u.status === 'deleted') return { publicId: u.publicId, status: 'deleted' };
@@ -108,8 +116,8 @@ export async function getPublicProfile(deps: AppDeps, publicId: string): Promise
   if (visible.favoriteSystems) dto.favoriteSystemIds = row.favoriteSystemIds;
   if (visible.preferredFormats) dto.preferredFormats = row.preferredFormats;
   if (visible.experience && row.experience !== null) dto.experience = row.experience;
-  // TODO(Task 7): заповнити іграми (recruiting|started|finished).
-  dto.gamesAsGm = [];
-  dto.gamesAsPlayer = [];
+  const { asGm, asPlayer } = await listProfileGames(deps, u.id, viewer);
+  dto.gamesAsGm = asGm;
+  dto.gamesAsPlayer = asPlayer;
   return dto;
 }

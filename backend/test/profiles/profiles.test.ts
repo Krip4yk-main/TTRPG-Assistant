@@ -3,8 +3,9 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { createSession } from '../../src/auth/session.service.js';
-import { gameSystems } from '../../src/db/schema/index.js';
+import { events, gameMembers, gameSystems } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
+import { harness } from '../games/fixtures.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
@@ -133,5 +134,68 @@ describe('profiles', () => {
         experience: true,
       },
     });
+  });
+});
+
+describe('profile audit', () => {
+  it('profile.updated lists only the fields actually sent', async () => {
+    const u = await createUser(db, { nickname: 'Hero' });
+    await call('patch', '/api/me/profile', await login(u.id), { experience: 'veteran' });
+    const [e] = await db.select().from(events).where(eq(events.type, 'profile.updated'));
+    expect(e!.payload).toEqual({ fields: ['experience'] });
+  });
+});
+
+describe('profile games', () => {
+  const games = harness(deps, app);
+
+  it('gamesAsGm has published games as GameCardDto, not drafts; members see gamesAsPlayer', async () => {
+    const gm = await games.userWithAge(30, 'Master');
+    const player = await games.userWithAge(25, 'Player');
+    await games.createGame(gm.cookie, { title: 'Чернетка' });
+    const pubId = await games.createGame(gm.cookie, { title: 'Відкрита' }, true);
+    await db.insert(gameMembers).values({ gameId: pubId, userId: player.id });
+
+    const gmProfile = (await request(app).get(`/api/users/${gm.publicId}`)).body;
+    expect(gmProfile.gamesAsGm).toHaveLength(1);
+    expect(gmProfile.gamesAsPlayer).toEqual([]);
+    const card = gmProfile.gamesAsGm[0];
+    expect(card).toMatchObject({
+      id: pubId,
+      title: 'Відкрита',
+      status: 'recruiting',
+      gm: { publicId: gm.publicId, nickname: 'Master', avatarUrl: null },
+      format: 'online',
+      kind: 'campaign',
+      maxPlayers: 5,
+      freeSlots: 4,
+      priceUah: null,
+      ageRating: 'none',
+      language: 'uk',
+    });
+    expect(card.system).toEqual({ id: expect.any(Number), name: expect.any(String) });
+    expect(card.nextSessionAt).toEqual(expect.any(String));
+    expect('address' in card).toBe(false);
+    expect('description' in card).toBe(false);
+
+    const playerProfile = (await request(app).get(`/api/users/${player.publicId}`)).body;
+    expect(playerProfile.gamesAsPlayer.map((g: { id: number }) => g.id)).toEqual([pubId]);
+  });
+
+  it('18+ game on a public profile is restricted for a guest', async () => {
+    const gm = await games.userWithAge(30);
+    await games.createGame(gm.cookie, { ageRating: '18+' }, true);
+    const guest = (await request(app).get(`/api/users/${gm.publicId}`)).body;
+    expect(Object.keys(guest.gamesAsGm[0]).sort()).toEqual([
+      'ageRating',
+      'gm',
+      'id',
+      'restricted',
+      'title',
+    ]);
+    const adult = await games.userWithAge(20);
+    const seen = (await request(app).get(`/api/users/${gm.publicId}`).set('Cookie', adult.cookie))
+      .body;
+    expect(seen.gamesAsGm[0].restricted).toBeUndefined();
   });
 });

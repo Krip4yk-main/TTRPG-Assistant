@@ -14,6 +14,7 @@ import { usersRouter } from './users/users.routes.js';
 import { catalogRouter } from './catalog/catalog.routes.js';
 import { profileRouter, publicUsersRouter } from './profiles/profiles.routes.js';
 import { availabilityRouter } from './availability/availability.routes.js';
+import { gamesRouter } from './games/games.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
@@ -54,6 +55,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));
   app.use('/api/catalog', catalogRouter(deps));
+  app.use('/api/games', gamesRouter(deps));
   app.use('/api/internal', internalRouter(deps));
 
   // Тестові маршрути — лише в NODE_ENV=test.
