@@ -35,7 +35,16 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
   return { env, db, redis };
 }
 
-const TABLES = ['events', 'identity_tombstones', 'sessions', 'auth_identities', 'users'];
+const TABLES = [
+  'availability_busy_dates',
+  'availability_slots',
+  'user_profiles',
+  'events',
+  'identity_tombstones',
+  'sessions',
+  'auth_identities',
+  'users',
+];
 
 export async function resetDb(db: Db): Promise<void> {
   // Одна транзакція = одне з'єднання, тож SET FOREIGN_KEY_CHECKS діє на всі TRUNCATE.

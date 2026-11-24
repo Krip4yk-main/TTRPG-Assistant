@@ -43,6 +43,13 @@
       "when": 1795535824946,
       "tag": "0005_catalog_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1795536254229,
+      "tag": "0006_profiles_availability",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,8 @@ import { loadSession, requireActive, requireAuth } from './auth/session.middlewa
 import { internalRouter } from './internal/internal.routes.js';
 import { usersRouter } from './users/users.routes.js';
 import { catalogRouter } from './catalog/catalog.routes.js';
+import { profileRouter, publicUsersRouter } from './profiles/profiles.routes.js';
+import { availabilityRouter } from './availability/availability.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
@@ -47,7 +49,10 @@ export function createApp(deps: AppDeps): express.Express {
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));
+  app.use('/api/me/profile', profileRouter(deps));
+  app.use('/api/me/availability', availabilityRouter(deps));
   app.use('/api/me', usersRouter(deps));
+  app.use('/api/users', publicUsersRouter(deps));
   app.use('/api/catalog', catalogRouter(deps));
   app.use('/api/internal', internalRouter(deps));
 
