@@ -1,11 +1,29 @@
-<span class="chip">
-  <span class="label">
-    @if (labelKey(); as key) {
-      {{ key | translate }}
-    } @else {
-      {{ custom() }}
-    }
-  </span>
+<span class="chip" [class.selectable]="selectable()" [class.selected]="selected()">
+  @if (selectable()) {
+    <button
+      type="button"
+      class="label toggle"
+      [attr.aria-pressed]="selected()"
+      (click)="toggled.emit()"
+    >
+      @if (selected()) {
+        <mat-icon class="check" aria-hidden="true" fontIcon="check"></mat-icon>
+      }
+      @if (labelKey(); as key) {
+        {{ key | translate }}
+      } @else {
+        {{ custom() }}
+      }
+    </button>
+  } @else {
+    <span class="label">
+      @if (labelKey(); as key) {
+        {{ key | translate }}
+      } @else {
+        {{ custom() }}
+      }
+    </span>
+  }
   @if (hintKey(); as hint) {
     <button
       type="button"

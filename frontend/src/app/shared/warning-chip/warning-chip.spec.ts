@@ -36,6 +36,20 @@ describe('WarningChip', () => {
     expect(described).toContain(uk.warnings.gore.hint);
   });
 
+  it('selectable: label is an aria-pressed toggle, (i) stays a separate button', () => {
+    const toggled = vi.fn();
+    fixture.componentRef.setInput('slug', 'gore');
+    fixture.componentRef.setInput('selectable', true);
+    fixture.componentRef.setInput('selected', true);
+    fixture.componentInstance.toggled.subscribe(toggled);
+    fixture.detectChanges();
+    const toggle = el.querySelector<HTMLButtonElement>('button.label')!;
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.querySelector('.info')).toBeNull();
+    toggle.click();
+    expect(toggled).toHaveBeenCalledTimes(1);
+  });
+
   it('custom warning: text only, no (i)', () => {
     fixture.componentRef.setInput('custom', 'Павуки');
     fixture.detectChanges();

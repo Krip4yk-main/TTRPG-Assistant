@@ -47,6 +47,16 @@
   flex: 1 1 auto;
 }
 
+.gm-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-sm);
+
+  .active {
+    color: var(--nri-accent-text);
+  }
+}
+
 .menu-header {
   padding: var(--nri-space-sm) var(--nri-space-md);
   font-weight: 600;
@@ -77,6 +87,11 @@
 
   .view-mode {
     font-size: 0.8rem;
+  }
+
+  // На вузькому екрані «Мої ігри» — це головна (логотип) у виді майстра.
+  .gm-nav .my-games-link {
+    display: none;
   }
 }
 

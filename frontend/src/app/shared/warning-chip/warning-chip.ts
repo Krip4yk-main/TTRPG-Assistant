@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -6,6 +6,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 /**
  * Чип попередження про контент. Для каталожного (`slug`) показує (i) з поясненням
  * (hover/фокус; `matTooltip` додає aria-describedby); власне попередження майстра (`custom`) — лише текст, без (i).
+ * `selectable` — мітка стає кнопкою-перемикачем (`aria-pressed`) для мультивибору у формі;
+ * (i) лишається окремою кнопкою поруч (не вкладеною).
  */
 @Component({
   selector: 'nri-warning-chip',
@@ -17,6 +19,9 @@ import { TranslatePipe } from '@ngx-translate/core';
 export class WarningChip {
   readonly slug = input<string | null>(null);
   readonly custom = input<string | null>(null);
+  readonly selectable = input(false);
+  readonly selected = input(false);
+  readonly toggled = output<void>();
 
   protected readonly hintKey = computed(() => {
     const s = this.slug();

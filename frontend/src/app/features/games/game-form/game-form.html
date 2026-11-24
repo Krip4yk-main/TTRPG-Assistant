@@ -1,0 +1,583 @@
+<section class="nri-page game-form-page">
+  <h1>{{ (id() === undefined ? 'games.form.titleNew' : 'games.form.titleEdit') | translate }}</h1>
+
+  @if (loadError(); as key) {
+    <div class="nri-alert" role="alert">
+      <p>{{ key | translate }}</p>
+      <a routerLink="/my-games">{{ 'games.form.backToMyGames' | translate }}</a>
+    </div>
+  } @else if (!ready()) {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  } @else {
+    @if (closed()) {
+      <p class="nri-notice">{{ 'games.form.notEditable' | translate }}</p>
+    }
+
+    <form class="game-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <!-- Основне -->
+      <fieldset class="nri-card section">
+        <legend>{{ 'games.form.sections.main' | translate }}</legend>
+
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'games.form.title' | translate }}</mat-label>
+            <input matInput formControlName="title" maxlength="120" required />
+            @if (errorKey('title'); as key) {
+              <mat-error>{{ key | translate: { max: 120 } }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.system' | translate }}</mat-label>
+              <select matNativeControl formControlName="system" required>
+                <option [ngValue]="null" disabled>
+                  {{ 'games.form.systemPlaceholder' | translate }}
+                </option>
+                @for (s of systemOptions(); track s.id) {
+                  <option [ngValue]="s.id">{{ s.name }}</option>
+                }
+                <option [ngValue]="'other'">{{ 'games.form.systemOther' | translate }}</option>
+              </select>
+              @if (locked()) {
+                <mat-hint>{{ 'games.form.lockedHint' | translate }}</mat-hint>
+              }
+              @if (errorKey('system'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+            @if (apiError('system'); as key) {
+              <p class="field-error" role="alert">{{ key | translate }}</p>
+            }
+          </div>
+
+          @if (value().system === 'other') {
+            <div class="field">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.systemOtherName' | translate }}</mat-label>
+                <input matInput formControlName="systemOther" maxlength="80" required />
+                @if (errorKey('systemOther'); as key) {
+                  <mat-error>{{ key | translate: { max: 80 } }}</mat-error>
+                }
+              </mat-form-field>
+              @if (apiError('systemOther'); as key) {
+                <p class="field-error" role="alert">{{ key | translate }}</p>
+              }
+            </div>
+          }
+
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.genre' | translate }}</mat-label>
+              <select matNativeControl formControlName="genreId" required>
+                <option [ngValue]="null" disabled>
+                  {{ 'games.form.genrePlaceholder' | translate }}
+                </option>
+                @for (g of catalog()?.genres ?? []; track g.id) {
+                  <option [ngValue]="g.id">{{ 'genres.' + g.slug | translate }}</option>
+                }
+              </select>
+              <mat-hint>{{ 'games.form.genreHint' | translate }}</mat-hint>
+              @if (errorKey('genreId'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+            @if (apiError('genreId'); as key) {
+              <p class="field-error" role="alert">{{ key | translate }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'games.form.description' | translate }}</mat-label>
+            <textarea matInput formControlName="description" rows="5" maxlength="5000"></textarea>
+            @if (errorKey('description'); as key) {
+              <mat-error>{{ key | translate: { max: 5000 } }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'games.form.coverUrl' | translate }}</mat-label>
+            <input matInput type="url" formControlName="coverUrl" maxlength="512" inputmode="url" />
+            <mat-hint>{{ 'games.form.coverUrlHint' | translate }}</mat-hint>
+            @if (errorKey('coverUrl'); as key) {
+              <mat-error>{{ key | translate: { max: 512 } }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+      </fieldset>
+
+      <!-- Формат і місце -->
+      <fieldset class="nri-card section">
+        <legend>{{ 'games.form.sections.place' | translate }}</legend>
+
+        <div class="field" role="group" aria-labelledby="format-label">
+          <span id="format-label" class="group-label">{{ 'games.form.format' | translate }}</span>
+          <mat-radio-group formControlName="format" aria-labelledby="format-label">
+            <mat-radio-button class="format-online" value="online">{{
+              'games.format.online' | translate
+            }}</mat-radio-button>
+            <mat-radio-button class="format-offline" value="offline">{{
+              'games.format.offline' | translate
+            }}</mat-radio-button>
+          </mat-radio-group>
+        </div>
+
+        @if (value().format === 'offline') {
+          <div class="row">
+            <div class="field">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.city' | translate }}</mat-label>
+                <input
+                  matInput
+                  formControlName="city"
+                  maxlength="80"
+                  autocomplete="address-level2"
+                  required
+                />
+                @if (errorKey('city'); as key) {
+                  <mat-error>{{ key | translate: { max: 80 } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <div class="field">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.address' | translate }}</mat-label>
+                <input
+                  matInput
+                  formControlName="address"
+                  maxlength="255"
+                  autocomplete="street-address"
+                />
+                <mat-hint>{{ 'games.form.addressHint' | translate }}</mat-hint>
+                @if (errorKey('address'); as key) {
+                  <mat-error>{{ key | translate: { max: 255 } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+          </div>
+        } @else {
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.platform' | translate }}</mat-label>
+              <input matInput formControlName="platform" maxlength="60" />
+              <mat-hint>{{ 'games.form.platformHint' | translate }}</mat-hint>
+              @if (errorKey('platform'); as key) {
+                <mat-error>{{ key | translate: { max: 60 } }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+        }
+
+        <div class="row">
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.language' | translate }}</mat-label>
+              <select matNativeControl formControlName="language">
+                @for (l of languages; track l) {
+                  <option [ngValue]="l">{{ 'games.language.' + l | translate }}</option>
+                }
+              </select>
+            </mat-form-field>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Розклад -->
+      <fieldset class="nri-card section">
+        <legend>{{ 'games.form.sections.schedule' | translate }}</legend>
+
+        <div class="field" role="group" aria-labelledby="kind-label">
+          <span id="kind-label" class="group-label">{{ 'games.form.kind' | translate }}</span>
+          <mat-radio-group formControlName="kind" aria-labelledby="kind-label">
+            <mat-radio-button value="oneshot">{{
+              'games.kind.oneshot' | translate
+            }}</mat-radio-button>
+            <mat-radio-button value="campaign">{{
+              'games.kind.campaign' | translate
+            }}</mat-radio-button>
+          </mat-radio-group>
+          @if (locked()) {
+            <p class="nri-muted hint">{{ 'games.form.lockedHint' | translate }}</p>
+          }
+          @if (apiError('kind'); as key) {
+            <p class="field-error" role="alert">{{ key | translate }}</p>
+          }
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.startDate' | translate }}</mat-label>
+              <input
+                matInput
+                [matDatepicker]="picker"
+                [min]="isDraft() ? today : null"
+                formControlName="startDate"
+                required
+              />
+              <mat-datepicker-toggle matIconSuffix [for]="picker" />
+              <mat-datepicker #picker />
+              <mat-hint>{{ 'games.form.startDateHint' | translate }}</mat-hint>
+              @if (errorKey('startDate'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+            @if (apiError('startDate'); as key) {
+              <p class="field-error" role="alert">{{ key | translate }}</p>
+            }
+          </div>
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
+              <input matInput type="time" formControlName="startTime" step="60" required />
+              <mat-hint>{{ 'games.form.timezoneHint' | translate: { tz: timezone() } }}</mat-hint>
+              @if (errorKey('startTime'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
+              <select matNativeControl formControlName="durationMinutes">
+                @for (m of durations; track m) {
+                  <option [ngValue]="m">
+                    {{ 'games.form.hours' | translate: { h: hours(m) } }}
+                  </option>
+                }
+              </select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (value().kind === 'campaign') {
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.recurrence' | translate }}</mat-label>
+              <select matNativeControl formControlName="recurrence">
+                @for (r of recurrences; track r) {
+                  <option [ngValue]="r">{{ 'games.recurrence.' + r | translate }}</option>
+                }
+              </select>
+              @if (errorKey('recurrence'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          @if (value().recurrence === 'weekly' || value().recurrence === 'biweekly') {
+            <div class="field" role="group" aria-labelledby="weekdays-label">
+              <span id="weekdays-label" class="group-label">{{
+                'games.form.weekdays' | translate
+              }}</span>
+              <mat-button-toggle-group
+                multiple
+                formControlName="weekdays"
+                aria-labelledby="weekdays-label"
+                aria-describedby="weekdays-hint"
+                class="weekdays"
+              >
+                @for (d of weekdays; track d) {
+                  <mat-button-toggle
+                    [value]="d"
+                    [attr.aria-label]="'games.weekdaysLong.' + d | translate"
+                    >{{ 'games.weekdays.' + d | translate }}</mat-button-toggle
+                  >
+                }
+              </mat-button-toggle-group>
+              <p id="weekdays-hint" class="nri-muted hint">
+                {{ 'games.form.weekdaysHint' | translate }}
+              </p>
+              @if (looseError('weekdays'); as key) {
+                <p class="field-error" role="alert">{{ key | translate }}</p>
+              }
+            </div>
+          }
+        }
+      </fieldset>
+
+      <!-- Гравці й умови -->
+      <fieldset class="nri-card section">
+        <legend>{{ 'games.form.sections.players' | translate }}</legend>
+
+        <div class="row">
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.minPlayers' | translate }}</mat-label>
+              <input
+                matInput
+                type="number"
+                formControlName="minPlayers"
+                min="1"
+                max="20"
+                required
+              />
+              @if (errorKey('minPlayers'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.maxPlayers' | translate }}</mat-label>
+              <input
+                matInput
+                type="number"
+                formControlName="maxPlayers"
+                min="1"
+                max="20"
+                required
+              />
+              @if (errorKey('maxPlayers'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.price' | translate }}</mat-label>
+              <input matInput type="number" formControlName="priceUah" min="0" max="100000" />
+              <mat-hint>{{ 'games.form.priceHint' | translate }}</mat-hint>
+              @if (errorKey('priceUah'); as key) {
+                <mat-error>{{ key | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.ageRating' | translate }}</mat-label>
+              <select matNativeControl formControlName="ageRating">
+                @for (r of ageRatings; track r) {
+                  <option [ngValue]="r" [disabled]="!ageAllowed(r)">
+                    {{ 'games.ageRating.' + r | translate }}
+                  </option>
+                }
+              </select>
+              @if (!ageAllowed('18+') || !ageAllowed('21+')) {
+                <mat-hint>{{ 'games.form.ageRatingHint' | translate }}</mat-hint>
+              }
+            </mat-form-field>
+            @if (apiError('ageRating'); as key) {
+              <p class="field-error" role="alert">{{ key | translate }}</p>
+            }
+          </div>
+          <div class="field">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'games.form.experience' | translate }}</mat-label>
+              <select matNativeControl formControlName="experience">
+                @for (x of experiences; track x) {
+                  <option [ngValue]="x">{{ 'games.experience.' + x | translate }}</option>
+                }
+              </select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'games.form.requirements' | translate }}</mat-label>
+            <textarea matInput formControlName="requirements" rows="3" maxlength="2000"></textarea>
+            @if (errorKey('requirements'); as key) {
+              <mat-error>{{ key | translate: { max: 2000 } }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <mat-checkbox formControlName="showWhenFull">{{
+          'games.form.showWhenFull' | translate
+        }}</mat-checkbox>
+      </fieldset>
+
+      <!-- Попередження -->
+      <fieldset class="nri-card section">
+        <legend>{{ 'games.form.sections.warnings' | translate }}</legend>
+        <p class="nri-muted hint">{{ 'games.form.warningsHint' | translate }}</p>
+        <ul class="chips" [attr.aria-label]="'games.form.sections.warnings' | translate">
+          @for (w of catalog()?.contentWarnings ?? []; track w.id) {
+            <li>
+              <nri-warning-chip
+                [slug]="w.slug"
+                [selectable]="!closed()"
+                [selected]="warningSelected(w.id)"
+                (toggled)="toggleWarning(w.id)"
+              />
+            </li>
+          }
+        </ul>
+        @if (apiError('contentWarningIds'); as key) {
+          <p class="field-error" role="alert">{{ key | translate }}</p>
+        }
+
+        @if (value().customWarnings.length > 0) {
+          <ul class="chips custom">
+            @for (w of value().customWarnings; track $index) {
+              <li class="custom-chip">
+                <nri-warning-chip [custom]="w" />
+                <button
+                  mat-icon-button
+                  type="button"
+                  [disabled]="closed()"
+                  [attr.aria-label]="'games.form.removeCustomWarning' | translate: { name: w }"
+                  (click)="removeCustomWarning($index)"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <div class="add-row">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'games.form.customWarning' | translate }}</mat-label>
+            <input
+              matInput
+              [formControl]="newCustomWarning"
+              maxlength="60"
+              (keydown.enter)="$event.preventDefault(); addCustomWarning()"
+            />
+          </mat-form-field>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="closed() || value().customWarnings.length >= maxCustomWarnings"
+            (click)="addCustomWarning()"
+          >
+            {{ 'games.form.addCustomWarning' | translate }}
+          </button>
+        </div>
+      </fieldset>
+
+      <!-- Канали -->
+      <fieldset class="nri-card section" formArrayName="channelLinks">
+        <legend>{{ 'games.form.sections.channels' | translate }}</legend>
+        <p class="nri-muted hint">{{ 'games.form.channelsHint' | translate }}</p>
+        @for (link of c.channelLinks.controls; track link; let i = $index) {
+          <div class="row channel" [formGroupName]="i">
+            <div class="field">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.channelLabel' | translate }}</mat-label>
+                <input matInput formControlName="label" maxlength="40" required />
+                @if (errorKey('channelLinks.' + i + '.label'); as key) {
+                  <mat-error>{{ key | translate: { max: 40 } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <div class="field grow">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.channelUrl' | translate }}</mat-label>
+                <input matInput type="url" formControlName="url" maxlength="512" required />
+                @if (errorKey('channelLinks.' + i + '.url'); as key) {
+                  <mat-error>{{ key | translate: { max: 512 } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <button
+              mat-icon-button
+              type="button"
+              class="remove"
+              [disabled]="closed()"
+              [attr.aria-label]="'games.form.removeChannel' | translate: { n: i + 1 }"
+              (click)="removeChannel(i)"
+            >
+              <mat-icon aria-hidden="true">delete</mat-icon>
+            </button>
+          </div>
+        }
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="closed() || value().channelLinks.length >= maxChannels"
+          (click)="addChannel()"
+        >
+          <mat-icon aria-hidden="true">add</mat-icon>
+          {{ 'games.form.addChannel' | translate }}
+        </button>
+      </fieldset>
+
+      <!-- Анкета -->
+      <fieldset class="nri-card section" formArrayName="applicationQuestions">
+        <legend>{{ 'games.form.sections.questions' | translate }}</legend>
+        <p class="nri-muted hint">{{ 'games.form.questionsHint' | translate }}</p>
+        @for (q of c.applicationQuestions.controls; track q; let i = $index) {
+          <div class="row question">
+            <div class="field grow">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'games.form.question' | translate: { n: i + 1 } }}</mat-label>
+                <textarea
+                  matInput
+                  [formControlName]="i"
+                  rows="2"
+                  maxlength="300"
+                  required
+                ></textarea>
+                @if (errorKey('applicationQuestions.' + i); as key) {
+                  <mat-error>{{ key | translate: { max: 300 } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <button
+              mat-icon-button
+              type="button"
+              class="remove"
+              [disabled]="closed()"
+              [attr.aria-label]="'games.form.removeQuestion' | translate: { n: i + 1 }"
+              (click)="removeQuestion(i)"
+            >
+              <mat-icon aria-hidden="true">delete</mat-icon>
+            </button>
+          </div>
+        }
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="closed() || value().applicationQuestions.length >= maxQuestions"
+          (click)="addQuestion()"
+        >
+          <mat-icon aria-hidden="true">add</mat-icon>
+          {{ 'games.form.addQuestion' | translate }}
+        </button>
+      </fieldset>
+
+      <div aria-live="polite">
+        @if (formError(); as key) {
+          <p class="nri-alert" role="alert">{{ key | translate }}</p>
+        }
+      </div>
+
+      @if (!closed()) {
+        <div class="form-actions">
+          <a mat-button routerLink="/my-games">{{ 'common.cancel' | translate }}</a>
+          <button mat-stroked-button type="submit" class="save" [disabled]="busy()">
+            {{ (isDraft() ? 'games.form.saveDraft' : 'games.form.save') | translate }}
+          </button>
+          @if (isDraft()) {
+            <button
+              mat-flat-button
+              type="button"
+              class="publish"
+              [disabled]="busy() || !valid()"
+              [attr.aria-describedby]="valid() ? null : 'publish-hint'"
+              (click)="publish()"
+            >
+              {{ 'games.form.publish' | translate }}
+            </button>
+          }
+        </div>
+        @if (isDraft() && !valid()) {
+          <p id="publish-hint" class="nri-muted hint publish-hint">
+            {{ 'games.form.publishHint' | translate }}
+          </p>
+        }
+      }
+    </form>
+  }
+</section>

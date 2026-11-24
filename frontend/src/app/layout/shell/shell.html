@@ -4,6 +4,28 @@
   <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
   <span class="spacer"></span>
 
+  @if (auth.isActive() && viewMode.mode() === 'gm') {
+    <nav class="gm-nav" [attr.aria-label]="'shell.viewMode.gm' | translate">
+      <a
+        mat-button
+        class="my-games-link"
+        routerLink="/my-games"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        >{{ 'shell.myGames' | translate }}</a
+      >
+      <a
+        mat-stroked-button
+        routerLink="/games/new"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+      >
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'shell.newGame' | translate }}
+      </a>
+    </nav>
+  }
+
   @if (auth.isActive()) {
     <mat-button-toggle-group
       class="view-mode"

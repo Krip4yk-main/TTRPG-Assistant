@@ -46,3 +46,16 @@ export function provideUkDates(): Provider[] {
     { provide: DateAdapter, useClass: UkDateAdapter },
   ];
 }
+
+/** Момент часу для показу (`2 бер. 2027 р., 19:00`) у поясі `timeZone`. */
+export function formatDateTime(iso: string, timeZone: string | null | undefined): string {
+  const opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+  try {
+    return new Intl.DateTimeFormat('uk-UA', { ...opts, timeZone: timeZone ?? undefined }).format(
+      new Date(iso),
+    );
+  } catch {
+    // Невідомий пояс — показуємо в поясі браузера.
+    return new Intl.DateTimeFormat('uk-UA', opts).format(new Date(iso));
+  }
+}
