@@ -97,4 +97,44 @@ describe('AccountSettings nickname', () => {
     expect(el.textContent).toContain('profile.errors.NICKNAME_TAKEN');
     expect(auth.me()?.nickname).toBe('Gandalf');
   });
+
+  it('birth-date form submit PATCHes /api/me/birth-date with the ISO date', async () => {
+    const bdForm = el.querySelector<HTMLFormElement>('form.birth-date:not(.nickname)')!;
+    const bd = el.querySelector<HTMLInputElement>('form.birth-date:not(.nickname) input')!;
+    bd.value = '02.03.1991';
+    bd.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    bdForm.dispatchEvent(new Event('submit'));
+    const req = http.expectOne('/api/me/birth-date');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ birthDate: '1991-03-02' });
+    req.flush({ ...me, birthDate: '1991-03-02' });
+    await fixture.whenStable();
+    expect(auth.me()?.birthDate).toBe('1991-03-02');
+  });
+
+  it('birth-date 409 BIRTH_DATE_COOLDOWN shows the cooldown message', async () => {
+    const bdForm = el.querySelector<HTMLFormElement>('form.birth-date:not(.nickname)')!;
+    const bd = el.querySelector<HTMLInputElement>('form.birth-date:not(.nickname) input')!;
+    bd.value = '02.03.1991';
+    bd.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    bdForm.dispatchEvent(new Event('submit'));
+    http
+      .expectOne('/api/me/birth-date')
+      .flush(
+        {
+          error: {
+            code: 'BIRTH_DATE_COOLDOWN',
+            details: { availableAt: '2027-01-01T00:00:00.000Z' },
+          },
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('profile.errors.BIRTH_DATE_COOLDOWN');
+  });
 });

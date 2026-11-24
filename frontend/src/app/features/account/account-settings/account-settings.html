@@ -123,14 +123,14 @@
   <section class="nri-card" aria-labelledby="birth-date-title">
     <h2 id="birth-date-title">{{ 'account.birthDate.title' | translate }}</h2>
     <p class="nri-muted">{{ 'account.birthDate.hint' | translate }}</p>
-    <form class="birth-date" (ngSubmit)="saveBirthDate()" novalidate>
+    <form class="birth-date" [formGroup]="birthDateForm" (ngSubmit)="saveBirthDate()" novalidate>
       <mat-form-field appearance="outline">
         <mat-label>{{ 'profile.fields.birthDate' | translate }}</mat-label>
         <input
           matInput
           [matDatepicker]="picker"
           [max]="maxBirthDate"
-          [formControl]="birthDate"
+          formControlName="birthDate"
           [errorStateMatcher]="errorState"
           autocomplete="bday"
           required

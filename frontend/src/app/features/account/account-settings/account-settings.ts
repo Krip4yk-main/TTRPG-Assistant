@@ -123,6 +123,8 @@ export class AccountSettings {
     minAgeValidatorFor(() => this.me()?.timezone),
   ]);
 
+  protected readonly birthDateForm = new FormGroup({ birthDate: this.birthDate });
+
   constructor() {
     this.nickname.setValue(this.me()?.nickname ?? '');
     const current = this.me()?.birthDate;
