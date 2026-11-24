@@ -32,3 +32,5 @@
 - Graceful shutdown не обриває «зависані» keep-alive з'єднання.
 - `updated_at` оновлюється лише через Drizzle, без `ON UPDATE` у БД.
 - `bot` досі на `@types/node` ^24.
+- `AuthStore.revalidate('auth-error')` з відповіддю 200 не скидає прапорець `failed` — банер «Спробувати ще раз» може залишитись після попередньої 5xx.
+- Google OAuth ще не перевірено на справжньому Google — перший вхід перевірити локально (localhost дозволений як redirect URI) або на staging.
