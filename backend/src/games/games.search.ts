@@ -54,14 +54,20 @@ const DATE_ONLY_FROM_SPAN_MS = 366 * DAY_MS;
 // ---------- курсор ----------
 
 /**
- * Курсор — непрозорий токен: AES-256-GCM над JSON `{ s, k, id }` (сортування, ключ
- * сортування останнього виданого рядка (ISO) та його id), base64url(`iv | tag | шифротекст`).
+ * Курсор — непрозорий токен: AES-256-GCM над JSON `{ s, r, k, id }` (сортування, ранг
+ * статусу (0 — набір, 1 — гра вже йде), ключ сортування останнього виданого рядка (ISO)
+ * та його id), base64url(`iv | tag | шифротекст`).
  * Шифрування не дає вичитати `starts_at`/`published_at` прихованої (18+/21+) гри.
  * Ключ — HKDF-SHA256 від `IDENTITY_PEPPER` з окремою міткою. Підроблений, сміттєвий
  * курсор чи курсор іншого сортування → 400.
  */
 const cursorSchema = z
-  .object({ s: z.enum(SEARCH_SORTS), k: z.iso.datetime(), id: z.number().int().positive() })
+  .object({
+    s: z.enum(SEARCH_SORTS),
+    r: z.union([z.literal(0), z.literal(1)]),
+    k: z.iso.datetime(),
+    id: z.number().int().positive(),
+  })
   .strict();
 type Cursor = z.output<typeof cursorSchema>;
 
@@ -85,8 +91,24 @@ function sortKey(row: Loaded['row'], sort: SearchSort): Date {
   return sort === 'soonest' ? row.startsAt : row.publishedAt!;
 }
 
+/** Ранг статусу: ігри, що вже йдуть (`started`), — після всіх, що набирають гравців. */
+function statusRank(row: Loaded['row']): 0 | 1 {
+  return row.status === 'started' ? 1 : 0;
+}
+
+type After = { r: 0 | 1; k: Date; id: number };
+
+function afterOf(row: Loaded['row'], sort: SearchSort): After {
+  return { r: statusRank(row), k: sortKey(row, sort), id: row.id };
+}
+
 function encodeCursor(deps: AppDeps, row: Loaded['row'], sort: SearchSort): string {
-  const c: Cursor = { s: sort, k: sortKey(row, sort).toISOString(), id: row.id };
+  const c: Cursor = {
+    s: sort,
+    r: statusRank(row),
+    k: sortKey(row, sort).toISOString(),
+    id: row.id,
+  };
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv('aes-256-gcm', cursorKey(deps), iv);
   const data = Buffer.concat([cipher.update(JSON.stringify(c), 'utf8'), cipher.final()]);
@@ -115,23 +137,31 @@ function decodeCursor(deps: AppDeps, raw: string, sort: SearchSort): Cursor {
 }
 
 /**
- * Порядок і умова «після курсора». `soonest` — за датою ПЕРШОЇ сесії (`starts_at`), а не
+ * Порядок і умова «після курсора». Першим ключем завжди йде ранг статусу: ігри, що вже
+ * йдуть (`started`, видимі лише з `show_when_full`), стоять після всіх `recruiting`.
+ * Далі `soonest` — за датою ПЕРШОЇ сесії (`starts_at`), а не
  * за `nextSessionAt`: так порядок стабільний у SQL і курсор не «пливе» з часом; для
  * кампаній, що вже йдуть, перша сесія в минулому, тож вони стоять на початку.
  * `newest` — за `published_at` спадно. Нічиї — за id у тому ж напрямку.
  */
+const rankSql = sql<number>`(case when ${games.status} = 'started' then 1 else 0 end)`;
+
 function ordering(sort: SearchSort) {
+  const withRank = (within: (c: After) => SQL | undefined) => (c: After) =>
+    or(sql`${rankSql} > ${c.r}`, and(sql`${rankSql} = ${c.r}`, within(c)));
   if (sort === 'soonest') {
     return {
-      order: [asc(games.startsAt), asc(games.id)],
-      after: (c: { k: Date; id: number }) =>
+      order: [asc(rankSql), asc(games.startsAt), asc(games.id)],
+      after: withRank((c) =>
         or(gt(games.startsAt, c.k), and(eq(games.startsAt, c.k), gt(games.id, c.id))),
+      ),
     };
   }
   return {
-    order: [desc(games.publishedAt), desc(games.id)],
-    after: (c: { k: Date; id: number }) =>
+    order: [asc(rankSql), desc(games.publishedAt), desc(games.id)],
+    after: withRank((c) =>
       or(lt(games.publishedAt, c.k), and(eq(games.publishedAt, c.k), lt(games.id, c.id))),
+    ),
   };
 }
 
@@ -320,10 +350,10 @@ export async function searchGames(
   body: unknown,
 ): Promise<SearchResultDto> {
   const f = searchFiltersSchema.parse(body);
-  let after: { k: Date; id: number } | null = null;
+  let after: After | null = null;
   if (f.cursor !== undefined) {
     const c = decodeCursor(deps, f.cursor, f.sort);
-    after = { k: new Date(c.k), id: c.id };
+    after = { r: c.r, k: new Date(c.k), id: c.id };
   }
   const [availability, viewer] = await Promise.all([
     calendarAvailability(deps, f, user),
@@ -357,7 +387,7 @@ export async function searchGames(
       exhausted = true;
       break;
     }
-    after = { k: sortKey(last!.row, f.sort), id: last!.row.id };
+    after = afterOf(last!.row, f.sort);
   }
 
   let nextCursor: string | null = null;

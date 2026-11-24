@@ -304,6 +304,31 @@ describe('POST /api/games/search — paging and visibility', () => {
     expect(pages).toEqual([[c, b], [a]]);
   });
 
+  it('running (started) games go after all recruiting ones, across pages too', async () => {
+    const base = Date.now() + 10 * DAY_MS;
+    // Кампанія, що вже йде: перша сесія раніше за всі інші й опублікована найпізніше.
+    const started = await insertGame({
+      status: 'started',
+      showWhenFull: true,
+      recurrence: 'weekly',
+      weekdays: [0],
+      startsAt: new Date(Date.now() - 20 * DAY_MS),
+      publishedAt: new Date(Date.now() - 1000),
+    });
+    const r1 = await insertGame({
+      startsAt: new Date(base),
+      publishedAt: new Date(Date.now() - 3 * DAY_MS),
+    });
+    const r2 = await insertGame({
+      startsAt: new Date(base + DAY_MS),
+      publishedAt: new Date(Date.now() - 2 * DAY_MS),
+    });
+    expect(ids(await search({}))).toEqual([r1, r2, started]);
+    expect(await collect({ limit: 1 })).toEqual([[r1], [r2], [started]]);
+    expect(ids(await search({ sort: 'newest' }))).toEqual([r2, r1, started]);
+    expect(await collect({ sort: 'newest', limit: 1 })).toEqual([[r2], [r1], [started]]);
+  });
+
   it('calendar filter dropping rows never skips or duplicates across pages', async () => {
     const tue = nextKyiv(1, 19);
     const expected: number[] = [];
