@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { completeProfileSchema } from '@nri/shared';
@@ -6,6 +7,7 @@ import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { clearSessionCookie } from '../auth/session.service.js';
 import { authIdentities } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { TG_LINK_PREFIX } from '../internal/internal.routes.js';
 import {
   changeBirthDate,
   completeProfile,
@@ -43,6 +45,14 @@ export function usersRouter(deps: AppDeps): Router {
     const { birthDate } = birthDateBody.parse(req.body);
     await changeBirthDate(deps, req.user!.userId, birthDate);
     res.json(await getMe(deps, req.user!.userId));
+  });
+
+  router.post('/telegram-link-token', auth, requireActive, async (req, res) => {
+    const bot = deps.env.TELEGRAM_BOT_USERNAME;
+    if (!bot) throw new AppError(404, 'NOT_FOUND');
+    const token = randomBytes(16).toString('base64url');
+    await deps.redis.set(`${TG_LINK_PREFIX}${token}`, String(req.user!.userId), 'EX', 600);
+    res.json({ url: `https://t.me/${bot}?start=${token}` });
   });
 
   router.delete('/identities/:provider', auth, async (req, res) => {

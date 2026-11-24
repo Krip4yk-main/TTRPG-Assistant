@@ -77,7 +77,10 @@ describe('app', () => {
   });
 
   it('skips CSRF for /api/internal/*', async () => {
-    const res = await request(makeApp()).post('/api/internal/ping').send({});
+    const app = makeApp();
+    // Без CSRF-токена: не 403, а 401 від перевірки внутрішнього ключа.
+    expect((await request(app).post('/api/internal/ping').send({})).status).toBe(401);
+    const res = await request(app).post('/api/internal/ping').set('X-Internal-Key', 'key').send({});
     expect(res.status).toBe(404);
   });
 
