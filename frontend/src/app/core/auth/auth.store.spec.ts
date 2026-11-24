@@ -237,6 +237,30 @@ describe('AuthStore', () => {
       }
     });
 
+    it('auth-error + 200 не перепідключає сокет (двічі поспіль теж)', async () => {
+      await login();
+      socket.connect.mockClear();
+      for (let i = 0; i < 2; i++) {
+        lost$.next('auth-error');
+        http.expectOne('/api/me').flush(me());
+        await store.revalidate();
+      }
+      expect(socket.connect).not.toHaveBeenCalled();
+      expect(store.me()?.nickname).toBe('Gandalf');
+    });
+
+    it('запізніла 200 після виходу не воскрешає користувача', async () => {
+      await login();
+      lost$.next('revoked');
+      const req = http.expectOne('/api/me');
+      const done = store.logout();
+      http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+      await done;
+      req.flush(me());
+      await store.revalidate();
+      expect(store.me()).toBeNull();
+    });
+
     it('5xx після connect_error не перепідключає сокет', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout'] });
       try {

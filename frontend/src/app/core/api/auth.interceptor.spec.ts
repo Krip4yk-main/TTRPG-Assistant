@@ -1,3 +1,4 @@
+import type { SessionLostReason } from '../realtime/socket.service';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -21,7 +22,11 @@ describe('authInterceptor', () => {
         provideRouter([]),
         {
           provide: SocketService,
-          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            sessionLost$: new Subject<SessionLostReason>(),
+          },
         },
       ],
     });

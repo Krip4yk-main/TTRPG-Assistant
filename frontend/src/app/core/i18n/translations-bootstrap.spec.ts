@@ -1,3 +1,4 @@
+import type { SessionLostReason } from '../realtime/socket.service';
 import { Subject } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -30,7 +31,11 @@ describe('завантаження перекладів з authInterceptor', () 
         }),
         {
           provide: SocketService,
-          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            sessionLost$: new Subject<SessionLostReason>(),
+          },
         },
       ],
     });

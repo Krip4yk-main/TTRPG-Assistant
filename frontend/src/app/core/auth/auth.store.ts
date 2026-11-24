@@ -26,7 +26,7 @@ export class AuthStore {
   private readonly channel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME);
   private revalidating: Promise<void> | null = null;
-  private loggingOut = false;
+  private loggingOut = 0;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -75,16 +75,22 @@ export class AuthStore {
    * Router береться ліниво (цикл DI). Ігнорується, поки триває власний вихід.
    */
   revalidate(reason?: SessionLostReason): Promise<void> {
-    if (this.loggingOut || !this.isAuthenticated()) return Promise.resolve();
+    if (this.loggingOut > 0 || !this.isAuthenticated()) return Promise.resolve();
     this.revalidating ??= firstValueFrom(this.api.me())
       .then(
         (me) => {
-          if (this.loggingOut) return;
+          if (this.loggingOut > 0 || !this.isAuthenticated()) return;
+          if (reason === 'auth-error') {
+            // Рукостискання відхилене, а /api/me каже «живий»: оновлюємо лише стан,
+            // без перепідключення й без скидання лічильника (інакше цикл на швидкості мережі).
+            this.state.set(me);
+            return;
+          }
           this.reconnectAttempts = 0;
           this.setMe(me);
         },
         (err: unknown) => {
-          if (this.loggingOut || !this.isAuthenticated()) return;
+          if (this.loggingOut > 0 || !this.isAuthenticated()) return;
           const banned =
             err instanceof HttpErrorResponse &&
             err.status === 403 &&
@@ -147,22 +153,22 @@ export class AuthStore {
   }
 
   async logout(): Promise<void> {
-    this.loggingOut = true;
+    this.loggingOut++;
     try {
       await firstValueFrom(this.api.logout());
     } finally {
-      this.loggingOut = false;
+      this.loggingOut--;
       this.setMe(null);
       this.channel?.postMessage('logout');
     }
   }
 
   async logoutAll(): Promise<void> {
-    this.loggingOut = true;
+    this.loggingOut++;
     try {
       await firstValueFrom(this.api.logoutAll());
     } finally {
-      this.loggingOut = false;
+      this.loggingOut--;
       this.setMe(null);
       this.channel?.postMessage('logout');
     }

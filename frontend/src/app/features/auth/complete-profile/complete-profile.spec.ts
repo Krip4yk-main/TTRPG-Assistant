@@ -1,3 +1,4 @@
+import type { SessionLostReason } from '../../../core/realtime/socket.service';
 import { Subject } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -33,7 +34,11 @@ describe('CompleteProfile', () => {
         provideTranslateService(),
         {
           provide: SocketService,
-          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            sessionLost$: new Subject<SessionLostReason>(),
+          },
         },
       ],
     }).compileComponents();
