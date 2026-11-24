@@ -99,13 +99,20 @@ function text(v: string | null, max: number): string | undefined {
   return t ? t : undefined;
 }
 
+/** `YYYY-MM-DD` справжньої дати (`2027-02-30` не «перекочується» в березень). */
 function isoDate(v: string | null): string | undefined {
-  return v && ISO_DATE.test(v) && !Number.isNaN(Date.parse(v)) ? v : undefined;
+  if (!v || !ISO_DATE.test(v)) return undefined;
+  const [y, m, d] = v.split('-').map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
+    ? v
+    : undefined;
 }
 
 /** URL → фільтри; некоректні значення мовчки відкидаються. */
 export function parseSearchParams(params: ParamMap): SearchFilterState {
-  const priceMax = Number(params.get(P.priceMax));
+  const rawPriceMax = params.get(P.priceMax)?.trim();
+  const priceMax = rawPriceMax ? Number(rawPriceMax) : NaN;
   const ageRatings = (params.get(P.age) ?? '')
     .split(',')
     .map((v) => oneOf(AGE_RATINGS, v))
@@ -120,9 +127,7 @@ export function parseSearchParams(params: ParamMap): SearchFilterState {
     dateTo: isoDate(params.get(P.to)),
     priceMode: oneOf(PRICE_MODES, params.get(P.price)) ?? 'any',
     priceMax:
-      params.has(P.priceMax) && Number.isInteger(priceMax) && priceMax >= 0 && priceMax <= 100_000
-        ? priceMax
-        : undefined,
+      Number.isInteger(priceMax) && priceMax >= 0 && priceMax <= 100_000 ? priceMax : undefined,
     ageRatings: [...new Set(ageRatings)],
     experience: oneOf(GAME_EXPERIENCE, params.get(P.experience)),
     platform: text(params.get(P.platform), 60),
@@ -231,4 +236,24 @@ export function toSearchRequest(
   if (f.hasFreeSlots) req.hasFreeSlots = true;
   if (f.excludeWarningIds.length) req.excludeWarningIds = f.excludeWarningIds;
   return req;
+}
+
+/** Режим календаря, що фактично застосовано до пошуку (`null` — ще визначається). */
+export type EffectiveCalendarMode = 'off' | 'mine' | 'custom' | null;
+
+/**
+ * Який календар застосувати: гість — завжди `off` (навіть з `?cal=mine`); календар «для
+ * цього пошуку» має пріоритет; далі `?cal=off`; інакше — `mine`, якщо є збережені слоти.
+ */
+export function resolveCalendarMode(s: {
+  signedIn: boolean;
+  custom: boolean;
+  chosen: UrlCalendarMode | undefined;
+  hasSlots: boolean | null;
+}): EffectiveCalendarMode {
+  if (!s.signedIn) return 'off';
+  if (s.custom) return 'custom';
+  if (s.chosen === 'off') return 'off';
+  if (s.hasSlots === null) return null;
+  return s.hasSlots ? 'mine' : 'off';
 }
