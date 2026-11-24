@@ -306,6 +306,9 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
   return gmView(deps, id);
 }
 
+/** Точка для тестів гонки: викликається між читанням гри й записом `PATCH`. */
+export const patchHooks: { beforeWrite?: (gameId: number) => Promise<void> } = {};
+
 export async function updateGame(
   deps: AppDeps,
   userId: number,
@@ -338,8 +341,15 @@ export async function updateGame(
   ) {
     throw new AppError(422, 'GAME_IN_PAST');
   }
+  await patchHooks.beforeWrite?.(id);
   await db.transaction(async (tx) => {
-    await tx.update(games).set(columns(next)).where(eq(games.id, id));
+    // Умова за прочитаним статусом: якщо гру тим часом опублікували/скасували, заблоковані
+    // поля чи завершена гра не змінюються — 409, транзакція відкочується.
+    const [res] = await tx
+      .update(games)
+      .set(columns(next))
+      .where(and(eq(games.id, id), eq(games.status, row.status)));
+    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
     if (patch.contentWarningIds !== undefined) {
       await tx.delete(gameContentWarnings).where(eq(gameContentWarnings.gameId, id));
       if (next.contentWarningIds.length) {

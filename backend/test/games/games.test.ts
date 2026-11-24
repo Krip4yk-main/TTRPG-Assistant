@@ -1,8 +1,9 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { contentWarnings, events, gameSystems, games, users } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
+import { patchHooks } from '../../src/games/games.service.js';
 import { harness } from './fixtures.js';
 
 const deps = await testDeps();
@@ -169,6 +170,53 @@ describe('games edit locks', () => {
     const id = await createGame(gm.cookie, {}, true);
     const res = await call('patch', `/api/games/${id}`, other.cookie, { title: 'x' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('games PATCH vs concurrent transitions', () => {
+  afterEach(() => {
+    patchHooks.beforeWrite = undefined;
+  });
+
+  it('draft published between read and write → 409, locked field unchanged', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie);
+    const [before] = await db.select().from(games).where(eq(games.id, id));
+    patchHooks.beforeWrite = async (gameId) => {
+      await db.update(games).set({ status: 'recruiting' }).where(eq(games.id, gameId));
+    };
+    const res = await call('patch', `/api/games/${id}`, gm.cookie, {
+      systemId: null,
+      systemOther: 'Homebrew',
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('GAME_INVALID_TRANSITION');
+    const [after] = await db.select().from(games).where(eq(games.id, id));
+    expect(after).toMatchObject({
+      status: 'recruiting',
+      systemId: before!.systemId,
+      systemOther: null,
+    });
+  });
+
+  it('a no-op PATCH (same values) still succeeds', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    const [row] = await db.select().from(games).where(eq(games.id, id));
+    const res = await call('patch', `/api/games/${id}`, gm.cookie, { title: row!.title });
+    expect(res.status).toBe(200);
+  });
+
+  it('game cancelled between read and write → 409, nothing written', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    patchHooks.beforeWrite = async (gameId) => {
+      await db.update(games).set({ status: 'cancelled' }).where(eq(games.id, gameId));
+    };
+    const res = await call('patch', `/api/games/${id}`, gm.cookie, { title: 'Пізно' });
+    expect(res.status).toBe(409);
+    const [after] = await db.select().from(games).where(eq(games.id, id));
+    expect(after!.title).not.toBe('Пізно');
   });
 });
 
