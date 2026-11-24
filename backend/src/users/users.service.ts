@@ -1,8 +1,10 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
+  localDate,
   type CompleteProfileInput,
+  type MeDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
@@ -11,50 +13,24 @@ import {
   revokeTokenHashes,
 } from '../auth/session.service.js';
 import { isDuplicateKey, subjectHash } from '../auth/identity.service.js';
-import { authIdentities, identityTombstones, sessions, users } from '../db/schema/index.js';
+import {
+  authIdentities,
+  availabilityBusyDates,
+  availabilitySlots,
+  gameMembers,
+  games,
+  identityTombstones,
+  sessions,
+  userProfiles,
+  users,
+} from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
 
-export type MeDto = {
-  id: number;
-  nickname: string | null;
-  avatarUrl: string | null;
-  birthDate: string | null;
-  role: typeof users.$inferSelect.role;
-  status: typeof users.$inferSelect.status;
-  timezone: string;
-  locale: string;
-  identities: { provider: Provider; displayName: string | null }[];
-};
-
 const DAY_MS = 86_400_000;
 export type Clock = () => Date;
-const DEFAULT_TZ = 'Europe/Kyiv';
-
-/**
- * Календарна дата `YYYY-MM-DD` у часовому поясі користувача (як її бачить фронтенд).
- * Невідомий/некоректний пояс — Europe/Kyiv.
- */
-export function localDate(d: Date, timeZone: string | null | undefined): string {
-  const fmt = (tz: string) =>
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  if (timeZone) {
-    try {
-      return fmt(timeZone);
-    } catch {
-      // RangeError: Invalid time zone — падаємо на типовий пояс.
-    }
-  }
-  return fmt(DEFAULT_TZ);
-}
-
 /**
  * Ставить is_banned і скидає Redis-кеш сесій, тож бан діє з наступного ж запиту:
  * requireAuth бачить isBanned -> 403 ACCOUNT_BANNED і викликає revokeAllUserSessions
@@ -77,6 +53,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     .orderBy(authIdentities.id);
   return {
     id: u.id,
+    publicId: u.publicId,
     nickname: u.nickname,
     avatarUrl: u.avatarUrl,
     birthDate: u.birthDate,
@@ -140,6 +117,50 @@ export async function completeProfile(
   return { ok: true };
 }
 
+export async function changeNickname(
+  deps: AppDeps,
+  userId: number,
+  nickname: string,
+): Promise<MeDto> {
+  const { db } = deps;
+  try {
+    const [r] = await db
+      .update(users)
+      .set({ nickname })
+      .where(and(eq(users.id, userId), eq(users.status, 'active')));
+    if (r.affectedRows === 0) throw new AppError(401, 'UNAUTHENTICATED');
+  } catch (err) {
+    if (isDuplicateKey(err)) throw new AppError(409, 'NICKNAME_TAKEN');
+    throw err;
+  }
+  await logEvent(db, { type: 'user.nickname_changed', userId });
+  return getMe(deps, userId);
+}
+
+/**
+ * Змінює пояс акаунта. Слоти календаря не перераховуються — лишаються тим самим «настінним»
+ * часом у новому поясі (R5). Сесійний кеш пояса не містить (`SessionUser`), тож не чіпаємо.
+ */
+export async function changeTimezone(
+  deps: AppDeps,
+  userId: number,
+  timezone: string,
+): Promise<MeDto> {
+  const { db } = deps;
+  const from = await db.transaction(async (tx) => {
+    const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+    if (!u || u.status !== 'active') throw new AppError(401, 'UNAUTHENTICATED');
+    if (u.timezone !== timezone) {
+      await tx.update(users).set({ timezone }).where(eq(users.id, userId));
+    }
+    return u.timezone;
+  });
+  if (from !== timezone) {
+    await logEvent(db, { type: 'user.timezone_changed', userId, payload: { from, to: timezone } });
+  }
+  return getMe(deps, userId);
+}
+
 export async function changeBirthDate(
   deps: AppDeps,
   userId: number,
@@ -197,8 +218,10 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   const { db, env } = deps;
   const now = new Date();
   // Хеші токенів збираємо в транзакції (до видалення рядків), щоб відкликання
-  // не залежало лише від Redis-сету `usess:`.
-  const tokenHashes = await db.transaction(async (tx) => {
+  // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
+  // FK-каскади не спрацьовують: профіль, календар і членства в іграх видаляємо явно,
+  // а активні ігри майстра скасовуємо (рішення R8).
+  const { tokenHashes, cancelledGameIds } = await db.transaction(async (tx) => {
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -224,6 +247,41 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       .from(sessions)
       .where(eq(sessions.userId, userId));
     await tx.delete(sessions).where(eq(sessions.userId, userId));
+    await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
+    await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
+    await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
+    // Склад завершених/скасованих ігор лишаємо: історія інших гравців зберігається, а
+    // видалений користувач показується анонімно. Виходимо лише з активних ігор.
+    await tx.delete(gameMembers).where(
+      and(
+        eq(gameMembers.userId, userId),
+        inArray(
+          gameMembers.gameId,
+          tx
+            .select({ id: games.id })
+            .from(games)
+            .where(inArray(games.status, ['recruiting', 'started'])),
+        ),
+      ),
+    );
+    const active = await tx
+      .select({ id: games.id, status: games.status })
+      .from(games)
+      .where(
+        and(eq(games.gmUserId, userId), inArray(games.status, ['draft', 'recruiting', 'started'])),
+      )
+      .for('update');
+    if (active.length) {
+      await tx
+        .update(games)
+        .set({ status: 'cancelled', cancelledAt: now })
+        .where(
+          inArray(
+            games.id,
+            active.map((g) => g.id),
+          ),
+        );
+    }
     await tx
       .update(users)
       .set({
@@ -236,9 +294,18 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         deletedAt: now,
       })
       .where(eq(users.id, userId));
-    return sess.map((r) => r.tokenHash);
+    return { tokenHashes: sess.map((r) => r.tokenHash), cancelledGameIds: active };
   });
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
+  for (const g of cancelledGameIds) {
+    await logEvent(db, {
+      type: 'game.cancelled',
+      userId,
+      entityType: 'game',
+      entityId: g.id,
+      payload: { from: g.status, to: 'cancelled', reason: 'account_deleted' },
+    });
+  }
   await logEvent(db, { type: 'user.deleted', userId });
 }

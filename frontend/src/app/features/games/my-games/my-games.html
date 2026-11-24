@@ -1,0 +1,104 @@
+<section class="nri-page my-games">
+  <header class="page-header">
+    <h1>{{ 'games.my.title' | translate }}</h1>
+    <a mat-flat-button routerLink="/games/new">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'games.my.newGame' | translate }}
+    </a>
+  </header>
+
+  <div aria-live="polite">
+    @if (message(); as msg) {
+      <p
+        [class.nri-alert]="msg.kind === 'error'"
+        [class.nri-notice]="msg.kind === 'info'"
+        [attr.role]="msg.kind === 'error' ? 'alert' : null"
+      >
+        {{ msg.key | translate }}
+      </p>
+    }
+  </div>
+
+  @if (loadFailed()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'games.my.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="load()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (games(); as list) {
+    @if (list.length === 0) {
+      <div class="nri-card empty">
+        <p>{{ 'games.my.empty' | translate }}</p>
+        <p class="nri-muted">{{ 'games.my.emptyCta' | translate }}</p>
+        <a mat-flat-button routerLink="/games/new">{{ 'games.my.newGame' | translate }}</a>
+      </div>
+    } @else {
+      <ul class="cards">
+        @for (game of list; track game.id) {
+          <li>
+            <article class="nri-card game" [attr.data-game-id]="game.id">
+              <header class="game-header">
+                <h2 class="game-title">{{ game.title }}</h2>
+                <span class="status" [attr.data-status]="game.status">{{
+                  'games.status.' + game.status | translate
+                }}</span>
+              </header>
+              <p class="nri-muted meta">
+                {{ systemName(game) }} · {{ 'games.format.' + game.format | translate }}
+                @if (game.city) {
+                  · {{ game.city }}
+                }
+                · {{ 'games.kind.' + game.kind | translate }}
+              </p>
+              <p class="meta">
+                @if (game.nextSessionAt; as at) {
+                  {{ 'games.my.nextSession' | translate: { date: when(game, at) } }}
+                } @else {
+                  {{ 'games.my.noNextSession' | translate }}
+                }
+              </p>
+              <p class="meta">
+                {{ 'games.my.slots' | translate: { free: game.freeSlots, max: game.maxPlayers } }}
+              </p>
+              <div class="actions">
+                @if (canEdit(game.status)) {
+                  <a
+                    mat-stroked-button
+                    data-action="edit"
+                    [routerLink]="['/games', game.id, 'edit']"
+                    [attr.aria-label]="
+                      'games.actions.aria'
+                        | translate
+                          : { action: ('games.actions.edit' | translate), title: game.title }
+                    "
+                    >{{ 'games.actions.edit' | translate }}</a
+                  >
+                }
+                @for (action of actionsFor(game.status); track action) {
+                  <button
+                    mat-button
+                    type="button"
+                    [attr.data-action]="action"
+                    [class.danger]="action === 'cancel'"
+                    [disabled]="busyId() !== null"
+                    [attr.aria-label]="
+                      'games.actions.aria'
+                        | translate
+                          : { action: ('games.actions.' + action | translate), title: game.title }
+                    "
+                    (click)="run(game, action)"
+                  >
+                    {{ 'games.actions.' + action | translate }}
+                  </button>
+                }
+              </div>
+            </article>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>

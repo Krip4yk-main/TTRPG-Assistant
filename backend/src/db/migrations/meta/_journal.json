@@ -15,6 +15,48 @@
       "when": 1795522637460,
       "tag": "0001_reflective_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1795533216725,
+      "tag": "0002_nickname_collation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1795534674575,
+      "tag": "0003_public_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1795535823530,
+      "tag": "0004_catalog_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1795535824946,
+      "tag": "0005_catalog_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1795536254229,
+      "tag": "0006_profiles_availability",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1795536629832,
+      "tag": "0007_games",
+      "breakpoints": true
     }
   ]
 }

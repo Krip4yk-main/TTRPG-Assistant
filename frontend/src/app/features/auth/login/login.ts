@@ -16,14 +16,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import { type ErrorCode } from '@nri/shared';
+import type { ErrorCode, MeDto } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import type { MeDto } from '../../../core/auth/me.model';
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
 /** Глобальна функція, яку викликає віджет Telegram (`data-onauth`). */

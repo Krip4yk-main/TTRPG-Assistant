@@ -1,0 +1,169 @@
+<section class="nri-page profile-edit">
+  <header>
+    <h1>{{ 'profileEdit.title' | translate }}</h1>
+    <p class="nri-muted lead">{{ 'profileEdit.lead' | translate }}</p>
+  </header>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert" role="alert">
+        <span>{{ 'profileEdit.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="load()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      <form class="nri-card" [formGroup]="form" (ngSubmit)="save()" novalidate>
+        <!-- Про себе -->
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'profile.fields.bio' | translate }}</mat-label>
+            <textarea
+              matInput
+              name="bio"
+              formControlName="bio"
+              rows="5"
+              [maxlength]="bioMax"
+            ></textarea>
+            <mat-hint align="end">{{ bioLength().length }} / {{ bioMax }}</mat-hint>
+            @if (form.controls.bio.hasError('maxlength')) {
+              <mat-error>{{ 'profileEdit.errors.tooLong' | translate: { max: bioMax } }}</mat-error>
+            }
+          </mat-form-field>
+          <ng-container
+            [ngTemplateOutlet]="privacyToggle"
+            [ngTemplateOutletContext]="{ key: 'bio', field: 'profile.fields.bio' }"
+          />
+        </div>
+
+        <!-- Місто -->
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'profile.fields.city' | translate }}</mat-label>
+            <input
+              matInput
+              name="city"
+              formControlName="city"
+              autocomplete="address-level2"
+              [maxlength]="cityMax"
+            />
+            @if (form.controls.city.hasError('maxlength')) {
+              <mat-error>{{
+                'profileEdit.errors.tooLong' | translate: { max: cityMax }
+              }}</mat-error>
+            }
+          </mat-form-field>
+          <ng-container
+            [ngTemplateOutlet]="privacyToggle"
+            [ngTemplateOutletContext]="{ key: 'city', field: 'profile.fields.city' }"
+          />
+        </div>
+
+        <!-- Улюблені системи -->
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'profile.fields.favoriteSystems' | translate }}</mat-label>
+            <mat-select multiple name="favoriteSystems" formControlName="favoriteSystemIds">
+              @for (s of catalog()?.systems ?? []; track s.id) {
+                <mat-option [value]="s.id">{{ s.name }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>{{ 'profileEdit.systemsHint' | translate: { max: systemsMax } }}</mat-hint>
+            @if (form.controls.favoriteSystemIds.hasError('maxlength')) {
+              <mat-error>{{
+                'profileEdit.errors.tooManySystems' | translate: { max: systemsMax }
+              }}</mat-error>
+            } @else if (form.controls.favoriteSystemIds.hasError('unknownSystem')) {
+              <mat-error class="unknown-system">{{
+                'games.form.errors.UNKNOWN_SYSTEM' | translate
+              }}</mat-error>
+            }
+          </mat-form-field>
+          <ng-container
+            [ngTemplateOutlet]="privacyToggle"
+            [ngTemplateOutletContext]="{
+              key: 'favoriteSystems',
+              field: 'profile.fields.favoriteSystems',
+            }"
+          />
+        </div>
+
+        <!-- Формат -->
+        <div class="field">
+          <fieldset class="formats">
+            <legend>{{ 'profile.fields.preferredFormats' | translate }}</legend>
+            @for (f of formats; track f) {
+              <mat-checkbox
+                [name]="'format-' + f"
+                [checked]="formatsValue().includes(f)"
+                (change)="toggleFormat(f, $event.checked)"
+                >{{ 'games.format.' + f | translate }}</mat-checkbox
+              >
+            }
+          </fieldset>
+          <ng-container
+            [ngTemplateOutlet]="privacyToggle"
+            [ngTemplateOutletContext]="{
+              key: 'preferredFormats',
+              field: 'profile.fields.preferredFormats',
+            }"
+          />
+        </div>
+
+        <!-- Досвід -->
+        <div class="field">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'profile.fields.experience' | translate }}</mat-label>
+            <select matNativeControl name="experience" formControlName="experience">
+              <option [ngValue]="null">{{ 'profile.page.notSpecified' | translate }}</option>
+              @for (e of experiences; track e) {
+                <option [ngValue]="e">{{ 'profile.experience.' + e | translate }}</option>
+              }
+            </select>
+          </mat-form-field>
+          <ng-container
+            [ngTemplateOutlet]="privacyToggle"
+            [ngTemplateOutletContext]="{ key: 'experience', field: 'profile.fields.experience' }"
+          />
+        </div>
+
+        <div class="actions">
+          <button mat-flat-button type="submit" [disabled]="saving()">
+            {{ (saving() ? 'common.saving' : 'common.save') | translate }}
+          </button>
+          @if (publicId(); as id) {
+            <a mat-stroked-button [routerLink]="['/users', id]">{{
+              'profileEdit.view' | translate
+            }}</a>
+          }
+          <a mat-button routerLink="/calendar">{{ 'profile.page.calendar' | translate }}</a>
+        </div>
+        <div aria-live="polite">
+          @if (message(); as m) {
+            <p
+              [class.nri-alert]="m.kind === 'error'"
+              [class.nri-notice]="m.kind === 'info'"
+              [attr.role]="m.kind === 'error' ? 'alert' : null"
+            >
+              {{ m.key | translate }}
+            </p>
+          }
+        </div>
+
+        <ng-template #privacyToggle let-key="key" let-field="field">
+          <mat-slide-toggle
+            class="visibility"
+            [attr.data-privacy]="key"
+            [formControl]="privacyControl(key)"
+            [aria-label]="'profileEdit.visibleFor' | translate: { field: (field | translate) }"
+            >{{ 'profileEdit.visible' | translate }}</mat-slide-toggle
+          >
+        </ng-template>
+      </form>
+    }
+  }
+</section>

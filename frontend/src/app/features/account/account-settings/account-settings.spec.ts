@@ -1,0 +1,209 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
+import { provideTranslateService } from '@ngx-translate/core';
+import { Subject } from 'rxjs';
+import type { MeDto } from '@nri/shared';
+import { AccountSettings } from './account-settings';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { browserZone } from '../../../core/i18n/dates';
+import { SocketService } from '../../../core/realtime/socket.service';
+
+const me: MeDto = {
+  id: 1,
+  publicId: 'abcdefghjk',
+  nickname: 'Gandalf',
+  avatarUrl: null,
+  birthDate: '1990-01-01',
+  role: 'user',
+  status: 'active',
+  timezone: 'Europe/Kyiv',
+  locale: 'uk',
+  identities: [{ provider: 'dev', displayName: 'G' }],
+};
+
+describe('AccountSettings nickname', () => {
+  let fixture: ComponentFixture<AccountSettings>;
+  let http: HttpTestingController;
+  let el: HTMLElement;
+  let auth: AuthStore;
+
+  const input = () => el.querySelector<HTMLInputElement>('input[name="nickname"]')!;
+  const form = () => el.querySelector<HTMLFormElement>('form.nickname')!;
+  const type = async (value: string) => {
+    input().value = value;
+    input().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+  };
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [AccountSettings],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    }).compileComponents();
+    auth = TestBed.inject(AuthStore);
+    auth.setMe(me);
+    fixture = TestBed.createComponent(AccountSettings);
+    http = TestBed.inject(HttpTestingController);
+    el = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+  });
+
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
+
+  it('prefills the current nickname; saving PATCHes and updates AuthStore.me()', async () => {
+    expect(input().value).toBe('Gandalf');
+    await type('Saruman');
+    form().dispatchEvent(new Event('submit'));
+    const req = http.expectOne('/api/me/nickname');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ nickname: 'Saruman' });
+    req.flush({ ...me, nickname: 'Saruman' });
+    await fixture.whenStable();
+    expect(auth.me()?.nickname).toBe('Saruman');
+    expect(auth.me()?.publicId).toBe('abcdefghjk');
+  });
+
+  it('invalid nickname is not sent and shows a format error', async () => {
+    await type('a!');
+    form().dispatchEvent(new Event('submit'));
+    http.expectNone('/api/me/nickname');
+    expect(el.textContent).toContain('profile.errors.NICKNAME_FORMAT');
+  });
+
+  it('409 NICKNAME_TAKEN shows the error next to the field', async () => {
+    await type('Saruman');
+    form().dispatchEvent(new Event('submit'));
+    http
+      .expectOne('/api/me/nickname')
+      .flush({ error: { code: 'NICKNAME_TAKEN' } }, { status: 409, statusText: 'Conflict' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('profile.errors.NICKNAME_TAKEN');
+    expect(auth.me()?.nickname).toBe('Gandalf');
+  });
+
+  it('birth-date form submit PATCHes /api/me/birth-date with the ISO date', async () => {
+    const bdForm = el.querySelector<HTMLFormElement>('form.birth-date:not(.nickname)')!;
+    const bd = el.querySelector<HTMLInputElement>('form.birth-date:not(.nickname) input')!;
+    bd.value = '02.03.1991';
+    bd.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    bdForm.dispatchEvent(new Event('submit'));
+    const req = http.expectOne('/api/me/birth-date');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ birthDate: '1991-03-02' });
+    req.flush({ ...me, birthDate: '1991-03-02' });
+    await fixture.whenStable();
+    expect(auth.me()?.birthDate).toBe('1991-03-02');
+  });
+
+  it('birth-date 409 BIRTH_DATE_COOLDOWN shows the cooldown message', async () => {
+    const bdForm = el.querySelector<HTMLFormElement>('form.birth-date:not(.nickname)')!;
+    const bd = el.querySelector<HTMLInputElement>('form.birth-date:not(.nickname) input')!;
+    bd.value = '02.03.1991';
+    bd.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    bdForm.dispatchEvent(new Event('submit'));
+    http.expectOne('/api/me/birth-date').flush(
+      {
+        error: {
+          code: 'BIRTH_DATE_COOLDOWN',
+          details: { availableAt: '2027-01-01T00:00:00.000Z' },
+        },
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('profile.errors.BIRTH_DATE_COOLDOWN');
+  });
+
+  describe('time zone', () => {
+    const tzInput = () =>
+      el.querySelector<HTMLInputElement>('form.timezone input[name="timezone"]')!;
+    const tzForm = () => el.querySelector<HTMLFormElement>('form.timezone')!;
+    const typeTz = async (value: string) => {
+      tzInput().value = value;
+      tzInput().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('prefills the account zone; saving PATCHes /api/me/timezone and refreshes AuthStore.me()', async () => {
+      fixture.detectChanges();
+      expect(tzInput().value).toBe('Europe/Kyiv');
+      // Пояснення: слоти календаря лишаються тим самим «настінним» часом.
+      expect(el.textContent).toContain('account.timezone.hint');
+      await typeTz('America/New_York');
+      tzForm().dispatchEvent(new Event('submit'));
+      const req = http.expectOne('/api/me/timezone');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ timezone: 'America/New_York' });
+      req.flush({ ...me, timezone: 'America/New_York' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(auth.me()?.timezone).toBe('America/New_York');
+      expect(el.textContent).toContain('account.timezone.saved');
+    });
+
+    it('an invalid zone is not sent and shows an error', async () => {
+      fixture.detectChanges();
+      await typeTz('Nope/Zone');
+      tzInput().dispatchEvent(new Event('blur'));
+      tzForm().dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      http.expectNone('/api/me/timezone');
+      expect(el.textContent).toContain('profile.errors.TIMEZONE');
+    });
+
+    const recreate = async () => {
+      fixture = TestBed.createComponent(AccountSettings);
+      el = fixture.nativeElement as HTMLElement;
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it('offers the device zone when it differs', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Asia/Tokyo');
+      await recreate();
+      const useDevice = el.querySelector<HTMLButtonElement>('button.use-device-tz')!;
+      expect(useDevice.textContent).toContain('account.timezone.useDevice');
+      useDevice.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(tzInput().value).toBe('Asia/Tokyo');
+      http.expectNone('/api/me/timezone');
+    });
+
+    it('no device-zone button when the device is already in the account zone', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
+      await recreate();
+      expect(el.querySelector('button.use-device-tz')).toBeNull();
+    });
+  });
+});

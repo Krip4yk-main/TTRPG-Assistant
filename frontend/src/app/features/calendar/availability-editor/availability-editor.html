@@ -1,0 +1,170 @@
+@let custom = mode() === 'custom';
+@if (state() === 'loading') {
+  <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+} @else if (state() === 'error') {
+  <div class="nri-alert" role="alert">
+    <span>{{ 'calendar.loadError' | translate }}</span>
+    <button mat-stroked-button type="button" (click)="load()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+} @else {
+  <div class="editor" [class.compact]="custom">
+    <div class="tz">
+      <p class="tz-line">
+        <mat-icon aria-hidden="true">schedule</mat-icon>
+        @if (custom) {
+          <span>{{ 'calendar.timezone' | translate: { tz: timezone() } }}</span>
+        } @else {
+          <span>{{ 'calendar.accountTimezone' | translate: { tz: timezone() } }}</span>
+        }
+      </p>
+      @if (!custom) {
+        <p class="nri-muted hint">
+          <a routerLink="/account">{{ 'calendar.accountTimezoneLink' | translate }}</a>
+        </p>
+      }
+    </div>
+
+    <section class="week" [attr.aria-labelledby]="uid + '-week'">
+      @if (custom) {
+        <p class="label" [id]="uid + '-week'">{{ 'calendar.week' | translate }}</p>
+      } @else {
+        <h2 [id]="uid + '-week'">{{ 'calendar.week' | translate }}</h2>
+      }
+      <p class="nri-muted hint" [id]="uid + '-help'">{{ 'calendar.help' | translate }}</p>
+
+      <div class="grid-scroll">
+        <div
+          role="grid"
+          class="grid"
+          aria-multiselectable="true"
+          [attr.aria-labelledby]="uid + '-week'"
+          [attr.aria-describedby]="uid + '-help'"
+          [attr.aria-rowcount]="rows.length + 1"
+          [attr.aria-colcount]="days.length + 1"
+        >
+          <div role="row" class="row head">
+            <span role="columnheader" class="corner">
+              <span class="nri-visually-hidden">{{ 'calendar.time' | translate }}</span>
+            </span>
+            @for (d of days; track d) {
+              <span role="columnheader" class="day">
+                <abbr [title]="'games.weekdaysLong.' + d | translate">{{
+                  'games.weekdays.' + d | translate
+                }}</abbr>
+              </span>
+            }
+          </div>
+          @for (c of rows; track c) {
+            <div role="row" class="row" [class.hour]="c % 2 === 0">
+              <span role="rowheader" class="time">
+                <span [class.nri-visually-hidden]="c % 2 === 1">{{ times[c] }}</span>
+              </span>
+              @for (d of days; track d) {
+                @let i = d * rows.length + c;
+                <div
+                  role="gridcell"
+                  class="cell"
+                  [class.on]="display()[i]"
+                  [attr.data-day]="d"
+                  [attr.data-cell]="c"
+                  [attr.aria-selected]="display()[i]"
+                  [attr.aria-label]="labels()[d][c]"
+                  [attr.tabindex]="focused() === i ? 0 : -1"
+                  (pointerdown)="onPointerDown($event, d, c)"
+                  (pointerenter)="onPointerEnter(d, c)"
+                  (focus)="focused.set(i)"
+                  (keydown)="onKeydown($event)"
+                ></div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+      <p class="nri-muted count" aria-live="polite">
+        {{ 'calendar.selected' | translate: { hours: selectedCount() / 2 } }}
+      </p>
+    </section>
+
+    <section class="busy" [attr.aria-labelledby]="uid + '-busy'">
+      @if (custom) {
+        <p class="label" [id]="uid + '-busy'">{{ 'calendar.busy.title' | translate }}</p>
+      } @else {
+        <h2 [id]="uid + '-busy'">{{ 'calendar.busy.title' | translate }}</h2>
+      }
+      <p class="nri-muted hint">{{ 'calendar.busy.hint' | translate }}</p>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="busy-input">
+        <mat-label>{{ 'calendar.busy.add' | translate }}</mat-label>
+        <input
+          #busyInput
+          matInput
+          [matDatepicker]="busyPicker"
+          [min]="today"
+          [disabled]="busyDates().length >= maxBusy"
+          (dateChange)="addBusy($event, busyInput)"
+        />
+        <mat-hint>{{ 'calendar.busy.format' | translate }}</mat-hint>
+        <mat-datepicker-toggle matIconSuffix [for]="busyPicker" />
+        <mat-datepicker #busyPicker />
+      </mat-form-field>
+      @if (busyDates().length) {
+        <ul class="busy-list">
+          @for (date of busyDates(); track date) {
+            <li>
+              <span>{{ formatDate(date) }}</span>
+              <button
+                mat-icon-button
+                type="button"
+                [attr.aria-label]="'calendar.busy.remove' | translate: { date: formatDate(date) }"
+                (click)="removeBusy(date)"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="nri-muted hint">{{ 'calendar.busy.none' | translate }}</p>
+      }
+    </section>
+
+    <div class="actions">
+      @if (custom) {
+        <button mat-flat-button type="button" class="apply" (click)="applyCustom()">
+          {{ 'calendar.apply' | translate }}
+        </button>
+      } @else {
+        <button
+          mat-flat-button
+          type="button"
+          class="save"
+          [disabled]="saving() || !dirty()"
+          (click)="save()"
+        >
+          {{ (saving() ? 'common.saving' : 'common.save') | translate }}
+        </button>
+      }
+      <button
+        mat-stroked-button
+        type="button"
+        class="clear"
+        [disabled]="selectedCount() === 0"
+        (click)="clearWeek()"
+      >
+        {{ 'calendar.clear' | translate }}
+      </button>
+    </div>
+    <div aria-live="polite">
+      @if (message(); as m) {
+        <p
+          [class.nri-alert]="m.kind === 'error'"
+          [class.nri-notice]="m.kind === 'info'"
+          [attr.role]="m.kind === 'error' ? 'alert' : null"
+        >
+          {{ m.key | translate }}
+        </p>
+      }
+    </div>
+  </div>
+}

@@ -47,6 +47,20 @@
   flex: 1 1 auto;
 }
 
+.view-mode .short {
+  display: none;
+}
+
+.gm-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-sm);
+
+  .active {
+    color: var(--nri-accent-text);
+  }
+}
+
 .menu-header {
   padding: var(--nri-space-sm) var(--nri-space-md);
   font-weight: 600;
@@ -77,6 +91,42 @@
 
   .view-mode {
     font-size: 0.8rem;
+  }
+
+  // На вузькому екрані «Мої ігри» — це головна (логотип) у виді майстра.
+  .gm-nav .my-games-link {
+    display: none;
+  }
+}
+
+// Вузький тулбар: «Нова гра» — лише іконка, перемикач виду — короткі підписи.
+@media (max-width: 639px) {
+  .toolbar {
+    gap: var(--nri-space-xs);
+    padding: 0 var(--nri-space-sm);
+  }
+
+  .gm-nav .nav-label {
+    display: none;
+  }
+
+  .new-game-link {
+    min-width: 40px;
+    padding: 0 var(--nri-space-sm);
+
+    mat-icon {
+      margin: 0;
+    }
+  }
+
+  .view-mode {
+    .long {
+      display: none;
+    }
+
+    .short {
+      display: inline;
+    }
   }
 }
 

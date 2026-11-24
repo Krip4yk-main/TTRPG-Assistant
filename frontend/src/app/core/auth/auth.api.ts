@@ -1,8 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { CompleteProfileInput, DevLoginInput } from '@nri/shared';
-import type { IdentityDto, IdentityProvider, MeDto } from './me.model';
+import type {
+  CompleteProfileInput,
+  DevLoginInput,
+  IdentityDto,
+  IdentityProvider,
+  MeDto,
+} from '@nri/shared';
 
 /** Дані Telegram Login Widget (передаються бекенду як є для перевірки підпису). */
 export type TelegramAuthData = Record<string, string | number>;
@@ -38,8 +43,17 @@ export class AuthApi {
     return this.http.post<MeDto>('/api/me/complete-profile', input);
   }
 
+  changeNickname(nickname: string): Observable<MeDto> {
+    return this.http.patch<MeDto>('/api/me/nickname', { nickname });
+  }
+
   changeBirthDate(birthDate: string): Observable<MeDto> {
     return this.http.patch<MeDto>('/api/me/birth-date', { birthDate });
+  }
+
+  /** Пояс акаунта; слоти календаря лишаються тим самим «настінним» часом (R5). */
+  changeTimezone(timezone: string): Observable<MeDto> {
+    return this.http.patch<MeDto>('/api/me/timezone', { timezone });
   }
 
   unlinkIdentity(provider: IdentityProvider): Observable<{ identities: IdentityDto[] }> {

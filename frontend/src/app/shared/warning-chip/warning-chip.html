@@ -1,0 +1,37 @@
+<span class="chip" [class.selectable]="selectable()" [class.selected]="selected()">
+  @if (selectable()) {
+    <button
+      type="button"
+      class="label toggle"
+      [attr.aria-pressed]="selected()"
+      (click)="toggled.emit()"
+    >
+      @if (selected()) {
+        <mat-icon class="check" aria-hidden="true">check</mat-icon>
+      }
+      @if (labelKey(); as key) {
+        {{ key | translate }}
+      } @else {
+        {{ custom() }}
+      }
+    </button>
+  } @else {
+    <span class="label">
+      @if (labelKey(); as key) {
+        {{ key | translate }}
+      } @else {
+        {{ custom() }}
+      }
+    </span>
+  }
+  @if (hintKey(); as hint) {
+    <button
+      type="button"
+      class="info"
+      [matTooltip]="hint | translate"
+      [attr.aria-label]="'common.moreInfo' | translate"
+    >
+      <mat-icon aria-hidden="true">info</mat-icon>
+    </button>
+  }
+</span>

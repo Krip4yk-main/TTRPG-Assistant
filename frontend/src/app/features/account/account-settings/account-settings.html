@@ -9,6 +9,27 @@
     <p class="nri-alert" role="alert">{{ key | translate }}</p>
   }
 
+  <!-- Профіль і календар -->
+  <section class="nri-card" aria-labelledby="profile-links-title">
+    <h2 id="profile-links-title">{{ 'account.profile.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.profile.hint' | translate }}</p>
+    <div class="link-actions">
+      <a mat-flat-button routerLink="/profile/edit">
+        <mat-icon aria-hidden="true">edit</mat-icon>
+        {{ 'account.profile.edit' | translate }}
+      </a>
+      <a mat-stroked-button routerLink="/calendar">
+        <mat-icon aria-hidden="true">calendar_month</mat-icon>
+        {{ 'account.profile.calendar' | translate }}
+      </a>
+      @if (me(); as user) {
+        <a mat-button [routerLink]="['/users', user.publicId]">
+          {{ 'account.profile.view' | translate }}
+        </a>
+      }
+    </div>
+  </section>
+
   <!-- Способи входу -->
   <section class="nri-card" aria-labelledby="identities-title">
     <h2 id="identities-title">{{ 'account.identities.title' | translate }}</h2>
@@ -75,18 +96,62 @@
     </div>
   </section>
 
+  <!-- Нік -->
+  <section class="nri-card" aria-labelledby="nickname-title">
+    <h2 id="nickname-title">{{ 'account.nickname.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.nickname.hint' | translate }}</p>
+    <form
+      class="nickname birth-date"
+      [formGroup]="nicknameForm"
+      (ngSubmit)="saveNickname()"
+      novalidate
+    >
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'profile.fields.nickname' | translate }}</mat-label>
+        <input
+          matInput
+          name="nickname"
+          formControlName="nickname"
+          [errorStateMatcher]="errorState"
+          autocomplete="nickname"
+          maxlength="32"
+          required
+        />
+        <mat-hint>{{ 'profile.hints.nickname' | translate }}</mat-hint>
+        @if (nickname.hasError('taken')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_TAKEN' | translate }}</mat-error>
+        } @else if (nickname.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        } @else if (nickname.hasError('nicknameFormat')) {
+          <mat-error>{{ 'profile.errors.NICKNAME_FORMAT' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="busy()">
+        {{ 'common.save' | translate }}
+      </button>
+    </form>
+    <div aria-live="polite">
+      @if (nicknameError(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+      @if (nicknameSaved()) {
+        <p class="nri-notice">{{ 'account.nickname.saved' | translate }}</p>
+      }
+    </div>
+  </section>
+
   <!-- Дата народження -->
   <section class="nri-card" aria-labelledby="birth-date-title">
     <h2 id="birth-date-title">{{ 'account.birthDate.title' | translate }}</h2>
     <p class="nri-muted">{{ 'account.birthDate.hint' | translate }}</p>
-    <form class="birth-date" (ngSubmit)="saveBirthDate()" novalidate>
+    <form class="birth-date" [formGroup]="birthDateForm" (ngSubmit)="saveBirthDate()" novalidate>
       <mat-form-field appearance="outline">
         <mat-label>{{ 'profile.fields.birthDate' | translate }}</mat-label>
         <input
           matInput
           [matDatepicker]="picker"
           [max]="maxBirthDate"
-          [formControl]="birthDate"
+          formControlName="birthDate"
           [errorStateMatcher]="errorState"
           autocomplete="bday"
           required
@@ -113,6 +178,55 @@
       }
       @if (birthDateSaved()) {
         <p class="nri-notice">{{ 'account.birthDate.saved' | translate }}</p>
+      }
+    </div>
+  </section>
+
+  <!-- Часовий пояс -->
+  <section class="nri-card" aria-labelledby="timezone-title">
+    <h2 id="timezone-title">{{ 'account.timezone.title' | translate }}</h2>
+    <p class="nri-muted" id="timezone-hint">{{ 'account.timezone.hint' | translate }}</p>
+    <form class="timezone" [formGroup]="timezoneForm" (ngSubmit)="saveTimezone()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'account.timezone.label' | translate }}</mat-label>
+        <input
+          matInput
+          name="timezone"
+          formControlName="timezone"
+          [matAutocomplete]="tzAuto"
+          [errorStateMatcher]="errorState"
+          aria-describedby="timezone-hint"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <mat-autocomplete #tzAuto="matAutocomplete">
+          @for (tz of timezoneOptions(); track tz) {
+            <mat-option [value]="tz">{{ tz }}</mat-option>
+          }
+        </mat-autocomplete>
+        <mat-hint>{{ 'account.timezone.search' | translate }}</mat-hint>
+        @if (timezone.hasError('timezone')) {
+          <mat-error>{{ 'profile.errors.TIMEZONE' | translate }}</mat-error>
+        } @else if (timezone.hasError('required')) {
+          <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="busy()">
+        {{ 'common.save' | translate }}
+      </button>
+    </form>
+    @if (deviceZone(); as device) {
+      <button mat-button type="button" class="use-device-tz" (click)="useDeviceZone()">
+        {{ 'account.timezone.useDevice' | translate: { tz: device } }}
+      </button>
+    }
+    <div aria-live="polite">
+      @if (timezoneMessage(); as msg) {
+        <p class="nri-alert" role="alert">{{ msg.key | translate: msg.params }}</p>
+      }
+      @if (timezoneSaved()) {
+        <p class="nri-notice">{{ 'account.timezone.saved' | translate }}</p>
       }
     </div>
   </section>

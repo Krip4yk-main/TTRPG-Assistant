@@ -118,3 +118,19 @@ a,
     scroll-behavior: auto !important;
   }
 }
+
+// ---- Оверлеї Angular Material / CDK ----
+// Структурні стилі CDK підвантажуються ліниво й ПІСЛЯ styles.css, тож тут потрібна вища
+// специфічність (`html …`), інакше стандартне rgba(0, 0, 0, 0.32) перекриє наше.
+html .cdk-overlay-dark-backdrop {
+  background: var(--nri-backdrop);
+}
+
+// Межа відділяє спливні поверхні від темного фону (у M3 вони без тіні/рамки).
+.mat-mdc-dialog-surface.mdc-dialog__surface,
+.mat-mdc-menu-panel.mat-mdc-menu-panel,
+.mat-mdc-select-panel.mat-mdc-select-panel,
+.mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel {
+  outline: 1px solid var(--nri-overlay-border);
+  outline-offset: -1px;
+}

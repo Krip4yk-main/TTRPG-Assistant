@@ -87,6 +87,7 @@ describe('CompleteProfile', () => {
     const auth = TestBed.inject(AuthStore);
     auth.setMe({
       id: 7,
+      publicId: 'abcdefghjk',
       nickname: null,
       avatarUrl: null,
       birthDate: null,

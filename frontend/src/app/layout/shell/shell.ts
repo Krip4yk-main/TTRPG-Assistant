@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,6 +14,7 @@ import { UserName } from '../../shared/user-name/user-name';
   selector: 'nri-shell',
   imports: [
     RouterLink,
+    RouterLinkActive,
     RouterOutlet,
     MatButtonModule,
     MatButtonToggleModule,

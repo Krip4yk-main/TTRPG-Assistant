@@ -1,0 +1,12 @@
+<h2 mat-dialog-title>{{ data.title | translate }}</h2>
+<mat-dialog-content>
+  <p>{{ data.text | translate }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="false" cdkFocusInitial>
+    {{ 'common.cancel' | translate }}
+  </button>
+  <button mat-flat-button type="button" [class.danger]="data.danger" [mat-dialog-close]="true">
+    {{ data.confirm | translate }}
+  </button>
+</mat-dialog-actions>

@@ -4,6 +4,30 @@
   <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
   <span class="spacer"></span>
 
+  @if (auth.isActive() && viewMode.mode() === 'gm') {
+    <nav class="gm-nav" [attr.aria-label]="'shell.viewMode.gm' | translate">
+      <a
+        mat-button
+        class="my-games-link"
+        routerLink="/my-games"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        >{{ 'shell.myGames' | translate }}</a
+      >
+      <a
+        mat-stroked-button
+        class="new-game-link"
+        routerLink="/games/new"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        [attr.aria-label]="'shell.newGame' | translate"
+      >
+        <mat-icon aria-hidden="true">add</mat-icon>
+        <span class="nav-label">{{ 'shell.newGame' | translate }}</span>
+      </a>
+    </nav>
+  }
+
   @if (auth.isActive()) {
     <mat-button-toggle-group
       class="view-mode"
@@ -12,10 +36,14 @@
       (change)="setMode($event.value)"
       [attr.aria-label]="'shell.viewMode.label' | translate"
     >
-      <mat-button-toggle value="player">{{
-        'shell.viewMode.player' | translate
-      }}</mat-button-toggle>
-      <mat-button-toggle value="gm">{{ 'shell.viewMode.gm' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="player">
+        <span class="long">{{ 'shell.viewMode.player' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.playerShort' | translate }}</span>
+      </mat-button-toggle>
+      <mat-button-toggle value="gm">
+        <span class="long">{{ 'shell.viewMode.gm' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.gmShort' | translate }}</span>
+      </mat-button-toggle>
     </mat-button-toggle-group>
   }
   @if (auth.me(); as me) {
@@ -31,6 +59,10 @@
         <nri-user-name [user]="me" />
       </div>
       @if (auth.isActive()) {
+        <a mat-menu-item [routerLink]="['/users', me.publicId]">
+          <mat-icon aria-hidden="true">person</mat-icon>
+          <span>{{ 'shell.myProfile' | translate }}</span>
+        </a>
         <a mat-menu-item routerLink="/account">
           <mat-icon aria-hidden="true">settings</mat-icon>
           <span>{{ 'shell.account' | translate }}</span>

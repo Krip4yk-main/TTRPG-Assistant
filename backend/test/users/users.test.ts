@@ -1,16 +1,25 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { resolveLogin, subjectHash } from '../../src/auth/identity.service.js';
 import { createSession, hashToken } from '../../src/auth/session.service.js';
-import { authIdentities, identityTombstones, sessions, users } from '../../src/db/schema/index.js';
 import {
-  changeBirthDate,
-  completeProfile,
-  deleteAccount,
-  localDate,
-} from '../../src/users/users.service.js';
+  authIdentities,
+  availabilityBusyDates,
+  availabilitySlots,
+  events,
+  gameMembers,
+  games,
+  gameSystems,
+  genres,
+  identityTombstones,
+  sessions,
+  userProfiles,
+  users,
+} from '../../src/db/schema/index.js';
+import { changeBirthDate, completeProfile, deleteAccount } from '../../src/users/users.service.js';
+import { localDate } from '@nri/shared';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps();
@@ -59,6 +68,7 @@ describe('GET /api/me', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       id: u.id,
+      publicId: u.publicId,
       nickname: 'Hero',
       avatarUrl: null,
       birthDate: '2000-01-01',
@@ -230,6 +240,57 @@ describe('PATCH /api/me/birth-date', () => {
   });
 });
 
+describe('PATCH /api/me/timezone', () => {
+  it('validates and updates the account timezone; slots keep their wall-clock times', async () => {
+    const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Kyiv' });
+    const cookie = await login(u.id);
+    await db
+      .insert(availabilitySlots)
+      .values({ userId: u.id, weekday: 1, startMin: 19 * 60, endMin: 23 * 60 });
+
+    const res = await call('patch', '/api/me/timezone', cookie, { timezone: 'America/New_York' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: u.id,
+      publicId: u.publicId,
+      timezone: 'America/New_York',
+    });
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.timezone).toBe('America/New_York');
+    expect((await call('get', '/api/me', cookie)).body.timezone).toBe('America/New_York');
+
+    const cal = (await call('get', '/api/me/availability', cookie)).body;
+    expect(cal).toEqual({
+      timezone: 'America/New_York',
+      slots: [{ weekday: 1, startMin: 19 * 60, endMin: 23 * 60 }],
+      busyDates: [],
+    });
+    const [e] = await db.select().from(events).where(eq(events.type, 'user.timezone_changed'));
+    expect(e!.payload).toEqual({ from: 'Europe/Kyiv', to: 'America/New_York' });
+  });
+
+  it('400 for an invalid zone or extra keys; 401 without a session; 403 for pending', async () => {
+    const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Kyiv' });
+    const cookie = await login(u.id);
+    for (const body of [{}, { timezone: 'Nope/Zone' }, { timezone: 'UTC', extra: 1 }]) {
+      const res = await call('patch', '/api/me/timezone', cookie, body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION');
+    }
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.timezone).toBe('Europe/Kyiv');
+    const guest = await request(app)
+      .patch('/api/me/timezone')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ timezone: 'UTC' });
+    expect(guest.status).toBe(401);
+    const p = await createUser(db, { status: 'pending' });
+    const res = await call('patch', '/api/me/timezone', await login(p.id), { timezone: 'UTC' });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('DELETE /api/me/identities/:provider', () => {
   it('last identity: 409 LAST_IDENTITY; with two: 200', async () => {
     const u = await createUser(db, { nickname: 'Hero' });
@@ -335,5 +396,112 @@ describe('DELETE /api/me', () => {
     const rows = await db.select().from(identityTombstones);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.isBanned).toBe(true);
+  });
+
+  async function insertGame(
+    gmUserId: number,
+    patch: Partial<typeof games.$inferInsert> = {},
+  ): Promise<number> {
+    const [sys] = await db.select({ id: gameSystems.id }).from(gameSystems).limit(1);
+    const [gen] = await db.select({ id: genres.id }).from(genres).limit(1);
+    const [r] = await db
+      .insert(games)
+      .values({
+        gmUserId,
+        title: 'Гра',
+        description: '',
+        systemId: sys!.id,
+        genreId: gen!.id,
+        format: 'online',
+        kind: 'campaign',
+        startsAt: new Date(Date.now() + 30 * 86_400_000),
+        durationMinutes: 240,
+        recurrence: 'none',
+        weekdays: [],
+        timezone: 'Europe/Kyiv',
+        minPlayers: 1,
+        maxPlayers: 5,
+        status: 'recruiting',
+        publishedAt: new Date(),
+        ...patch,
+      })
+      .$returningId();
+    return r!.id;
+  }
+
+  it('removes profile, availability and active memberships (no FK cascade on a tombstone)', async () => {
+    const u = await createUser(db, { nickname: 'Hero' });
+    const other = await createUser(db, { nickname: 'Other' });
+    const theirGame = await insertGame(other.id);
+    const startedGame = await insertGame(other.id, { status: 'started' });
+    const finishedGame = await insertGame(other.id, { status: 'finished' });
+    const cancelledGame = await insertGame(other.id, { status: 'cancelled' });
+    await db.insert(gameMembers).values([
+      { gameId: startedGame, userId: u.id },
+      { gameId: finishedGame, userId: u.id },
+      { gameId: cancelledGame, userId: u.id },
+    ]);
+    await db.insert(userProfiles).values({ userId: u.id, bio: 'secret bio', city: 'Київ' });
+    await db
+      .insert(availabilitySlots)
+      .values({ userId: u.id, weekday: 1, startMin: 0, endMin: 60 });
+    await db.insert(availabilityBusyDates).values({ userId: u.id, date: '2030-01-01' });
+    await db.insert(gameMembers).values({ gameId: theirGame, userId: u.id });
+    await deleteAccount(deps, u.id);
+    expect(await db.select().from(userProfiles).where(eq(userProfiles.userId, u.id))).toHaveLength(
+      0,
+    );
+    expect(
+      await db.select().from(availabilitySlots).where(eq(availabilitySlots.userId, u.id)),
+    ).toHaveLength(0);
+    expect(
+      await db.select().from(availabilityBusyDates).where(eq(availabilityBusyDates.userId, u.id)),
+    ).toHaveLength(0);
+    // Активні ігри покинуто; склад завершених/скасованих (історія інших) збережено.
+    const left = await db.select().from(gameMembers).where(eq(gameMembers.userId, u.id));
+    expect(left.map((m) => m.gameId).sort()).toEqual([finishedGame, cancelledGame].sort());
+    // Чужа гра не зачеплена.
+    const [g] = await db.select().from(games).where(eq(games.id, theirGame));
+    expect(g!.status).toBe('recruiting');
+  });
+
+  it("cancels the GM's active games; they leave search and the sitemap (R8)", async () => {
+    const u = await createUser(db, { nickname: 'Gm' });
+    const recruiting = await insertGame(u.id);
+    const started = await insertGame(u.id, { status: 'started', showWhenFull: true });
+    const draft = await insertGame(u.id, { status: 'draft', publishedAt: null });
+    const finished = await insertGame(u.id, { status: 'finished' });
+    const before = await request(app)
+      .post('/api/games/search')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({});
+    expect(before.body.items.map((i: { id: number }) => i.id).sort()).toEqual(
+      [recruiting, started].sort(),
+    );
+    await deleteAccount(deps, u.id);
+    const rows = await db.select().from(games).where(eq(games.gmUserId, u.id));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const id of [recruiting, started, draft]) {
+      expect(byId.get(id)!.status).toBe('cancelled');
+      expect(byId.get(id)!.cancelledAt).not.toBeNull();
+    }
+    expect(byId.get(finished)!.status).toBe('finished');
+    const ev = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, 'game.cancelled'), eq(events.userId, u.id)));
+    expect(ev.map((e) => e.entityId).sort()).toEqual([recruiting, started, draft].sort());
+    for (const e of ev) expect(e.payload).toMatchObject({ reason: 'account_deleted' });
+
+    const after = await request(app)
+      .post('/api/games/search')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({});
+    expect(after.body.items).toHaveLength(0);
+    await redis.del('seo:sitemap');
+    const sitemap = await request(app).get('/sitemap.xml');
+    for (const id of [recruiting, started]) expect(sitemap.text).not.toContain(`/games/${id}<`);
   });
 });

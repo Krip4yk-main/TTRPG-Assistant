@@ -76,6 +76,32 @@ html {
     )
   );
 
+  // Оверлеї. За замовчуванням M3 фарбує діалог у `surface`, а ми прирівняли `surface` до фону
+  // сторінки (#0F172A) — тож діалог зливався зі сторінкою й виглядав «прозорим» (особливо
+  // під слабким стандартним затемненням). Усі спливні поверхні — на рівень вище за картки
+  // (#192134): `surface-container-high`. Затемнення фону — `.cdk-overlay-dark-backdrop` у
+  // styles.less (у CDK немає токена для нього).
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.menu-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.select-overrides(
+    (
+      panel-background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.autocomplete-overrides(
+    (
+      background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+
   // Filled-кнопки — темно-зелена заливка MASTER (#15803D) зі світлим текстом.
   @include mat.button-overrides(
     (

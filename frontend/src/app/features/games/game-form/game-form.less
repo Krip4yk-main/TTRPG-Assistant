@@ -1,0 +1,144 @@
+.game-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  min-width: 0;
+  margin: 0;
+
+  legend {
+    padding: 0 var(--nri-space-sm);
+    font-family: var(--nri-font-heading);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--nri-accent-text);
+  }
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 var(--nri-space-md);
+
+  > .field {
+    flex: 1 1 200px;
+  }
+
+  > .grow {
+    flex: 3 1 260px;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  // Місце під підказку/помилку (subscriptSizing="dynamic"), щоб вона не налазила на сусіднє поле.
+  margin-bottom: var(--nri-space-md);
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.group-label {
+  margin-bottom: var(--nri-space-xs);
+  font-weight: 600;
+}
+
+mat-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-md);
+}
+
+.hint {
+  margin: var(--nri-space-xs) 0;
+  font-size: 0.875rem;
+}
+
+.field-error {
+  margin: 0 0 var(--nri-space-sm);
+  color: var(--nri-danger-text);
+  font-size: 0.875rem;
+}
+
+.weekdays {
+  flex-wrap: wrap;
+  align-self: flex-start;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.custom-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 var(--nri-space-md);
+  margin-top: var(--nri-space-sm);
+
+  mat-form-field {
+    flex: 1 1 240px;
+  }
+
+  button {
+    margin-top: var(--nri-space-sm);
+  }
+}
+
+.channel,
+.question {
+  align-items: flex-start;
+
+  .remove {
+    margin-top: var(--nri-space-sm);
+  }
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nri-space-sm);
+}
+
+.publish-hint {
+  text-align: right;
+}
+
+@media (max-width: 599px) {
+  .form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .publish-hint {
+    text-align: left;
+  }
+}
+
+.restored-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}

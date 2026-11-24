@@ -24,12 +24,6 @@ import {
 const OAUTH_TTL_SEC = 10 * 60;
 const OAUTH_COOKIE = 'nri_oauth';
 const OAUTH_COOKIE_PATH = '/api/auth';
-const REDIRECTABLE_ERRORS = new Set([
-  'IDENTITY_TAKEN',
-  'IDENTITY_BANNED',
-  'ACCOUNT_BANNED',
-  'PROVIDER_ALREADY_LINKED',
-]);
 
 /** Лише відносний шлях усередині сайту: `/x`, але не `//host` і не `/\\host`. */
 const safeReturnTo = (v: unknown): string => {
@@ -211,7 +205,8 @@ export function authRouter(deps: AppDeps): Router {
       const code =
         err instanceof AppError ? err.code : err instanceof ZodError ? 'VALIDATION' : null;
       if (!code) throw err;
-      const base = req.query.mode === 'link' ? '/account' : '/login';
+      // Без сесії на `/account` не потрапити — веде на логін.
+      const base = req.query.mode === 'link' && code !== 'UNAUTHENTICATED' ? '/account' : '/login';
       res.redirect(`${base}?error=${code}`);
     }
   });
@@ -297,9 +292,8 @@ export function authRouter(deps: AppDeps): Router {
       await startSession(req, res, userId);
       return res.redirect(u.status === 'pending' ? '/complete-profile' : safeReturnTo(st.returnTo));
     } catch (err) {
-      if (err instanceof AppError && REDIRECTABLE_ERRORS.has(err.code)) {
-        return res.redirect(`${errBase}?error=${err.code}`);
-      }
+      // Top-level навігація: будь-яка AppError віддається редиректом, не JSON.
+      if (err instanceof AppError) return res.redirect(`${errBase}?error=${err.code}`);
       throw err;
     }
   });

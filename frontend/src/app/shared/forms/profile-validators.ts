@@ -7,8 +7,8 @@ import type {
   ValidatorFn,
 } from '@angular/forms';
 import type { ErrorStateMatcher } from '@angular/material/core';
-import { canRegister, completeProfileSchema } from '@nri/shared';
-import { toIsoDate, todayIso } from '../../core/i18n/dates';
+import { canRegister, completeProfileSchema, localDate } from '@nri/shared';
+import { toIsoDate } from '../../core/i18n/dates';
 
 /** Формат ніку — та сама Zod-схема, що й на бекенді. */
 export const nicknameValidator: ValidatorFn = (
@@ -21,13 +21,23 @@ export const nicknameValidator: ValidatorFn = (
     : { nicknameFormat: true };
 };
 
-/** Мінімальний вік реєстрації (`canRegister` з @nri/shared). */
-export const minAgeValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
-  const value: unknown = control.value;
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
-  if (value.getTime() > Date.now()) return { futureDate: true };
-  return canRegister(toIsoDate(value), todayIso()) ? null : { ageTooLow: true };
-};
+/**
+ * Мінімальний вік реєстрації (`canRegister` з @nri/shared). «Сьогодні» — календарна дата
+ * у поясі користувача (та сама `localDate`, що й на бекенді), а не пояс браузера.
+ */
+export function minAgeValidatorFor(
+  timezone: () => string | null | undefined,
+  now: () => Date = () => new Date(),
+): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value: unknown = control.value;
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+    const today = localDate(now(), timezone());
+    const birth = toIsoDate(value);
+    if (birth > today) return { futureDate: true };
+    return canRegister(birth, today) ? null : { ageTooLow: true };
+  };
+}
 
 export const timezoneValidator: ValidatorFn = (
   control: AbstractControl,

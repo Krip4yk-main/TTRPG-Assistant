@@ -8,25 +8,42 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { MIN_REGISTRATION_AGE, type ErrorCode } from '@nri/shared';
+import {
+  MIN_REGISTRATION_AGE,
+  changeNicknameSchema,
+  changeTimezoneSchema,
+  type ErrorCode,
+  type IdentityProvider,
+} from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import type { IdentityProvider } from '../../../core/auth/me.model';
-import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
+import {
+  browserTimeZone,
+  differentZones,
+  fromIsoDate,
+  provideUkDates,
+  toIsoDate,
+} from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
-import { eagerErrorState, minAgeValidator } from '../../../shared/forms/profile-validators';
+import {
+  eagerErrorState,
+  minAgeValidatorFor,
+  nicknameValidator,
+  timezoneValidator,
+} from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
@@ -37,6 +54,17 @@ const PROFILE_ERROR_CODES = new Set<ErrorCode>([
   'BIRTH_DATE_COOLDOWN',
   'NICKNAME_TAKEN',
 ]);
+
+/** Найбільше варіантів поясу в списку автодоповнення. */
+const MAX_TZ_OPTIONS = 50;
+
+function supportedTimezones(): string[] {
+  try {
+    return Intl.supportedValuesOf('timeZone');
+  } catch {
+    return ['Europe/Kyiv'];
+  }
+}
 
 /** Повідомлення секції: ключ i18n + параметри. */
 interface Message {
@@ -49,10 +77,12 @@ interface Message {
   selector: 'nri-account-settings',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     MatButtonModule,
     MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
+    MatAutocompleteModule,
     MatInputModule,
     MatTooltipModule,
     TranslatePipe,
@@ -92,23 +122,66 @@ export class AccountSettings {
   protected readonly busy = signal(false);
   protected readonly identityMessage = signal<Message | null>(null);
   protected readonly telegramPending = signal(false);
+  protected readonly nicknameError = signal<string | null>(null);
+  protected readonly nicknameSaved = signal(false);
   protected readonly birthDateMessage = signal<Message | null>(null);
   protected readonly birthDateSaved = signal(false);
   protected readonly dangerMessage = signal<Message | null>(null);
+  protected readonly timezoneMessage = signal<Message | null>(null);
+  protected readonly timezoneSaved = signal(false);
   protected readonly queryErrorKey = computed(() => {
     const code = this.error();
     if (!code) return null;
     return isErrorCode(code) ? `errors.${code}` : 'errors.UNKNOWN';
   });
 
+  protected readonly nickname = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, nicknameValidator],
+  });
+
+  protected readonly nicknameForm = new FormGroup({ nickname: this.nickname });
+
   protected readonly birthDate = new FormControl<Date | null>(null, [
     Validators.required,
-    minAgeValidator,
+    minAgeValidatorFor(() => this.me()?.timezone),
   ]);
 
+  protected readonly birthDateForm = new FormGroup({ birthDate: this.birthDate });
+
+  protected readonly timezone = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, timezoneValidator],
+  });
+
+  protected readonly timezoneForm = new FormGroup({ timezone: this.timezone });
+
+  private readonly allTimezones = supportedTimezones();
+  private readonly timezoneQuery = signal('');
+  /** Пошук поясу: збіг за підрядком (без регістру), не більше `MAX_TZ_OPTIONS`. */
+  protected readonly timezoneOptions = computed(() => {
+    const q = this.timezoneQuery().trim().toLowerCase().replace(/\s+/g, '_');
+    const list = q
+      ? this.allTimezones.filter((tz) => tz.toLowerCase().includes(q))
+      : this.allTimezones;
+    return list.slice(0, MAX_TZ_OPTIONS);
+  });
+  private readonly deviceTz = browserTimeZone();
+  /** Пояс пристрою, якщо він відрізняється від введеного; інакше `null`. */
+  protected readonly deviceZone = computed(() =>
+    differentZones(this.deviceTz, this.timezoneQuery()) ? this.deviceTz : null,
+  );
+
   constructor() {
+    this.nickname.setValue(this.me()?.nickname ?? '');
     const current = this.me()?.birthDate;
     if (current) this.birthDate.setValue(fromIsoDate(current));
+    this.timezone.setValue(this.me()?.timezone ?? '');
+    this.timezoneQuery.set(this.timezone.value);
+    this.timezone.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => {
+      this.timezoneQuery.set(v);
+      this.timezoneSaved.set(false);
+    });
 
     // Бот підтвердив прив'язку Telegram → оновлюємо профіль.
     inject(SocketService)
@@ -154,6 +227,34 @@ export class AccountSettings {
     });
   }
 
+  protected async saveNickname(): Promise<void> {
+    if (this.busy()) return;
+    const parsed = changeNicknameSchema.safeParse({ nickname: this.nickname.value.trim() });
+    if (this.nickname.invalid || !parsed.success) {
+      this.nickname.markAsTouched();
+      return;
+    }
+    this.nicknameSaved.set(false);
+    this.nicknameError.set(null);
+    this.busy.set(true);
+    try {
+      const me = await firstValueFrom(this.api.changeNickname(parsed.data.nickname));
+      this.auth.setMe(me);
+      this.nickname.setValue(me.nickname ?? '');
+      this.nicknameSaved.set(true);
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code === 'NICKNAME_TAKEN') {
+        this.nickname.setErrors({ ...this.nickname.errors, taken: true });
+        this.nickname.markAsTouched();
+      } else if (code !== 'UNAUTHENTICATED') {
+        this.nicknameError.set(`errors.${code}`);
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async saveBirthDate(): Promise<void> {
     const value = this.birthDate.value;
     if (this.birthDate.invalid || !value) {
@@ -165,6 +266,28 @@ export class AccountSettings {
       const me = await firstValueFrom(this.api.changeBirthDate(toIsoDate(value)));
       this.auth.setMe(me);
       this.birthDateSaved.set(true);
+    });
+  }
+
+  protected useDeviceZone(): void {
+    const device = this.deviceZone();
+    if (!device) return;
+    this.timezone.setValue(device);
+    this.timezone.markAsDirty();
+  }
+
+  protected async saveTimezone(): Promise<void> {
+    const parsed = changeTimezoneSchema.safeParse({ timezone: this.timezone.value.trim() });
+    if (this.timezone.invalid || !parsed.success) {
+      this.timezone.markAsTouched();
+      return;
+    }
+    this.timezoneSaved.set(false);
+    await this.run(this.timezoneMessage, async () => {
+      const me = await firstValueFrom(this.api.changeTimezone(parsed.data.timezone));
+      this.auth.setMe(me);
+      this.timezone.setValue(me.timezone);
+      this.timezoneSaved.set(true);
     });
   }
 

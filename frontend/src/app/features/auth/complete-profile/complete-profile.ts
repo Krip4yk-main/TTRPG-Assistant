@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,7 +15,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import {
   eagerErrorState,
-  minAgeValidator,
+  minAgeValidatorFor,
   nicknameValidator,
   timezoneValidator,
 } from '../../../shared/forms/profile-validators';
@@ -56,16 +56,21 @@ export class CompleteProfile {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
 
+  private readonly timezoneControl = new FormControl(defaultTimezone(), {
+    nonNullable: true,
+    validators: [Validators.required, timezoneValidator],
+  });
+
   readonly form = new FormGroup({
     nickname: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, nicknameValidator],
     }),
-    birthDate: new FormControl<Date | null>(null, [Validators.required, minAgeValidator]),
-    timezone: new FormControl(defaultTimezone(), {
-      nonNullable: true,
-      validators: [Validators.required, timezoneValidator],
-    }),
+    birthDate: new FormControl<Date | null>(null, [
+      Validators.required,
+      minAgeValidatorFor(() => this.timezoneControl.value),
+    ]),
+    timezone: this.timezoneControl,
   });
 
   protected readonly minAge = MIN_REGISTRATION_AGE;
@@ -77,6 +82,13 @@ export class CompleteProfile {
   protected readonly formError = signal<ErrorCode | null>(null);
   /** Сигнал статусу форми — щоб OnPush-шаблон оновлював кнопку. */
   protected readonly status = toSignal(this.form.statusChanges, { initialValue: this.form.status });
+
+  constructor() {
+    // Вік залежить від поясу («сьогодні» у поясі користувача): перевіряємо заново.
+    this.form.controls.timezone.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.form.controls.birthDate.updateValueAndValidity());
+  }
 
   async submit(): Promise<void> {
     if (this.form.invalid || this.submitting()) return;

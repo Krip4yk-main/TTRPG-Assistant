@@ -3,7 +3,9 @@ import { and, eq } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { authIdentities, identityTombstones, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
+import type { Db } from '../db/client.js';
 import { AppError } from '../http/errors.js';
+import { generatePublicId, PUBLIC_ID_ATTEMPTS } from '../users/nickname.js';
 import type { Provider, VerifiedIdentity } from './providers/provider.js';
 
 type Deps = Pick<AppDeps, 'env' | 'db'>;
@@ -17,6 +19,23 @@ export function isDuplicateKey(err: unknown): boolean {
     if (o.code === 'ER_DUP_ENTRY' || o.errno === 1062) return true;
   }
   return false;
+}
+
+/** Створює рядок користувача з унікальним publicId; колізія → повтор (до PUBLIC_ID_ATTEMPTS разів). */
+export async function insertUserWithPublicId(
+  db: Pick<Db, 'insert'>,
+  avatarUrl: string | null,
+): Promise<{ id: number }[]> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await db
+        .insert(users)
+        .values({ status: 'pending', avatarUrl, publicId: generatePublicId() })
+        .$returningId();
+    } catch (err) {
+      if (!isDuplicateKey(err) || attempt >= PUBLIC_ID_ATTEMPTS) throw err;
+    }
+  }
 }
 
 async function assertNotBanned({ env, db }: Deps, identity: VerifiedIdentity): Promise<void> {
@@ -60,10 +79,7 @@ export async function resolveLogin(
   let userId: number;
   try {
     userId = await db.transaction(async (tx) => {
-      const [u] = await tx
-        .insert(users)
-        .values({ status: 'pending', avatarUrl: identity.avatarUrl ?? null })
-        .$returningId();
+      const [u] = await insertUserWithPublicId(tx, identity.avatarUrl ?? null);
       await tx.insert(authIdentities).values({
         userId: u!.id,
         provider: identity.provider,

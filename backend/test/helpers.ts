@@ -4,6 +4,7 @@ import type { AppDeps } from '../src/app.js';
 import { createDb } from '../src/db/client.js';
 import type { Db } from '../src/db/client.js';
 import { users } from '../src/db/schema/index.js';
+import { generatePublicId } from '../src/users/nickname.js';
 import { createRedis } from '../src/redis/client.js';
 
 export const TEST_PEPPER = 'test-pepper-0123456789abcdefghijklmnop';
@@ -34,7 +35,19 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
   return { env, db, redis };
 }
 
-const TABLES = ['events', 'identity_tombstones', 'sessions', 'auth_identities', 'users'];
+const TABLES = [
+  'game_members',
+  'game_content_warnings',
+  'games',
+  'availability_busy_dates',
+  'availability_slots',
+  'user_profiles',
+  'events',
+  'identity_tombstones',
+  'sessions',
+  'auth_identities',
+  'users',
+];
 
 export async function resetDb(db: Db): Promise<void> {
   // Одна транзакція = одне з'єднання, тож SET FOREIGN_KEY_CHECKS діє на всі TRUNCATE.
@@ -54,7 +67,7 @@ export async function createUser(
 ): Promise<typeof users.$inferSelect> {
   const [res] = await db
     .insert(users)
-    .values({ status: 'active', ...overrides })
+    .values({ status: 'active', publicId: generatePublicId(), ...overrides })
     .$returningId();
   const [row] = await db
     .select()
