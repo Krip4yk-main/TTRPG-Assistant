@@ -6,12 +6,8 @@ import type { Env } from './config/env.js';
 import type { Db } from './db/client.js';
 import type { Redis } from './redis/client.js';
 import { AppError, errorHandler, notFoundHandler } from './http/errors.js';
-import {
-  loadSession,
-  logoutHandlers,
-  requireActive,
-  requireAuth,
-} from './auth/session.middleware.js';
+import { authRouter } from './auth/auth.routes.js';
+import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
 export type AppDeps = { env: Env; db: Db; redis: Redis };
@@ -37,9 +33,7 @@ export function createApp(deps: AppDeps): express.Express {
   });
 
   const auth = requireAuth(deps);
-  const logout = logoutHandlers(deps);
-  app.post('/api/auth/logout', auth, logout.logout);
-  app.post('/api/auth/logout-all', auth, logout.logoutAll);
+  app.use('/api/auth', authRouter(deps));
 
   // Тестові маршрути — лише в NODE_ENV=test.
   if (env.NODE_ENV === 'test') {
