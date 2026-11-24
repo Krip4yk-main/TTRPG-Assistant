@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { CompleteProfile } from './complete-profile';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { AuthStore } from '../../../core/auth/auth.store';
 
 /** Дата `years` років тому відносно сьогодні (локальний час). */
 function yearsAgo(years: number): Date {
@@ -71,5 +72,36 @@ describe('CompleteProfile', () => {
 
     expect(el.textContent).toContain('profile.errors.NICKNAME_TAKEN');
     expect(el.textContent).not.toContain('profile.errors.AGE_TOO_LOW');
+  });
+
+  it('відповідь 422 AGE_TOO_LOW → стан очищено й перехід на /login?error=AGE_TOO_LOW', async () => {
+    const auth = TestBed.inject(AuthStore);
+    auth.setMe({
+      id: 7,
+      nickname: null,
+      avatarUrl: null,
+      birthDate: null,
+      role: 'user',
+      status: 'pending',
+      timezone: 'Europe/Kyiv',
+      locale: 'uk',
+      identities: [{ provider: 'dev', displayName: 'kid' }],
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    const form = fixture.componentInstance.form;
+    form.controls.nickname.setValue('Pippin');
+    form.controls.birthDate.setValue(yearsAgo(20));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    submitButton().click();
+
+    http
+      .expectOne('/api/me/complete-profile')
+      .flush({ error: { code: 'AGE_TOO_LOW' } }, { status: 422, statusText: 'Unprocessable' });
+    await fixture.whenStable();
+
+    expect(auth.me()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { error: 'AGE_TOO_LOW' } });
   });
 });

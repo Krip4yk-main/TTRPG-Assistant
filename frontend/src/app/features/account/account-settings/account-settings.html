@@ -21,29 +21,38 @@
               <span class="nri-muted">{{ identity.displayName }}</span>
             }
           </div>
-          <button
-            mat-stroked-button
-            type="button"
-            [disabled]="busy()"
-            (click)="unlink(identity.provider)"
-            [attr.aria-label]="
-              'account.identities.unlinkAria'
-                | translate: { provider: (providerKey(identity.provider) | translate) }
-            "
-          >
-            {{ 'account.identities.unlink' | translate }}
-          </button>
+          <!-- Обгортка: tooltip на вимкненій кнопці не спрацьовує. -->
+          <span [matTooltip]="isLastIdentity() ? ('account.identities.lastHint' | translate) : ''">
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="busy() || isLastIdentity()"
+              (click)="unlink(identity.provider)"
+              [attr.aria-describedby]="isLastIdentity() ? 'last-identity-hint' : null"
+              [attr.aria-label]="
+                'account.identities.unlinkAria'
+                  | translate: { provider: (providerKey(identity.provider) | translate) }
+              "
+            >
+              {{ 'account.identities.unlink' | translate }}
+            </button>
+          </span>
         </li>
       }
     </ul>
+    @if (isLastIdentity()) {
+      <p id="last-identity-hint" class="nri-muted hint">
+        {{ 'account.identities.lastHint' | translate }}
+      </p>
+    }
 
     <div class="link-actions">
-      @if (!hasTelegram()) {
+      @if (canLinkTelegram()) {
         <button mat-flat-button type="button" [disabled]="busy()" (click)="linkTelegram()">
           {{ 'account.identities.linkTelegram' | translate }}
         </button>
       }
-      @if (!hasGoogle()) {
+      @if (canLinkGoogle()) {
         <a mat-flat-button [href]="googleLinkUrl">{{
           'account.identities.linkGoogle' | translate
         }}</a>
@@ -56,8 +65,9 @@
       }
       @if (identityMessage(); as msg) {
         <p
-          [class.nri-alert]="msg.key.includes('errors.')"
-          [class.nri-notice]="!msg.key.includes('errors.')"
+          [class.nri-alert]="msg.kind === 'error'"
+          [class.nri-notice]="msg.kind === 'info'"
+          [attr.role]="msg.kind === 'error' ? 'alert' : null"
         >
           {{ msg.key | translate: msg.params }}
         </p>

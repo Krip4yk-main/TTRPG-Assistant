@@ -15,7 +15,12 @@
           [attr.aria-label]="'login.telegram' | translate"
         ></div>
       }
-      <a mat-flat-button class="google" [href]="googleUrl">{{ 'login.google' | translate }}</a>
+      @if (googleLogin) {
+        <a mat-flat-button class="google" [href]="googleUrl()">{{ 'login.google' | translate }}</a>
+      }
+      @if (!telegramBot && !googleLogin && !devLoginEnabled) {
+        <p class="nri-muted">{{ 'login.noProviders' | translate }}</p>
+      }
     </div>
 
     @if (devLoginEnabled) {

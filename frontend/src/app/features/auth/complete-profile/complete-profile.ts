@@ -107,7 +107,8 @@ export class CompleteProfile {
         // Бекенд відхилив реєстрацію й знищив сесію.
         this.auth.setMe(null);
         await this.router.navigate(['/login'], { queryParams: { error: 'AGE_TOO_LOW' } });
-      } else {
+      } else if (code !== 'UNAUTHENTICATED') {
+        // 401 обробляє authInterceptor (очищення стану й перехід на /login).
         this.formError.set(code);
       }
     } finally {

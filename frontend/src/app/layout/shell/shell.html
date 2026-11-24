@@ -46,6 +46,15 @@
   }
 </mat-toolbar>
 
+@if (auth.loadFailed()) {
+  <div class="connection-banner" role="alert">
+    <span>{{ 'shell.connectionError' | translate }}</span>
+    <button mat-stroked-button type="button" [disabled]="retrying()" (click)="retry()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+}
+
 <main id="main-content" class="main" tabindex="-1">
   <router-outlet />
 </main>

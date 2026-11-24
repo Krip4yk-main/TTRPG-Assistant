@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -36,11 +36,30 @@ export class Shell {
     this.viewMode.setMode(mode);
   }
 
+  protected readonly retrying = signal(false);
+
   protected async logout(): Promise<void> {
     try {
       await this.auth.logout();
+    } catch {
+      // Локальний стан уже очищено; сесію на сервері можна завершити пізніше.
     } finally {
       await this.router.navigateByUrl('/login');
+    }
+  }
+
+  /** Повторна перевірка сесії після збою сервера/мережі. */
+  protected async retry(): Promise<void> {
+    if (this.retrying()) return;
+    this.retrying.set(true);
+    try {
+      await this.auth.load();
+      if (!this.auth.loadFailed()) {
+        const blocked = this.auth.takeBlockedUrl();
+        if (blocked) await this.router.navigateByUrl(blocked);
+      }
+    } finally {
+      this.retrying.set(false);
     }
   }
 }

@@ -25,6 +25,7 @@ const get = (key) => process.env[key] ?? fileVars[key] ?? '';
 
 const config = {
   telegramBotUsername: get('NG_APP_TELEGRAM_BOT_USERNAME').replace(/^@/, ''),
+  googleLogin: get('NG_APP_GOOGLE_LOGIN') === 'true',
   devLogin: get('NG_APP_DEV_LOGIN') === 'true',
 };
 
@@ -32,6 +33,8 @@ const source = `// Згенеровано scripts/gen-runtime-config.mjs — н�
 export interface RuntimeConfig {
   /** Ім'я Telegram-бота для Login Widget; порожньо — віджет вимкнено. */
   readonly telegramBotUsername: string;
+  /** Показувати вхід / прив'язку через Google. */
+  readonly googleLogin: boolean;
   /** Показувати форму dev-входу. */
   readonly devLogin: boolean;
 }

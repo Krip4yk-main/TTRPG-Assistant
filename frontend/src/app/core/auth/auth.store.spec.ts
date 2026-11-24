@@ -86,4 +86,47 @@ describe('AuthStore', () => {
     expect(store.isAuthenticated()).toBe(false);
     expect(socket.disconnect).toHaveBeenCalled();
   });
+
+  it('load() з 5xx до першого успіху → стан «невідомо», не гість', async () => {
+    const done = store.load();
+    http
+      .expectOne('/api/me')
+      .flush({ error: { code: 'INTERNAL' } }, { status: 500, statusText: 'Server Error' });
+    await done;
+
+    expect(store.me()).toBeNull();
+    expect(store.loadFailed()).toBe(true);
+    expect(store.isUnknown()).toBe(true);
+  });
+
+  it('load() з мережевою помилкою не розлогінює активного користувача', async () => {
+    const first = store.load();
+    http.expectOne('/api/me').flush(me());
+    await first;
+
+    const again = store.load();
+    http.expectOne('/api/me').error(new ProgressEvent('error'));
+    await again;
+
+    expect(store.me()?.nickname).toBe('Gandalf');
+    expect(store.isAuthenticated()).toBe(true);
+    expect(store.loadFailed()).toBe(true);
+    expect(store.isUnknown()).toBe(false);
+  });
+
+  it('успішне повторне load() скидає помилку', async () => {
+    const failed = store.load();
+    http.expectOne('/api/me').error(new ProgressEvent('error'));
+    await failed;
+
+    const ok = store.load();
+    http
+      .expectOne('/api/me')
+      .flush({ error: { code: 'UNAUTHENTICATED' } }, { status: 401, statusText: 'Unauthorized' });
+    await ok;
+
+    expect(store.loadFailed()).toBe(false);
+    expect(store.isUnknown()).toBe(false);
+    expect(store.isAuthenticated()).toBe(false);
+  });
 });

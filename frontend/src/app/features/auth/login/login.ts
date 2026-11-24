@@ -20,6 +20,7 @@ import { type ErrorCode } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
+import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import type { MeDto } from '../../../core/auth/me.model';
@@ -50,10 +51,14 @@ export class Login {
 
   /** `?error=CODE` після OAuth-редиректу або відхиленої реєстрації. */
   readonly error = input<string>();
+  /** `?returnTo=/path` — куди повернутися після входу (лише внутрішні шляхи). */
+  readonly returnTo = input<string>();
 
   protected readonly telegramBot = runtimeConfig.telegramBotUsername;
   protected readonly devLoginEnabled = runtimeConfig.devLogin;
-  protected readonly googleUrl = this.api.googleStartUrl('login', '/');
+  protected readonly googleLogin = runtimeConfig.googleLogin;
+  private readonly target = computed(() => safeReturnTo(this.returnTo()) ?? '/');
+  protected readonly googleUrl = computed(() => this.api.googleStartUrl('login', this.target()));
 
   protected readonly busy = signal(false);
   private readonly actionError = signal<ErrorCode | null>(null);
@@ -112,7 +117,9 @@ export class Login {
     try {
       const { user } = await firstValueFrom(request);
       this.auth.setMe(user);
-      await this.router.navigateByUrl(user.status === 'pending' ? '/complete-profile' : '/');
+      await this.router.navigateByUrl(
+        user.status === 'pending' ? '/complete-profile' : this.target(),
+      );
     } catch (err) {
       this.actionError.set(toApiError(err).code);
     } finally {

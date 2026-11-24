@@ -10,8 +10,10 @@ RUN npm ci --workspace shared --workspace frontend --include-workspace-root=fals
 COPY shared shared
 COPY frontend frontend
 ARG NG_APP_TELEGRAM_BOT_USERNAME=""
+ARG NG_APP_GOOGLE_LOGIN=""
 ARG NG_APP_DEV_LOGIN=""
 ENV NG_APP_TELEGRAM_BOT_USERNAME=${NG_APP_TELEGRAM_BOT_USERNAME} \
+    NG_APP_GOOGLE_LOGIN=${NG_APP_GOOGLE_LOGIN} \
     NG_APP_DEV_LOGIN=${NG_APP_DEV_LOGIN}
 RUN npm run build -w shared && npm run build -w frontend
 

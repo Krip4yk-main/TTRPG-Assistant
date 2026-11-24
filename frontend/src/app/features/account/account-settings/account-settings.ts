@@ -16,6 +16,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { MIN_REGISTRATION_AGE, type ErrorCode } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
@@ -27,6 +28,7 @@ import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates
 import { SocketService } from '../../../core/realtime/socket.service';
 import { eagerErrorState, minAgeValidator } from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
+import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
 
 /** Коди, для яких є специфічні для профілю тексти (`profile.errors.*`). */
@@ -38,6 +40,7 @@ const PROFILE_ERROR_CODES = new Set<ErrorCode>([
 
 /** Повідомлення секції: ключ i18n + параметри. */
 interface Message {
+  kind: 'error' | 'info';
   key: string;
   params?: Record<string, string | number>;
 }
@@ -51,6 +54,7 @@ interface Message {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatTooltipModule,
     TranslatePipe,
     UserName,
   ],
@@ -73,6 +77,12 @@ export class AccountSettings {
   protected readonly identities = computed(() => this.me()?.identities ?? []);
   protected readonly hasTelegram = computed(() => this.has('telegram'));
   protected readonly hasGoogle = computed(() => this.has('google'));
+  /** Відв'язати не можна останній спосіб входу (бекенд відповів би 409 LAST_IDENTITY). */
+  protected readonly isLastIdentity = computed(() => this.identities().length <= 1);
+  protected readonly canLinkTelegram = computed(
+    () => !!runtimeConfig.telegramBotUsername && !this.hasTelegram(),
+  );
+  protected readonly canLinkGoogle = computed(() => runtimeConfig.googleLogin && !this.hasGoogle());
   protected readonly googleLinkUrl = this.api.googleStartUrl('link', '/account');
   protected readonly birthDateIso = computed(() => this.me()?.birthDate ?? null);
   protected readonly minAge = MIN_REGISTRATION_AGE;
@@ -106,7 +116,7 @@ export class AccountSettings {
       .pipe(takeUntilDestroyed())
       .subscribe(() => {
         this.telegramPending.set(false);
-        this.identityMessage.set({ key: 'account.identities.linked' });
+        this.identityMessage.set({ kind: 'info', key: 'account.identities.linked' });
         void this.auth.load();
       });
   }
@@ -120,7 +130,7 @@ export class AccountSettings {
       const { identities } = await firstValueFrom(this.api.unlinkIdentity(provider));
       const me = this.me();
       if (me) this.auth.setMe({ ...me, identities });
-      this.identityMessage.set({ key: 'account.identities.unlinked' });
+      this.identityMessage.set({ kind: 'info', key: 'account.identities.unlinked' });
     });
   }
 
@@ -159,10 +169,18 @@ export class AccountSettings {
   }
 
   protected async logoutAll(): Promise<void> {
-    await this.run(this.dangerMessage, async () => {
+    if (this.busy()) return;
+    this.busy.set(true);
+    try {
+      // Навіть якщо запит упав, локальний стан уже очищено (AuthStore.logoutAll) —
+      // користувач у будь-якому разі опиняється на сторінці входу.
       await this.auth.logoutAll();
+    } catch {
+      // ігноруємо: див. вище
+    } finally {
+      this.busy.set(false);
       await this.router.navigateByUrl('/login');
-    });
+    }
   }
 
   protected async deleteAccount(): Promise<void> {
@@ -195,13 +213,10 @@ export class AccountSettings {
       await action();
     } catch (err) {
       const { code, details } = toApiError(err);
-      if (code === 'UNAUTHENTICATED') {
-        this.auth.setMe(null);
-        await this.router.navigateByUrl('/login');
-        return;
-      }
+      // 401 уже обробив authInterceptor (очистив стан і перейшов на /login).
+      if (code === 'UNAUTHENTICATED') return;
       const scope = PROFILE_ERROR_CODES.has(code) ? 'profile.errors.' : 'errors.';
-      target.set({ key: `${scope}${code}`, params: this.errorParams(details) });
+      target.set({ kind: 'error', key: `${scope}${code}`, params: this.errorParams(details) });
     } finally {
       this.busy.set(false);
     }
