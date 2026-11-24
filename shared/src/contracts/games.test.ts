@@ -137,6 +137,14 @@ describe('searchFiltersSchema', () => {
       searchFiltersSchema.safeParse({ calendar: { mode: 'mine', availability } }).success,
     ).toBe(false);
   });
+  it('limits the date window to 366 days', () => {
+    const ok = { dateFrom: '2027-01-01T00:00:00Z', dateTo: '2028-01-01T00:00:00Z' };
+    expect(searchFiltersSchema.safeParse(ok).success).toBe(true);
+    const tooLong = { dateFrom: '2027-01-01T00:00:00Z', dateTo: '2028-01-03T00:00:00Z' };
+    expect(searchFiltersSchema.safeParse(tooLong).success).toBe(false);
+    const empty = { dateFrom: '2027-01-01T00:00:00Z', dateTo: '2027-01-01T00:00:00Z' };
+    expect(searchFiltersSchema.safeParse(empty).success).toBe(false);
+  });
   it('rejects unknown keys and dateFrom after dateTo', () => {
     expect(searchFiltersSchema.safeParse({ status: 'draft' }).success).toBe(false);
     expect(

@@ -128,23 +128,33 @@ describe('POST /api/games/search — filters', () => {
     );
   });
 
-  it('hasFreeSlots hides full games; started games only with show_when_full', async () => {
+  it('full games: hidden unless show_when_full; hasFreeSlots hides all full games', async () => {
     const p1 = await createUser(db);
     const p2 = await createUser(db);
-    const full = await insertGame({ maxPlayers: 2 });
+    const fullHidden = await insertGame({ maxPlayers: 2 });
+    const fullShown = await insertGame({ maxPlayers: 2, showWhenFull: true });
     const startedFull = await insertGame({ maxPlayers: 2, status: 'started', showWhenFull: true });
     const startedHidden = await insertGame({ status: 'started', showWhenFull: false });
-    for (const gameId of [full, startedFull]) {
+    const open = await insertGame({ maxPlayers: 3 });
+    for (const gameId of [fullHidden, fullShown, startedFull, open]) {
       await db.insert(gameMembers).values([
         { gameId, userId: p1.id },
         { gameId, userId: p2.id },
       ]);
     }
     const all = await search({});
-    expect(ids(all).sort()).toEqual([full, startedFull].sort());
+    expect(ids(all).sort()).toEqual([fullShown, startedFull, open].sort());
+    expect(ids(all)).not.toContain(fullHidden);
     expect(ids(all)).not.toContain(startedHidden);
-    expect(all.body.items.every((i: { freeSlots: number }) => i.freeSlots === 0)).toBe(true);
-    expect(ids(await search({ hasFreeSlots: true }))).toEqual([]);
+    expect(ids(await search({ hasFreeSlots: true }))).toEqual([open]);
+  });
+
+  it("experience 'any' is no filter; other levels include 'any' games", async () => {
+    const any = await insertGame({ experience: 'any' });
+    const beg = await insertGame({ experience: 'beginner' });
+    const exp = await insertGame({ experience: 'experienced' });
+    expect(ids(await search({ experience: 'any' })).sort()).toEqual([any, beg, exp].sort());
+    expect(ids(await search({ experience: 'beginner' })).sort()).toEqual([any, beg].sort());
   });
 
   it('drafts, cancelled and finished games never appear', async () => {
@@ -309,6 +319,66 @@ describe('POST /api/games/search — paging and visibility', () => {
     expect(res.status).toBe(400);
   });
 
+  it('cursor is opaque and tamper-evident', async () => {
+    for (let i = 0; i < 3; i++) await insertGame();
+    const first = await search({ limit: 1 });
+    const cursor = first.body.nextCursor as string;
+    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+    expect(() => JSON.parse(raw)).toThrow();
+    expect(raw).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect((await search({ limit: 1, cursor })).status).toBe(200);
+    const bytes = Buffer.from(cursor, 'base64url');
+    bytes[bytes.length - 1]! ^= 1;
+    const flipped = await search({ limit: 1, cursor: bytes.toString('base64url') });
+    expect(flipped.status).toBe(400);
+    expect(flipped.body.error.code).toBe('VALIDATION');
+  });
+
+  it('detail filters never return games the viewer is too young for', async () => {
+    const { warnings } = await catalog();
+    const adultGame = await insertGame({
+      ageRating: '18+',
+      format: 'offline',
+      city: 'Київ',
+      priceUah: null,
+      startsAt: nextKyiv(1, 19),
+      recurrence: 'weekly',
+      weekdays: [1],
+    });
+    const calendar = {
+      mode: 'custom',
+      availability: {
+        timezone: KYIV,
+        slots: [{ weekday: 1, startMin: 0, endMin: 24 * 60 }],
+        busyDates: [],
+      },
+    };
+    const probes: object[] = [
+      { city: 'Київ' },
+      { priceMode: 'free' },
+      { excludeWarningIds: [warnings[0]!] },
+      { calendar },
+      { hasFreeSlots: true },
+    ];
+    for (const probe of probes) {
+      expect(ids(await search(probe))).toEqual([]);
+    }
+    // Без детальних фільтрів гість бачить обмежену картку; ageRatings — не детальний фільтр.
+    expect((await search({})).body.items).toEqual([
+      expect.objectContaining({ id: adultGame, restricted: true }),
+    ]);
+    expect(ids(await search({ ageRatings: ['18+'] }))).toEqual([adultGame]);
+    // 18–20 не проходить лише 21+.
+    const young = await userWithAge(19);
+    expect(ids(await search({ city: 'Київ' }, young.cookie))).toEqual([adultGame]);
+    const g21 = await insertGame({ ageRating: '21+', format: 'offline', city: 'Київ' });
+    expect(ids(await search({ city: 'Київ' }, young.cookie))).toEqual([adultGame]);
+    const adult = await userWithAge(25);
+    expect(ids(await search({ city: 'Київ' }, adult.cookie)).sort()).toEqual(
+      [adultGame, g21].sort(),
+    );
+  });
+
   it('18+ game for a guest has exactly the restricted keys (Review Focus 3)', async () => {
     const id = await insertGame({ ageRating: '18+', city: 'Київ' });
     const res = await search({});
@@ -325,27 +395,5 @@ describe('POST /api/games/search — paging and visibility', () => {
     const asAdult = await search({}, adult.cookie);
     expect(asAdult.body.items[0]).not.toHaveProperty('restricted');
     expect(asAdult.body.items[0].city).toBe('Київ');
-  });
-
-  it('restricted cards carry no fit even with the calendar on', async () => {
-    await insertGame({
-      ageRating: '21+',
-      startsAt: nextKyiv(1, 19),
-      recurrence: 'weekly',
-      weekdays: [1],
-    });
-    const res = await search({
-      calendar: {
-        mode: 'custom',
-        availability: {
-          timezone: KYIV,
-          slots: [{ weekday: 1, startMin: 0, endMin: 24 * 60 }],
-          busyDates: [],
-        },
-      },
-    });
-    expect(Object.keys(res.body.items[0]).sort()).toEqual(
-      ['ageRating', 'gm', 'id', 'restricted', 'title'].sort(),
-    );
   });
 });

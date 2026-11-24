@@ -253,6 +253,9 @@ export type SearchSort = (typeof SEARCH_SORTS)[number];
 
 export const PRICE_MODES = ['any', 'free', 'paid'] as const;
 
+/** Найбільше вікно `dateTo − dateFrom`, діб. */
+export const MAX_DATE_WINDOW_DAYS = 366;
+
 /** Необов'язковий рядок-фільтр: обрізається, порожній → відсутній. */
 const optFilter = (max: number) =>
   z
@@ -279,9 +282,13 @@ const calendarSchema = z
 /**
  * Тіло `POST /api/games/search`.
  * - `city`, `platform` — точний збіг без урахування регістру;
- * - `experience` — ігри з цим рівнем або з `any`;
+ * - `experience` — ігри з цим рівнем або з `any`; `any` — без фільтра;
  * - `priceMode: 'free'` — лише безкоштовні; `priceMax` — ціна ≤ max (з `any` — ще й безкоштовні);
  * - `dateFrom`/`dateTo` — момент часу (ISO з поясом): є сесія в `[max(dateFrom, зараз), dateTo)`;
+ *   вікно не довше `MAX_DATE_WINDOW_DAYS`;
+ * - видимі: `recruiting` (повна — лише з `showWhenFull`), `started` — лише з `showWhenFull`;
+ * - гра з віковою позначкою, якої глядач не проходить, з будь-яким детальним фільтром
+ *   (усе, крім `ageRatings`/`sort`/`cursor`/`limit`) не видається взагалі;
  * - `calendar` — фільтр відповідності календарю гравця на 4 тижні (`FIT_HORIZON_DAYS`):
  *   `full` проходить завжди, `partial` — лише з `includePartial`;
  * - `cursor` — непрозорий рядок з `nextCursor` попередньої сторінки (з тим самим `sort`).
@@ -309,9 +316,18 @@ export const searchFiltersSchema = z
     limit: z.number().int().min(1).max(50).default(20),
   })
   .strict()
-  .refine((f) => !f.dateFrom || !f.dateTo || new Date(f.dateFrom) < new Date(f.dateTo), {
-    message: 'dateFrom must be before dateTo',
-    path: ['dateTo'],
+  .superRefine((f, ctx) => {
+    if (!f.dateFrom || !f.dateTo) return;
+    const span = Date.parse(f.dateTo) - Date.parse(f.dateFrom);
+    if (span <= 0) {
+      ctx.addIssue({ code: 'custom', path: ['dateTo'], message: 'dateFrom must be before dateTo' });
+    } else if (span > MAX_DATE_WINDOW_DAYS * 86_400_000) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dateTo'],
+        message: `Date window must not exceed ${MAX_DATE_WINDOW_DAYS} days`,
+      });
+    }
   });
 
 export type SearchFilters = z.output<typeof searchFiltersSchema>;
@@ -323,6 +339,9 @@ export type SearchGameCardDto = GameCardDto & { fit?: 'full' | 'partial' };
 /** Відповідь `POST /api/games/search`. */
 export interface SearchResultDto {
   items: (SearchGameCardDto | RestrictedGameDto)[];
-  /** `null` — сторінок більше немає. */
+  /**
+   * `null` — сторінок більше немає. Порожні (чи короткі) `items` з не-`null` курсором
+   * означають «перегляд обмежено — продовжуйте з цим курсором».
+   */
   nextCursor: string | null;
 }

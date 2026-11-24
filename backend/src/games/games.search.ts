@@ -12,18 +12,22 @@ import {
   lte,
   ne,
   notExists,
+  notInArray,
   or,
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
   availabilityFit,
   expandOccurrences,
   FIT_HORIZON_DAYS,
   isRestrictedGame,
+  meetsAgeRating,
   SEARCH_SORTS,
   searchFiltersSchema,
+  type AgeRating,
   type AvailabilityDto,
   type SearchFilters,
   type SearchGameCardDto,
@@ -36,7 +40,7 @@ import { getAvailability } from '../availability/availability.service.js';
 import { gameContentWarnings, gameMembers, games } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { loadGames, resolveViewer, toCardDto, type Loaded } from './games.service.js';
-import { toCardView } from './games.visibility.js';
+import { toCardView, viewerAge, type Viewer } from './games.visibility.js';
 
 const DAY_MS = 86_400_000;
 /** Кандидатів за один SQL-запит, коли діє фільтр у пам'яті (календар/дати). */
@@ -49,29 +53,58 @@ const DATE_ONLY_FROM_SPAN_MS = 366 * DAY_MS;
 // ---------- курсор ----------
 
 /**
- * Курсор — base64url JSON `{ s, k, id }`: сортування, ключ сортування останнього
- * виданого рядка (ISO) та його id. Курсор іншого сортування чи сміття → 400.
+ * Курсор — непрозорий токен: AES-256-GCM над JSON `{ s, k, id }` (сортування, ключ
+ * сортування останнього виданого рядка (ISO) та його id), base64url(`iv | tag | шифротекст`).
+ * Шифрування не дає вичитати `starts_at`/`published_at` прихованої (18+/21+) гри.
+ * Ключ — HKDF-SHA256 від `IDENTITY_PEPPER` з окремою міткою. Підроблений, сміттєвий
+ * курсор чи курсор іншого сортування → 400.
  */
 const cursorSchema = z
   .object({ s: z.enum(SEARCH_SORTS), k: z.iso.datetime(), id: z.number().int().positive() })
   .strict();
 type Cursor = z.output<typeof cursorSchema>;
 
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
+const cursorKeys = new WeakMap<AppDeps['env'], Buffer>();
+
+function cursorKey(deps: AppDeps): Buffer {
+  let key = cursorKeys.get(deps.env);
+  if (!key) {
+    key = Buffer.from(
+      hkdfSync('sha256', deps.env.IDENTITY_PEPPER, Buffer.alloc(0), 'nri:search-cursor', 32),
+    );
+    cursorKeys.set(deps.env, key);
+  }
+  return key;
+}
+
 function sortKey(row: Loaded['row'], sort: SearchSort): Date {
   // Видимі ігри (recruiting/started) завжди опубліковані — `published_at` не NULL.
   return sort === 'soonest' ? row.startsAt : row.publishedAt!;
 }
 
-function encodeCursor(row: Loaded['row'], sort: SearchSort): string {
+function encodeCursor(deps: AppDeps, row: Loaded['row'], sort: SearchSort): string {
   const c: Cursor = { s: sort, k: sortKey(row, sort).toISOString(), id: row.id };
-  return Buffer.from(JSON.stringify(c)).toString('base64url');
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv('aes-256-gcm', cursorKey(deps), iv);
+  const data = Buffer.concat([cipher.update(JSON.stringify(c), 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64url');
 }
 
-function decodeCursor(raw: string, sort: SearchSort): Cursor {
+function decodeCursor(deps: AppDeps, raw: string, sort: SearchSort): Cursor {
   const invalid = () => new AppError(400, 'VALIDATION', { reason: 'INVALID_CURSOR' });
   let parsed: unknown;
   try {
-    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    const buf = Buffer.from(raw, 'base64url');
+    if (buf.length <= IV_BYTES + TAG_BYTES) throw invalid();
+    const decipher = createDecipheriv('aes-256-gcm', cursorKey(deps), buf.subarray(0, IV_BYTES));
+    decipher.setAuthTag(buf.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
+    const plain = Buffer.concat([
+      decipher.update(buf.subarray(IV_BYTES + TAG_BYTES)),
+      decipher.final(),
+    ]);
+    parsed = JSON.parse(plain.toString('utf8'));
   } catch {
     throw invalid();
   }
@@ -108,9 +141,13 @@ const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers
 /** SQL-префільтр за всіма полями, крім календаря (і точної перевірки дат). */
 function sqlFilters(deps: AppDeps, f: SearchFilters): SQL[] {
   const c: (SQL | undefined)[] = [
-    // Видимі статуси: набір гравців; гра, що йде, — лише з show_when_full.
+    // Видимі: набір гравців (повна гра — лише з show_when_full); гра, що йде, — лише з
+    // show_when_full.
     or(
-      eq(games.status, 'recruiting'),
+      and(
+        eq(games.status, 'recruiting'),
+        or(eq(games.showWhenFull, true), sql`${games.maxPlayers} > ${memberCount}`),
+      ),
       and(eq(games.status, 'started'), eq(games.showWhenFull, true)),
     ),
     isNotNull(games.publishedAt),
@@ -123,7 +160,10 @@ function sqlFilters(deps: AppDeps, f: SearchFilters): SQL[] {
   if (f.city) c.push(sql`lower(${games.city}) = lower(${f.city})`);
   if (f.platform) c.push(sql`lower(${games.platform}) = lower(${f.platform})`);
   if (f.ageRatings?.length) c.push(inArray(games.ageRating, f.ageRatings));
-  if (f.experience) c.push(inArray(games.experience, [...new Set([f.experience, 'any' as const])]));
+  // Рівень X → ігри з X або `any`; `any` у фільтрі — без обмеження.
+  if (f.experience && f.experience !== 'any') {
+    c.push(inArray(games.experience, [f.experience, 'any']));
+  }
   if (f.priceMode === 'free') {
     c.push(isNull(games.priceUah));
   } else if (f.priceMode === 'paid') {
@@ -216,6 +256,43 @@ async function calendarAvailability(
   }
 }
 
+const RESTRICTED_RATINGS: AgeRating[] = ['18+', '21+'];
+
+/** Чи задано хоч один фільтр за атрибутами гри (усе, крім `ageRatings`/`sort`/`cursor`/`limit`). */
+function hasDetailFilters(f: SearchFilters): boolean {
+  return Boolean(
+    f.systemIds?.length ||
+    f.genreIds?.length ||
+    f.format ||
+    f.city ||
+    f.kind ||
+    f.dateFrom ||
+    f.dateTo ||
+    f.priceMode !== 'any' ||
+    f.priceMax !== undefined ||
+    (f.experience && f.experience !== 'any') ||
+    f.platform ||
+    f.language ||
+    f.hasFreeSlots ||
+    f.excludeWarningIds?.length ||
+    f.calendar.mode !== 'off',
+  );
+}
+
+/**
+ * Ігри з віковою позначкою, якої глядач не проходить (крім власних ігор майстра), з
+ * детальними фільтрами не видаються взагалі: інакше перемиканням фільтрів можна було б
+ * вивідати місто, ціну, розклад тощо. Без детальних фільтрів вони лишаються у видачі
+ * як `RestrictedGameDto`.
+ */
+function hideRestricted(viewer: Viewer, now: Date): SQL | undefined {
+  const age = viewerAge(viewer, now);
+  const failed = RESTRICTED_RATINGS.filter((r) => !meetsAgeRating(age, r));
+  if (failed.length === 0) return undefined;
+  const notFailed = notInArray(games.ageRating, failed);
+  return viewer ? or(notFailed, eq(games.gmUserId, viewer.userId)) : notFailed;
+}
+
 // ---------- пошук ----------
 
 /**
@@ -235,7 +312,7 @@ export async function searchGames(
   const f = searchFiltersSchema.parse(body);
   let after: { k: Date; id: number } | null = null;
   if (f.cursor !== undefined) {
-    const c = decodeCursor(f.cursor, f.sort);
+    const c = decodeCursor(deps, f.cursor, f.sort);
     after = { k: new Date(c.k), id: c.id };
   }
   const [availability, viewer] = await Promise.all([
@@ -246,6 +323,10 @@ export async function searchGames(
   const filter = memoryFilter(f, availability, now);
   const { order, after: afterCond } = ordering(f.sort);
   const base = sqlFilters(deps, f);
+  if (hasDetailFilters(f)) {
+    const hide = hideRestricted(viewer, now);
+    if (hide) base.push(hide);
+  }
   const batch = filter ? BATCH : f.limit + 1;
 
   const picked: { l: Loaded; fit?: 'full' | 'partial' }[] = [];
@@ -272,9 +353,9 @@ export async function searchGames(
   let nextCursor: string | null = null;
   if (picked.length > f.limit) {
     picked.length = f.limit;
-    nextCursor = encodeCursor(picked.at(-1)!.l.row, f.sort);
+    nextCursor = encodeCursor(deps, picked.at(-1)!.l.row, f.sort);
   } else if (!exhausted && last) {
-    nextCursor = encodeCursor(last.row, f.sort);
+    nextCursor = encodeCursor(deps, last.row, f.sort);
   }
 
   const items = picked.map(({ l, fit }) => {
