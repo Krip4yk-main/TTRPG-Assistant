@@ -8,3 +8,4 @@ export * from './contracts/availability.js';
 export * from './schedule/tz.js';
 export * from './schedule/occurrences.js';
 export * from './schedule/fit.js';
+export * from './contracts/catalog.js';

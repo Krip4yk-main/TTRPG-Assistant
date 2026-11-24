@@ -1,0 +1,19 @@
+<span class="chip">
+  <span class="label">
+    @if (labelKey(); as key) {
+      {{ key | translate }}
+    } @else {
+      {{ custom() }}
+    }
+  </span>
+  @if (hintKey(); as hint) {
+    <button
+      type="button"
+      class="info"
+      [matTooltip]="hint | translate"
+      [attr.aria-label]="'common.moreInfo' | translate"
+    >
+      <mat-icon aria-hidden="true" fontIcon="info"></mat-icon>
+    </button>
+  }
+</span>

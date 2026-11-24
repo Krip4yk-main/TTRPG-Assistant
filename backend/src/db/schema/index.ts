@@ -1,9 +1,11 @@
 import * as auth from './auth.js';
+import * as catalog from './catalog.js';
 import * as events from './events.js';
 import * as users from './users.js';
 
 export * from './auth.js';
+export * from './catalog.js';
 export * from './events.js';
 export * from './users.js';
 
-export const schema = { ...users, ...auth, ...events };
+export const schema = { ...users, ...auth, ...events, ...catalog };

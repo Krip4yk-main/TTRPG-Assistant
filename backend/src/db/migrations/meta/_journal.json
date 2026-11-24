@@ -29,6 +29,20 @@
       "when": 1795534674575,
       "tag": "0003_public_id",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1795535823530,
+      "tag": "0004_catalog_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1795535824946,
+      "tag": "0005_catalog_seed",
+      "breakpoints": true
     }
   ]
 }
