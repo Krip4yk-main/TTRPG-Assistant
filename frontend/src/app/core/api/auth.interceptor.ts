@@ -1,5 +1,5 @@
 import { HttpErrorResponse, type HttpInterceptorFn } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { Injector, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
@@ -24,16 +24,17 @@ export function safeReturnTo(url: string | null | undefined): string | null {
  * компоненти просто не показують її повторно.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const auth = inject(AuthStore);
-  const router = inject(Router);
+  // Не-API запити (зокрема завантаження перекладів під час конструювання
+  // TranslateService) проходять без жодних інжекцій — інакше Router → TitleStrategy →
+  // TranslateService дає циклічний DI (NG0200).
+  if (!req.url.startsWith('/api/') || isExempt(req.method, req.url)) return next(req);
+  // Залежності резолвимо ліниво, лише коли справді обробляємо 401.
+  const injector = inject(Injector);
   return next(req).pipe(
     catchError((err: unknown) => {
-      if (
-        err instanceof HttpErrorResponse &&
-        err.status === 401 &&
-        req.url.startsWith('/api/') &&
-        !isExempt(req.method, req.url)
-      ) {
+      if (err instanceof HttpErrorResponse && err.status === 401) {
+        const auth = injector.get(AuthStore);
+        const router = injector.get(Router);
         auth.setMe(null);
         const returnTo = safeReturnTo(router.url);
         void router.navigate(['/login'], {
