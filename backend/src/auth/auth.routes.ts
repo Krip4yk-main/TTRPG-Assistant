@@ -1,8 +1,8 @@
-import { generateCodeVerifier, generateState } from 'arctic';
 import { timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import type { Request, RequestHandler, Response } from 'express';
 import { eq } from 'drizzle-orm';
+import { randomNonce, randomPKCECodeVerifier, randomState } from 'openid-client';
 import { z, ZodError } from 'zod';
 import type { ErrorCode } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -45,8 +45,13 @@ const safeReturnTo = (v: unknown): string => {
   return v;
 };
 
+/** Query callback-запиту як є (code, state, iss, ...) — для перевірок у openid-client. */
+const callbackParamsOf = (req: Request): URLSearchParams =>
+  new URL(req.originalUrl, 'http://callback.invalid').searchParams;
+
 type OAuthState = {
   codeVerifier: string;
+  nonce: string;
   mode: 'login' | 'link';
   userId?: number;
   returnTo: string;
@@ -156,10 +161,20 @@ export function authRouter(deps: AppDeps): Router {
         throw new AppError(403, 'ACCOUNT_BANNED');
       }
     }
-    const state = generateState();
-    const codeVerifier = generateCodeVerifier();
+    const state = randomState();
+    const codeVerifier = randomPKCECodeVerifier();
+    const nonce = randomNonce();
+    // URL будуємо ДО запису state/куки: збій провайдера (discovery) не лишає слідів.
+    let authUrl: URL;
+    try {
+      authUrl = await provider.createAuthorizationUrl({ state, codeVerifier, nonce });
+    } catch (err) {
+      console.error(`[oauth] ${provider.id}: authorization URL failed`, err);
+      throw new AppError(502, 'OAUTH_STATE_INVALID');
+    }
     const entry: OAuthState = {
       codeVerifier,
+      nonce,
       mode: q.mode,
       returnTo: safeReturnTo(req.query.returnTo),
       ...(q.mode === 'link' ? { userId: req.user!.userId } : {}),
@@ -173,7 +188,7 @@ export function authRouter(deps: AppDeps): Router {
       path: OAUTH_COOKIE_PATH,
       maxAge: OAUTH_TTL_SEC * 1000,
     });
-    res.redirect(provider.createAuthorizationUrl(state, codeVerifier).toString());
+    res.redirect(authUrl.toString());
   };
 
   // start — top-level навігація: будь-яка AppError (401/403/404, невалідний mode)
@@ -248,7 +263,12 @@ export function authRouter(deps: AppDeps): Router {
 
     let identity;
     try {
-      identity = await provider.exchange(code, st.codeVerifier);
+      identity = await provider.exchange({
+        callbackParams: callbackParamsOf(req),
+        codeVerifier: st.codeVerifier,
+        state,
+        nonce: st.nonce,
+      });
     } catch {
       return invalid();
     }

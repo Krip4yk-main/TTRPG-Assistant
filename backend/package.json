@@ -15,7 +15,6 @@
   "dependencies": {
     "@nri/shared": "*",
     "@socket.io/redis-adapter": "^8.3.0",
-    "arctic": "^3.7.0",
     "cookie": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.4",
@@ -24,6 +23,7 @@
     "helmet": "^8.3.0",
     "ioredis": "^6.1.0",
     "mysql2": "^3.24.6",
+    "openid-client": "^6.9.1",
     "rate-limit-redis": "^6.0.2",
     "socket.io": "^4.8.4",
     "tsx": "^4.23.15",

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
@@ -9,12 +9,17 @@ import { sign, TEST_BOT_TOKEN } from './telegram-sign.js';
 
 const base = await testDeps({ TELEGRAM_BOT_TOKEN: TEST_BOT_TOKEN });
 let subject = 'g-1';
+let authUrlFails = false;
+let lastExchange: Parameters<OAuthProvider['exchange']>[0] | null = null;
 const fake: OAuthProvider = {
   id: 'google',
-  createAuthorizationUrl: (state, verifier) =>
-    new URL(`https://accounts.example/auth?state=${state}&cv=${verifier}`),
-  exchange: async (code) => {
-    if (code === 'bad') throw new Error('exchange failed');
+  createAuthorizationUrl: async ({ state, codeVerifier, nonce }) => {
+    if (authUrlFails) throw new Error('discovery failed');
+    return new URL(`https://accounts.example/auth?state=${state}&cv=${codeVerifier}&n=${nonce}`);
+  },
+  exchange: async (params) => {
+    lastExchange = params;
+    if (params.callbackParams.get('code') === 'bad') throw new Error('exchange failed');
     return { provider: 'google', subject, displayName: 'Gina', avatarUrl: 'https://img/g.png' };
   },
 };
@@ -23,6 +28,8 @@ const { db, redis } = deps;
 
 beforeEach(async () => {
   subject = 'g-1';
+  authUrlFails = false;
+  lastExchange = null;
   await resetDb(db);
   await redis.flushdb();
 });
@@ -51,6 +58,49 @@ describe('google oauth', () => {
     expect(stored).toMatchObject({ mode: 'login', returnTo: '/' });
     expect(stored.codeVerifier).toBeTruthy();
     expect(await redis.ttl(`oauth:${state}`)).toBeGreaterThan(500);
+  });
+
+  it('start stores a per-flow nonce; callback hands state/verifier/nonce to the provider', async () => {
+    const agent = request.agent(createApp(deps));
+    const { res, state } = await startFlow(agent);
+    const loc = new URL(res.headers.location as string);
+    const stored = JSON.parse((await redis.get(`oauth:${state}`))!);
+    expect(stored.nonce).toBeTruthy();
+    expect(loc.searchParams.get('n')).toBe(stored.nonce);
+    expect(loc.searchParams.get('cv')).toBe(stored.codeVerifier);
+    const other = await startFlow(request.agent(createApp(deps)));
+    expect(JSON.parse((await redis.get(`oauth:${other.state}`))!).nonce).not.toBe(stored.nonce);
+    await agent.get(`/api/auth/google/callback?code=c&state=${state}&iss=x`);
+    expect(lastExchange).toMatchObject({
+      state,
+      codeVerifier: stored.codeVerifier,
+      nonce: stored.nonce,
+    });
+    expect(Object.fromEntries(lastExchange!.callbackParams)).toEqual({
+      code: 'c',
+      state,
+      iss: 'x',
+    });
+  });
+
+  it('provider failure on start (e.g. discovery) redirects, stores no state/cookie', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      authUrlFails = true;
+      const app = createApp(deps);
+      const res = await request(app).get('/api/auth/google/start');
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+      expect(cookies(res)).not.toMatch(/nri_oauth=[^;]/);
+      expect(await redis.keys('oauth:*')).toHaveLength(0);
+      // Наступна спроба (провайдер «ожив») проходить.
+      authUrlFails = false;
+      expect((await request(app).get('/api/auth/google/start')).headers.location).toMatch(
+        /^https:\/\/accounts\.example\/auth/,
+      );
+    } finally {
+      err.mockRestore();
+    }
   });
 
   it('rejects open-redirect returnTo', async () => {

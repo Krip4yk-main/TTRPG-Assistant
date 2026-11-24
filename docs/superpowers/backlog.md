@@ -19,7 +19,7 @@
 - Discord OAuth (резерв з дизайну; інтерфейс провайдера вже готовий).
 
 ## До продакшену
-- Замінити `arctic` (позначено на npm як «no longer supported») на `openid-client` або `oauth4webapi` — провайдери ізольовані за інтерфейсом `OAuthProvider`.
+- ~~Замінити `arctic` (позначено на npm як «no longer supported») на `openid-client` або `oauth4webapi`~~ — **зроблено**: Google на `openid-client` v6 (discovery, PKCE S256, state, nonce, перевірка підпису ID Token через JWKS, iss/aud/exp).
 - Компілювати бекенд у JS (`tsc`/`tsup`) замість запуску через `tsx`.
 - Шрифти й іконки з Google Fonts CDN → локально (приватність, CSP); повний CSP для SPA.
 

@@ -122,7 +122,6 @@ docker run --rm --env-file backend/.env nri-backend node --import tsx src/cli/se
 
 ### Відомі обмеження
 
-- Бібліотека OAuth `arctic` позначена як deprecated — замініть до production.
 - Шрифти підвантажуються з Google CDN.
 
 ## Автор
