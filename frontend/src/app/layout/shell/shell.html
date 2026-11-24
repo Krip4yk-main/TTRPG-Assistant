@@ -28,6 +28,22 @@
     </nav>
   }
 
+  @if (auth.isActive() && viewMode.mode() === 'player') {
+    <nav class="player-nav" [attr.aria-label]="'shell.viewMode.player' | translate">
+      <a
+        mat-button
+        class="my-applications-link"
+        routerLink="/my-applications"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        [attr.aria-label]="'shell.myApplications' | translate"
+      >
+        <mat-icon aria-hidden="true">assignment</mat-icon>
+        <span class="nav-label">{{ 'shell.myApplications' | translate }}</span>
+      </a>
+    </nav>
+  }
+
   @if (auth.isActive()) {
     <mat-button-toggle-group
       class="view-mode"

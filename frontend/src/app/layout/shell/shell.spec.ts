@@ -95,5 +95,22 @@ describe('Shell home by view mode', () => {
     await settle();
     expect(el.querySelector('a[href="/my-games"]')).not.toBeNull();
     expect(el.querySelector('a[href="/games/new"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/my-applications"]')).toBeNull();
+  });
+
+  it('player view shows the "My applications" link', async () => {
+    TestBed.inject(ViewModeStore).setMode('player');
+    await settle();
+    expect(el.querySelector('a[href="/my-applications"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/my-games"]')).toBeNull();
+  });
+
+  it('/my-applications renders the page', async () => {
+    TestBed.inject(ViewModeStore).setMode('player');
+    await TestBed.inject(Router).navigateByUrl('/my-applications');
+    await settle();
+    http.expectOne('/api/me/applications').flush([]);
+    await settle();
+    expect(el.querySelector('nri-my-applications')).not.toBeNull();
   });
 });

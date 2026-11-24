@@ -51,7 +51,8 @@
   display: none;
 }
 
-.gm-nav {
+.gm-nav,
+.player-nav {
   display: flex;
   align-items: center;
   gap: var(--nri-space-sm);
@@ -106,8 +107,18 @@
     padding: 0 var(--nri-space-sm);
   }
 
-  .gm-nav .nav-label {
+  .gm-nav .nav-label,
+  .player-nav .nav-label {
     display: none;
+  }
+
+  .my-applications-link {
+    min-width: 40px;
+    padding: 0 var(--nri-space-sm);
+
+    mat-icon {
+      margin: 0;
+    }
   }
 
   .new-game-link {

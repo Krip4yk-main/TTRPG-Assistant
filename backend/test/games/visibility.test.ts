@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
-import { gameMembers } from '../../src/db/schema/index.js';
+import { gameBans, gameMembers, gmBlacklist } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from './fixtures.js';
 
@@ -176,5 +176,45 @@ describe('games visibility — age ratings (Review Focus 3)', () => {
     expect(Object.keys(body).sort()).toEqual(RESTRICTED_KEYS);
     const adult = await userWithAge(21);
     expect((await call('get', `/api/games/${id}`, adult.cookie)).body.restricted).toBeUndefined();
+  });
+});
+
+describe('games visibility — viewer relation', () => {
+  it('guest gets no `viewer`; GM, outsider, pending, member, banned, blacklisted get their relation', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    const [outsider, pending, member, banned, black] = await Promise.all(
+      [1, 2, 3, 4, 5].map(() => userWithAge(25)),
+    );
+    await db.insert(gameMembers).values({ gameId: id, userId: member!.id });
+    await db.insert(gameBans).values({ gameId: id, userId: banned!.id });
+    await db.insert(gmBlacklist).values({ gmUserId: gm.id, userId: black!.id });
+    const app = await call('post', `/api/games/${id}/applications`, pending!.cookie, {
+      warningsAccepted: true,
+      answers: [],
+    });
+    expect(app.status).toBe(201);
+
+    const viewerOf = async (cookie?: string) =>
+      (await call('get', `/api/games/${id}`, cookie)).body.viewer;
+    expect(await viewerOf()).toBeUndefined();
+    expect(await viewerOf(gm.cookie)).toEqual({ relation: 'gm', applicationId: null });
+    expect(await viewerOf(outsider!.cookie)).toEqual({ relation: 'none', applicationId: null });
+    expect(await viewerOf(pending!.cookie)).toEqual({
+      relation: 'pending',
+      applicationId: app.body.id,
+    });
+    expect(await viewerOf(member!.cookie)).toEqual({ relation: 'member', applicationId: null });
+    expect(await viewerOf(banned!.cookie)).toEqual({ relation: 'banned', applicationId: null });
+    expect(await viewerOf(black!.cookie)).toEqual({
+      relation: 'blacklisted',
+      applicationId: null,
+    });
+
+    // Відкликана заявка — знову `none` (можна подати повторно).
+    expect((await call('delete', `/api/applications/${app.body.id}`, pending!.cookie)).status).toBe(
+      200,
+    );
+    expect(await viewerOf(pending!.cookie)).toEqual({ relation: 'none', applicationId: null });
   });
 });

@@ -84,6 +84,38 @@ h1 {
   gap: var(--nri-space-sm) var(--nri-space-md);
 }
 
+.relation {
+  align-self: center;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  padding: var(--nri-space-xs) var(--nri-space-md);
+  border-color: var(--nri-accent);
+  color: var(--nri-accent-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+}
+
+.notice-area {
+  &:empty {
+    display: none;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    margin-left: 0.25em;
+    color: var(--nri-primary-text);
+  }
+}
+
 .apply-hint {
   margin: 0;
   font-size: 0.9rem;

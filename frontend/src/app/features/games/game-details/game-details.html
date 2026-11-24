@@ -99,18 +99,67 @@
                   {{ 'games.actions.edit' | translate }}
                 </a>
               }
+            } @else if (!signedIn()) {
+              @if (accepting()) {
+                <a
+                  mat-flat-button
+                  class="apply-login"
+                  routerLink="/login"
+                  [queryParams]="{ returnTo: returnTo() }"
+                  >{{ 'games.details.applyLogin' | translate }}</a
+                >
+              } @else {
+                <p class="nri-muted apply-hint">{{ 'games.details.closedHint' | translate }}</p>
+              }
+            } @else if (relation() === 'member') {
+              <span class="badge relation" data-relation="member">
+                <mat-icon aria-hidden="true">how_to_reg</mat-icon>
+                {{ 'games.details.member' | translate }}
+              </span>
+            } @else if (relation() === 'pending') {
+              <span class="badge relation" data-relation="pending">
+                <mat-icon aria-hidden="true">hourglass_top</mat-icon>
+                {{ 'games.details.pending' | translate }}
+              </span>
+              <button
+                mat-stroked-button
+                type="button"
+                class="withdraw"
+                [disabled]="busy()"
+                (click)="withdraw()"
+              >
+                {{ 'games.details.withdraw' | translate }}
+              </button>
             } @else {
               <button
                 mat-flat-button
                 type="button"
                 class="apply"
-                disabled
-                aria-describedby="game-apply-hint"
+                [disabled]="!!applyBlock() || busy()"
+                [attr.aria-describedby]="applyBlock() ? 'game-apply-hint' : null"
+                (click)="apply()"
               >
                 {{ 'games.details.apply' | translate }}
               </button>
-              <p id="game-apply-hint" class="nri-muted apply-hint">
-                {{ 'games.details.applySoon' | translate }}
+              @if (applyBlock(); as hint) {
+                <p id="game-apply-hint" class="nri-muted apply-hint">{{ hint | translate }}</p>
+              }
+            }
+          </div>
+
+          <div class="notice-area" aria-live="polite">
+            @if (notice(); as n) {
+              <p
+                [class.nri-alert]="n.kind === 'error'"
+                [class.nri-notice]="n.kind === 'info'"
+                [attr.role]="n.kind === 'error' ? 'alert' : null"
+              >
+                {{ n.key | translate }}
+                @if (n.link) {
+                  <a routerLink="/my-applications">{{
+                    'games.details.myApplications' | translate
+                  }}</a>
+                }
               </p>
             }
           </div>

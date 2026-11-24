@@ -1,0 +1,147 @@
+<h2 mat-dialog-title>{{ 'games.applications.apply.title' | translate: { title: data.title } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    @if (hasWarnings) {
+      <fieldset class="section">
+        <legend>{{ 'games.applications.apply.warningsTitle' | translate }}</legend>
+        <ul class="chips">
+          @for (slug of data.warningSlugs; track slug) {
+            <li><nri-warning-chip [slug]="slug" /></li>
+          }
+          @for (w of data.customWarnings; track $index) {
+            <li><nri-warning-chip [custom]="w" /></li>
+          }
+        </ul>
+        <mat-checkbox
+          class="accept"
+          formControlName="accepted"
+          [aria-describedby]="acceptError() ? 'apply-accept-error' : ''"
+        >
+          {{ 'games.applications.apply.accept' | translate }}
+        </mat-checkbox>
+        @if (acceptError()) {
+          <p
+            id="apply-accept-error"
+            class="field-error accept-error server-field-error"
+            role="alert"
+            tabindex="-1"
+          >
+            {{ 'games.applications.apply.acceptRequired' | translate }}
+          </p>
+        }
+      </fieldset>
+    }
+
+    @if (data.questions.length) {
+      <fieldset class="section" formArrayName="answers">
+        <legend>{{ 'games.applications.apply.questionsTitle' | translate }}</legend>
+        @if (serverField() === 'ANSWERS_REQUIRED') {
+          <p class="field-error server-field-error" role="alert" tabindex="-1">
+            {{ 'errors.ANSWERS_REQUIRED' | translate }}
+          </p>
+        }
+        @for (q of data.questions; track $index; let i = $index) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ q }}</mat-label>
+            <textarea
+              matInput
+              class="answer"
+              rows="2"
+              required
+              [formControlName]="i"
+              [attr.maxlength]="limits.answer"
+            ></textarea>
+            @if (errorKey(answers.at(i), 'games.applications.apply.answerRequired'); as key) {
+              <mat-error>{{ key | translate: { max: limits.answer } }}</mat-error>
+            }
+          </mat-form-field>
+        }
+      </fieldset>
+    }
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'games.applications.apply.message' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="message"
+        rows="3"
+        formControlName="message"
+        [attr.maxlength]="limits.message"
+      ></textarea>
+      <mat-hint>{{
+        'games.applications.apply.messageHint' | translate: { max: limits.message }
+      }}</mat-hint>
+      @if (errorKey(form.controls.message, 'games.applications.apply.tooLong'); as key) {
+        <mat-error>{{ key | translate: { max: limits.message } }}</mat-error>
+      }
+    </mat-form-field>
+
+    <fieldset class="section" formArrayName="constraints">
+      <legend>{{ 'games.applications.apply.constraintsTitle' | translate }}</legend>
+      <p class="nri-muted hint">
+        {{
+          'games.applications.apply.constraintsHint'
+            | translate: { max: limits.constraints, len: limits.constraint }
+        }}
+      </p>
+      @for (c of constraints.controls; track c; let i = $index) {
+        <div class="constraint-row">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
+            <mat-label>{{
+              'games.applications.apply.constraint' | translate: { n: i + 1 }
+            }}</mat-label>
+            <input
+              matInput
+              class="constraint"
+              required
+              [attr.data-index]="i"
+              [formControlName]="i"
+              [attr.maxlength]="limits.constraint"
+            />
+            @if (errorKey(c, 'games.applications.apply.constraintRequired'); as key) {
+              <mat-error>{{ key | translate: { max: limits.constraint } }}</mat-error>
+            }
+          </mat-form-field>
+          <button
+            mat-icon-button
+            type="button"
+            class="remove-constraint"
+            [attr.aria-label]="
+              'games.applications.apply.removeConstraint' | translate: { n: i + 1 }
+            "
+            (click)="removeConstraint(i)"
+          >
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+      }
+      <button
+        mat-stroked-button
+        type="button"
+        class="add-constraint"
+        [disabled]="constraints.length >= limits.constraints"
+        (click)="addConstraint()"
+      >
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'games.applications.apply.addConstraint' | translate }}
+      </button>
+    </fieldset>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" [disabled]="submitting()">
+      {{
+        (submitting() ? 'games.applications.apply.submitting' : 'games.applications.apply.submit')
+          | translate
+      }}
+    </button>
+  </mat-dialog-actions>
+</form>

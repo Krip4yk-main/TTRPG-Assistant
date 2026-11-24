@@ -4,6 +4,7 @@ import {
   GAME_LOCKED_AFTER_PUBLISH,
   gameInputSchema,
   gamePatchSchema,
+  isRestrictedGame,
   meetsAgeRating,
   scheduleRuleInputSchema,
   type GameAction,
@@ -14,15 +15,19 @@ import {
   type EventType,
   type GameTransitionDto,
   type GameViewDto,
+  type GameViewerDto,
   type RestrictedGameDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import type { SessionUser } from '../auth/session.service.js';
 import {
   contentWarnings,
+  gameApplications,
+  gameBans,
   gameContentWarnings,
   gameMembers,
   games,
+  gmBlacklist,
   gameSessions,
   gameSystems,
   genres,
@@ -701,30 +706,59 @@ export async function transitionGame(
 export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Promise<GameViewDto> {
   const l = await loadOne(deps, id);
   if (!l) throw new AppError(404, 'NOT_FOUND');
-  let isMember = false;
-  if (viewer) {
-    const [m] = await deps.db
-      .select({ id: gameMembers.gameId })
-      .from(gameMembers)
-      .where(
-        and(
-          eq(gameMembers.gameId, id),
-          eq(gameMembers.userId, viewer.userId),
-          isNull(gameMembers.leftAt),
-        ),
-      );
-    isMember = Boolean(m);
-  }
+  const rel = viewer ? await viewerRelation(deps, l.row, viewer.userId) : null;
   const now = new Date();
   const view = toGameView(
     toGameDto(l, await warningIdsOf(deps, id), now),
     l.row.gmUserId,
     viewer,
-    isMember,
+    rel?.relation === 'member',
     now,
   );
   if (!view) throw new AppError(404, 'NOT_FOUND');
-  return view;
+  return rel && !isRestrictedGame(view) ? { ...view, viewer: rel } : view;
+}
+
+/** Стосунок автентифікованого глядача до гри (див. `GameViewerDto`). */
+async function viewerRelation(deps: AppDeps, g: GameRow, userId: number): Promise<GameViewerDto> {
+  const none = (relation: GameViewerDto['relation']) => ({ relation, applicationId: null });
+  if (g.gmUserId === userId) return none('gm');
+  const { db } = deps;
+  const [[m], [app], [ban], [black]] = await Promise.all([
+    db
+      .select({ id: gameMembers.id })
+      .from(gameMembers)
+      .where(
+        and(
+          eq(gameMembers.gameId, g.id),
+          eq(gameMembers.userId, userId),
+          isNull(gameMembers.leftAt),
+        ),
+      ),
+    db
+      .select({ id: gameApplications.id })
+      .from(gameApplications)
+      .where(
+        and(
+          eq(gameApplications.gameId, g.id),
+          eq(gameApplications.userId, userId),
+          eq(gameApplications.status, 'pending'),
+        ),
+      ),
+    db
+      .select({ id: gameBans.userId })
+      .from(gameBans)
+      .where(and(eq(gameBans.gameId, g.id), eq(gameBans.userId, userId))),
+    db
+      .select({ id: gmBlacklist.userId })
+      .from(gmBlacklist)
+      .where(and(eq(gmBlacklist.gmUserId, g.gmUserId), eq(gmBlacklist.userId, userId))),
+  ]);
+  if (m) return none('member');
+  if (app) return { relation: 'pending', applicationId: app.id };
+  if (ban) return none('banned');
+  if (black) return none('blacklisted');
+  return none('none');
 }
 
 /** «Мої ігри»: усі ігри майстра в усіх статусах. */

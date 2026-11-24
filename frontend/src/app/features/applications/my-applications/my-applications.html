@@ -1,0 +1,148 @@
+<section class="nri-page my-applications">
+  <h1>{{ 'games.applications.my.title' | translate }}</h1>
+
+  <div aria-live="polite">
+    @if (message(); as msg) {
+      <p
+        [class.nri-alert]="msg.kind === 'error'"
+        [class.nri-notice]="msg.kind === 'info'"
+        [attr.role]="msg.kind === 'error' ? 'alert' : null"
+      >
+        {{ msg.key | translate }}
+      </p>
+    }
+  </div>
+
+  @if (loadFailed()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'games.applications.my.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="load()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (items(); as list) {
+    @if (list.length === 0) {
+      <div class="nri-card empty">
+        <p>{{ 'games.applications.my.empty' | translate }}</p>
+        <p class="nri-muted">{{ 'games.applications.my.emptyCta' | translate }}</p>
+        <a mat-flat-button routerLink="/">{{ 'games.applications.my.find' | translate }}</a>
+      </div>
+    } @else {
+      @for (group of groups(); track group.status) {
+        <section class="group" [attr.data-status]="group.status">
+          <h2>
+            {{ 'games.applications.statusGroup.' + group.status | translate }}
+            <span class="count">({{ group.items.length }})</span>
+          </h2>
+          <ul class="cards">
+            @for (a of group.items; track a.id) {
+              <li>
+                <article class="nri-card application" [attr.data-application-id]="a.id">
+                  <header class="app-header">
+                    <h3 class="game-title">
+                      <a class="game-link" [routerLink]="['/games', a.gameId]">{{
+                        a.game.title
+                      }}</a>
+                    </h3>
+                    <span class="status" [attr.data-status]="a.status">{{
+                      'games.applications.status.' + a.status | translate
+                    }}</span>
+                  </header>
+
+                  @if (fullGame(a); as g) {
+                    <p class="nri-muted meta">
+                      {{ systemName(g) }} · {{ 'games.format.' + g.format | translate }}
+                      @if (g.city) {
+                        · {{ g.city }}
+                      }
+                      · {{ 'games.kind.' + g.kind | translate }}
+                    </p>
+                  } @else {
+                    <p class="meta">
+                      <span class="badge age">{{
+                        'games.ageRating.' + a.game.ageRating | translate
+                      }}</span>
+                    </p>
+                  }
+                  <p class="meta">
+                    {{ 'search.card.gm' | translate }}:
+                    @if (a.game.gm.nickname) {
+                      <a class="gm-link" [routerLink]="['/users', a.game.gm.publicId]">{{
+                        a.game.gm.nickname
+                      }}</a>
+                    } @else {
+                      {{ 'user.deleted' | translate }}
+                    }
+                  </p>
+                  <p class="nri-muted meta">
+                    {{ 'games.applications.my.submitted' | translate: { date: when(a.createdAt) } }}
+                    @if (a.decidedAt; as d) {
+                      · {{ 'games.applications.my.decided' | translate: { date: when(d) } }}
+                    }
+                  </p>
+
+                  @if (a.cancelReason; as reason) {
+                    <p class="nri-notice reason">
+                      {{ 'games.applications.cancelReason.' + reason | translate }}
+                    </p>
+                  }
+
+                  @if (a.message) {
+                    <div class="block">
+                      <h4>{{ 'games.applications.my.message' | translate }}</h4>
+                      <p class="text">{{ a.message }}</p>
+                    </div>
+                  }
+
+                  @if (a.constraints.length) {
+                    <div class="block">
+                      <h4>{{ 'games.applications.my.constraints' | translate }}</h4>
+                      <ul class="constraints">
+                        @for (c of a.constraints; track c.id) {
+                          <li>
+                            <span class="constraint-text">{{ c.text }}</span>
+                            <span class="response" [attr.data-response]="c.response ?? 'none'">{{
+                              'games.applications.constraintResponse.' + (c.response ?? 'none')
+                                | translate
+                            }}</span>
+                            @if (c.comment) {
+                              <span class="comment"
+                                ><span class="nri-muted"
+                                  >{{ 'games.applications.my.gmComment' | translate }}:</span
+                                >
+                                {{ c.comment }}</span
+                              >
+                            }
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+
+                  @if (a.status === 'pending') {
+                    <div class="actions">
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        class="withdraw danger"
+                        [disabled]="busyId() !== null"
+                        [attr.aria-label]="
+                          'games.applications.my.withdrawAria' | translate: { title: a.game.title }
+                        "
+                        (click)="withdraw(a)"
+                      >
+                        {{ 'games.applications.my.withdraw' | translate }}
+                      </button>
+                    </div>
+                  }
+                </article>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>

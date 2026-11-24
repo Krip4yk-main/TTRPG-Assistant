@@ -239,6 +239,27 @@ export interface RestrictedGameDto {
   restricted: true;
 }
 
+/**
+ * Стосунок глядача до гри (лише в `GET /api/games/:id` для автентифікованого глядача, що
+ * бачить повний вид): `pending` — є активна заявка (`applicationId`); `banned` — бан у
+ * цій грі; `blacklisted` — у чорному списку майстра.
+ */
+export const VIEWER_RELATIONS = [
+  'gm',
+  'member',
+  'pending',
+  'banned',
+  'blacklisted',
+  'none',
+] as const;
+export type ViewerRelation = (typeof VIEWER_RELATIONS)[number];
+
+export interface GameViewerDto {
+  relation: ViewerRelation;
+  /** Id активної (`pending`) заявки глядача; інакше `null`. */
+  applicationId: number | null;
+}
+
 /** Повна гра — для майстра й учасників (`game_members`). */
 export interface GameDto extends Omit<GameInput, 'systemId'> {
   id: number;
@@ -254,6 +275,8 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Лише у `GET /api/games/:id` для автентифікованого глядача. */
+  viewer?: GameViewerDto;
 }
 
 /** Приватні поля гри: лише майстру й учасникам. */

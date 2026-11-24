@@ -37,6 +37,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/games/my-games/my-games').then((m) => m.MyGames),
   },
   {
+    path: 'my-applications',
+    canActivate: [activeGuard],
+    title: 'titles.myApplications',
+    loadComponent: () =>
+      import('./features/applications/my-applications/my-applications').then(
+        (m) => m.MyApplications,
+      ),
+  },
+  {
     path: 'games/new',
     canActivate: [activeGuard],
     title: 'titles.newGame',
