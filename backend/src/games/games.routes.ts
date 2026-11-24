@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { AppError } from '../http/errors.js';
+import { searchGames } from './games.search.js';
 import {
   createGame,
   GAME_ACTIONS,
@@ -25,6 +26,10 @@ export function gamesRouter(deps: AppDeps): Router {
 
   router.post('/', auth, requireActive, async (req, res) => {
     res.status(201).json(await createGame(deps, req.user!.userId, req.body));
+  });
+  // Публічний пошук; `calendar.mode = 'mine'` вимагає сесії (перевіряє сервіс).
+  router.post('/search', async (req, res) => {
+    res.json(await searchGames(deps, req.user, req.body));
   });
   router.get('/mine', auth, requireActive, async (req, res) => {
     res.json(await listMyGames(deps, req.user!.userId));

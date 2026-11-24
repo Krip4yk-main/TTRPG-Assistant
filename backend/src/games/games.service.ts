@@ -29,7 +29,7 @@ import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibili
 
 type GameRow = typeof games.$inferSelect;
 
-interface Loaded {
+export interface Loaded {
   row: GameRow;
   gm: GameDto['gm'];
   systemName: string | null;
@@ -42,13 +42,15 @@ const NEXT_SESSION_HORIZON_MS = 70 * DAY_MS;
 
 // ---------- завантаження й перетворення ----------
 
-async function loadGames(
+/** Ігри з майстром, назвою системи й кількістю учасників (одним пакетним запитом). */
+export async function loadGames(
   deps: AppDeps,
   where: SQL | undefined,
   order: SQL[] = [desc(games.createdAt), desc(games.id)],
+  limit?: number,
 ): Promise<Loaded[]> {
   const { db } = deps;
-  const rows = await db
+  const query = db
     .select({
       row: games,
       gmPublicId: users.publicId,
@@ -61,6 +63,7 @@ async function loadGames(
     .leftJoin(gameSystems, eq(gameSystems.id, games.systemId))
     .where(where)
     .orderBy(...order);
+  const rows = await (limit === undefined ? query : query.limit(limit));
   if (rows.length === 0) return [];
   const counts = await db
     .select({ gameId: gameMembers.gameId, n: count() })

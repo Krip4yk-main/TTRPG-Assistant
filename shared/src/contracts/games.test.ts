@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gameInputSchema, gamePatchSchema } from './games.js';
+import { gameInputSchema, gamePatchSchema, searchFiltersSchema } from './games.js';
 
 const TZ = 'Europe/Kyiv';
 // 2027-01-04 — понеділок; 17:00Z = 19:00 за Києвом.
@@ -106,5 +106,44 @@ describe('gamePatchSchema', () => {
   it('validates field shapes', () => {
     expect(gamePatchSchema.safeParse({ coverUrl: 'http://a.test' }).success).toBe(false);
     expect(gamePatchSchema.safeParse({ nope: 1 }).success).toBe(false);
+  });
+});
+
+describe('searchFiltersSchema', () => {
+  it('fills defaults', () => {
+    expect(searchFiltersSchema.parse({})).toEqual({
+      sort: 'soonest',
+      limit: 20,
+      priceMode: 'any',
+      calendar: { mode: 'off', includePartial: false },
+    });
+  });
+  it('bounds limit to 1–50', () => {
+    expect(searchFiltersSchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(searchFiltersSchema.safeParse({ limit: 51 }).success).toBe(false);
+    expect(searchFiltersSchema.parse({ limit: 50 }).limit).toBe(50);
+  });
+  it('trims city and treats blank as absent', () => {
+    expect(searchFiltersSchema.parse({ city: '  Київ ' }).city).toBe('Київ');
+    expect(searchFiltersSchema.parse({ city: '  ' }).city).toBeUndefined();
+  });
+  it('custom calendar requires availability; off/mine forbid it', () => {
+    const availability = { timezone: 'Europe/Kyiv', slots: [], busyDates: [] };
+    expect(searchFiltersSchema.safeParse({ calendar: { mode: 'custom' } }).success).toBe(false);
+    expect(
+      searchFiltersSchema.safeParse({ calendar: { mode: 'custom', availability } }).success,
+    ).toBe(true);
+    expect(
+      searchFiltersSchema.safeParse({ calendar: { mode: 'mine', availability } }).success,
+    ).toBe(false);
+  });
+  it('rejects unknown keys and dateFrom after dateTo', () => {
+    expect(searchFiltersSchema.safeParse({ status: 'draft' }).success).toBe(false);
+    expect(
+      searchFiltersSchema.safeParse({
+        dateFrom: '2027-01-10T00:00:00Z',
+        dateTo: '2027-01-01T00:00:00Z',
+      }).success,
+    ).toBe(false);
   });
 });

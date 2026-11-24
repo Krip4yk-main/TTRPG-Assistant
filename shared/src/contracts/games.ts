@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AgeRating } from '../age.js';
+import { availabilityInputSchema } from './availability.js';
 import { toZoned, type Weekday } from '../schedule/tz.js';
 import type { Recurrence } from '../schedule/occurrences.js';
 
@@ -244,3 +245,84 @@ export type GameViewDto = GameDto | PublicGameDto | RestrictedGameDto;
 
 export const isRestrictedGame = (g: object): g is RestrictedGameDto =>
   'restricted' in g && g.restricted === true;
+
+// ---------- пошук ----------
+
+export const SEARCH_SORTS = ['soonest', 'newest'] as const;
+export type SearchSort = (typeof SEARCH_SORTS)[number];
+
+export const PRICE_MODES = ['any', 'free', 'paid'] as const;
+
+/** Необов'язковий рядок-фільтр: обрізається, порожній → відсутній. */
+const optFilter = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((s) => (s ? s : undefined));
+
+const idList = z.array(z.number().int().positive()).max(50);
+
+const calendarSchema = z
+  .object({
+    mode: z.enum(['off', 'mine', 'custom']),
+    availability: availabilityInputSchema.optional(),
+    includePartial: z.boolean().default(false),
+  })
+  .strict()
+  .refine((c) => (c.mode === 'custom') === (c.availability !== undefined), {
+    message: 'availability is required for custom mode and only allowed there',
+    path: ['availability'],
+  });
+
+/**
+ * Тіло `POST /api/games/search`.
+ * - `city`, `platform` — точний збіг без урахування регістру;
+ * - `experience` — ігри з цим рівнем або з `any`;
+ * - `priceMode: 'free'` — лише безкоштовні; `priceMax` — ціна ≤ max (з `any` — ще й безкоштовні);
+ * - `dateFrom`/`dateTo` — момент часу (ISO з поясом): є сесія в `[max(dateFrom, зараз), dateTo)`;
+ * - `calendar` — фільтр відповідності календарю гравця на 4 тижні (`FIT_HORIZON_DAYS`):
+ *   `full` проходить завжди, `partial` — лише з `includePartial`;
+ * - `cursor` — непрозорий рядок з `nextCursor` попередньої сторінки (з тим самим `sort`).
+ */
+export const searchFiltersSchema = z
+  .object({
+    systemIds: idList.optional(),
+    genreIds: idList.optional(),
+    format: z.enum(GAME_FORMATS).optional(),
+    city: optFilter(80),
+    kind: z.enum(GAME_KINDS).optional(),
+    dateFrom: z.iso.datetime({ offset: true }).optional(),
+    dateTo: z.iso.datetime({ offset: true }).optional(),
+    priceMode: z.enum(PRICE_MODES).default('any'),
+    priceMax: z.number().int().min(0).max(100_000).optional(),
+    ageRatings: z.array(z.enum(AGE_RATINGS)).max(3).optional(),
+    experience: z.enum(GAME_EXPERIENCE).optional(),
+    platform: optFilter(60),
+    language: z.enum(GAME_LANGUAGES).optional(),
+    hasFreeSlots: z.boolean().optional(),
+    excludeWarningIds: idList.optional(),
+    calendar: calendarSchema.default({ mode: 'off', includePartial: false }),
+    sort: z.enum(SEARCH_SORTS).default('soonest'),
+    cursor: z.string().max(512).optional(),
+    limit: z.number().int().min(1).max(50).default(20),
+  })
+  .strict()
+  .refine((f) => !f.dateFrom || !f.dateTo || new Date(f.dateFrom) < new Date(f.dateTo), {
+    message: 'dateFrom must be before dateTo',
+    path: ['dateTo'],
+  });
+
+export type SearchFilters = z.output<typeof searchFiltersSchema>;
+export type SearchFiltersInput = z.input<typeof searchFiltersSchema>;
+
+/** Картка в результатах пошуку; `fit` — лише коли увімкнено календарний фільтр. */
+export type SearchGameCardDto = GameCardDto & { fit?: 'full' | 'partial' };
+
+/** Відповідь `POST /api/games/search`. */
+export interface SearchResultDto {
+  items: (SearchGameCardDto | RestrictedGameDto)[];
+  /** `null` — сторінок більше немає. */
+  nextCursor: string | null;
+}
