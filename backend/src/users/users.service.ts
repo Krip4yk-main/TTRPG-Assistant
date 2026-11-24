@@ -223,7 +223,17 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
   // FK-каскади не спрацьовують: профіль, календар і членства в іграх видаляємо явно,
   // а активні ігри майстра скасовуємо (рішення R8).
-  const { tokenHashes, cancelledGameIds, cancelledApps } = await db.transaction(async (tx) => {
+  // Порядок блокувань той самий, що в заявках/затвердженні: спершу рядки ігор, потім
+  // рядок користувача (див. `lockUser` у applications.rules.ts) — інакше видалення й
+  // затвердження в тій самій грі блокують одне одного по колу.
+  const result = await db.transaction(async (tx) => {
+    const active = await tx
+      .select({ id: games.id, status: games.status })
+      .from(games)
+      .where(
+        and(eq(games.gmUserId, userId), inArray(games.status, ['draft', 'recruiting', 'started'])),
+      )
+      .for('update');
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -254,30 +264,38 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
     // Склад завершених/скасованих ігор лишаємо: історія інших гравців зберігається, а
     // видалений користувач показується анонімно. Виходимо лише з активних ігор.
-    await tx.delete(gameMembers).where(
-      and(
-        eq(gameMembers.userId, userId),
-        inArray(
-          gameMembers.gameId,
-          tx
-            .select({ id: games.id })
-            .from(games)
-            .where(inArray(games.status, ['recruiting', 'started'])),
-        ),
-      ),
-    );
+    // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри):
+    // нові членства/заявки неможливі — затвердження й заявка чекають на X рядка `users`.
+    const memberIds = (
+      await tx
+        .select({ id: gameMembers.id })
+        .from(gameMembers)
+        .innerJoin(games, eq(games.id, gameMembers.gameId))
+        .where(
+          and(eq(gameMembers.userId, userId), inArray(games.status, ['recruiting', 'started'])),
+        )
+    ).map((m) => m.id);
+    if (memberIds.length) await tx.delete(gameMembers).where(inArray(gameMembers.id, memberIds));
     // Свої `pending`-заявки — відкликано (FK-каскад на надгробку не спрацює).
-    await tx
-      .update(gameApplications)
-      .set({ status: 'withdrawn', decidedAt: now })
-      .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')));
-    const active = await tx
-      .select({ id: games.id, status: games.status })
-      .from(games)
-      .where(
-        and(eq(games.gmUserId, userId), inArray(games.status, ['draft', 'recruiting', 'started'])),
-      )
+    const withdrawn = await tx
+      .select({ id: gameApplications.id, gameId: gameApplications.gameId })
+      .from(gameApplications)
+      .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')))
       .for('update');
+    if (withdrawn.length) {
+      await tx
+        .update(gameApplications)
+        .set({ status: 'withdrawn', decidedAt: now })
+        .where(
+          and(
+            inArray(
+              gameApplications.id,
+              withdrawn.map((w) => w.id),
+            ),
+            eq(gameApplications.status, 'pending'),
+          ),
+        );
+    }
     if (active.length) {
       await tx
         .update(games)
@@ -306,8 +324,14 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       active.map((g) => g.id),
       now,
     );
-    return { tokenHashes: sess.map((r) => r.tokenHash), cancelledGameIds: active, cancelledApps };
+    return {
+      tokenHashes: sess.map((r) => r.tokenHash),
+      cancelledGameIds: active,
+      cancelledApps,
+      withdrawn,
+    };
   });
+  const { tokenHashes, cancelledGameIds, cancelledApps, withdrawn } = result;
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
   for (const g of cancelledGameIds) {
@@ -320,5 +344,14 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     });
   }
   await logCancelled(db, cancelledApps, 'application.cancelled_game');
+  for (const w of withdrawn) {
+    await logEvent(db, {
+      type: 'application.withdrawn',
+      userId,
+      entityType: 'application',
+      entityId: w.id,
+      payload: { gameId: w.gameId, reason: 'account_deleted' },
+    });
+  }
   await logEvent(db, { type: 'user.deleted', userId });
 }

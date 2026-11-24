@@ -21,6 +21,17 @@ export function viewerAge(viewer: Viewer, now: Date = new Date()): number | null
   return ageOn(viewer.birthDate, localDate(now, viewer.timezone));
 }
 
+/**
+ * Гра прихована від усіх, крім майстра: чернетка або ніколи не опублікована (зокрема
+ * скасована чернетка). Для таких ігор не-майстер отримує 404, а не 403.
+ */
+export function isHiddenFromNonGm(g: {
+  status: GameDto['status'];
+  publishedAt: Date | string | null;
+}): boolean {
+  return g.status === 'draft' || g.publishedAt === null;
+}
+
 function restrictedView(g: Pick<GameDto, 'id' | 'title' | 'gm' | 'ageRating'>): RestrictedGameDto {
   return {
     id: g.id,
@@ -48,7 +59,8 @@ function isRestrictedFor(
  * - майстер — повний вид;
  * - вікова позначка, якої глядач не проходить (гість — завжди для 18+/21+) — рівно
  *   `{ id, title, gm, ageRating, restricted: true }`;
- * - учасник (`game_members`) — повний вид;
+ * - активний учасник (`game_members.left_at IS NULL`) — повний вид; колишній (вийшов,
+ *   виключений, забанений) — як сторонній;
  * - інші — повний вид без `address` і `channelLinks`.
  */
 export function toGameView(
@@ -59,7 +71,7 @@ export function toGameView(
   now: Date = new Date(),
 ): GameViewDto | null {
   const isGm = viewer?.userId === gmUserId;
-  if ((game.status === 'draft' || game.publishedAt === null) && !isGm) return null;
+  if (isHiddenFromNonGm(game) && !isGm) return null;
   if (isGm) return game;
   if (isRestrictedFor(game, gmUserId, viewer, now)) return restrictedView(game);
   if (isMember) return game;

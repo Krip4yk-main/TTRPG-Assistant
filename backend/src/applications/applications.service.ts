@@ -23,9 +23,9 @@ import {
 } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { loadGames, toCardDto, viewerById } from '../games/games.service.js';
-import { toCardView, viewerAge } from '../games/games.visibility.js';
+import { isHiddenFromNonGm, toCardView, viewerAge } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
-import type { Tx } from './applications.rules.js';
+import { lockUser, type Tx } from './applications.rules.js';
 
 type ApplicationRow = typeof gameApplications.$inferSelect;
 type GameRow = typeof games.$inferSelect;
@@ -97,8 +97,16 @@ const acceptsApplications = (g: GameRow): boolean =>
  */
 async function lockGame(tx: Tx, gameId: number): Promise<GameRow> {
   const [g] = await tx.select().from(games).where(eq(games.id, gameId)).for('share');
-  if (!g || g.publishedAt === null || g.status === 'draft') throw new AppError(404, 'NOT_FOUND');
+  if (!g || isHiddenFromNonGm(g)) throw new AppError(404, 'NOT_FOUND');
   return g;
+}
+
+async function isBannedInGame(tx: Tx, gameId: number, userId: number): Promise<boolean> {
+  const [ban] = await tx
+    .select({ id: gameBans.userId })
+    .from(gameBans)
+    .where(and(eq(gameBans.gameId, gameId), eq(gameBans.userId, userId)));
+  return Boolean(ban);
 }
 
 async function isActiveMember(tx: Tx, gameId: number, userId: number): Promise<boolean> {
@@ -148,22 +156,23 @@ export async function createApplication(
   const { db } = deps;
   const input = applicationInputSchema.parse(body);
   const now = new Date();
-  const viewer = await viewerById(deps, userId);
-  if (!viewer) throw new AppError(401, 'UNAUTHENTICATED');
   let id: number;
   try {
     id = await db.transaction(async (tx) => {
+      // Порядок блокувань: гра → користувач → заявки (див. `lockUser`).
       const g = await lockGame(tx, gameId);
-      if (!acceptsApplications(g)) throw new AppError(409, 'APPLICATION_CLOSED');
-      if (g.gmUserId === userId) throw new AppError(403, 'FORBIDDEN');
-      if (!meetsAgeRating(viewerAge(viewer, now), g.ageRating)) {
+      const u = await lockUser(tx, userId);
+      if (!u || u.status === 'deleted') throw new AppError(404, 'NOT_FOUND');
+      if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
+      const isGm = g.gmUserId === userId;
+      // Вік — до перевірки набору: неповнолітній не дізнається, чи гра ще набирає.
+      const viewer = { userId, birthDate: u.birthDate, timezone: u.timezone };
+      if (!isGm && !meetsAgeRating(viewerAge(viewer, now), g.ageRating)) {
         throw new AppError(403, 'AGE_RESTRICTED_APPLY');
       }
-      const [ban] = await tx
-        .select({ id: gameBans.userId })
-        .from(gameBans)
-        .where(and(eq(gameBans.gameId, gameId), eq(gameBans.userId, userId)));
-      if (ban) throw new AppError(403, 'BANNED_FROM_GAME');
+      if (!acceptsApplications(g)) throw new AppError(409, 'APPLICATION_CLOSED');
+      if (isGm) throw new AppError(403, 'FORBIDDEN');
+      if (await isBannedInGame(tx, gameId, userId)) throw new AppError(403, 'BANNED_FROM_GAME');
       const [black] = await tx
         .select({ id: gmBlacklist.userId })
         .from(gmBlacklist)
@@ -233,9 +242,10 @@ export async function withdrawApplication(
 }
 
 /**
- * Затвердження: транзакція з блокуваннями «гра (FOR SHARE) → заявка (FOR UPDATE)» — той
- * самий порядок, що в підняття позначки (гра → заявки), тож без взаємоблокувань. Межу
- * `maxPlayers` не перевіряємо (рішення власника); вік — так.
+ * Затвердження: транзакція з блокуваннями «гра (FOR SHARE) → заявник (FOR SHARE) → заявка
+ * (FOR UPDATE)» — той самий порядок, що в підняття позначки, бан у грі (гра X) і видалення
+ * акаунта (ігри → користувач), тож без взаємоблокувань. Бан у грі перевіряється під
+ * блокуванням гри. Межу `maxPlayers` не перевіряємо (рішення власника); вік — так.
  */
 export async function approveApplication(
   deps: AppDeps,
@@ -245,19 +255,26 @@ export async function approveApplication(
   const { db } = deps;
   const app = await loadForGm(deps, gmUserId, id);
   const now = new Date();
-  const applicant = await viewerById(deps, app.userId);
   try {
     await db.transaction(async (tx) => {
       const g = await lockGame(tx, app.gameId);
+      const u = await lockUser(tx, app.userId);
       const [locked] = await tx
         .select()
         .from(gameApplications)
         .where(eq(gameApplications.id, id))
         .for('update');
       if (!locked || locked.status !== 'pending') throw new AppError(409, 'APPLICATION_CLOSED');
+      if (!u || u.status === 'deleted' || u.isBanned) {
+        throw new AppError(409, 'APPLICATION_CLOSED');
+      }
       if (g.status !== 'recruiting' && g.status !== 'started') {
         throw new AppError(409, 'APPLICATION_CLOSED');
       }
+      if (await isBannedInGame(tx, g.id, app.userId)) {
+        throw new AppError(403, 'BANNED_FROM_GAME');
+      }
+      const applicant = { userId: app.userId, birthDate: u.birthDate, timezone: u.timezone };
       if (!meetsAgeRating(viewerAge(applicant, now), g.ageRating)) {
         throw new AppError(403, 'AGE_RESTRICTED_APPLY');
       }
@@ -371,7 +388,7 @@ export async function listGameApplications(
   const [g] = await db.select().from(games).where(eq(games.id, gameId));
   if (!g) throw new AppError(404, 'NOT_FOUND');
   if (g.gmUserId !== gmUserId) {
-    throw g.status === 'draft' ? new AppError(404, 'NOT_FOUND') : new AppError(403, 'FORBIDDEN');
+    throw isHiddenFromNonGm(g) ? new AppError(404, 'NOT_FOUND') : new AppError(403, 'FORBIDDEN');
   }
   const rows = await db
     .select({

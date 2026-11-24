@@ -27,6 +27,7 @@ const APPLICATION_STATUSES = [
 const APPLICATION_CANCEL_REASONS = [
   'age_rating',
   'game_cancelled',
+  'game_finished',
   'banned',
 ] as const satisfies ApplicationCancelReason[];
 const CONSTRAINT_RESPONSES = [

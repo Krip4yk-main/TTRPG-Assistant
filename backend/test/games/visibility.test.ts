@@ -96,6 +96,45 @@ describe('games visibility — drafts and private fields (Review Focus 4)', () =
     expect(body.freeSlots).toBe(5);
   });
 
+  it('left / kicked / banned via the API see no address or channels; active member does (Review Focus 3)', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    const [left, kicked, banned, active] = await Promise.all(
+      [1, 2, 3, 4].map(() => userWithAge(25)),
+    );
+    for (const p of [left!, kicked!, banned!, active!]) {
+      const a = await call('post', `/api/games/${id}/applications`, p.cookie, {
+        warningsAccepted: true,
+        answers: [],
+      });
+      expect((await call('post', `/api/applications/${a.body.id}/approve`, gm.cookie)).status).toBe(
+        200,
+      );
+    }
+    expect(
+      (
+        await call('post', `/api/games/${id}/leave`, left!.cookie, {
+          noteForGm: 'Переїжджаю в інше місто',
+        })
+      ).status,
+    ).toBe(204);
+    expect(
+      (await call('post', `/api/games/${id}/members/${kicked!.publicId}/kick`, gm.cookie)).status,
+    ).toBe(204);
+    expect(
+      (await call('post', `/api/games/${id}/members/${banned!.publicId}/ban`, gm.cookie)).status,
+    ).toBe(204);
+    for (const p of [left!, kicked!, banned!]) {
+      const body = (await call('get', `/api/games/${id}`, p.cookie)).body;
+      expect('address' in body).toBe(false);
+      expect('channelLinks' in body).toBe(false);
+      expect((await call('get', `/api/games/${id}/members`, p.cookie)).status).toBe(403);
+    }
+    const body = (await call('get', `/api/games/${id}`, active!.cookie)).body;
+    expect(body.address).toBe('вул. Таємна, 1');
+    expect(body.channelLinks).toHaveLength(1);
+  });
+
   it('unknown id → 404', async () => {
     expect((await call('get', '/api/games/999999')).status).toBe(404);
     expect((await call('get', '/api/games/abc')).status).toBe(404);

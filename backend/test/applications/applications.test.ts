@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
   events,
@@ -8,7 +8,9 @@ import {
   gameMembers,
   games,
   gmBlacklist,
+  users,
 } from '../../src/db/schema/index.js';
+import { deleteAccount } from '../../src/users/users.service.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
 
@@ -347,5 +349,97 @@ describe('game cancellation', () => {
       .where(eq(gameApplications.id, a.body.id));
     expect(row).toMatchObject({ status: 'cancelled', cancelReason: 'game_cancelled' });
     expect(await eventTypes()).toContain('application.cancelled_game');
+  });
+});
+
+describe('Task 3 carry-overs', () => {
+  it('site-banned applicant: apply → 403 ACCOUNT_BANNED; approve → 409 APPLICATION_CLOSED', async () => {
+    const { gm, gameId } = await setup();
+    const p = await userWithAge(25);
+    const q = await userWithAge(25);
+    const a = await apply(gameId, p.cookie);
+    await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(inArray(users.id, [p.id, q.id]));
+    const r = await apply(gameId, q.cookie);
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('ACCOUNT_BANNED');
+    const ap = await call('post', `/api/applications/${a.body.id}/approve`, gm.cookie);
+    expect(ap.status).toBe(409);
+    expect(ap.body.error.code).toBe('APPLICATION_CLOSED');
+    expect(await db.select().from(gameMembers)).toHaveLength(0);
+  });
+
+  it('approve of a deleted applicant → 409, no member', async () => {
+    const { gm, gameId } = await setup();
+    const p = await userWithAge(25);
+    const a = await apply(gameId, p.cookie);
+    await deleteAccount(deps, p.id);
+    const ap = await call('post', `/api/applications/${a.body.id}/approve`, gm.cookie);
+    expect(ap.status).toBe(409);
+    expect(await db.select().from(gameMembers)).toHaveLength(0);
+  });
+
+  it('deleteAccount concurrent with approve: no deadlock, never a deleted member', async () => {
+    for (let i = 0; i < 5; i++) {
+      await resetDb(db);
+      const { gm, gameId } = await setup();
+      const p = await userWithAge(25);
+      const a = await apply(gameId, p.cookie);
+      const [del, ap] = await Promise.allSettled([
+        deleteAccount(deps, p.id),
+        call('post', `/api/applications/${a.body.id}/approve`, gm.cookie),
+      ]);
+      expect(del.status).toBe('fulfilled');
+      expect(ap.status).toBe('fulfilled');
+      expect([200, 409]).toContain((ap as PromiseFulfilledResult<{ status: number }>).value.status);
+      expect(
+        await db
+          .select()
+          .from(gameMembers)
+          .where(and(eq(gameMembers.userId, p.id), isNull(gameMembers.leftAt))),
+      ).toHaveLength(0);
+    }
+  }, 30_000);
+
+  it('GM deleting the account while approving in own game: no deadlock', async () => {
+    for (let i = 0; i < 5; i++) {
+      await resetDb(db);
+      const { gm, gameId } = await setup();
+      const p = await userWithAge(25);
+      const a = await apply(gameId, p.cookie);
+      const [del, ap] = await Promise.allSettled([
+        deleteAccount(deps, gm.id),
+        call('post', `/api/applications/${a.body.id}/approve`, gm.cookie),
+      ]);
+      expect(del.status).toBe('fulfilled');
+      expect(ap.status).toBe('fulfilled');
+      expect([200, 401, 409]).toContain(
+        (ap as PromiseFulfilledResult<{ status: number }>).value.status,
+      );
+      const [g] = await db.select().from(games).where(eq(games.id, gameId));
+      expect(g!.status).toBe('cancelled');
+    }
+  }, 30_000);
+
+  it('cancelled never-published game: applications list → 404 for non-GM', async () => {
+    const gm = await userWithAge(30);
+    const other = await userWithAge(30);
+    const id = await createGame(gm.cookie);
+    await call('post', `/api/games/${id}/cancel`, gm.cookie);
+    expect((await call('get', `/api/games/${id}/applications`, other.cookie)).status).toBe(404);
+    expect((await call('get', `/api/games/${id}/applications`, gm.cookie)).status).toBe(200);
+  });
+
+  it('age-restricted closed game: a minor gets AGE_RESTRICTED_APPLY, not APPLICATION_CLOSED', async () => {
+    const { gm, gameId } = await setup({ ageRating: '18+' });
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    const kid = await userWithAge(17);
+    const r = await apply(gameId, kid.cookie);
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('AGE_RESTRICTED_APPLY');
+    const adult = await userWithAge(25);
+    expect((await apply(gameId, adult.cookie)).body.error.code).toBe('APPLICATION_CLOSED');
   });
 });

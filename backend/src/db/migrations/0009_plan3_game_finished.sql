@@ -1,0 +1,1 @@
+ALTER TABLE `game_applications` MODIFY COLUMN `cancel_reason` enum('age_rating','game_cancelled','game_finished','banned');

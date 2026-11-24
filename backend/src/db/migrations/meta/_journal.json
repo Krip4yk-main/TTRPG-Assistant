@@ -64,6 +64,13 @@
       "when": 1795550810062,
       "tag": "0008_plan3",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1795553991890,
+      "tag": "0009_plan3_game_finished",
+      "breakpoints": true
     }
   ]
 }

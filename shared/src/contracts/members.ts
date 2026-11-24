@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { GameDto } from './games.js';
 
 export const MEMBER_ROLES = ['player'] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
@@ -42,3 +43,6 @@ export interface BlacklistEntryDto {
 /** Попередження у відповіді на `POST /api/games/:id/start`. */
 export const START_WARNINGS = ['BELOW_MIN_PLAYERS'] as const;
 export type StartWarning = (typeof START_WARNINGS)[number];
+
+/** Відповідь `POST /api/games/:id/{publish,start,finish,cancel}`: гра майстра + попередження. */
+export type GameTransitionDto = GameDto & { warning?: StartWarning };

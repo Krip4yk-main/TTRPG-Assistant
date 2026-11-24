@@ -11,6 +11,7 @@ import {
   type GameInput,
   type GameStatus,
   type EventType,
+  type GameTransitionDto,
   type GameViewDto,
   type RestrictedGameDto,
 } from '@nri/shared';
@@ -31,6 +32,7 @@ import {
   isRatingRaised,
   logCancelled,
   type CancelledApplication,
+  type Tx,
 } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
@@ -363,6 +365,10 @@ export async function updateGame(
       .set(columns(next))
       .where(and(eq(games.id, id), eq(games.status, row.status)));
     if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    // Під X-блокуванням гри (затвердження бере FOR SHARE) кількість учасників не зміниться.
+    if (next.maxPlayers < current.maxPlayers && next.maxPlayers < (await activeCount(tx, id))) {
+      throw new AppError(409, 'MAX_BELOW_MEMBERS');
+    }
     if (patch.contentWarningIds !== undefined) {
       await tx.delete(gameContentWarnings).where(eq(gameContentWarnings.gameId, id));
       if (next.contentWarningIds.length) {
@@ -410,26 +416,47 @@ const EVENT: Record<GameAction, EventType> = {
   cancel: 'game.cancelled',
 };
 
+/** Активні учасники гри (`left_at IS NULL`). */
+async function activeCount(tx: Tx, gameId: number): Promise<number> {
+  const [r] = await tx
+    .select({ n: count() })
+    .from(gameMembers)
+    .where(and(eq(gameMembers.gameId, gameId), isNull(gameMembers.leftAt)));
+  return r?.n ?? 0;
+}
+
+/**
+ * Перехід статусу. Старт з меншою за мінімум кількістю учасників дозволено — у відповіді
+ * `warning: 'BELOW_MIN_PLAYERS'`. Скасування й завершення скасовують `pending`-заявки
+ * (`game_cancelled` / `game_finished`).
+ */
 export async function transitionGame(
   deps: AppDeps,
   userId: number,
   id: number,
   action: GameAction,
-): Promise<GameDto> {
+): Promise<GameTransitionDto> {
   const { db } = deps;
   const t = TRANSITIONS[action];
   const { row } = await loadOwned(deps, userId, id);
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
-  const cancelled: CancelledApplication[] = await db.transaction(async (tx) => {
+  const { cancelled, belowMin } = await db.transaction(async (tx) => {
     // Умова за поточним статусом захищає від гонки двох переходів.
     const [res] = await tx
       .update(games)
       .set({ status: t.to, [t.stamp]: now })
       .where(and(eq(games.id, id), eq(games.status, row.status)));
     if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
-    return action === 'cancel' ? cancelPendingForGames(tx, [id], now) : [];
+    const belowMin = action === 'start' && (await activeCount(tx, id)) < row.minPlayers;
+    const cancelled: CancelledApplication[] =
+      action === 'cancel'
+        ? await cancelPendingForGames(tx, [id], now, 'game_cancelled')
+        : action === 'finish'
+          ? await cancelPendingForGames(tx, [id], now, 'game_finished')
+          : [];
+    return { cancelled, belowMin };
   });
   await logEvent(db, {
     type: EVENT[action],
@@ -439,7 +466,8 @@ export async function transitionGame(
     payload: { from: row.status, to: t.to },
   });
   await logCancelled(db, cancelled, 'application.cancelled_game');
-  return gmView(deps, id);
+  const view = await gmView(deps, id);
+  return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
 }
 
 export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Promise<GameViewDto> {

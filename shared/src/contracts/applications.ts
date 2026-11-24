@@ -11,7 +11,12 @@ export const APPLICATION_STATUSES = [
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 /** Причина автоматичного скасування `pending`-заявки. */
-export const APPLICATION_CANCEL_REASONS = ['age_rating', 'game_cancelled', 'banned'] as const;
+export const APPLICATION_CANCEL_REASONS = [
+  'age_rating',
+  'game_cancelled',
+  'game_finished',
+  'banned',
+] as const;
 export type ApplicationCancelReason = (typeof APPLICATION_CANCEL_REASONS)[number];
 
 /** Відповідь майстра на обмеження гравця. */

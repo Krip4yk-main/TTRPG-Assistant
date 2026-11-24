@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { meetsAgeRating, type AgeRating } from '@nri/shared';
+import { meetsAgeRating, type AgeRating, type ApplicationCancelReason } from '@nri/shared';
 import type { Db } from '../db/client.js';
 import { gameApplications, gameMembers, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
@@ -24,7 +24,7 @@ export const isRatingRaised = (from: AgeRating, to: AgeRating): boolean =>
 async function cancelPending(
   tx: Tx,
   rows: CancelledApplication[],
-  reason: 'age_rating' | 'game_cancelled',
+  reason: ApplicationCancelReason,
   now: Date,
 ): Promise<CancelledApplication[]> {
   if (rows.length === 0) return [];
@@ -43,11 +43,54 @@ async function cancelPending(
   return rows;
 }
 
-/** Скасовує всі `pending`-заявки на ці ігри (`game_cancelled`). Викликати в транзакції. */
+/**
+ * Порядок блокувань у всіх транзакціях заявок/учасників: рядок гри → рядок користувача
+ * (заявника) → заявки/членства. `deleteAccount` іде тим самим порядком (спершу свої ігри,
+ * потім себе), тож затвердження й видалення акаунта не блокують одне одного по колу.
+ *
+ * Користувач під спільним блокуванням: видалення акаунта (X на `users`) чекає на
+ * заявку/затвердження й навпаки. Неіснуючий — `null`.
+ */
+export async function lockUser(tx: Tx, userId: number): Promise<typeof users.$inferSelect | null> {
+  const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('share');
+  return u ?? null;
+}
+
+/** Скасовує `pending`-заявку користувача на гру (бан у грі). Викликати в транзакції. */
+export async function cancelPendingOfUser(
+  tx: Tx,
+  gameId: number,
+  userId: number,
+  reason: ApplicationCancelReason,
+  now: Date = new Date(),
+): Promise<CancelledApplication[]> {
+  const rows = await tx
+    .select({
+      id: gameApplications.id,
+      gameId: gameApplications.gameId,
+      userId: gameApplications.userId,
+    })
+    .from(gameApplications)
+    .where(
+      and(
+        eq(gameApplications.gameId, gameId),
+        eq(gameApplications.userId, userId),
+        eq(gameApplications.status, 'pending'),
+      ),
+    )
+    .for('update');
+  return cancelPending(tx, rows, reason, now);
+}
+
+/**
+ * Скасовує всі `pending`-заявки на ці ігри (`game_cancelled` / `game_finished`).
+ * Викликати в транзакції.
+ */
 export async function cancelPendingForGames(
   tx: Tx,
   gameIds: number[],
   now: Date = new Date(),
+  reason: 'game_cancelled' | 'game_finished' = 'game_cancelled',
 ): Promise<CancelledApplication[]> {
   if (gameIds.length === 0) return [];
   const rows = await tx
@@ -59,7 +102,7 @@ export async function cancelPendingForGames(
     .from(gameApplications)
     .where(and(inArray(gameApplications.gameId, gameIds), eq(gameApplications.status, 'pending')))
     .for('update');
-  return cancelPending(tx, rows, 'game_cancelled', now);
+  return cancelPending(tx, rows, reason, now);
 }
 
 /**
