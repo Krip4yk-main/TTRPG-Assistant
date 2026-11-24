@@ -23,7 +23,7 @@ import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import type { MeDto } from '../../../core/auth/me.model';
+import type { MeDto } from '@nri/shared';
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
 /** Глобальна функція, яку викликає віджет Telegram (`data-onauth`). */

@@ -3,6 +3,7 @@ import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
   type CompleteProfileInput,
+  type MeDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
@@ -16,18 +17,6 @@ import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
-
-export type MeDto = {
-  id: number;
-  nickname: string | null;
-  avatarUrl: string | null;
-  birthDate: string | null;
-  role: typeof users.$inferSelect.role;
-  status: typeof users.$inferSelect.status;
-  timezone: string;
-  locale: string;
-  identities: { provider: Provider; displayName: string | null }[];
-};
 
 const DAY_MS = 86_400_000;
 export type Clock = () => Date;

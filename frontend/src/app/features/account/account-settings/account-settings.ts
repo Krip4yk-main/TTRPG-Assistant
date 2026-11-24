@@ -23,7 +23,7 @@ import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import type { IdentityProvider } from '../../../core/auth/me.model';
+import type { IdentityProvider } from '@nri/shared';
 import { fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { eagerErrorState, minAgeValidator } from '../../../shared/forms/profile-validators';

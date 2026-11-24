@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import type { SessionLostReason } from '../realtime/socket.service';
 import { AuthStore } from './auth.store';
 import { SocketService } from '../realtime/socket.service';
-import type { MeDto } from './me.model';
+import type { MeDto } from '@nri/shared';
 
 const me = (over: Partial<MeDto> = {}): MeDto => ({
   id: 1,

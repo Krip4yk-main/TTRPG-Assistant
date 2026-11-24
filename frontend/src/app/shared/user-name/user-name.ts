@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { UserStatus } from '../../core/auth/me.model';
+import type { UserStatus } from '@nri/shared';
 
 export interface UserNameSource {
   nickname: string | null;

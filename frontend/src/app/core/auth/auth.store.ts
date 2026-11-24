@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthApi } from './auth.api';
-import type { MeDto } from './me.model';
+import type { MeDto } from '@nri/shared';
 import { SocketService, type SessionLostReason } from '../realtime/socket.service';
 import { safeReturnTo } from './return-to';
 
