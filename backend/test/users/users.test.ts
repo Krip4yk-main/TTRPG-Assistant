@@ -3,9 +3,14 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { resolveLogin, subjectHash } from '../../src/auth/identity.service.js';
-import { createSession } from '../../src/auth/session.service.js';
+import { createSession, hashToken } from '../../src/auth/session.service.js';
 import { authIdentities, identityTombstones, sessions, users } from '../../src/db/schema/index.js';
-import { deleteAccount } from '../../src/users/users.service.js';
+import {
+  changeBirthDate,
+  completeProfile,
+  deleteAccount,
+  localDate,
+} from '../../src/users/users.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps();
@@ -134,6 +139,55 @@ describe('complete-profile', () => {
   });
 });
 
+describe('age check uses the user timezone for "today"', () => {
+  // 00:30 24.11 у Києві (UTC+2), але ще 23.11 за UTC.
+  const clock = () => new Date('2026-11-23T22:30:00Z');
+
+  it('localDate formats in the given zone and falls back to Europe/Kyiv', () => {
+    expect(localDate(clock(), 'Europe/Kyiv')).toBe('2026-11-24');
+    expect(localDate(clock(), 'UTC')).toBe('2026-11-23');
+    expect(localDate(clock(), 'Not/AZone')).toBe('2026-11-24');
+    expect(localDate(clock(), undefined)).toBe('2026-11-24');
+  });
+
+  it('14th birthday in Kyiv just after local midnight is allowed', async () => {
+    const id = await pending();
+    const r = await completeProfile(
+      deps,
+      id,
+      { nickname: 'Teen', birthDate: '2012-11-24', timezone: 'Europe/Kyiv' },
+      clock,
+    );
+    expect(r).toEqual({ ok: true });
+  });
+
+  it('same clock with timezone UTC is AGE_TOO_LOW', async () => {
+    const id = await pending();
+    const r = await completeProfile(
+      deps,
+      id,
+      { nickname: 'Teen', birthDate: '2012-11-24', timezone: 'UTC' },
+      clock,
+    );
+    expect(r).toEqual({ ok: false, rejected: 'AGE_TOO_LOW' });
+  });
+
+  it('without input timezone uses the stored user timezone (default Europe/Kyiv)', async () => {
+    const id = await pending();
+    const r = await completeProfile(deps, id, { nickname: 'Teen', birthDate: '2012-11-24' }, clock);
+    expect(r).toEqual({ ok: true });
+  });
+
+  it('changeBirthDate uses the stored user timezone', async () => {
+    const kyiv = await createUser(db, { nickname: 'K1', birthDate: '2000-01-01' });
+    await changeBirthDate(deps, kyiv.id, '2012-11-24', clock);
+    const utc = await createUser(db, { nickname: 'U1', birthDate: '2000-01-01', timezone: 'UTC' });
+    await expect(changeBirthDate(deps, utc.id, '2012-11-24', clock)).rejects.toMatchObject({
+      code: 'AGE_TOO_LOW',
+    });
+  });
+});
+
 describe('PATCH /api/me/birth-date', () => {
   it('second change within 30 days is 409 with availableAt; same date is a no-op', async () => {
     const u = await createUser(db, { nickname: 'Hero', birthDate: '2000-01-01' });
@@ -212,9 +266,16 @@ describe('DELETE /api/me', () => {
     const res = await call('delete', '/api/me', cookie);
     expect(res.status).toBe(204);
     const [row] = await db.select().from(users).where(eq(users.id, userId));
-    expect(row).toMatchObject({ status: 'deleted', nickname: null, avatarUrl: null, birthDate: null });
+    expect(row).toMatchObject({
+      status: 'deleted',
+      nickname: null,
+      avatarUrl: null,
+      birthDate: null,
+    });
     expect(row!.deletedAt).not.toBeNull();
-    expect(await db.select().from(authIdentities).where(eq(authIdentities.userId, userId))).toHaveLength(0);
+    expect(
+      await db.select().from(authIdentities).where(eq(authIdentities.userId, userId)),
+    ).toHaveLength(0);
     expect(await db.select().from(sessions).where(eq(sessions.userId, userId))).toHaveLength(0);
     const [t] = await db.select().from(identityTombstones);
     expect(t).toMatchObject({
@@ -238,6 +299,20 @@ describe('DELETE /api/me', () => {
     const [t] = await db.select().from(identityTombstones);
     expect(t!.isBanned).toBe(true);
     await expect(resolveLogin(deps, ident)).rejects.toMatchObject({ code: 'IDENTITY_BANNED' });
+  });
+
+  it('revokes DB sessions even if the Redis usess: set is gone', async () => {
+    const u = await createUser(db, { nickname: 'Hero' });
+    const { token } = await createSession(deps, u.id, {});
+    const hash = hashToken(token);
+    const cookie = `nri_sid=${token}; nri_csrf=t`;
+    expect((await call('get', '/api/me', cookie)).status).toBe(200); // кеш sess:<hash>
+    await redis.del(`usess:${u.id}`);
+    expect(await redis.exists(`sess:${hash}`)).toBe(1);
+    await deleteAccount(deps, u.id);
+    expect(await redis.exists(`revoked:${hash}`)).toBe(1);
+    expect(await redis.exists(`sess:${hash}`)).toBe(0);
+    expect((await call('get', '/api/me', cookie)).status).toBe(401);
   });
 
   it('owner cannot self-delete: 409 OWNER_CANNOT_DELETE', async () => {

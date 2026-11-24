@@ -3,7 +3,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import type { Request, RequestHandler, Response } from 'express';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
+import type { ErrorCode } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
@@ -13,7 +14,12 @@ import { getMe } from '../users/users.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
 import { defaultOAuthProviders } from './providers/index.js';
 import { logoutHandlers, requireAuth } from './session.middleware.js';
-import { createSession, revokeAllUserSessions, revokeSession, setSessionCookie } from './session.service.js';
+import {
+  createSession,
+  revokeAllUserSessions,
+  revokeSession,
+  setSessionCookie,
+} from './session.service.js';
 
 const OAUTH_TTL_SEC = 10 * 60;
 const OAUTH_COOKIE = 'nri_oauth';
@@ -138,7 +144,7 @@ export function authRouter(deps: AppDeps): Router {
     return p;
   };
 
-  router.get('/:provider/start', async (req, res) => {
+  const oauthStart = async (req: Request, res: Response): Promise<void> => {
     const provider = providerOf(req);
     const q = z
       .object({ mode: z.enum(['login', 'link']).default('login') })
@@ -168,27 +174,76 @@ export function authRouter(deps: AppDeps): Router {
       maxAge: OAUTH_TTL_SEC * 1000,
     });
     res.redirect(provider.createAuthorizationUrl(state, codeVerifier).toString());
+  };
+
+  // start — top-level навігація: будь-яка AppError (401/403/404, невалідний mode)
+  // віддається редиректом `/login?error=CODE` (для `mode=link` — `/account?error=CODE`).
+  router.get('/:provider/start', async (req, res) => {
+    try {
+      await oauthStart(req, res);
+    } catch (err) {
+      const code =
+        err instanceof AppError ? err.code : err instanceof ZodError ? 'VALIDATION' : null;
+      if (!code) throw err;
+      const base = req.query.mode === 'link' ? '/account' : '/login';
+      res.redirect(`${base}?error=${code}`);
+    }
   });
 
   router.get('/:provider/callback', async (req, res) => {
-    const provider = providerOf(req);
     // Кука state очищається за будь-якого результату.
     res.clearCookie(OAUTH_COOKIE, { path: OAUTH_COOKIE_PATH });
-    const invalid = () => res.redirect('/login?error=OAUTH_STATE_INVALID');
-    const { code, state } = req.query;
-    if (typeof code !== 'string' || typeof state !== 'string' || !code || !state) return invalid();
+    const { code, state, error } = req.query;
+    // Режим потоку: із запису state (якщо він ще є), інакше — login.
+    let st: OAuthState | null = null;
+    const modeOf = async (): Promise<OAuthState['mode']> => {
+      if (st) return st.mode;
+      if (typeof state !== 'string' || !state) return 'login';
+      const raw = await deps.redis.get(`oauth:${state}`);
+      if (!raw) return 'login';
+      try {
+        return (JSON.parse(raw) as OAuthState).mode === 'link' ? 'link' : 'login';
+      } catch {
+        return 'login';
+      }
+    };
+    const fail = async (errCode: ErrorCode): Promise<void> => {
+      const base = (await modeOf()) === 'link' ? '/account' : '/login';
+      res.redirect(`${base}?error=${errCode}`);
+    };
+    const invalid = () => fail('OAUTH_STATE_INVALID');
+
+    let provider;
+    try {
+      provider = providerOf(req);
+    } catch (err) {
+      if (err instanceof AppError) return fail(err.code);
+      throw err;
+    }
     // Звіряємо з кукою ДО GETDEL: чужий callback не спалює і не використовує state.
     // (Невідповідність кладе state недоступним лише для цього браузера; запис у Redis
     // залишається до TTL — ініціатор все ще може завершити потік у своєму браузері.)
     const bound = (req.cookies as Record<string, unknown> | undefined)?.[OAUTH_COOKIE];
-    if (typeof bound !== 'string') return invalid();
-    const a = Buffer.from(bound);
-    const b = Buffer.from(state);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return invalid();
+    const boundOk = (): boolean => {
+      if (typeof bound !== 'string' || typeof state !== 'string' || !state) return false;
+      const a = Buffer.from(bound);
+      const b = Buffer.from(state);
+      return a.length === b.length && timingSafeEqual(a, b);
+    };
+    // Провайдер повернув помилку (`?error=access_denied` — користувач скасував).
+    if (typeof error === 'string' && error) {
+      const mode = await modeOf();
+      if (boundOk()) await deps.redis.del(`oauth:${state as string}`);
+      const errCode: ErrorCode =
+        error === 'access_denied' ? 'OAUTH_CANCELLED' : 'OAUTH_STATE_INVALID';
+      return res.redirect(`${mode === 'link' ? '/account' : '/login'}?error=${errCode}`);
+    }
+    if (typeof code !== 'string' || typeof state !== 'string' || !code || !state) return invalid();
+    if (!boundOk()) return invalid();
     // GETDEL: запис одноразовий навіть при паралельних callback-ах.
     const raw = await deps.redis.getdel(`oauth:${state}`);
     if (!raw) return invalid();
-    const st = JSON.parse(raw) as OAuthState;
+    st = JSON.parse(raw) as OAuthState;
     if (st.mode === 'link' && req.user?.userId !== st.userId) return invalid();
 
     let identity;

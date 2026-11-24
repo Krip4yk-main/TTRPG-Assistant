@@ -1,8 +1,8 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { loadEnv } from '../../src/config/env.js';
-import { closeDeps, testDeps } from '../helpers.js';
+import { closeDeps, TEST_PEPPER, testDeps } from '../helpers.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
@@ -12,7 +12,7 @@ function makeApp(extra: Record<string, string> = {}) {
     NODE_ENV: 'test',
     DATABASE_URL: process.env.DATABASE_URL_TEST ?? 'mysql://x:x@localhost:3306/nri_test',
     REDIS_URL: 'redis://localhost:6379/15',
-    IDENTITY_PEPPER: 'pepper',
+    IDENTITY_PEPPER: TEST_PEPPER,
     INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extra,
   });
@@ -35,11 +35,21 @@ describe('loadEnv', () => {
   it('lists missing required keys', () => {
     expect(() => loadEnv({})).toThrow(/DATABASE_URL/);
   });
+  it('requires IDENTITY_PEPPER of at least 32 chars', () => {
+    const base = {
+      DATABASE_URL: 'a',
+      REDIS_URL: 'b',
+      INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
+    };
+    expect(() => loadEnv({ ...base, IDENTITY_PEPPER: 'short' })).toThrow(/IDENTITY_PEPPER/);
+    expect(loadEnv({ ...base, IDENTITY_PEPPER: TEST_PEPPER }).IDENTITY_PEPPER).toBe(TEST_PEPPER);
+  });
+
   it('treats telegram/google/dev keys as optional', () => {
     const env = loadEnv({
       DATABASE_URL: 'a',
       REDIS_URL: 'b',
-      IDENTITY_PEPPER: 'c',
+      IDENTITY_PEPPER: TEST_PEPPER,
       INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
       TELEGRAM_BOT_TOKEN: '',
     });
@@ -120,6 +130,32 @@ describe('app', () => {
       .send('{bad');
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION');
+  });
+
+  it('maps body-parser 413/415 to their status with VALIDATION, without logging', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const agent = request.agent(makeApp());
+      const get = await agent.get('/api/health');
+      const token = csrfToken(get.headers['set-cookie'] as unknown as string[]);
+      const big = await agent
+        .post('/api/health-echo')
+        .set('X-CSRF-Token', token)
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify({ a: 'x'.repeat(200 * 1024) }));
+      expect(big.status).toBe(413);
+      expect(big.body).toEqual({ error: { code: 'VALIDATION' } });
+      const charset = await agent
+        .post('/api/health-echo')
+        .set('X-CSRF-Token', token)
+        .set('Content-Type', 'application/json; charset=bogus')
+        .send('{}');
+      expect(charset.status).toBe(415);
+      expect(charset.body).toEqual({ error: { code: 'VALIDATION' } });
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('returns 404 NOT_FOUND for unknown routes', async () => {

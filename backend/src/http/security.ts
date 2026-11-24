@@ -4,6 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import type { Redis } from 'ioredis';
 import type { Env } from '../config/env.js';
+import { oauthNavErrorBase } from '../auth/oauth-nav.js';
 import { AppError } from './errors.js';
 
 export const CSRF_COOKIE = 'nri_csrf';
@@ -57,7 +58,15 @@ function limiter(
       sendCommand: (command: string, ...args: string[]) =>
         redis.call(command, ...args) as Promise<never>,
     }),
-    handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED')),
+    handler: (req, res, next) => {
+      // OAuth start/callback — навігація браузера: редирект замість JSON.
+      const base = oauthNavErrorBase(req);
+      if (base) {
+        res.redirect(`${base}?error=RATE_LIMITED`);
+        return;
+      }
+      next(new AppError(429, 'RATE_LIMITED'));
+    },
   });
 }
 

@@ -122,13 +122,58 @@ describe('google oauth', () => {
     expect(res.headers.location).toBe('/login?error=UNAUTHENTICATED');
   });
 
-  it('unknown/unconfigured provider is 404', async () => {
+  it('unknown/unconfigured provider redirects with NOT_FOUND (top-level navigation)', async () => {
     const agent = request.agent(createApp(deps));
-    expect((await agent.get('/api/auth/discord/start')).status).toBe(404);
-    expect((await agent.get('/api/auth/discord/callback?code=x&state=y')).status).toBe(404);
+    const r1 = await agent.get('/api/auth/discord/start');
+    expect(r1.status).toBe(302);
+    expect(r1.headers.location).toBe('/login?error=NOT_FOUND');
+    const r2 = await agent.get('/api/auth/discord/callback?code=x&state=y');
+    expect(r2.headers.location).toBe('/login?error=NOT_FOUND');
+    expect((await agent.get('/api/auth/discord/start?mode=link')).headers.location).toBe(
+      '/account?error=NOT_FOUND',
+    );
     const d2 = await testDeps();
     try {
-      expect((await request(createApp(d2)).get('/api/auth/google/start')).status).toBe(404);
+      const r3 = await request(createApp(d2)).get('/api/auth/google/start');
+      expect(r3.status).toBe(302);
+      expect(r3.headers.location).toBe('/login?error=NOT_FOUND');
+    } finally {
+      await closeDeps(d2);
+    }
+  });
+
+  it('invalid mode on start redirects with VALIDATION', async () => {
+    const res = await request(createApp(deps)).get('/api/auth/google/start?mode=bogus');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login?error=VALIDATION');
+  });
+
+  it('provider ?error=access_denied -> /login?error=OAUTH_CANCELLED, state burned', async () => {
+    const agent = request.agent(createApp(deps));
+    const { state } = await startFlow(agent);
+    const res = await agent.get(`/api/auth/google/callback?error=access_denied&state=${state}`);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login?error=OAUTH_CANCELLED');
+    expect(await redis.get(`oauth:${state}`)).toBeNull();
+    const other = await agent.get('/api/auth/google/callback?error=server_error');
+    expect(other.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+  });
+
+  it('rate-limited start/callback redirect instead of JSON 429', async () => {
+    const d2 = await testDeps({ RATE_LIMIT_AUTH_MAX: '1' });
+    try {
+      const app = createApp({ ...d2, oauthProviders: { google: fake } });
+      const agent = request.agent(app);
+      expect((await agent.get('/api/auth/google/start')).status).toBe(302);
+      const s = await agent.get('/api/auth/google/start?mode=link');
+      expect(s.status).toBe(302);
+      expect(s.headers.location).toBe('/account?error=RATE_LIMITED');
+      const c = await agent.get('/api/auth/google/callback?code=c&state=x');
+      expect(c.headers.location).toBe('/login?error=RATE_LIMITED');
+      // Звичайні (не навігаційні) маршрути й далі отримують JSON 429.
+      const ping = await agent.get('/api/auth/ping');
+      expect(ping.status).toBe(429);
+      expect(ping.body.error.code).toBe('RATE_LIMITED');
     } finally {
       await closeDeps(d2);
     }
@@ -234,12 +279,14 @@ describe('google oauth', () => {
       await db.update(users).set({ isBanned: true });
       await redis.flushdb();
       const res = await a.agent.get('/api/auth/google/start?mode=link');
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/account?error=ACCOUNT_BANNED');
     });
 
     it('link start requires a session', async () => {
       const res = await request(createApp(deps)).get('/api/auth/google/start?mode=link');
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/account?error=UNAUTHENTICATED');
     });
 
     it('callback session must match initiating user', async () => {
@@ -248,9 +295,45 @@ describe('google oauth', () => {
       const b = await loggedInTelegram(app, '1003');
       const { state } = await startFlow(a.agent, '?mode=link');
       const res = await b.agent.get(`/api/auth/google/callback?code=c&state=${state}`);
-      expect(res.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+      expect(res.headers.location).toBe('/account?error=OAUTH_STATE_INVALID');
       const g = await db.select().from(authIdentities).where(eq(authIdentities.provider, 'google'));
       expect(g).toHaveLength(0);
+    });
+
+    it('failed exchange in link mode -> /account?error=OAUTH_STATE_INVALID', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1020');
+      const { state } = await startFlow(a.agent, '?mode=link');
+      const res = await a.agent.get(`/api/auth/google/callback?code=bad&state=${state}`);
+      expect(res.headers.location).toBe('/account?error=OAUTH_STATE_INVALID');
+    });
+
+    it('cookie mismatch in link mode -> /account (mode read from the state record)', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1021');
+      const { state } = await startFlow(a.agent, '?mode=link');
+      const res = await request(app).get(`/api/auth/google/callback?code=c&state=${state}`);
+      expect(res.headers.location).toBe('/account?error=OAUTH_STATE_INVALID');
+      // Чужий callback не спалює state.
+      expect(await redis.get(`oauth:${state}`)).not.toBeNull();
+    });
+
+    it('missing/expired state falls back to /login', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1022');
+      const { state } = await startFlow(a.agent, '?mode=link');
+      await redis.del(`oauth:${state}`);
+      const res = await a.agent.get(`/api/auth/google/callback?code=c&state=${state}`);
+      expect(res.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+    });
+
+    it('provider ?error=access_denied in link mode -> /account?error=OAUTH_CANCELLED', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1023');
+      const { state } = await startFlow(a.agent, '?mode=link');
+      const res = await a.agent.get(`/api/auth/google/callback?error=access_denied&state=${state}`);
+      expect(res.headers.location).toBe('/account?error=OAUTH_CANCELLED');
+      expect(await redis.get(`oauth:${state}`)).toBeNull();
     });
 
     it('identity owned by someone else -> /account?error=IDENTITY_TAKEN', async () => {

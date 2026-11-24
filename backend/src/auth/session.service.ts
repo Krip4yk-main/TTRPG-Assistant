@@ -177,6 +177,20 @@ export async function evictUserSessionCache({ redis }: Deps, userId: number): Pr
   if (keys.length) await redis.del(...keys);
 }
 
+/**
+ * Відкликає конкретні сесії за хешами токенів: надгробок, потім видалення кешу.
+ * Рядки БД не чіпає (викликач видаляє їх сам, напр. у транзакції).
+ */
+export async function revokeTokenHashes(
+  { redis }: Pick<Deps, 'redis'>,
+  hashes: Iterable<string>,
+): Promise<void> {
+  for (const h of hashes) {
+    await redis.set(revokedKey(h), '1', 'EX', REVOKED_TTL_SEC);
+    await redis.del(sessKey(h), slideKey(h));
+  }
+}
+
 export async function revokeAllUserSessions(
   { db, redis, realtime }: Deps,
   userId: number,
@@ -188,12 +202,7 @@ export async function revokeAllUserSessions(
   await db.delete(sessions).where(eq(sessions.userId, userId));
   const members = await redis.smembers(userSetKey(userId));
   const hashes = new Set([...members, ...rows.map((r) => r.tokenHash)]);
-  const purge = async (hs: Iterable<string>) => {
-    for (const h of hs) {
-      await redis.set(revokedKey(h), '1', 'EX', REVOKED_TTL_SEC);
-      await redis.del(sessKey(h), slideKey(h));
-    }
-  };
+  const purge = (hs: Iterable<string>) => revokeTokenHashes({ redis }, hs);
   await purge(hashes);
   // Вхід під час logout-all: додаємо те, що з'явилося в сеті після першого читання.
   const late = (await redis.smembers(userSetKey(userId))).filter((h) => !hashes.has(h));

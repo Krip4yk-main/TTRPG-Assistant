@@ -21,6 +21,7 @@ export function createBackendClient(
   baseUrl: string,
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs = 10_000,
 ): BackendClient {
   const base = baseUrl.replace(/\/+$/, '');
   return {
@@ -30,6 +31,8 @@ export function createBackendClient(
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-internal-key': apiKey },
           body: JSON.stringify({ token, telegramId, displayName }),
+          // Бекенд, що «завис», не повинен тримати обробник апдейту вічно.
+          signal: AbortSignal.timeout(timeoutMs),
         });
         const data = (await res.json().catch(() => null)) as {
           nickname?: string;

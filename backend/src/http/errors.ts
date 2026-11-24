@@ -34,10 +34,14 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     res.status(400).json(body('VALIDATION', err.issues));
     return;
   }
-  // Некоректний JSON від body-parser.
-  if (err && typeof err === 'object' && (err as { type?: string }).type === 'entity.parse.failed') {
-    res.status(400).json(body('VALIDATION'));
-    return;
+  // Помилки body-parser (некоректний JSON, 413 entity.too.large, 415 тощо) — клієнтські:
+  // віддаємо їхній 4xx-статус із кодом VALIDATION, без стеку в лог.
+  if (err && typeof err === 'object') {
+    const { type, status } = err as { type?: unknown; status?: unknown };
+    if (typeof type === 'string' && typeof status === 'number' && status >= 400 && status < 500) {
+      res.status(status).json(body('VALIDATION'));
+      return;
+    }
   }
   console.error(err);
   res.status(500).json({ error: { code: 'INTERNAL' } });

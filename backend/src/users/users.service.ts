@@ -5,7 +5,11 @@ import {
   type CompleteProfileInput,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
-import { evictUserSessionCache, revokeAllUserSessions } from '../auth/session.service.js';
+import {
+  evictUserSessionCache,
+  revokeAllUserSessions,
+  revokeTokenHashes,
+} from '../auth/session.service.js';
 import { isDuplicateKey, subjectHash } from '../auth/identity.service.js';
 import { authIdentities, identityTombstones, sessions, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
@@ -27,7 +31,29 @@ export type MeDto = {
 
 const DAY_MS = 86_400_000;
 export type Clock = () => Date;
-const utcDate = (d: Date): string => d.toISOString().slice(0, 10);
+const DEFAULT_TZ = 'Europe/Kyiv';
+
+/**
+ * Календарна дата `YYYY-MM-DD` у часовому поясі користувача (як її бачить фронтенд).
+ * Невідомий/некоректний пояс — Europe/Kyiv.
+ */
+export function localDate(d: Date, timeZone: string | null | undefined): string {
+  const fmt = (tz: string) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  if (timeZone) {
+    try {
+      return fmt(timeZone);
+    } catch {
+      // RangeError: Invalid time zone — падаємо на типовий пояс.
+    }
+  }
+  return fmt(DEFAULT_TZ);
+}
 
 /**
  * Ставить is_banned і скидає Redis-кеш сесій, тож бан діє з наступного ж запиту:
@@ -75,7 +101,15 @@ export async function completeProfile(
   now: Clock = () => new Date(),
 ): Promise<CompleteResult> {
   const { db } = deps;
-  if (!canRegister(input.birthDate, utcDate(now()))) {
+  let tz = input.timezone;
+  if (!tz) {
+    const [u] = await db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId));
+    tz = u?.timezone;
+  }
+  if (!canRegister(input.birthDate, localDate(now(), tz))) {
     const [del] = await db.transaction(async (tx) =>
       tx.delete(users).where(and(eq(users.id, userId), eq(users.status, 'pending'))),
     );
@@ -125,7 +159,8 @@ export async function changeBirthDate(
       );
       throw new AppError(409, 'BIRTH_DATE_COOLDOWN', { availableAt: availableAt.toISOString() });
     }
-    if (!canRegister(birthDate, utcDate(current))) throw new AppError(422, 'AGE_TOO_LOW');
+    if (!canRegister(birthDate, localDate(current, u.timezone)))
+      throw new AppError(422, 'AGE_TOO_LOW');
     await tx
       .update(users)
       .set({ birthDate, birthDateChangedAt: current })
@@ -161,7 +196,9 @@ export async function unlinkIdentity(
 export async function deleteAccount(deps: AppDeps, userId: number): Promise<void> {
   const { db, env } = deps;
   const now = new Date();
-  await db.transaction(async (tx) => {
+  // Хеші токенів збираємо в транзакції (до видалення рядків), щоб відкликання
+  // не залежало лише від Redis-сету `usess:`.
+  const tokenHashes = await db.transaction(async (tx) => {
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
@@ -182,6 +219,10 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         });
     }
     await tx.delete(authIdentities).where(eq(authIdentities.userId, userId));
+    const sess = await tx
+      .select({ tokenHash: sessions.tokenHash })
+      .from(sessions)
+      .where(eq(sessions.userId, userId));
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx
       .update(users)
@@ -195,7 +236,9 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         deletedAt: now,
       })
       .where(eq(users.id, userId));
+    return sess.map((r) => r.tokenHash);
   });
+  await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
   await logEvent(db, { type: 'user.deleted', userId });
 }

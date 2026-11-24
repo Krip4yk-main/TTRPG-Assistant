@@ -6,6 +6,8 @@ import type { Db } from '../src/db/client.js';
 import { users } from '../src/db/schema/index.js';
 import { createRedis } from '../src/redis/client.js';
 
+export const TEST_PEPPER = 'test-pepper-0123456789abcdefghijklmnop';
+
 const pools = new WeakMap<Db, { end(): Promise<void> }>();
 
 export async function closeDeps(deps: AppDeps): Promise<void> {
@@ -22,7 +24,7 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
     NODE_ENV: 'test',
     DATABASE_URL: dbUrl,
     REDIS_URL: redisUrl,
-    IDENTITY_PEPPER: 'pepper',
+    IDENTITY_PEPPER: TEST_PEPPER,
     INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extraEnv,
   });

@@ -15,7 +15,7 @@ const schema = z.object({
   DATABASE_URL_TEST: optional,
   REDIS_URL: z.string().min(1),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
-  IDENTITY_PEPPER: z.string().min(1),
+  IDENTITY_PEPPER: z.string().min(32),
   INTERNAL_API_KEY: z.string().min(32),
   TELEGRAM_BOT_TOKEN: optional,
   TELEGRAM_BOT_USERNAME: optional,

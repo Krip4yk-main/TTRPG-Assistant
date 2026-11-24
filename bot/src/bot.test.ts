@@ -86,6 +86,21 @@ describe('createBackendClient', () => {
     expect(await client.linkTelegram('t', 1, 'n')).toEqual({ ok: false, reason });
   });
 
+  it('passes an abort signal; a hung backend times out -> error', async () => {
+    const { f, client } = make(json(200, { ok: true, nickname: 'Hero' }));
+    await client.linkTelegram('t', 1, 'n');
+    expect(f.mock.calls[0]![1].signal).toBeInstanceOf(AbortSignal);
+
+    const hung = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal!.addEventListener('abort', () => reject(init.signal!.reason));
+        }),
+    );
+    const slow = createBackendClient('http://x', 'k', hung as unknown as typeof fetch, 20);
+    expect(await slow.linkTelegram('t', 1, 'n')).toEqual({ ok: false, reason: 'error' });
+  });
+
   it('network failure -> error', async () => {
     const { client } = make(new Error('down'));
     expect(await client.linkTelegram('t', 1, 'n')).toEqual({ ok: false, reason: 'error' });

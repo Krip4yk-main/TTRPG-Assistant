@@ -19,6 +19,7 @@ RUN npm run build -w shared && npm run build -w frontend
 
 # Статика за nginx; /api і /socket.io проксіює зовнішній reverse proxy на бекенд.
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+COPY frontend/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist/frontend/browser /usr/share/nginx/html
 EXPOSE 8080

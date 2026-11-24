@@ -14,3 +14,4 @@ Thumbs.db
 backend/.env
 frontend/.env
 bot/.env
+.claude/launch.json

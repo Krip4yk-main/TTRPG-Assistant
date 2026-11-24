@@ -51,7 +51,10 @@ docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRA
 - `NODE_ENV=production` — задайте явно (за замовчуванням `development`);
 - `DEV_LOGIN_ENABLED` не задавати або `false`;
 - `TRUST_PROXY` — кількість проксі перед бекендом (наприклад, `1`);
-- `PUBLIC_BASE_URL` — публічний https-URL застосунку; `IDENTITY_PEPPER`, `INTERNAL_API_KEY` — унікальні випадкові значення, `INTERNAL_API_KEY` однаковий у backend і bot.
+- `PUBLIC_BASE_URL` — публічний https-URL застосунку; `IDENTITY_PEPPER`, `INTERNAL_API_KEY` — унікальні випадкові значення (≥32 символи, `openssl rand -base64 32`), `INTERNAL_API_KEY` однаковий у backend і bot.
+- `IDENTITY_PEPPER` **ніколи не змінюйте** після запуску: ротація анулює всі надгробки ідентичностей, зокрема бани видалених акаунтів;
+- Redis у production — лише в приватній мережі і **з автентифікацією** (`requirepass` або ACL-користувач, `REDIS_URL=redis://user:password@host:6379`): бекенд довіряє вмісту Redis (кеш сесій, надгробки відкликаних сесій, OAuth state), тож доступ до Redis рівнозначний доступу до будь-якого акаунта;
+- MySQL і Redis не публікуйте назовні: локальний `docker-compose.yml` прив'язує їхні порти лише до `127.0.0.1`.
 
 ### Reverse proxy
 
