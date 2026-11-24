@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import {
   expandOccurrences,
   GAME_LOCKED_AFTER_PUBLISH,
@@ -37,7 +37,12 @@ import {
   type Tx,
 } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
-import { materializeForRow, replaceRuleSessions } from '../sessions/materialize.js';
+import {
+  cancelFutureSessions,
+  logSessionsCancelled,
+  materializeForRow,
+  replaceRuleSessions,
+} from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
 
@@ -48,6 +53,16 @@ export interface Loaded {
   gm: GameDto['gm'];
   systemName: string | null;
   memberCount: number;
+  /** Матеріалізовані сесії; `null` — у гри їх немає (тоді найближча — з правила). */
+  sessions: SessionStats | null;
+}
+
+/** Зведення матеріалізованих сесій гри для `nextSessionAt`. */
+export interface SessionStats {
+  /** Найближча `scheduled` сесія, що починається не раніше моменту завантаження. */
+  nextScheduled: Date | null;
+  /** Найпізніший матеріалізований слот правила: слоти після нього ще не створено. */
+  lastRuleSlot: Date | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -93,12 +108,46 @@ export async function loadGames(
     )
     .groupBy(gameMembers.gameId);
   const byGame = new Map(counts.map((c) => [c.gameId, c.n]));
+  const stats = await sessionStats(
+    deps,
+    rows.map((r) => r.row.id),
+    new Date(),
+  );
   return rows.map((r) => ({
     row: r.row,
     gm: { publicId: r.gmPublicId, nickname: r.gmNickname, avatarUrl: r.gmAvatarUrl },
     systemName: r.systemName,
     memberCount: byGame.get(r.row.id) ?? 0,
+    sessions: stats.get(r.row.id) ?? null,
   }));
+}
+
+/** Зведення сесій для набору ігор — одним запитом (без N+1). */
+async function sessionStats(
+  deps: AppDeps,
+  gameIds: number[],
+  now: Date,
+): Promise<Map<number, SessionStats>> {
+  const rows = await deps.db
+    .select({
+      gameId: gameSessions.gameId,
+      nextScheduled: sql<
+        string | null
+      >`min(case when ${gameSessions.status} = 'scheduled' and ${gameSessions.startsAt} >= ${now} then ${gameSessions.startsAt} end)`,
+      lastRuleSlot: sql<string | null>`max(${gameSessions.ruleStartsAt})`,
+    })
+    .from(gameSessions)
+    .where(inArray(gameSessions.gameId, gameIds))
+    .groupBy(gameSessions.gameId);
+  // Агрегати повертаються рядками 'YYYY-MM-DD HH:MM:SS' (UTC, див. db/client.ts).
+  const asDate = (v: string | Date | null): Date | null =>
+    v === null ? null : v instanceof Date ? v : new Date(`${v.replace(' ', 'T')}Z`);
+  return new Map(
+    rows.map((r) => [
+      r.gameId,
+      { nextScheduled: asDate(r.nextScheduled), lastRuleSlot: asDate(r.lastRuleSlot) },
+    ]),
+  );
 }
 
 async function loadOne(deps: AppDeps, id: number): Promise<Loaded | null> {
@@ -115,10 +164,27 @@ async function warningIdsOf(deps: AppDeps, gameId: number): Promise<number[]> {
   return rows.map((r) => r.id);
 }
 
-/** Найближча сесія, що починається не раніше `now`; для завершених/скасованих — `null`. */
-function nextSessionAt(row: GameRow, now: Date): string | null {
+/**
+ * Найближча сесія, що починається не раніше `now`; для завершених/скасованих — `null`.
+ * Матеріалізовані сесії мають пріоритет (перенесення й скасування враховано): найближча
+ * `scheduled` або перший слот правила після вже матеріалізованих, якщо він раніший. Гра
+ * без матеріалізованих сесій (чернетка) — з правила.
+ */
+function nextSessionAt(l: Pick<Loaded, 'row' | 'sessions'>, now: Date): string | null {
+  const { row, sessions } = l;
   if (row.status === 'finished' || row.status === 'cancelled') return null;
-  const to = new Date(Math.max(now.getTime(), row.startsAt.getTime()) + NEXT_SESSION_HORIZON_MS);
+  const scheduled =
+    sessions?.nextScheduled && sessions.nextScheduled >= now ? sessions.nextScheduled : null;
+  const fromRule = ruleNext(row, sessions?.lastRuleSlot ?? null, now);
+  if (scheduled && fromRule) return (scheduled < fromRule ? scheduled : fromRule).toISOString();
+  return (scheduled ?? fromRule)?.toISOString() ?? null;
+}
+
+/** Перший слот правила ≥ `now` і пізніший за `after` (останній матеріалізований). */
+function ruleNext(row: GameRow, after: Date | null, now: Date): Date | null {
+  const fromMs = after ? Math.max(now.getTime(), after.getTime() + 1) : now.getTime();
+  const from = new Date(fromMs);
+  const to = new Date(Math.max(fromMs, row.startsAt.getTime()) + NEXT_SESSION_HORIZON_MS);
   const [first] = expandOccurrences(
     {
       startsAt: row.startsAt.toISOString(),
@@ -127,10 +193,10 @@ function nextSessionAt(row: GameRow, now: Date): string | null {
       weekdays: row.weekdays,
       timezone: row.timezone,
     },
-    now,
+    from,
     to,
   );
-  return first ? first.start.toISOString() : null;
+  return first ? first.start : null;
 }
 
 function omit<T extends object, K extends keyof T>(o: T, ...keys: K[]): Omit<T, K> {
@@ -189,7 +255,7 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
     gm: l.gm,
     timezone: l.row.timezone,
     status: l.row.status,
-    nextSessionAt: nextSessionAt(l.row, now),
+    nextSessionAt: nextSessionAt(l, now),
     freeSlots: freeSlots(l),
     publishedAt: iso(l.row.publishedAt),
     startedAt: iso(l.row.startedAt),
@@ -212,7 +278,7 @@ export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
     gm: l.gm,
     format: r.format,
     city: r.city,
-    nextSessionAt: nextSessionAt(r, now),
+    nextSessionAt: nextSessionAt(l, now),
     timezone: r.timezone,
     freeSlots: freeSlots(l),
     maxPlayers: r.maxPlayers,
@@ -335,41 +401,45 @@ export async function updateGame(
 ): Promise<GameDto> {
   const { db } = deps;
   const patch = gamePatchSchema.parse(body);
-  const l = await loadOwned(deps, userId, id);
-  const { row } = l;
-  if (row.status === 'finished' || row.status === 'cancelled') {
+  const { row: seen } = await loadOwned(deps, userId, id);
+  if (seen.status === 'finished' || seen.status === 'cancelled') {
     throw new AppError(409, 'GAME_INVALID_TRANSITION');
   }
-  const current = toInput(row, await warningIdsOf(deps, id));
-  if (row.status !== 'draft') {
-    for (const field of GAME_LOCKED_AFTER_PUBLISH) {
-      if (patch[field] !== undefined && patch[field] !== current[field]) {
-        throw new AppError(409, 'GAME_FIELD_LOCKED', { field });
+  await patchHooks.beforeWrite?.(id);
+  const gm = await loadGm(deps, userId);
+  const now = new Date();
+  const { cancelled, current, next, ruleChanged } = await db.transaction(async (tx) => {
+    // Патч зливається зі свіжим рядком під X-блокуванням: паралельний PATCH чи нове правило
+    // (`PUT /schedule`) не загубляться. Якщо статус змінився після першого читання
+    // (опублікували/скасували) — 409, заблоковані поля не змінюються.
+    const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
+    if (!row || row.status !== seen.status) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    const warningIds = (
+      await tx
+        .select({ id: gameContentWarnings.warningId })
+        .from(gameContentWarnings)
+        .where(eq(gameContentWarnings.gameId, id))
+        .orderBy(asc(gameContentWarnings.warningId))
+    ).map((w) => w.id);
+    const current = toInput(row, warningIds);
+    if (row.status !== 'draft') {
+      for (const field of GAME_LOCKED_AFTER_PUBLISH) {
+        if (patch[field] !== undefined && patch[field] !== current[field]) {
+          throw new AppError(409, 'GAME_FIELD_LOCKED', { field });
+        }
       }
     }
-  }
-  const next = gameInputSchema(row.timezone).parse({ ...current, ...patch });
-  const now = new Date();
-  assertGmAge(await loadGm(deps, userId), next, now);
-  await assertCatalogRefs(deps, next, current);
-  if (
-    row.status === 'recruiting' &&
-    next.startsAt !== current.startsAt &&
-    new Date(next.startsAt) <= now
-  ) {
-    throw new AppError(422, 'GAME_IN_PAST');
-  }
-  await patchHooks.beforeWrite?.(id);
-  // Зміна розкладу опублікованої гри — те саме, що нове правило (`PUT /schedule`).
-  const ruleChanged = row.status !== 'draft' && isRuleChanged(current, next);
-  const cancelled = await db.transaction(async (tx) => {
-    // Умова за прочитаним статусом: якщо гру тим часом опублікували/скасували, заблоковані
-    // поля чи завершена гра не змінюються — 409, транзакція відкочується.
-    const [res] = await tx
-      .update(games)
-      .set(columns(next))
-      .where(and(eq(games.id, id), eq(games.status, row.status)));
-    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    const next = gameInputSchema(row.timezone).parse({ ...current, ...patch });
+    assertGmAge(gm, next, now);
+    await assertCatalogRefs(deps, next, current);
+    // Зміна розкладу опублікованої гри — те саме, що нове правило (`PUT /schedule`): перша
+    // сесія має бути в майбутньому, майбутні сесії правила замінюються.
+    const ruleChanged = row.status !== 'draft' && isRuleChanged(current, next);
+    const startsMoved = row.status === 'recruiting' && next.startsAt !== current.startsAt;
+    if ((ruleChanged || startsMoved) && new Date(next.startsAt) <= now) {
+      throw new AppError(422, 'GAME_IN_PAST');
+    }
+    await tx.update(games).set(columns(next)).where(eq(games.id, id));
     // Під X-блокуванням гри (затвердження бере FOR SHARE) кількість учасників не зміниться.
     if (next.maxPlayers < current.maxPlayers && next.maxPlayers < (await activeCount(tx, id))) {
       throw new AppError(409, 'MAX_BELOW_MEMBERS');
@@ -383,10 +453,12 @@ export async function updateGame(
       }
     }
     if (ruleChanged) await replaceRuleSessions(tx, { ...row, ...columns(next) }, now);
-    // Після UPDATE рядок гри заблоковано (X), тож паралельні заявки/затвердження чекають.
-    return row.status !== 'draft' && isRatingRaised(current.ageRating, next.ageRating)
-      ? applyAgeRatingRaise(tx, id, next.ageRating, now)
-      : [];
+    // Рядок гри заблоковано (X), тож паралельні заявки/затвердження чекають.
+    const cancelled =
+      row.status !== 'draft' && isRatingRaised(current.ageRating, next.ageRating)
+        ? await applyAgeRatingRaise(tx, id, next.ageRating, now)
+        : [];
+    return { cancelled, current, next, ruleChanged };
   });
   await logCancelled(db, cancelled, 'application.cancelled_age');
   await logEvent(db, {
@@ -560,28 +632,35 @@ export async function transitionGame(
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
-  const { cancelled, belowMin, doneSessionIds } = await db.transaction(async (tx) => {
-    // Умова за поточним статусом захищає від гонки двох переходів.
-    const [res] = await tx
-      .update(games)
-      .set({ status: t.to, [t.stamp]: now })
-      .where(and(eq(games.id, id), eq(games.status, row.status)));
-    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
-    // Публікація й старт зсувають вікно сесій (рядок гри вже під X-блокуванням).
-    if (action === 'publish' || action === 'start') {
-      await materializeForRow(tx, { ...row, status: t.to }, now);
-    }
-    const doneSessionIds =
-      action === 'finish' && row.kind === 'oneshot' ? await finishOneshotSession(tx, row, now) : [];
-    const belowMin = action === 'start' && (await activeCount(tx, id)) < row.minPlayers;
-    const cancelled: CancelledApplication[] =
-      action === 'cancel'
-        ? await cancelPendingForGames(tx, [id], now, 'game_cancelled')
-        : action === 'finish'
-          ? await cancelPendingForGames(tx, [id], now, 'game_finished')
+  const endReason =
+    action === 'cancel' ? 'game_cancelled' : action === 'finish' ? 'game_finished' : null;
+  const { cancelled, belowMin, doneSessionIds, cancelledSessions } = await db.transaction(
+    async (tx) => {
+      // Умова за поточним статусом захищає від гонки двох переходів.
+      const [res] = await tx
+        .update(games)
+        .set({ status: t.to, [t.stamp]: now })
+        .where(and(eq(games.id, id), eq(games.status, row.status)));
+      if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+      // Публікація й старт зсувають вікно сесій (рядок гри вже під X-блокуванням).
+      if (action === 'publish' || action === 'start') {
+        await materializeForRow(tx, { ...row, status: t.to }, now);
+      }
+      const doneSessionIds =
+        action === 'finish' && row.kind === 'oneshot'
+          ? await finishOneshotSession(tx, row, now)
           : [];
-    return { cancelled, belowMin, doneSessionIds };
-  });
+      const belowMin = action === 'start' && (await activeCount(tx, id)) < row.minPlayers;
+      const cancelled: CancelledApplication[] = endReason
+        ? await cancelPendingForGames(tx, [id], now, endReason)
+        : [];
+      // Майбутні сесії завершеної/скасованої гри скасовуються; минулі `scheduled` лишаються.
+      const cancelledSessions = endReason
+        ? await cancelFutureSessions(tx, [id], now, endReason)
+        : [];
+      return { cancelled, belowMin, doneSessionIds, cancelledSessions };
+    },
+  );
   await logEvent(db, {
     type: EVENT[action],
     userId,
@@ -599,6 +678,7 @@ export async function transitionGame(
       payload: { gameId: id, present: [], absent: [], reason: 'game_finished' },
     });
   }
+  if (endReason) await logSessionsCancelled(db, userId, cancelledSessions, endReason);
   const view = await gmView(deps, id);
   return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
 }

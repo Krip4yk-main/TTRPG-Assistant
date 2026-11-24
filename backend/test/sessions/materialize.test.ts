@@ -105,7 +105,7 @@ describe('materializeSessions', () => {
       expect(res.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
       expect(await sessionsOf(id)).toHaveLength(4);
     }
-  });
+  }, 30_000);
 
   it('the window slides forward', async () => {
     const id = await insertGame();

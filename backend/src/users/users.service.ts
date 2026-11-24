@@ -28,6 +28,7 @@ import {
 } from '../db/schema/index.js';
 import { cancelPendingForGames, logCancelled } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
+import { cancelFutureSessions, logSessionsCancelled } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
@@ -260,6 +261,15 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
+    // Гра, створена між читанням кандидатів і транзакцією, теж скасовується: після X на
+    // `users` дочитуємо свої активні ігри блокувальним читанням (свої рядки ігор не беруть
+    // ні заявки, ні затвердження чужих користувачів у зворотному порядку).
+    const late = await tx
+      .select({ id: games.id, status: games.status })
+      .from(games)
+      .where(and(eq(games.gmUserId, userId), inArray(games.status, ACTIVE_GAME_STATUSES)))
+      .for('update');
+    for (const g of late) if (!active.some((a) => a.id === g.id)) active.push(g);
     const identities = await tx
       .select()
       .from(authIdentities)
@@ -357,14 +367,21 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       active.map((g) => g.id),
       now,
     );
+    const cancelledSessions = await cancelFutureSessions(
+      tx,
+      active.map((g) => g.id),
+      now,
+      'game_cancelled',
+    );
     return {
       tokenHashes: sess.map((r) => r.tokenHash),
       cancelledGameIds: active,
       cancelledApps,
+      cancelledSessions,
       withdrawn,
     };
   });
-  const { tokenHashes, cancelledGameIds, cancelledApps, withdrawn } = result;
+  const { tokenHashes, cancelledGameIds, cancelledApps, cancelledSessions, withdrawn } = result;
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
   for (const g of cancelledGameIds) {
@@ -377,6 +394,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     });
   }
   await logCancelled(db, cancelledApps, 'application.cancelled_game');
+  await logSessionsCancelled(db, userId, cancelledSessions, 'game_cancelled');
   for (const w of withdrawn) {
     await logEvent(db, {
       type: 'application.withdrawn',

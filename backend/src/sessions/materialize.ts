@@ -3,6 +3,8 @@ import { expandOccurrences, SESSION_WINDOW_DAYS } from '@nri/shared';
 import type { Db } from '../db/client.js';
 import { games, gameSessions } from '../db/schema/index.js';
 import type { Tx } from '../applications/applications.rules.js';
+import { logEvent } from '../events/events.service.js';
+import { AppError } from '../http/errors.js';
 
 type GameRow = typeof games.$inferSelect;
 type Exec = Db | Tx;
@@ -34,7 +36,13 @@ export async function materializeForRow(
   from: Date = new Date(now.getTime() - DAY_MS),
 ): Promise<number> {
   if (!isRunning(game)) return 0;
-  const to = new Date(now.getTime() + SESSION_WINDOW_DAYS * DAY_MS);
+  // Єдина сесія ваншота (`none`) створюється одразу, навіть за межами вікна.
+  const to = new Date(
+    Math.max(
+      now.getTime() + SESSION_WINDOW_DAYS * DAY_MS,
+      game.recurrence === 'none' ? game.startsAt.getTime() + 60_000 : 0,
+    ),
+  );
   const slots = expandOccurrences(
     {
       startsAt: game.startsAt.toISOString(),
@@ -108,8 +116,24 @@ export async function materializeSessions(
  * його X-блокування): видаляє майбутні сесії правила, які ще не чіпали (`scheduled`,
  * `origin='rule'`, не перенесені), і матеріалізує нові від `now`. Перенесені, скасовані,
  * завершені й ручні сесії лишаються.
+ *
+ * Ваншот має рівно одну сесію: новий час замінює її `scheduled`-сесію (навіть перенесену
+ * чи минулу), а якщо сесію вже завершено — 409 `SESSION_INVALID_STATE`.
  */
 export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Promise<void> {
+  if (game.kind === 'oneshot') {
+    const [done] = await tx
+      .select({ id: gameSessions.id })
+      .from(gameSessions)
+      .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'done')))
+      .limit(1);
+    if (done) throw new AppError(409, 'SESSION_INVALID_STATE');
+    await tx
+      .delete(gameSessions)
+      .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'scheduled')));
+    await materializeForRow(tx, game, now, game.startsAt);
+    return;
+  }
   await tx
     .delete(gameSessions)
     .where(
@@ -122,6 +146,69 @@ export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Pro
       ),
     );
   await materializeForRow(tx, game, now, now);
+}
+
+/** Скасована сесія — для подій `session.cancelled` після коміту. */
+export interface CancelledSession {
+  id: number;
+  gameId: number;
+}
+
+/**
+ * Завершення чи скасування гри (викликати в транзакції, що тримає X-блокування гри):
+ * майбутні `scheduled` сесії → `cancelled` з причиною `game_finished`/`game_cancelled`.
+ * Минулі `scheduled` лишаються як є (історія; завершити їх уже не можна).
+ */
+export async function cancelFutureSessions(
+  tx: Tx,
+  gameIds: number[],
+  now: Date,
+  reason: 'game_finished' | 'game_cancelled',
+): Promise<CancelledSession[]> {
+  if (gameIds.length === 0) return [];
+  const rows = await tx
+    .select({ id: gameSessions.id, gameId: gameSessions.gameId })
+    .from(gameSessions)
+    .where(
+      and(
+        inArray(gameSessions.gameId, gameIds),
+        eq(gameSessions.status, 'scheduled'),
+        gt(gameSessions.startsAt, now),
+      ),
+    )
+    .for('update');
+  if (rows.length === 0) return [];
+  await tx
+    .update(gameSessions)
+    .set({ status: 'cancelled', cancelReason: reason })
+    .where(
+      and(
+        inArray(
+          gameSessions.id,
+          rows.map((r) => r.id),
+        ),
+        eq(gameSessions.status, 'scheduled'),
+      ),
+    );
+  return rows;
+}
+
+/** Події `session.cancelled` для автоскасованих сесій (після коміту). */
+export async function logSessionsCancelled(
+  db: Db,
+  userId: number,
+  rows: CancelledSession[],
+  reason: 'game_finished' | 'game_cancelled',
+): Promise<void> {
+  for (const r of rows) {
+    await logEvent(db, {
+      type: 'session.cancelled',
+      userId,
+      entityType: 'session',
+      entityId: r.id,
+      payload: { gameId: r.gameId, reason },
+    });
+  }
 }
 
 /** Сесії гри для списку: минулі `pastDays` діб і всі майбутні (з перенесеними). */

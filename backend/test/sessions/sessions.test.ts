@@ -1,7 +1,9 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { and, asc, eq } from 'drizzle-orm';
 import { toZoned, zonedToUtc, type SessionDto } from '@nri/shared';
 import { createApp } from '../../src/app.js';
+import { patchHooks } from '../../src/games/games.service.js';
+import { deleteAccount } from '../../src/users/users.service.js';
 import { events, games, gameSessions, sessionAttendance } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
@@ -467,5 +469,168 @@ describe('oneshot', () => {
         .from(gameSessions)
         .where(and(eq(gameSessions.gameId, s.gameId), eq(gameSessions.status, 'scheduled'))),
     ).toHaveLength(4);
+  });
+});
+
+describe('game end cancels future sessions (R4)', () => {
+  it('finishing a campaign: future scheduled (incl. rescheduled) → cancelled, past and done kept', async () => {
+    const { gm, gameId } = await weekly();
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    const [s1, s2, s3, s4] = await rows(gameId);
+    await moveToPast(s1!.id);
+    await db
+      .update(gameSessions)
+      .set({ status: 'done', doneAt: new Date() })
+      .where(eq(gameSessions.id, s2!.id));
+    await call('post', `/api/sessions/${s3!.id}/reschedule`, gm.cookie, {
+      startsAt: kyivAt(12, 20).startsAt,
+    });
+    const f = await call('post', `/api/games/${gameId}/finish`, gm.cookie);
+    expect(f.status).toBe(200);
+    expect(f.body.nextSessionAt).toBeNull();
+    const byId = new Map((await rows(gameId)).map((r) => [r.id, r]));
+    expect(byId.get(s1!.id)!.status).toBe('scheduled');
+    expect(byId.get(s2!.id)!.status).toBe('done');
+    for (const s of [s3!, s4!]) {
+      expect(byId.get(s.id)).toMatchObject({ status: 'cancelled', cancelReason: 'game_finished' });
+    }
+    const ev = await eventsOf('session.cancelled');
+    expect(ev.map((e) => e.entityId).sort()).toEqual([s3!.id, s4!.id].sort());
+    for (const e of ev) expect(e.payload).toMatchObject({ gameId, reason: 'game_finished' });
+  });
+
+  it('cancelling a game cancels its future sessions with game_cancelled', async () => {
+    const { gm, gameId } = await weekly();
+    expect((await call('post', `/api/games/${gameId}/cancel`, gm.cookie)).status).toBe(200);
+    const r = await rows(gameId);
+    expect(r).toHaveLength(4);
+    for (const s of r) {
+      expect(s).toMatchObject({ status: 'cancelled', cancelReason: 'game_cancelled' });
+    }
+    expect(await eventsOf('session.cancelled')).toHaveLength(4);
+  });
+
+  it('deleting the GM account cancels the future sessions of their games', async () => {
+    const { gm, gameId } = await weekly();
+    await deleteAccount(deps, gm.id);
+    const r = await rows(gameId);
+    expect(r).toHaveLength(4);
+    for (const s of r) {
+      expect(s).toMatchObject({ status: 'cancelled', cancelReason: 'game_cancelled' });
+    }
+    expect(await eventsOf('session.cancelled')).toHaveLength(4);
+  });
+
+  it('oneshot far beyond the window: session exists from publish; finish marks it done', async () => {
+    const { gm, gameId } = await oneshot({ startsAt: kyivAt(45).startsAt });
+    const [s] = await rows(gameId);
+    expect(s).toMatchObject({ status: 'scheduled' });
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    await call('post', `/api/games/${gameId}/finish`, gm.cookie);
+    const after = await rows(gameId);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ id: s!.id, status: 'done' });
+    expect(await eventsOf('session.cancelled')).toHaveLength(0);
+  });
+});
+
+describe('nextSessionAt from materialized sessions (R4)', () => {
+  it('rescheduled next session shows the new time; cancelled one is skipped', async () => {
+    const { gm, gameId } = await weekly();
+    const [s1, s2] = await rows(gameId);
+    const next = async () => {
+      const g = await call('get', `/api/games/${gameId}`, gm.cookie);
+      const mine = await call('get', '/api/games/mine', gm.cookie);
+      const card = mine.body.find((c: { id: number }) => c.id === gameId);
+      expect(card.nextSessionAt).toBe(g.body.nextSessionAt);
+      return g.body.nextSessionAt as string | null;
+    };
+    expect(await next()).toBe(s1!.startsAt.toISOString());
+    const moved = kyivAt(1, 10).startsAt;
+    await call('post', `/api/sessions/${s1!.id}/reschedule`, gm.cookie, { startsAt: moved });
+    expect(await next()).toBe(moved);
+    await call('post', `/api/sessions/${s1!.id}/cancel`, gm.cookie, { reason: 'хворію' });
+    expect(await next()).toBe(s2!.startsAt.toISOString());
+  });
+
+  it('all materialized sessions cancelled → first rule slot after them', async () => {
+    const { gm, gameId, first } = await weekly();
+    for (const s of await rows(gameId)) {
+      await call('post', `/api/sessions/${s.id}/cancel`, gm.cookie, { reason: 'відпустка' });
+    }
+    const g = await call('get', `/api/games/${gameId}`, gm.cookie);
+    // П'ятий тиждень від першої сесії — у той самий місцевий час.
+    const z = toZoned(new Date(new Date(first.startsAt).getTime() + 28 * DAY), TZ);
+    const expected = zonedToUtc(
+      { year: z.year, month: z.month, day: z.day, hour: 19, minute: 0 },
+      TZ,
+    );
+    expect(g.body.nextSessionAt).toBe(expected.toISOString());
+  });
+});
+
+describe('PATCH of the schedule on a published game (R4)', () => {
+  afterEach(() => {
+    patchHooks.beforeWrite = undefined;
+  });
+
+  it('started oneshot: past startsAt → 422; moving it leaves a single session', async () => {
+    const { gm, gameId } = await oneshot();
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    const [s] = await rows(gameId);
+    await moveToPast(s!.id);
+    const past = await call('patch', `/api/games/${gameId}`, gm.cookie, {
+      startsAt: new Date(Math.floor((Date.now() - DAY) / 60_000) * 60_000).toISOString(),
+    });
+    expect(past.status).toBe(422);
+    const to = kyivAt(5).startsAt;
+    const ok = await call('patch', `/api/games/${gameId}`, gm.cookie, { startsAt: to });
+    expect(ok.status).toBe(200);
+    const r = await rows(gameId);
+    expect(r.map((x) => [x.startsAt.toISOString(), x.status])).toEqual([[to, 'scheduled']]);
+  });
+
+  it('a oneshot whose session is done cannot be moved → 409', async () => {
+    const { gm, gameId } = await oneshot();
+    const [s] = await rows(gameId);
+    await db
+      .update(gameSessions)
+      .set({ status: 'done', doneAt: new Date() })
+      .where(eq(gameSessions.id, s!.id));
+    const to = kyivAt(6).startsAt;
+    const r = await call('patch', `/api/games/${gameId}`, gm.cookie, { startsAt: to });
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('SESSION_INVALID_STATE');
+  });
+
+  it('started campaign: rule change with a past anchor → 422', async () => {
+    const { gm, gameId, first } = await weekly();
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    await db
+      .update(games)
+      .set({ startsAt: new Date(Date.parse(first.startsAt) - 14 * DAY) })
+      .where(eq(games.id, gameId));
+    const bad = await call('patch', `/api/games/${gameId}`, gm.cookie, { durationMinutes: 180 });
+    expect(bad.status).toBe(422);
+    expect(bad.body.error.code).toBe('GAME_IN_PAST');
+  });
+
+  it('PATCH merges onto the fresh row (no lost update from a concurrent rule change)', async () => {
+    const { gm, gameId } = await weekly();
+    const sched = kyivAt(3);
+    patchHooks.beforeWrite = async (id) => {
+      const r = await call('put', `/api/games/${id}/schedule`, gm.cookie, {
+        recurrence: 'weekly',
+        weekdays: [sched.weekday],
+        startsAt: sched.startsAt,
+      });
+      expect(r.status).toBe(200);
+    };
+    const res = await call('patch', `/api/games/${gameId}`, gm.cookie, { title: 'Нова назва' });
+    expect(res.status).toBe(200);
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.title).toBe('Нова назва');
+    expect(g!.startsAt.toISOString()).toBe(sched.startsAt);
+    expect(g!.weekdays).toEqual([sched.weekday]);
   });
 });
