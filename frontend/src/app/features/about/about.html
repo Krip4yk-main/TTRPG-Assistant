@@ -9,7 +9,9 @@
   <dl class="nri-card credits">
     @for (link of authorLinks; track link.key) {
       <dt>{{ link.key | translate }}</dt>
-      <dd>{{ link.value }}</dd>
+      <dd>
+        <a [href]="link.href" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+      </dd>
     }
   </dl>
 </section>

@@ -127,7 +127,7 @@ docker run --rm --env-file backend/.env nri-backend node --import tsx src/cli/se
 
 ## Автор
 
-- GitHub: <GITHUB_URL>
-- Email: <EMAIL>
-- Telegram: <TELEGRAM>
-- LinkedIn: <LINKEDIN>
+- GitHub: [Krip4yk-main](https://github.com/Krip4yk-main)
+- Email: [krip4yk.main@gmail.com](mailto:krip4yk.main@gmail.com)
+- Telegram: [@krip4yk](https://t.me/krip4yk)
+- LinkedIn: [Viacheslav Mykhalchenko](https://www.linkedin.com/in/viacheslav-mykhalchenko-752042171/)

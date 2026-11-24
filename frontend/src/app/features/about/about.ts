@@ -1,12 +1,20 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 
-/** Кредити автора — плейсхолдери, як у README (заповнює власник). */
+/** Публічні контакти автора. `label` — відображуваний текст, `href` — посилання. */
 const AUTHOR_LINKS = [
-  { key: 'about.author.github', value: '<GITHUB_URL>' },
-  { key: 'about.author.email', value: '<EMAIL>' },
-  { key: 'about.author.telegram', value: '<TELEGRAM>' },
-  { key: 'about.author.linkedin', value: '<LINKEDIN>' },
+  { key: 'about.author.github', label: 'Krip4yk-main', href: 'https://github.com/Krip4yk-main' },
+  {
+    key: 'about.author.email',
+    label: 'krip4yk.main@gmail.com',
+    href: 'mailto:krip4yk.main@gmail.com',
+  },
+  { key: 'about.author.telegram', label: '@krip4yk', href: 'https://t.me/krip4yk' },
+  {
+    key: 'about.author.linkedin',
+    label: 'Viacheslav Mykhalchenko',
+    href: 'https://www.linkedin.com/in/viacheslav-mykhalchenko-752042171/',
+  },
 ] as const;
 
 @Component({
