@@ -2,7 +2,14 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { leaveGameInputSchema, type BlacklistEntryDto, type MemberDto } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { cancelPendingOfUser, type Tx } from '../applications/applications.rules.js';
-import { gameBans, gameMembers, games, gmBlacklist, users } from '../db/schema/index.js';
+import {
+  calendarPinnedGames,
+  gameBans,
+  gameMembers,
+  games,
+  gmBlacklist,
+  users,
+} from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
@@ -28,6 +35,13 @@ function assertVisible(g: GameRow, userId: number): void {
 function assertGm(g: GameRow, userId: number): void {
   assertVisible(g, userId);
   if (g.gmUserId !== userId) throw new AppError(403, 'FORBIDDEN');
+}
+
+/** Завершене членство знімає ручне закріплення гри в календарі. */
+async function unpinGame(tx: Tx, userId: number, gameId: number): Promise<void> {
+  await tx
+    .delete(calendarPinnedGames)
+    .where(and(eq(calendarPinnedGames.userId, userId), eq(calendarPinnedGames.gameId, gameId)));
 }
 
 async function activeMembership(tx: Tx | AppDeps['db'], gameId: number, userId: number) {
@@ -113,6 +127,7 @@ export async function leaveGame(
       })
       .where(and(eq(gameMembers.id, m.id), isNull(gameMembers.leftAt)));
     if (res.affectedRows === 0) throw new AppError(403, 'NOT_A_MEMBER');
+    await unpinGame(tx, userId, gameId);
   });
   await logEvent(deps.db, {
     type: 'member.left',
@@ -148,6 +163,7 @@ export async function kickMember(
         ),
       );
     if (res.affectedRows === 0) throw new AppError(404, 'NOT_FOUND');
+    await unpinGame(tx, target.id, gameId);
   });
   await logEvent(deps.db, {
     type: 'member.kicked',
@@ -190,6 +206,7 @@ export async function banMember(
         ),
       );
     const cancelled = await cancelPendingOfUser(tx, gameId, target.id, 'banned', now);
+    await unpinGame(tx, target.id, gameId);
     return { wasMember: res.affectedRows > 0, cancelled };
   });
   await logEvent(deps.db, {

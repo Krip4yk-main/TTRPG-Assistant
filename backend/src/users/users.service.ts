@@ -17,6 +17,7 @@ import { isDuplicateKey, subjectHash } from '../auth/identity.service.js';
 import {
   authIdentities,
   availabilityBusyDates,
+  calendarPinnedGames,
   availabilitySlots,
   gameApplications,
   gameMembers,
@@ -295,6 +296,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
     await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
+    await tx.delete(calendarPinnedGames).where(eq(calendarPinnedGames.userId, userId));
     // Склад завершених/скасованих ігор лишаємо: історія інших гравців зберігається, а
     // видалений користувач показується анонімно. Виходимо лише з активних ігор.
     // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри):
