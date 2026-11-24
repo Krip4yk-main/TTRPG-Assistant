@@ -141,20 +141,30 @@ describe('telegram routes', () => {
 
   it('rejects invalid body shape with 400', async () => {
     const { agent, csrf } = await agentWithCsrf(createApp(deps));
-    const res = await agent.post('/api/auth/telegram').set('x-csrf-token', csrf).send({ id: [1] });
+    const res = await agent
+      .post('/api/auth/telegram')
+      .set('x-csrf-token', csrf)
+      .send({ id: [1] });
     expect(res.status).toBe(400);
   });
 
   it('banned existing user gets 403 ACCOUNT_BANNED and no session', async () => {
     const app = createApp(deps);
     const first = await agentWithCsrf(app);
-    await first.agent.post('/api/auth/telegram').set('x-csrf-token', first.csrf).send(widget('888'));
+    await first.agent
+      .post('/api/auth/telegram')
+      .set('x-csrf-token', first.csrf)
+      .send(widget('888'));
     await db.update(users).set({ isBanned: true });
     await db.delete(sessions);
     const { agent, csrf } = await agentWithCsrf(app);
-    const res = await agent.post('/api/auth/telegram').set('x-csrf-token', csrf).send(widget('888'));
+    const res = await agent
+      .post('/api/auth/telegram')
+      .set('x-csrf-token', csrf)
+      .send(widget('888'));
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ACCOUNT_BANNED');
+    expect(res.body.error.details).toEqual({ appealToken: expect.any(String), appealSent: false });
     expect(cookies(res)).not.toMatch(/nri_sid/);
     expect(await db.select().from(sessions)).toHaveLength(0);
   });

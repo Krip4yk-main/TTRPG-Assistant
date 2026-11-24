@@ -11,6 +11,7 @@ import { AppError } from '../http/errors.js';
 import { devLoginEnabled, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
 import { getMe } from '../users/users.service.js';
+import { bannedError, issueAppealToken } from '../appeals/appeals.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
 import { defaultOAuthProviders } from './providers/index.js';
 import { logoutHandlers, requireAuth } from './session.middleware.js';
@@ -128,7 +129,7 @@ export function authRouter(deps: AppDeps): Router {
     const { userId } = await resolveLogin(deps, identity);
     const [u] = await db.select().from(users).where(eq(users.id, userId));
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
-    if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
+    if (u.isBanned) throw await bannedError(deps, userId);
     await startSession(req, res, userId);
     res.json({ user: await getMe(deps, userId) });
   });
@@ -288,7 +289,10 @@ export function authRouter(deps: AppDeps): Router {
       const { userId } = await resolveLogin(deps, identity);
       const [u] = await db.select().from(users).where(eq(users.id, userId));
       if (!u || u.status === 'deleted') return res.redirect('/login?error=UNAUTHENTICATED');
-      if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
+      if (u.isBanned) {
+        const { appealToken } = await issueAppealToken(deps, userId);
+        return res.redirect(`/login?error=ACCOUNT_BANNED&appeal=${appealToken}`);
+      }
       await startSession(req, res, userId);
       return res.redirect(u.status === 'pending' ? '/complete-profile' : safeReturnTo(st.returnTo));
     } catch (err) {

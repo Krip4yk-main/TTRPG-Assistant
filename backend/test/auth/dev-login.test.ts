@@ -61,7 +61,10 @@ describe('dev-login proxy hardening', () => {
     expect(res.status).toBe(404);
   });
   it('404 for local socket with X-Forwarded-For', async () => {
-    const res = await post(await appWith(DEV), { nickname: 'Hero' }).set('X-Forwarded-For', '8.8.8.8');
+    const res = await post(await appWith(DEV), { nickname: 'Hero' }).set(
+      'X-Forwarded-For',
+      '8.8.8.8',
+    );
     expect(res.status).toBe(404);
   });
 });
@@ -84,7 +87,10 @@ describe('POST /api/auth/dev-login', () => {
   });
 
   it('404 when NODE_ENV=production or DEV_LOGIN_ENABLED=false', async () => {
-    for (const extra of [{ ...DEV, NODE_ENV: 'production' }, { ...DEV, DEV_LOGIN_ENABLED: 'false' }]) {
+    for (const extra of [
+      { ...DEV, NODE_ENV: 'production' },
+      { ...DEV, DEV_LOGIN_ENABLED: 'false' },
+    ]) {
       const res = await post(await appWith(extra), { nickname: 'Hero' });
       expect(res.status).toBe(404);
       expect(res.body).toEqual({ error: { code: 'NOT_FOUND' } });
@@ -94,7 +100,11 @@ describe('POST /api/auth/dev-login', () => {
   it('owner: no key / wrong key -> 403, right key -> 200', async () => {
     await createUser(db, { nickname: 'Boss', role: 'owner' });
     const app = await appWith(DEV);
-    for (const body of [{ nickname: 'Boss' }, { nickname: 'Boss', ownerKey: 'nope' }, { nickname: 'Boss', ownerKey: 'sekret-keyX' }]) {
+    for (const body of [
+      { nickname: 'Boss' },
+      { nickname: 'Boss', ownerKey: 'nope' },
+      { nickname: 'Boss', ownerKey: 'sekret-keyX' },
+    ]) {
       const r = await post(app, body);
       expect(r.status).toBe(403);
       expect(r.body).toEqual({ error: { code: 'FORBIDDEN' } });
@@ -124,7 +134,12 @@ describe('POST /api/auth/dev-login', () => {
     await db.update(users).set({ isBanned: true }).where(eq(users.nickname, 'Bad'));
     const res = await post(app, { nickname: 'Bad' });
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ error: { code: 'ACCOUNT_BANNED' } });
+    expect(res.body).toEqual({
+      error: {
+        code: 'ACCOUNT_BANNED',
+        details: { appealToken: expect.any(String), appealSent: false },
+      },
+    });
     expect((await post(app, {})).status).toBe(400);
     expect((await post(app, { nickname: 'x'.repeat(33) })).status).toBe(400);
   });

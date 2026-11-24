@@ -310,7 +310,12 @@ describe('google oauth', () => {
     const a2 = request.agent(createApp(deps));
     const s2 = await startFlow(a2);
     const res = await a2.get(`/api/auth/google/callback?code=c&state=${s2.state}`);
-    expect(res.headers.location).toBe('/login?error=ACCOUNT_BANNED');
+    const loc = new URL(res.headers.location as string, 'http://x.invalid');
+    expect(loc.pathname).toBe('/login');
+    expect(loc.searchParams.get('error')).toBe('ACCOUNT_BANNED');
+    const appeal = loc.searchParams.get('appeal');
+    expect(appeal).toMatch(/^[A-Za-z0-9_-]{22,}$/);
+    expect(await redis.get(`appeal:${appeal}`)).not.toBeNull();
     expect(cookies(res)).not.toMatch(/nri_sid/);
   });
 

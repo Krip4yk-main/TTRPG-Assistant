@@ -44,7 +44,12 @@ export type Clock = () => Date;
  * (далі 401). Рядки БД тут свідомо лишаються, щоб перший запит отримав зрозумілий 403.
  */
 export async function banUser(deps: AppDeps, userId: number): Promise<void> {
-  await deps.db.update(users).set({ isBanned: true }).where(eq(users.id, userId));
+  // Новий період бану (ban_epoch+1) лише для незабаненого: повторний виклик не відкриває
+  // ще одну апеляцію.
+  await deps.db
+    .update(users)
+    .set({ isBanned: true, banEpoch: sql`${users.banEpoch} + 1` })
+    .where(and(eq(users.id, userId), eq(users.isBanned, false)));
   await evictUserSessionCache(deps, userId);
   deps.realtime?.disconnectUser(userId);
 }

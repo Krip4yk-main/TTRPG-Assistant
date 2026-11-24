@@ -8,6 +8,7 @@ import type { Redis } from './redis/client.js';
 import { AppError, errorHandler, notFoundHandler } from './http/errors.js';
 import type { OAuthProvider } from './auth/providers/oauth.js';
 import { authRouter } from './auth/auth.routes.js';
+import { appealsRouter } from './appeals/appeals.routes.js';
 import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
 import { internalRouter } from './internal/internal.routes.js';
 import { usersRouter } from './users/users.routes.js';
@@ -49,14 +50,15 @@ export function createApp(deps: AppDeps): express.Express {
 
   app.use(helmet());
   app.use(cookieParser());
+  // Поза /api: без сесії, CSRF-cookie та загального rate limiter (лише GET — тіло не потрібне).
+  app.use(seoRootRouter(deps));
+  // Rate limiter — ДО парсерів тіла: клієнт поза лімітом не змусить розбирати 1 МБ.
+  app.use(['/api/auth', '/api/appeals'], limits.auth);
+  app.use('/api', limits.general);
   // Нотатки до 200 000 символів (кирилиця ≈ 400 КБ): окремий ліміт, змонтований ДО глобального
   // (body-parser пропускає вже розібране тіло).
   app.use(['/api/games/:id/notes', '/api/sessions/:id/notes'], express.json({ limit: '1mb' }));
   app.use(express.json({ limit: '100kb' }));
-  // Поза /api: без сесії, CSRF-cookie та загального rate limiter.
-  app.use(seoRootRouter(deps));
-  app.use('/api/auth', limits.auth);
-  app.use('/api', limits.general);
   app.use(csrfProtection(env));
   app.use(loadSession(deps));
 
@@ -66,6 +68,7 @@ export function createApp(deps: AppDeps): express.Express {
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));
+  app.use('/api/appeals', appealsRouter(deps));
   app.use('/api/me/profile', profileRouter(deps));
   app.use('/api/me/availability', availabilityRouter(deps));
   app.use('/api/me/applications', myApplicationsRouter(deps));

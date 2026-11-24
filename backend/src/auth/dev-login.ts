@@ -9,6 +9,7 @@ import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { getMe } from '../users/users.service.js';
 import { isDuplicateKey, resolveLogin } from './identity.service.js';
+import { bannedError } from '../appeals/appeals.service.js';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -80,7 +81,7 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
       if (u.role === 'owner' && !ownerKeyMatches(env.DEV_OWNER_KEY, ownerKey)) {
         throw new AppError(403, 'FORBIDDEN');
       }
-      if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
+      if (u.isBanned) throw await bannedError(deps, u.id);
       await startSession(req, res, userId);
       res.json({ user: await getMe(deps, u.id) });
       return;

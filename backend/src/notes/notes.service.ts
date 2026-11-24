@@ -10,6 +10,7 @@ import type { AppDeps } from '../app.js';
 import { gameMembers, games, gameSessions, notes, users } from '../db/schema/index.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
+import { isDuplicateKey } from '../auth/identity.service.js';
 
 type GameRow = typeof games.$inferSelect;
 type NoteRow = typeof notes.$inferSelect;
@@ -90,11 +91,16 @@ async function writeOwn(
   const input = noteUpdateSchema.parse(rawBody);
   let ok: boolean;
   if (input.version === 0) {
-    const [res] = await deps.db
-      .insert(notes)
-      .ignore()
-      .values({ scope, gameId, sessionId, userId, body: input.body, version: 1 });
-    ok = res.affectedRows > 0;
+    // Лише дубль ключа — конфлікт; решта помилок (FK, обрізання тощо) не ховається за IGNORE.
+    try {
+      await deps.db
+        .insert(notes)
+        .values({ scope, gameId, sessionId, userId, body: input.body, version: 1 });
+      ok = true;
+    } catch (err) {
+      if (!isDuplicateKey(err)) throw err;
+      ok = false;
+    }
   } else {
     const [res] = await deps.db
       .update(notes)

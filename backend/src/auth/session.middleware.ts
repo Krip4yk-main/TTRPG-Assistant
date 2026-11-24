@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import type { AppDeps } from '../app.js';
 import { AppError } from '../http/errors.js';
+import { bannedError } from '../appeals/appeals.service.js';
 import {
   clearSessionCookie,
   resolveSessionDetailed,
@@ -42,7 +43,8 @@ export function requireAuth(deps: AppDeps): RequestHandler {
     // (повз banUser) обмежений TTL кешу (≤5 хв).
     if (req.user.isBanned) {
       await revokeAllUserSessions(deps, req.user.userId);
-      throw new AppError(403, 'ACCOUNT_BANNED');
+      // Токен апеляції — фронтенд покаже форму після бану посеред сесії.
+      throw await bannedError(deps, req.user.userId);
     }
     next();
   };
@@ -53,7 +55,10 @@ export const requireActive: RequestHandler = (req, _res, next) => {
   next();
 };
 
-export function logoutHandlers(deps: AppDeps): { logout: RequestHandler; logoutAll: RequestHandler } {
+export function logoutHandlers(deps: AppDeps): {
+  logout: RequestHandler;
+  logoutAll: RequestHandler;
+} {
   return {
     logout: async (req: Request, res) => {
       await revokeSession(deps, req.sessionToken!, req.user!.userId);
