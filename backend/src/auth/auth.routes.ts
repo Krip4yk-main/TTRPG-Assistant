@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { AppDeps } from '../app.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { devLoginEnabled, devLoginRouter } from './dev-login.js';
+import { devLoginEnabled, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
 import { defaultOAuthProviders } from './providers/index.js';
@@ -87,6 +87,7 @@ export function authRouter(deps: AppDeps): Router {
     setSessionCookie(res, token, expiresAt, env);
   };
 
+  warnDevLoginMisconfig(env);
   if (devLoginEnabled(env)) router.use(devLoginRouter(deps, startSession));
 
   const requireTelegram: RequestHandler = (_req, _res, next) => {

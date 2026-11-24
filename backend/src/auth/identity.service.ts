@@ -11,7 +11,7 @@ type Deps = Pick<AppDeps, 'env' | 'db'>;
 export const subjectHash = (provider: Provider, subject: string, pepper: string): string =>
   createHmac('sha256', pepper).update(`${provider}:${subject}`).digest('hex');
 
-function isDuplicateKey(err: unknown): boolean {
+export function isDuplicateKey(err: unknown): boolean {
   for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
     const o = e as { code?: string; errno?: number };
     if (o.code === 'ER_DUP_ENTRY' || o.errno === 1062) return true;

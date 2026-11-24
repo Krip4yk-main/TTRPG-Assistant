@@ -7,18 +7,34 @@ import type { AppDeps } from '../app.js';
 import type { Env } from '../config/env.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { resolveLogin } from './identity.service.js';
+import { isDuplicateKey, resolveLogin } from './identity.service.js';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
 /** Лише адреса TCP-сокета; X-Forwarded-* і req.ip ігноруються навмисно. */
+const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'x-real-ip', 'forwarded'];
+
+/** Запит із проксі-заголовками вважається не локальним (reverse proxy на тому ж хості). */
 export function isLocalRequest(req: Pick<Request, 'socket' | 'headers'>): boolean {
+  if (PROXY_HEADERS.some((h) => req.headers?.[h] !== undefined)) return false;
   const addr = req.socket?.remoteAddress;
   return typeof addr === 'string' && LOOPBACK.has(addr);
 }
 
-export const devLoginEnabled = (env: Pick<Env, 'NODE_ENV' | 'DEV_LOGIN_ENABLED'>): boolean =>
-  env.NODE_ENV === 'development' && env.DEV_LOGIN_ENABLED;
+type DevEnv = Pick<Env, 'NODE_ENV' | 'DEV_LOGIN_ENABLED' | 'TRUST_PROXY'>;
+
+export const devLoginEnabled = (env: DevEnv): boolean =>
+  env.NODE_ENV === 'development' && env.DEV_LOGIN_ENABLED && env.TRUST_PROXY === 0;
+
+/** Гучне попередження, якщо dev-вхід увімкнено, але середовище виглядає небезпечним. */
+export function warnDevLoginMisconfig(env: DevEnv): void {
+  if (env.DEV_LOGIN_ENABLED && !devLoginEnabled(env)) {
+    console.warn(
+      '[SECURITY] DEV_LOGIN_ENABLED=true, але NODE_ENV!=development або TRUST_PROXY>0: dev-вхід вимкнено. ' +
+        'Не вмикайте DEV_LOGIN_ENABLED поза локальною розробкою.',
+    );
+  }
+}
 
 function ownerKeyMatches(expected: string | undefined, given: string | undefined): boolean {
   if (!expected || !given) return false;
@@ -32,14 +48,6 @@ const bodySchema = devLoginSchema.extend({
 });
 
 type StartSession = (req: Request, res: Response, userId: number) => Promise<void>;
-
-function isDuplicateKey(err: unknown): boolean {
-  for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
-    const o = e as { code?: string; errno?: number };
-    if (o.code === 'ER_DUP_ENTRY' || o.errno === 1062) return true;
-  }
-  return false;
-}
 
 /** Монтувати лише коли `devLoginEnabled(env)`. Не локальний запит → 404, як невідомий маршрут. */
 export function devLoginRouter(deps: AppDeps, startSession: StartSession): Router {
@@ -88,9 +96,11 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
         .set({ status: 'active', nickname, birthDate: '2000-01-01' })
         .where(eq(users.id, created.userId));
     } catch (err) {
-      // Гонка за нікнейм: прибираємо щойно створеного pending-користувача.
-      await db.delete(authIdentities).where(eq(authIdentities.userId, created.userId));
-      await db.delete(users).where(eq(users.id, created.userId));
+      // Гонка за нікнейм: прибираємо лише те, що створив цей запит.
+      if (created.isNew) {
+        await db.delete(authIdentities).where(eq(authIdentities.userId, created.userId));
+        await db.delete(users).where(eq(users.id, created.userId));
+      }
       if (isDuplicateKey(err)) throw new AppError(409, 'NICKNAME_TAKEN');
       throw err;
     }

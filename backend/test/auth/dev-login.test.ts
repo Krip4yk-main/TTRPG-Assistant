@@ -49,6 +49,23 @@ describe('isLocalRequest', () => {
   });
 });
 
+describe('dev-login proxy hardening', () => {
+  it('isLocalRequest false when any proxy header present', () => {
+    for (const h of ['x-forwarded-for', 'x-forwarded-host', 'x-real-ip', 'forwarded'])
+      expect(
+        isLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { [h]: 'x' } } as never),
+      ).toBe(false);
+  });
+  it('404 when TRUST_PROXY>0', async () => {
+    const res = await post(await appWith({ ...DEV, TRUST_PROXY: '1' }), { nickname: 'Hero' });
+    expect(res.status).toBe(404);
+  });
+  it('404 for local socket with X-Forwarded-For', async () => {
+    const res = await post(await appWith(DEV), { nickname: 'Hero' }).set('X-Forwarded-For', '8.8.8.8');
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('POST /api/auth/dev-login', () => {
   it('logs in from localhost, creating an active dev user and cookie', async () => {
     const app = await appWith(DEV);
