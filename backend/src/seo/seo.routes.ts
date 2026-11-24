@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { games, users } from '../db/schema/index.js';
-import { AppError } from '../http/errors.js';
-import { getPublicProfile } from '../profiles/profiles.service.js';
+import { getPublicProfileHead } from '../profiles/profiles.service.js';
 
 const SITE_NAME = 'НРІ Асистент';
 const NEUTRAL_TITLE = SITE_NAME;
 const MAX_DESCRIPTION = 200;
 const SITEMAP_LIMIT = 50_000;
+const SITEMAP_KEY = 'seo:sitemap';
+const SITEMAP_TTL_SEC = 600;
 const CACHE = 'public, max-age=3600';
 
 const ESCAPES: Record<string, string> = {
@@ -50,7 +51,7 @@ function renderOg(o: OgInput): string {
     `<meta property="og:type" content="${o.type}">`,
     `<meta property="og:title" content="${title}">`,
     `<meta property="og:url" content="${escapeHtml(o.url)}">`,
-    `<meta name="twitter:card" content="${o.image ? 'summary_large_image' : 'summary'}">`,
+    `<meta name="twitter:card" content="${o.image?.startsWith('https://') ? 'summary_large_image' : 'summary'}">`,
     `<meta name="twitter:title" content="${title}">`,
   ];
   if (o.description) {
@@ -61,7 +62,7 @@ function renderOg(o: OgInput): string {
       `<meta name="twitter:description" content="${d}">`,
     );
   }
-  if (o.image) {
+  if (o.image?.startsWith('https://')) {
     const i = escapeHtml(o.image);
     tags.push(
       `<meta property="og:image" content="${i}">`,
@@ -96,6 +97,11 @@ export function seoRootRouter(deps: AppDeps): Router {
   });
 
   router.get('/sitemap.xml', async (_req, res) => {
+    const cached = await deps.redis.get(SITEMAP_KEY);
+    if (cached) {
+      res.set('Cache-Control', CACHE).type('application/xml').send(cached);
+      return;
+    }
     const gameRows = await db
       .select({ id: games.id, updatedAt: games.updatedAt })
       .from(games)
@@ -118,12 +124,9 @@ export function seoRootRouter(deps: AppDeps): Router {
       ...gameRows.map((g) => entry(`/games/${g.id}`, g.updatedAt)),
       ...userRows.map((u) => entry(`/users/${u.publicId}`, u.updatedAt)),
     ];
-    res
-      .set('Cache-Control', CACHE)
-      .type('application/xml')
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`,
-      );
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+    await deps.redis.set(SITEMAP_KEY, xml, 'EX', SITEMAP_TTL_SEC);
+    res.set('Cache-Control', CACHE).type('application/xml').send(xml);
   });
 
   return router;
@@ -164,17 +167,12 @@ export function ogRouter(deps: AppDeps): Router {
   router.get('/users/:publicId', async (req, res) => {
     const publicId = req.params.publicId;
     const url = `${base}/users/${encodeURIComponent(publicId)}`;
-    let profile;
-    try {
-      profile = await getPublicProfile(deps, publicId, null);
-    } catch (e) {
-      if (e instanceof AppError && e.status === 404) {
-        sendHtml(res, neutral(`${base}/`), 404);
-        return;
-      }
-      throw e;
+    const profile = await getPublicProfileHead(deps, publicId);
+    if (!profile) {
+      sendHtml(res, neutral(`${base}/`), 404);
+      return;
     }
-    if (profile.status === 'deleted') {
+    if (profile.status === 'deleted' || profile.isBanned) {
       sendHtml(res, neutral(url));
       return;
     }

@@ -121,3 +121,32 @@ export async function getPublicProfile(
   dto.gamesAsPlayer = asPlayer;
   return dto;
 }
+
+export type PublicProfileHead = {
+  status: 'active' | 'deleted';
+  isBanned: boolean;
+  nickname: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+};
+
+/** Легка «голова» профілю для OG: без списків ігор; `null` — немає або ще pending. */
+export async function getPublicProfileHead(
+  deps: AppDeps,
+  publicId: string,
+): Promise<PublicProfileHead | null> {
+  const [u] = await deps.db.select().from(users).where(eq(users.publicId, publicId));
+  if (!u || u.status === 'pending') return null;
+  if (u.status === 'deleted') {
+    return { status: 'deleted', isBanned: false, nickname: null, avatarUrl: null, bio: null };
+  }
+  const row = await loadRow(deps, u.id);
+  const visible = resolvePrivacy(row.privacy);
+  return {
+    status: 'active',
+    isBanned: u.isBanned,
+    nickname: u.nickname,
+    avatarUrl: u.avatarUrl,
+    bio: visible.bio ? row.bio : null,
+  };
+}

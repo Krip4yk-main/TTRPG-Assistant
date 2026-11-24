@@ -152,4 +152,26 @@ describe('og previews', () => {
     expect(del.text).toContain('noindex');
     expect(del.text).not.toContain('Ghost');
   });
+
+  it('hidden bio is not exposed; non-https avatar skipped', async () => {
+    const u = await createUser(db, { nickname: 'Shy', avatarUrl: 'http://x.example/a.png' });
+    await db
+      .insert(userProfiles)
+      .values({ userId: u.id, bio: 'приховано', privacy: { bio: false } });
+    const res = await request(app).get(`/api/og/users/${u.publicId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('приховано');
+    expect(res.text).not.toContain('og:description');
+    expect(res.text).not.toContain('og:image');
+  });
+
+  it('banned user is neutral + noindex; pending is 404', async () => {
+    const b = await createUser(db, { nickname: 'Banned', isBanned: true });
+    const res = await request(app).get(`/api/og/users/${b.publicId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('noindex');
+    expect(res.text).not.toContain('Banned');
+    const p = await createUser(db, { status: 'pending' });
+    expect((await request(app).get(`/api/og/users/${p.publicId}`)).status).toBe(404);
+  });
 });
