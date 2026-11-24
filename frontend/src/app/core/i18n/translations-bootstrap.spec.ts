@@ -1,3 +1,4 @@
+import { Subject } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -27,7 +28,10 @@ describe('завантаження перекладів з authInterceptor', () 
           fallbackLang: 'uk',
           lang: 'uk',
         }),
-        { provide: SocketService, useValue: { connect: vi.fn(), disconnect: vi.fn() } },
+        {
+          provide: SocketService,
+          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+        },
       ],
     });
     const translate = TestBed.inject(TranslateService);

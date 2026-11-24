@@ -3,7 +3,11 @@ import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from '../../src/app.js';
-import { createSession, revokeAllUserSessions, revokeSession } from '../../src/auth/session.service.js';
+import {
+  createSession,
+  revokeAllUserSessions,
+  revokeSession,
+} from '../../src/auth/session.service.js';
 import { banUser } from '../../src/users/users.service.js';
 import { createHttpServer } from '../../src/http-server.js';
 import type { RealtimeHub } from '../../src/realtime/socket.js';
@@ -132,6 +136,45 @@ describe('realtime', () => {
     await revokeAllUserSessions(deps, u.id);
     await gone;
     expect(c.connected).toBe(false);
+  });
+
+  it('logout-all emits session.revoked before disconnect', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = client({ cookie: `nri_sid=${token}` });
+    await waitFor(c, 'connect');
+    const order: string[] = [];
+    c.on('session.revoked', () => order.push('revoked'));
+    const gone = waitFor(c, 'disconnect').then(() => order.push('disconnect'));
+    await revokeAllUserSessions(deps, u.id);
+    await gone;
+    expect(order).toEqual(['revoked', 'disconnect']);
+  });
+
+  it('single logout emits session.revoked only to that session', async () => {
+    const u = await createUser(deps.db);
+    const a = await createSession(deps, u.id, {});
+    const b = await createSession(deps, u.id, {});
+    const ca = client({ cookie: `nri_sid=${a.token}` });
+    const cb = client({ cookie: `nri_sid=${b.token}` });
+    await Promise.all([waitFor(ca, 'connect'), waitFor(cb, 'connect')]);
+    let bGot = false;
+    cb.on('session.revoked', () => (bGot = true));
+    const revoked = waitFor(ca, 'session.revoked');
+    await revokeSession(deps, a.token, u.id);
+    await revoked;
+    await new Promise((r) => setTimeout(r, 100));
+    expect(bGot).toBe(false);
+  });
+
+  it('banUser emits session.revoked', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = client({ cookie: `nri_sid=${token}` });
+    await waitFor(c, 'connect');
+    const revoked = waitFor(c, 'session.revoked');
+    await banUser(deps, u.id);
+    await revoked;
   });
 
   it('logout disconnects only that session', async () => {

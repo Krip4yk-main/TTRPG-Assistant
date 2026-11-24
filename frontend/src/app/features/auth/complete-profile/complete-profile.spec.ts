@@ -1,3 +1,4 @@
+import { Subject } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -30,7 +31,7 @@ describe('CompleteProfile', () => {
         provideRouter([]),
         // Без завантажувача перекладів pipe `translate` повертає сам ключ.
         provideTranslateService(),
-        { provide: SocketService, useValue: { connect: vi.fn(), disconnect: vi.fn() } },
+        { provide: SocketService, useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() } },
       ],
     }).compileComponents();
 

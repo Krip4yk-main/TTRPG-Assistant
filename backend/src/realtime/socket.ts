@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { parse as parseCookie } from 'cookie';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Server } from 'socket.io';
+import { SESSION_REVOKED_EVENT } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { hashToken, resolveSession, SESSION_COOKIE } from '../auth/session.service.js';
 
@@ -67,6 +68,8 @@ export function attachRealtime(
     toRoom: (room, event, payload) => void io.to(room).emit(event, payload),
     disconnectUser: (userId) => {
       try {
+        // Клієнт має дізнатися причину до розриву (інакше не відрізнить від мережевого збою).
+        io.in(userRoom(userId)).emit(SESSION_REVOKED_EVENT);
         io.in(userRoom(userId)).disconnectSockets(true);
       } catch (err) {
         logErr(err);
@@ -74,6 +77,7 @@ export function attachRealtime(
     },
     disconnectSession: (hash) => {
       try {
+        io.in(sessionRoom(hash)).emit(SESSION_REVOKED_EVENT);
         io.in(sessionRoom(hash)).disconnectSockets(true);
       } catch (err) {
         logErr(err);

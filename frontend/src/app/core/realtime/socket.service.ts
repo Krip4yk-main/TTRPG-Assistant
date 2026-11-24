@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { io, type Socket } from 'socket.io-client';
 
 /**
@@ -10,6 +10,13 @@ import { io, type Socket } from 'socket.io-client';
 @Injectable({ providedIn: 'root' })
 export class SocketService {
   private socket: Socket | null = null;
+  private readonly lost = new Subject<void>();
+
+  /**
+   * Сервер дав зрозуміти, що сесію втрачено (відкликано, бан, видалення акаунта).
+   * Тимчасові мережеві розриви сюди не потрапляють: socket.io перепідключиться сам.
+   */
+  readonly sessionLost$: Observable<void> = this.lost.asObservable();
 
   connect(): void {
     const socket = this.ensure();
@@ -30,7 +37,21 @@ export class SocketService {
   }
 
   private ensure(): Socket {
-    this.socket ??= io({ path: '/socket.io', withCredentials: true, autoConnect: false });
+    if (!this.socket) {
+      const socket = io({ path: '/socket.io', withCredentials: true, autoConnect: false });
+      // Дзеркало SESSION_REVOKED_EVENT з @nri/shared (фронтенд не тягне shared заради рядка).
+      socket.on('session.revoked', () => this.lost.next());
+      // Сервер сам розірвав з'єднання (disconnectSockets) — це не мережа.
+      socket.on('disconnect', (reason: string) => {
+        if (reason === 'io server disconnect') this.lost.next();
+      });
+      socket.on('connect_error', (err: Error) => {
+        if (err.message === 'UNAUTHENTICATED' || err.message === 'PROFILE_INCOMPLETE') {
+          this.lost.next();
+        }
+      });
+      this.socket = socket;
+    }
     return this.socket;
   }
 }

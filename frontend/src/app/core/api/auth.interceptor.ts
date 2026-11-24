@@ -3,19 +3,15 @@ import { Injector, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
+import { safeReturnTo } from '../auth/return-to';
+
+export { safeReturnTo };
 
 /** Запити, чий 401 обробляє сам викликач: початкова перевірка сесії та вхід/вихід. */
 function isExempt(method: string, url: string): boolean {
   const path = url.split('?')[0] ?? url;
   if (method === 'GET' && path === '/api/me') return true;
   return path.startsWith('/api/auth/');
-}
-
-/** Безпечний шлях повернення: лише внутрішній, не сторінка входу. */
-export function safeReturnTo(url: string | null | undefined): string | null {
-  if (!url || !url.startsWith('/') || url.startsWith('//') || url.startsWith('/\\')) return null;
-  if (url === '/' || url.startsWith('/login')) return null;
-  return url;
 }
 
 /**

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { Subject, firstValueFrom } from 'rxjs';
 import { authInterceptor } from './auth.interceptor';
 import { AuthStore } from '../auth/auth.store';
 import { SocketService } from '../realtime/socket.service';
@@ -19,7 +19,10 @@ describe('authInterceptor', () => {
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: SocketService, useValue: { connect: vi.fn(), disconnect: vi.fn() } },
+        {
+          provide: SocketService,
+          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject<void>() },
+        },
       ],
     });
     http = TestBed.inject(HttpClient);
