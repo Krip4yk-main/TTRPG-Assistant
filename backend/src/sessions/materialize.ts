@@ -117,8 +117,8 @@ export async function materializeSessions(
  * `origin='rule'`, не перенесені), і матеріалізує нові від `now`. Перенесені, скасовані,
  * завершені й ручні сесії лишаються.
  *
- * Ваншот має рівно одну сесію: новий час замінює її `scheduled`-сесію (навіть перенесену
- * чи минулу), а якщо сесію вже завершено — 409 `SESSION_INVALID_STATE`.
+ * Ваншот має рівно одну сесію: новий час замінює її `scheduled`- чи `cancelled`-сесію
+ * (навіть перенесену чи минулу), а якщо сесію вже завершено — 409 `SESSION_INVALID_STATE`.
  */
 export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Promise<void> {
   if (game.kind === 'oneshot') {
@@ -128,9 +128,16 @@ export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Pro
       .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'done')))
       .limit(1);
     if (done) throw new AppError(409, 'SESSION_INVALID_STATE');
+    // Скасовані теж: інакше скасована сесія зі старим `rule_starts_at` блокувала б (UNIQUE)
+    // нову, якщо час повернули рівно на той самий слот, — і гра лишилась би без сесії.
     await tx
       .delete(gameSessions)
-      .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'scheduled')));
+      .where(
+        and(
+          eq(gameSessions.gameId, game.id),
+          inArray(gameSessions.status, ['scheduled', 'cancelled']),
+        ),
+      );
     await materializeForRow(tx, game, now, game.startsAt);
     return;
   }

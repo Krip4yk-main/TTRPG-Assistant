@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
@@ -20,7 +20,7 @@ import {
   users,
 } from '../../src/db/schema/index.js';
 import { changeBirthDate, completeProfile, deleteAccount } from '../../src/users/users.service.js';
-import { localDate } from '@nri/shared';
+import { ageOn, localDate } from '@nri/shared';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps();
@@ -36,12 +36,31 @@ afterAll(async () => {
   await closeDeps(deps);
 });
 
+/**
+ * Дата народження `y` років тому (+`dayOffset` діб) від СЬОГОДНІШНЬОЇ дати в поясі акаунта
+ * (Europe/Kyiv — пояс тестових користувачів), як рахує бекенд, а не від дати UTC: інакше
+ * о 22:00–24:00 UTC вік виходив би на день «старшим».
+ */
 const yearsAgo = (y: number, dayOffset = 0): string => {
-  const d = new Date();
+  const d = new Date(`${localDate(new Date(), 'Europe/Kyiv')}T00:00:00Z`);
   d.setUTCFullYear(d.getUTCFullYear() - y);
   d.setUTCDate(d.getUTCDate() + dayOffset);
   return d.toISOString().slice(0, 10);
 };
+
+describe('yearsAgo helper', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('builds dates in the account zone (Kyiv), not UTC — 23:30 UTC is already tomorrow', () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-24T23:30:00Z') });
+    const today = localDate(new Date(), 'Europe/Kyiv');
+    expect(today).toBe('2026-11-25');
+    expect(ageOn(yearsAgo(14, 1), today)).toBe(13);
+    expect(ageOn(yearsAgo(14), today)).toBe(14);
+  });
+});
 
 async function login(userId: number): Promise<string> {
   const { token } = await createSession(deps, userId, {});

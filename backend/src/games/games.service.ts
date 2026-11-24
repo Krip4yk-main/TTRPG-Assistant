@@ -392,6 +392,8 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
 
 /** Точка для тестів гонки: викликається між читанням гри й записом `PATCH`. */
 export const patchHooks: { beforeWrite?: (gameId: number) => Promise<void> } = {};
+/** Точка для тестів гонки: між першим читанням гри й транзакцією нового правила розкладу. */
+export const ruleHooks: { beforeWrite?: (gameId: number) => Promise<void> } = {};
 
 export async function updateGame(
   deps: AppDeps,
@@ -523,36 +525,49 @@ export async function changeScheduleRule(
 ): Promise<GameDto> {
   const { db } = deps;
   const input = scheduleRuleInputSchema.parse(body);
-  const { row } = await loadOwned(deps, userId, id);
-  if (row.status !== 'recruiting' && row.status !== 'started') {
-    throw new AppError(409, 'GAME_INVALID_TRANSITION');
-  }
-  if (row.kind !== (mode === 'convert' ? 'oneshot' : 'campaign')) {
-    throw new AppError(409, 'GAME_INVALID_TRANSITION');
-  }
+  // Перше читання — лише доступ (404/403) і швидкі відмови; рішення — на свіжому рядку нижче.
+  const { row: seen } = await loadOwned(deps, userId, id);
+  const check = (row: GameRow) => {
+    if (row.status !== 'recruiting' && row.status !== 'started') {
+      throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    }
+    if (row.kind !== (mode === 'convert' ? 'oneshot' : 'campaign')) {
+      throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    }
+  };
+  check(seen);
   if (mode === 'convert' && input.recurrence === 'none') {
     throw new AppError(400, 'VALIDATION', { reason: 'RECURRENCE_REQUIRED' });
   }
-  const current = toInput(row, await warningIdsOf(deps, id));
-  const next = gameInputSchema(row.timezone).parse({
-    ...current,
-    kind: 'campaign',
-    startsAt: input.startsAt,
-    durationMinutes: input.durationMinutes ?? current.durationMinutes,
-    recurrence: input.recurrence,
-    weekdays: input.weekdays,
-  });
+  await ruleHooks.beforeWrite?.(id);
   const now = new Date();
-  if (new Date(next.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
-  const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(next.startsAt) };
-  await db.transaction(async (tx) => {
-    // Умова за прочитаними статусом і видом: паралельний перехід чи перетворення → 409.
-    const [res] = await tx
-      .update(games)
-      .set(set)
-      .where(and(eq(games.id, id), eq(games.status, row.status), eq(games.kind, row.kind)));
-    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  const { current, next } = await db.transaction(async (tx) => {
+    // Свіжий рядок під X-блокуванням: паралельний PATCH (тривалість, поля) чи перехід
+    // статусу не загубляться й не будуть перезаписані значеннями з першого читання.
+    const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
+    if (!row) throw new AppError(404, 'NOT_FOUND');
+    check(row);
+    const warningIds = (
+      await tx
+        .select({ id: gameContentWarnings.warningId })
+        .from(gameContentWarnings)
+        .where(eq(gameContentWarnings.gameId, id))
+        .orderBy(asc(gameContentWarnings.warningId))
+    ).map((w) => w.id);
+    const current = toInput(row, warningIds);
+    const next = gameInputSchema(row.timezone).parse({
+      ...current,
+      kind: 'campaign',
+      startsAt: input.startsAt,
+      durationMinutes: input.durationMinutes ?? current.durationMinutes,
+      recurrence: input.recurrence,
+      weekdays: input.weekdays,
+    });
+    if (new Date(next.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
+    const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(next.startsAt) };
+    await tx.update(games).set(set).where(eq(games.id, id));
     await replaceRuleSessions(tx, { ...row, ...set }, now);
+    return { current, next };
   });
   await logRuleChanged(
     deps,

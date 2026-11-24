@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { and, asc, eq } from 'drizzle-orm';
 import { toZoned, zonedToUtc, type SessionDto } from '@nri/shared';
 import { createApp } from '../../src/app.js';
-import { patchHooks } from '../../src/games/games.service.js';
+import { patchHooks, ruleHooks } from '../../src/games/games.service.js';
 import { deleteAccount } from '../../src/users/users.service.js';
 import { events, games, gameSessions, sessionAttendance } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
@@ -572,6 +572,7 @@ describe('nextSessionAt from materialized sessions (R4)', () => {
 describe('PATCH of the schedule on a published game (R4)', () => {
   afterEach(() => {
     patchHooks.beforeWrite = undefined;
+    ruleHooks.beforeWrite = undefined;
   });
 
   it('started oneshot: past startsAt → 422; moving it leaves a single session', async () => {
@@ -632,5 +633,39 @@ describe('PATCH of the schedule on a published game (R4)', () => {
     expect(g!.title).toBe('Нова назва');
     expect(g!.startsAt.toISOString()).toBe(sched.startsAt);
     expect(g!.weekdays).toEqual([sched.weekday]);
+  });
+
+  it('PUT /schedule re-reads the game under lock (concurrent duration change kept)', async () => {
+    const { gm, gameId } = await weekly();
+    const sched = kyivAt(3);
+    ruleHooks.beforeWrite = async (id) => {
+      await db.update(games).set({ durationMinutes: 180 }).where(eq(games.id, id));
+    };
+    const res = await call('put', `/api/games/${gameId}/schedule`, gm.cookie, {
+      recurrence: 'weekly',
+      weekdays: [sched.weekday],
+      startsAt: sched.startsAt,
+    });
+    expect(res.status).toBe(200);
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.durationMinutes).toBe(180);
+    const fresh = (await rows(gameId)).filter((r) => r.status === 'scheduled');
+    expect(fresh.length).toBeGreaterThan(0);
+    for (const r of fresh) expect(r.durationMinutes).toBe(180);
+  });
+
+  it('oneshot: cancelled session, moved away and back to the same time → scheduled again', async () => {
+    const { gm, gameId } = await oneshot();
+    const [s] = await rows(gameId);
+    const original = s!.startsAt.toISOString();
+    await call('post', `/api/sessions/${s!.id}/cancel`, gm.cookie, { reason: 'хворію' });
+    const away = await call('patch', `/api/games/${gameId}`, gm.cookie, {
+      startsAt: kyivAt(6).startsAt,
+    });
+    expect(away.status).toBe(200);
+    const back = await call('patch', `/api/games/${gameId}`, gm.cookie, { startsAt: original });
+    expect(back.status).toBe(200);
+    const r = await rows(gameId);
+    expect(r.map((x) => [x.startsAt.toISOString(), x.status])).toEqual([[original, 'scheduled']]);
   });
 });
