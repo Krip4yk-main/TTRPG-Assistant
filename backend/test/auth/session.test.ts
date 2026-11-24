@@ -143,4 +143,16 @@ describe('sessions', () => {
     await redis.set(`sess:${sha(a.token)}`, stale, 'EX', 300);
     await get(a.token).expect(401);
   });
+
+  it('slide never re-caches stale user state (ban during slide)', async () => {
+    const u = await createUser(db);
+    const { token } = await createSession(deps, u.id, {});
+    await get(token).expect(200); // кеш: isBanned=false
+    await redis.del(`slide:${sha(token)}`);
+    await get(token).expect(200); // слайд: кеш не має лишитися застарілим
+    expect(await redis.exists(`sess:${sha(token)}`)).toBe(0);
+    await banUser(deps, u.id);
+    expect((await get(token).expect(403)).body.error.code).toBe('ACCOUNT_BANNED');
+    await get(token).expect(401);
+  });
 });

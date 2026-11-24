@@ -31,7 +31,8 @@ export const hashToken = (token: string): string =>
 const sessKey = (hash: string) => `sess:${hash}`;
 const slideKey = (hash: string) => `slide:${hash}`;
 const revokedKey = (hash: string) => `revoked:${hash}`;
-const REVOKED_TTL_SEC = 300;
+// Інваріант: надгробок живе довше за кеш, тож запис, що «завис», не переживе надгробок.
+const REVOKED_TTL_SEC = CACHE_TTL_SEC + 60;
 const userSetKey = (userId: number) => `usess:${userId}`;
 
 export async function createSession(
@@ -51,7 +52,11 @@ export async function createSession(
   });
   // Щойно створена сесія не потребує одразу «ковзання».
   await redis.set(slideKey(tokenHash), '1', 'EX', SLIDE_INTERVAL_SEC);
-  await redis.sadd(userSetKey(userId), tokenHash);
+  await redis
+    .multi()
+    .sadd(userSetKey(userId), tokenHash)
+    .expire(userSetKey(userId), env.SESSION_TTL_DAYS * 86400)
+    .exec();
   return { token, expiresAt };
 }
 
@@ -139,12 +144,9 @@ export async function resolveSessionDetailed(
       await redis.del(sessKey(hash));
       return null;
     }
-    const entry: CacheEntry = { user, exp: slidTo.getTime() };
-    await redis.set(sessKey(hash), JSON.stringify(entry), 'EX', CACHE_TTL_SEC);
-    if (await redis.exists(revokedKey(hash))) {
-      await redis.del(sessKey(hash));
-      return null;
-    }
+    // Кеш НЕ перезаписуємо застарілим user (міг бути забанений між читанням і записом):
+    // скидаємо запис, наступний запит перечитає користувача з БД.
+    await redis.del(sessKey(hash));
   }
   return { user, slidTo };
 }
@@ -182,10 +184,17 @@ export async function revokeAllUserSessions({ db, redis }: Deps, userId: number)
   await db.delete(sessions).where(eq(sessions.userId, userId));
   const members = await redis.smembers(userSetKey(userId));
   const hashes = new Set([...members, ...rows.map((r) => r.tokenHash)]);
-  for (const h of hashes) await redis.set(revokedKey(h), '1', 'EX', REVOKED_TTL_SEC);
-  const keys = [...hashes].flatMap((h) => [sessKey(h), slideKey(h)]);
-  keys.push(userSetKey(userId));
-  await redis.del(...keys);
+  const purge = async (hs: Iterable<string>) => {
+    for (const h of hs) {
+      await redis.set(revokedKey(h), '1', 'EX', REVOKED_TTL_SEC);
+      await redis.del(sessKey(h), slideKey(h));
+    }
+  };
+  await purge(hashes);
+  // Вхід під час logout-all: додаємо те, що з'явилося в сеті після першого читання.
+  const late = (await redis.smembers(userSetKey(userId))).filter((h) => !hashes.has(h));
+  await purge(late);
+  await redis.del(userSetKey(userId));
 }
 
 export function setSessionCookie(
