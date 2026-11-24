@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "seed:owner": "tsx src/db/seed-owner.ts"
+    "seed:owner": "tsx src/cli/seed-owner.ts"
   },
   "dependencies": {
     "@nri/shared": "*",

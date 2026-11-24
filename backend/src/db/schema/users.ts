@@ -1,0 +1,36 @@
+import { sql } from 'drizzle-orm';
+import {
+  bigint,
+  boolean,
+  date,
+  datetime,
+  json,
+  mysqlEnum,
+  mysqlTable,
+  varchar,
+} from 'drizzle-orm/mysql-core';
+
+export const users = mysqlTable('users', {
+  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+  nickname: varchar('nickname', { length: 32 }).unique(),
+  avatarUrl: varchar('avatar_url', { length: 512 }),
+  birthDate: date('birth_date', { mode: 'string' }),
+  birthDateChangedAt: datetime('birth_date_changed_at'),
+  role: mysqlEnum('role', ['owner', 'admin', 'moderator', 'user']).notNull().default('user'),
+  status: mysqlEnum('status', ['pending', 'active', 'deleted']).notNull().default('pending'),
+  isBanned: boolean('is_banned').notNull().default(false),
+  timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Kyiv'),
+  locale: varchar('locale', { length: 8 }).notNull().default('uk'),
+  privacy: json('privacy')
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default(sql`(json_object())`),
+  createdAt: datetime('created_at')
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime('updated_at')
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`)
+    .$onUpdate(() => new Date()),
+  deletedAt: datetime('deleted_at'),
+});

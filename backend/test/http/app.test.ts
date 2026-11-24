@@ -2,17 +2,15 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { loadEnv } from '../../src/config/env.js';
-import { createDb } from '../../src/db/client.js';
-import { createRedis } from '../../src/redis/client.js';
+import { closeDeps, testDeps } from '../helpers.js';
 
-const base = process.env.REDIS_URL ?? 'redis://localhost:6379';
-const redis = createRedis(`${base.replace(/\/\d+$/, '')}/15`);
-const { db, pool } = createDb(process.env.DATABASE_URL_TEST ?? 'mysql://x:x@localhost:3306/nri_test');
+const deps = await testDeps();
+const { db, redis } = deps;
 
 function makeApp(extra: Record<string, string> = {}) {
   const env = loadEnv({
     NODE_ENV: 'test',
-    DATABASE_URL: 'mysql://x:x@localhost:3306/nri_test',
+    DATABASE_URL: process.env.DATABASE_URL_TEST ?? 'mysql://x:x@localhost:3306/nri_test',
     REDIS_URL: 'redis://localhost:6379/15',
     IDENTITY_PEPPER: 'pepper',
     INTERNAL_API_KEY: 'key',
@@ -30,8 +28,7 @@ beforeEach(async () => {
 });
 afterAll(async () => {
   await redis.flushdb();
-  redis.disconnect();
-  await pool.end();
+  await closeDeps(deps);
 });
 
 describe('loadEnv', () => {

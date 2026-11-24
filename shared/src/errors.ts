@@ -15,6 +15,7 @@ export const ERROR_CODES = [
   'NICKNAME_TAKEN',
   'PROFILE_INCOMPLETE',
   'ACCOUNT_BANNED',
+  'INTERNAL',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

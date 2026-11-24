@@ -7,7 +7,8 @@ import { schema } from './schema/index.js';
 export type Db = MySql2Database<typeof schema>;
 
 export function createDb(url: string): { db: Db; pool: Pool } {
-  const pool = mysql.createPool({ uri: url, timezone: 'Z' });
+  // dateStrings: DATE-колонки (birthDate) лишаються рядками 'YYYY-MM-DD'; datetime drizzle парсить як UTC.
+  const pool = mysql.createPool({ uri: url, timezone: 'Z', dateStrings: ['DATE'] });
   const db = drizzle(pool, { schema, mode: 'default' });
   return { db, pool };
 }
