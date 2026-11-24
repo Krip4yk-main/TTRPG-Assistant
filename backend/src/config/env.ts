@@ -16,7 +16,7 @@ const schema = z.object({
   REDIS_URL: z.string().min(1),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
   IDENTITY_PEPPER: z.string().min(1),
-  INTERNAL_API_KEY: z.string().min(1),
+  INTERNAL_API_KEY: z.string().min(32),
   TELEGRAM_BOT_TOKEN: optional,
   TELEGRAM_BOT_USERNAME: optional,
   TELEGRAM_LOGIN_MAX_AGE_SEC: z.coerce.number().int().positive().default(86400),
@@ -32,9 +32,7 @@ const schema = z.object({
 
 export type Env = z.infer<typeof schema>;
 
-export function loadEnv(
-  source: Record<string, string | undefined> = process.env,
-): Env {
+export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
   // Порожні значення з .env трактуємо як «не задано».
   const cleaned = Object.fromEntries(
     Object.entries(source).filter(([, v]) => v !== undefined && v !== ''),

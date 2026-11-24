@@ -1,20 +1,20 @@
-import { timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 import type { AppDeps } from '../app.js';
 import { linkIdentity } from '../auth/identity.service.js';
+import { eq } from 'drizzle-orm';
+import { users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { hasValidInternalKey } from '../http/security.js';
 import { getMe } from '../users/users.service.js';
 
 export const TG_LINK_PREFIX = 'tglink:';
 
 /** Перевірка `X-Internal-Key` (довжина — перед `timingSafeEqual`). */
 export function requireInternalKey(deps: Pick<AppDeps, 'env'>): RequestHandler {
-  const expected = Buffer.from(deps.env.INTERNAL_API_KEY);
   return (req, _res, next) => {
-    const given = Buffer.from(req.get('x-internal-key') ?? '');
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    if (!hasValidInternalKey(req, deps.env.INTERNAL_API_KEY)) {
       next(new AppError(401, 'UNAUTHENTICATED'));
       return;
     }
@@ -39,6 +39,14 @@ export function internalRouter(deps: AppDeps): Router {
     const raw = await deps.redis.getdel(`${TG_LINK_PREFIX}${input.token}`);
     const userId = raw === null ? NaN : Number(raw);
     if (!Number.isInteger(userId)) throw new AppError(404, 'NOT_FOUND');
+    // Токен міг пережити видалення/бан акаунта.
+    const [owner] = await deps.db
+      .select({ status: users.status, isBanned: users.isBanned })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (!owner || owner.status !== 'active' || owner.isBanned) {
+      throw new AppError(404, 'NOT_FOUND');
+    }
     await linkIdentity(deps, userId, {
       provider: 'telegram',
       subject: String(input.telegramId),

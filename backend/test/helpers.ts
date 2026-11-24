@@ -23,7 +23,7 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
     DATABASE_URL: dbUrl,
     REDIS_URL: redisUrl,
     IDENTITY_PEPPER: 'pepper',
-    INTERNAL_API_KEY: 'key',
+    INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extraEnv,
   });
   const { db, pool } = createDb(dbUrl);

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { createSession } from '../../src/auth/session.service.js';
-import { authIdentities } from '../../src/db/schema/index.js';
+import { authIdentities, users } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps({ TELEGRAM_BOT_USERNAME: 'nri_test_bot' });
@@ -31,7 +31,7 @@ async function issueToken(userId: number): Promise<string> {
   return m![1]!;
 }
 
-const link = (body: object, key: string | null = 'key') => {
+const link = (body: object, key: string | null = 'test-internal-key-0123456789abcdefghij') => {
   const r = request(app).post('/api/internal/telegram/link');
   if (key !== null) r.set('X-Internal-Key', key);
   return r.send(body);
@@ -82,7 +82,7 @@ describe('POST /api/internal/telegram/link', () => {
     const wrong = await link(body(token), 'nope');
     expect(wrong.status).toBe(401);
     expect(wrong.body.error.code).toBe('UNAUTHENTICATED');
-    expect((await link(body(token), 'keykeykey')).status).toBe(401);
+    expect((await link(body(token), 'test-internal-key-0123456789abcdefghijx')).status).toBe(401);
     expect(await redis.get(`tglink:${token}`)).not.toBeNull();
   });
 
@@ -98,6 +98,26 @@ describe('POST /api/internal/telegram/link', () => {
     const again = await link(body(token));
     expect(again.status).toBe(404);
     expect(again.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('deleted account: token is useless, no identity row', async () => {
+    const u = await createUser(db, { nickname: 'Gone' });
+    const token = await issueToken(u.id);
+    await db.update(users).set({ status: 'deleted' }).where(eq(users.id, u.id));
+    const res = await link(body(token));
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND');
+    expect(
+      await db.select().from(authIdentities).where(eq(authIdentities.userId, u.id)),
+    ).toHaveLength(0);
+  });
+
+  it('banned account cannot link', async () => {
+    const u = await createUser(db, { nickname: 'Bad' });
+    const token = await issueToken(u.id);
+    await db.update(users).set({ isBanned: true }).where(eq(users.id, u.id));
+    const res = await link(body(token));
+    expect(res.status).toBe(404);
   });
 
   it('unknown token is 404; invalid body is 400', async () => {

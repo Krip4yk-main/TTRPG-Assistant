@@ -3,7 +3,7 @@ import { z } from 'zod';
 const schema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1),
   BACKEND_INTERNAL_URL: z.url(),
-  INTERNAL_API_KEY: z.string().min(1),
+  INTERNAL_API_KEY: z.string().min(32),
 });
 export type BotEnv = z.infer<typeof schema>;
 

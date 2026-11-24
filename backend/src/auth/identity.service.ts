@@ -93,6 +93,12 @@ export async function linkIdentity(
   identity: VerifiedIdentity,
 ): Promise<void> {
   const { db } = deps;
+  // Захист у глибину: не прив'язуємо до неіснуючого чи видаленого акаунта.
+  const [target] = await db
+    .select({ status: users.status })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!target || target.status === 'deleted') throw new AppError(404, 'NOT_FOUND');
   // true — ідентичність уже моя; кидає 409, якщо чужа.
   const alreadyMine = async (): Promise<boolean> => {
     const owner = await findOwner(db, identity);

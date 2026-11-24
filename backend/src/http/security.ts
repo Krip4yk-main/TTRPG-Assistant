@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import type { RequestHandler } from 'express';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import type { Request, RequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import type { Redis } from 'ioredis';
@@ -32,10 +32,24 @@ export function csrfProtection(env: Pick<Env, 'NODE_ENV'>): RequestHandler {
   };
 }
 
-function limiter(redis: Redis, prefix: string, windowSec: number, limit: number): RequestHandler {
+/** Чи містить запит дійсний `X-Internal-Key` (довжина — перед timingSafeEqual). */
+export function hasValidInternalKey(req: Request, key: string): boolean {
+  const given = Buffer.from(req.get('x-internal-key') ?? '');
+  const expected = Buffer.from(key);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+function limiter(
+  redis: Redis,
+  prefix: string,
+  windowSec: number,
+  limit: number,
+  skip?: (req: Request) => boolean,
+): RequestHandler {
   return rateLimit({
     windowMs: windowSec * 1000,
     limit,
+    skip,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     store: new RedisStore({
@@ -49,7 +63,14 @@ function limiter(redis: Redis, prefix: string, windowSec: number, limit: number)
 
 export function rateLimiters(env: Env, redis: Redis) {
   return {
-    general: limiter(redis, 'general', env.RATE_LIMIT_WINDOW_SEC, env.RATE_LIMIT_MAX),
+    // Бот із дійсним ключем не обмежується; запити з хибним ключем лишаються під лімітом.
+    general: limiter(
+      redis,
+      'general',
+      env.RATE_LIMIT_WINDOW_SEC,
+      env.RATE_LIMIT_MAX,
+      (req) => req.path.startsWith('/internal/') && hasValidInternalKey(req, env.INTERNAL_API_KEY),
+    ),
     auth: limiter(redis, 'auth', env.RATE_LIMIT_WINDOW_SEC, env.RATE_LIMIT_AUTH_MAX),
   };
 }

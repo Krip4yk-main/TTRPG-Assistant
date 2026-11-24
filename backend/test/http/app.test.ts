@@ -13,7 +13,7 @@ function makeApp(extra: Record<string, string> = {}) {
     DATABASE_URL: process.env.DATABASE_URL_TEST ?? 'mysql://x:x@localhost:3306/nri_test',
     REDIS_URL: 'redis://localhost:6379/15',
     IDENTITY_PEPPER: 'pepper',
-    INTERNAL_API_KEY: 'key',
+    INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extra,
   });
   return createApp({ env, db, redis });
@@ -40,7 +40,7 @@ describe('loadEnv', () => {
       DATABASE_URL: 'a',
       REDIS_URL: 'b',
       IDENTITY_PEPPER: 'c',
-      INTERNAL_API_KEY: 'd',
+      INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
       TELEGRAM_BOT_TOKEN: '',
     });
     expect(env.TELEGRAM_BOT_TOKEN).toBeUndefined();
@@ -80,7 +80,10 @@ describe('app', () => {
     const app = makeApp();
     // Без CSRF-токена: не 403, а 401 від перевірки внутрішнього ключа.
     expect((await request(app).post('/api/internal/ping').send({})).status).toBe(401);
-    const res = await request(app).post('/api/internal/ping').set('X-Internal-Key', 'key').send({});
+    const res = await request(app)
+      .post('/api/internal/ping')
+      .set('X-Internal-Key', 'test-internal-key-0123456789abcdefghij')
+      .send({});
     expect(res.status).toBe(404);
   });
 
