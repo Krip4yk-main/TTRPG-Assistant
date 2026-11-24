@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { authIdentities, sessions, users } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
@@ -43,5 +43,19 @@ describe('schema', () => {
     expect(u.privacy).toEqual({});
     expect(u.isBanned).toBe(false);
     expect(u.nickname).toBeNull();
+  });
+
+  it('forces UTC session time zone on every pooled connection', async () => {
+    const rows = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        db.execute(sql`SELECT @@session.time_zone AS tz, SLEEP(0.05)`),
+      ),
+    );
+    for (const [r] of rows) expect((r as unknown as { tz: string }[])[0]!.tz).toBe('+00:00');
+  });
+
+  it('DB-side createdAt default is UTC (close to now)', async () => {
+    const u = await createUser(db);
+    expect(Math.abs(u.createdAt.getTime() - Date.now())).toBeLessThan(5000);
   });
 });

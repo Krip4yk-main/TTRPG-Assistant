@@ -7,7 +7,10 @@ export default async function setup(): Promise<() => void> {
   const url = process.env.DATABASE_URL_TEST;
   if (!url) throw new Error('DATABASE_URL_TEST is required for tests');
   const { db, pool } = createDb(url);
-  await migrate(db, { migrationsFolder: 'src/db/migrations' });
-  await pool.end();
+  try {
+    await migrate(db, { migrationsFolder: 'src/db/migrations' });
+  } finally {
+    await pool.end();
+  }
   return () => {};
 }

@@ -35,12 +35,15 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 const TABLES = ['events', 'identity_tombstones', 'sessions', 'auth_identities', 'users'];
 
 export async function resetDb(db: Db): Promise<void> {
-  await db.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
-  try {
-    for (const t of TABLES) await db.execute(sql.raw(`TRUNCATE TABLE \`${t}\``));
-  } finally {
-    await db.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
-  }
+  // Одна транзакція = одне з'єднання, тож SET FOREIGN_KEY_CHECKS діє на всі TRUNCATE.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
+    try {
+      for (const t of TABLES) await tx.execute(sql.raw(`TRUNCATE TABLE \`${t}\``));
+    } finally {
+      await tx.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
+    }
+  });
 }
 
 export async function createUser(
