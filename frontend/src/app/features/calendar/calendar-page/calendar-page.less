@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+  max-width: 760px;
+
+  h1 {
+    margin-bottom: var(--nri-space-xs);
+  }
+}
+
+.lead,
+.back {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .nri-card {
+    padding: var(--nri-space-md) var(--nri-space-sm);
+  }
+}

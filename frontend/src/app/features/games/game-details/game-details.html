@@ -33,7 +33,11 @@
             <h1>{{ g.title }}</h1>
             <p class="nri-muted">
               {{ 'search.card.gm' | translate }}:
-              {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+              @if (g.gm.nickname) {
+                <a class="gm-link" [routerLink]="['/users', g.gm.publicId]">{{ g.gm.nickname }}</a>
+              } @else {
+                {{ 'user.deleted' | translate }}
+              }
             </p>
             <p class="restricted-text">{{ 'games.restricted.' + g.ageRating | translate }}</p>
             @if (!signedIn()) {
@@ -75,7 +79,15 @@
             </p>
             <p class="gm">
               {{ 'search.card.gm' | translate }}:
-              <strong>{{ g.gm.nickname ?? ('user.deleted' | translate) }}</strong>
+              <strong>
+                @if (g.gm.nickname) {
+                  <a class="gm-link" [routerLink]="['/users', g.gm.publicId]">{{
+                    g.gm.nickname
+                  }}</a>
+                } @else {
+                  {{ 'user.deleted' | translate }}
+                }
+              </strong>
             </p>
           </header>
 

@@ -1,0 +1,68 @@
+:host {
+  display: block;
+}
+
+.profile-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+  max-width: 760px;
+
+  h1 {
+    margin-bottom: var(--nri-space-xs);
+  }
+}
+
+.lead {
+  margin: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+// Поле й перемикач видимості поруч; на вузькому екрані перемикач переходить під поле.
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nri-space-xs) var(--nri-space-md);
+  padding-bottom: var(--nri-space-sm);
+  border-bottom: 1px solid var(--nri-border);
+
+  > mat-form-field,
+  > .formats {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+}
+
+.visibility {
+  flex: 0 0 auto;
+  padding-top: var(--nri-space-md);
+}
+
+.formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs) var(--nri-space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    width: 100%;
+    padding: 0;
+    margin-bottom: var(--nri-space-xs);
+    color: var(--nri-text-muted);
+    font-size: 0.9rem;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}

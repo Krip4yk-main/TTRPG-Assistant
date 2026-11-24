@@ -24,10 +24,12 @@ import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { SeoService } from '../../../core/seo/seo.service';
 import { formatDateTime } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
+const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
 
 /** Повна гра для показу; приватні поля — лише для майстра й учасників. */
 type FullGame = PublicGameDto & { address?: string | null; channelLinks?: ChannelLink[] };
@@ -47,6 +49,7 @@ export class GameDetails {
   private readonly api = inject(GamesApi);
   private readonly auth = inject(AuthStore);
   private readonly catalog = inject(CatalogStore);
+  private readonly seo = inject(SeoService);
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
@@ -126,9 +129,26 @@ export class GameDetails {
       if (seq !== this.seq) return;
       this.view.set(g);
       this.state.set('ready');
+      this.updateSeo(g);
     } catch (err) {
       if (seq !== this.seq) return;
-      this.state.set(toApiError(err).status === 404 ? 'notFound' : 'error');
+      const notFound = toApiError(err).status === 404;
+      this.state.set(notFound ? 'notFound' : 'error');
+      if (notFound) this.seo.set({ titleKey: 'games.details.notFound', noindex: true });
     }
+  }
+
+  /** Назва гри у вкладці й превʼю; 18+/21+, чернетки й скасовані — без індексації. */
+  private updateSeo(g: GameViewDto): void {
+    if (isRestrictedGame(g)) {
+      this.seo.set({ title: g.title, noindex: true });
+      return;
+    }
+    this.seo.set({
+      title: g.title,
+      description: g.description,
+      image: g.coverUrl,
+      noindex: g.ageRating !== 'none' || NOINDEX_STATUSES.has(g.status),
+    });
   }
 }

@@ -18,7 +18,11 @@
       }
       <p class="meta gm">
         {{ 'search.card.gm' | translate }}:
-        {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+        @if (g.gm.nickname) {
+          <a class="gm-link" [routerLink]="['/users', g.gm.publicId]">{{ g.gm.nickname }}</a>
+        } @else {
+          {{ 'user.deleted' | translate }}
+        }
       </p>
     </div>
   </article>
@@ -87,7 +91,11 @@
       </dl>
       <p class="meta gm">
         {{ 'search.card.gm' | translate }}:
-        {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+        @if (g.gm.nickname) {
+          <a class="gm-link" [routerLink]="['/users', g.gm.publicId]">{{ g.gm.nickname }}</a>
+        } @else {
+          {{ 'user.deleted' | translate }}
+        }
       </p>
     </div>
   </article>

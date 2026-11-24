@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
@@ -57,6 +57,7 @@ interface Message {
   selector: 'nri-account-settings',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     MatButtonModule,
     MatDatepickerModule,
     MatFormFieldModule,

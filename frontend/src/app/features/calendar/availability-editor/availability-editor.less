@@ -1,0 +1,176 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+
+  &.compact {
+    gap: var(--nri-space-md);
+  }
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin-bottom: var(--nri-space-xs);
+}
+
+.label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0 0 var(--nri-space-sm);
+  font-size: 0.9rem;
+}
+
+.tz {
+  p {
+    margin: 0;
+  }
+}
+
+.tz-line {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  font-weight: 600;
+
+  mat-icon {
+    flex: none;
+  }
+}
+
+// Сітка прокручується всередині себе (вертикально), сторінка — без горизонтального скролу.
+.grid-scroll {
+  max-height: min(60vh, 560px);
+  overflow: auto;
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-surface);
+  overscroll-behavior: contain;
+
+  .compact & {
+    max-height: 340px;
+  }
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  user-select: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3.25rem repeat(7, minmax(0, 1fr));
+
+  &.head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--nri-surface-raised);
+    border-bottom: 1px solid var(--nri-border);
+  }
+
+  &.hour .cell {
+    border-top-color: var(--nri-border);
+  }
+}
+
+.corner,
+.day {
+  padding: var(--nri-space-xs) 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  abbr {
+    text-decoration: none;
+  }
+}
+
+.time {
+  padding-right: var(--nri-space-xs);
+  font-size: 0.75rem;
+  line-height: 1;
+  text-align: right;
+  color: var(--nri-text-muted);
+  // Підпис години — на лінії, де година починається.
+  transform: translateY(-0.4em);
+
+  .head + .row & {
+    transform: none;
+  }
+}
+
+.cell {
+  height: 1.25rem;
+  border-top: 1px dashed transparent;
+  border-left: 1px solid var(--nri-border);
+  background: var(--nri-surface);
+  cursor: pointer;
+  transition: background var(--nri-transition);
+
+  &:hover {
+    background: var(--nri-surface-sunken);
+  }
+
+  &.on {
+    background: var(--nri-primary);
+  }
+
+  &.on:hover {
+    background: var(--nri-accent);
+  }
+
+  &:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--nri-focus-ring);
+    outline-offset: -2px;
+  }
+}
+
+.count {
+  margin: var(--nri-space-xs) 0 0;
+  font-size: 0.9rem;
+}
+
+.busy-input {
+  width: 100%;
+  max-width: 320px;
+}
+
+.busy-list {
+  list-style: none;
+  margin: var(--nri-space-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nri-space-sm);
+    border-bottom: 1px solid var(--nri-border);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}
+
+@media (pointer: coarse) {
+  .cell {
+    height: 1.75rem;
+  }
+}

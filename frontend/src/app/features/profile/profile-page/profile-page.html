@@ -1,0 +1,153 @@
+<section class="nri-page profile">
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('notFound') {
+      <div class="nri-card">
+        <h1>{{ 'profile.page.notFound' | translate }}</h1>
+        <p class="nri-muted">{{ 'profile.page.notFoundHint' | translate }}</p>
+        <a mat-stroked-button routerLink="/">{{ 'games.details.back' | translate }}</a>
+      </div>
+    }
+    @case ('error') {
+      <div class="nri-alert" role="alert">
+        <span>{{ 'profile.page.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (profile(); as p) {
+        @if (deleted()) {
+          <div class="nri-card">
+            <h1 class="deleted">{{ 'user.deleted' | translate }}</h1>
+            <p class="nri-muted">{{ 'profile.page.deletedHint' | translate }}</p>
+          </div>
+        } @else {
+          <header class="nri-card head">
+            @if (p.avatarUrl) {
+              <img
+                class="avatar"
+                [src]="p.avatarUrl"
+                alt=""
+                width="96"
+                height="96"
+                referrerpolicy="no-referrer"
+              />
+            } @else {
+              <span class="avatar placeholder" aria-hidden="true">
+                <mat-icon>person</mat-icon>
+              </span>
+            }
+            <div class="who">
+              <h1>
+                <nri-user-name [user]="{ nickname: p.nickname ?? null, status: p.status }" />
+              </h1>
+              @if (isMe()) {
+                <div class="own-actions">
+                  <a mat-flat-button routerLink="/profile/edit">
+                    <mat-icon aria-hidden="true">edit</mat-icon>
+                    {{ 'profile.page.edit' | translate }}
+                  </a>
+                  <a mat-stroked-button routerLink="/calendar">
+                    <mat-icon aria-hidden="true">calendar_month</mat-icon>
+                    {{ 'profile.page.calendar' | translate }}
+                  </a>
+                </div>
+              }
+            </div>
+          </header>
+
+          <section class="nri-card about" aria-labelledby="profile-about">
+            <h2 id="profile-about">{{ 'profile.page.about' | translate }}</h2>
+            <dl class="facts">
+              @if (p.bio !== undefined) {
+                <div class="fact wide" data-field="bio">
+                  <dt>{{ 'profile.fields.bio' | translate }}</dt>
+                  <dd class="bio">{{ p.bio }}</dd>
+                </div>
+              }
+              @if (p.city !== undefined) {
+                <div class="fact" data-field="city">
+                  <dt>{{ 'profile.fields.city' | translate }}</dt>
+                  <dd>{{ p.city }}</dd>
+                </div>
+              }
+              @if (p.experience !== undefined) {
+                <div class="fact" data-field="experience">
+                  <dt>{{ 'profile.fields.experience' | translate }}</dt>
+                  <dd>{{ 'profile.experience.' + p.experience | translate }}</dd>
+                </div>
+              }
+              @if (p.preferredFormats !== undefined) {
+                <div class="fact" data-field="preferredFormats">
+                  <dt>{{ 'profile.fields.preferredFormats' | translate }}</dt>
+                  <dd>
+                    @for (f of p.preferredFormats; track f; let last = $last) {
+                      {{ 'games.format.' + f | translate }}{{ last ? '' : ', ' }}
+                    } @empty {
+                      <span class="nri-muted">{{ 'profile.page.notSpecified' | translate }}</span>
+                    }
+                  </dd>
+                </div>
+              }
+              @if (systems(); as names) {
+                <div class="fact wide" data-field="favoriteSystems">
+                  <dt>{{ 'profile.fields.favoriteSystems' | translate }}</dt>
+                  <dd>
+                    @if (names.length) {
+                      <ul class="tags">
+                        @for (n of names; track n) {
+                          <li>{{ n }}</li>
+                        }
+                      </ul>
+                    } @else {
+                      <span class="nri-muted">{{ 'profile.page.notSpecified' | translate }}</span>
+                    }
+                  </dd>
+                </div>
+              }
+            </dl>
+            @if (
+              p.bio === undefined &&
+              p.city === undefined &&
+              p.experience === undefined &&
+              p.preferredFormats === undefined &&
+              !systems()
+            ) {
+              <p class="nri-muted">{{ 'profile.page.allHidden' | translate }}</p>
+            }
+          </section>
+
+          <section class="games" aria-labelledby="profile-gm">
+            <h2 id="profile-gm">{{ 'profile.page.gamesAsGm' | translate }}</h2>
+            @if (gamesAsGm().length) {
+              <ul class="cards">
+                @for (g of gamesAsGm(); track g.id) {
+                  <li><nri-game-card [game]="g" [guest]="!signedIn()" /></li>
+                }
+              </ul>
+            } @else {
+              <p class="nri-muted">{{ 'profile.page.noGames' | translate }}</p>
+            }
+          </section>
+
+          <section class="games" aria-labelledby="profile-player">
+            <h2 id="profile-player">{{ 'profile.page.gamesAsPlayer' | translate }}</h2>
+            @if (gamesAsPlayer().length) {
+              <ul class="cards">
+                @for (g of gamesAsPlayer(); track g.id) {
+                  <li><nri-game-card [game]="g" [guest]="!signedIn()" /></li>
+                }
+              </ul>
+            } @else {
+              <p class="nri-muted">{{ 'profile.page.noGames' | translate }}</p>
+            }
+          </section>
+        }
+      }
+    }
+  }
+</section>

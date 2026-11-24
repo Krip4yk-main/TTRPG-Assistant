@@ -30,19 +30,31 @@
           <option
             value="mine"
             [disabled]="hasSlots() === false"
-            [selected]="calendarMode() === 'mine' || calendarMode() === 'custom'"
+            [selected]="calendarMode() === 'mine'"
           >
             {{ 'search.filters.calendar.mine' | translate }}
           </option>
+          <option value="custom" [selected]="calendarMode() === 'custom'">
+            {{ 'search.filters.calendar.custom' | translate }}
+          </option>
         </select>
-        @if (hasSlots() === false) {
-          <mat-hint>{{ 'search.filters.calendar.noSlots' | translate }}</mat-hint>
-        }
       </mat-form-field>
+      @if (hasSlots() === false && calendarMode() !== 'custom') {
+        <p class="nri-muted hint">
+          {{ 'search.filters.calendar.noSlots' | translate }}
+          <a routerLink="/calendar">{{ 'search.filters.calendar.noSlotsLink' | translate }}</a>
+        </p>
+      }
       @if (calendarMode() === 'custom') {
         <div class="custom-notice nri-notice" role="status">
           <span>{{ 'search.filters.calendar.customActive' | translate }}</span>
-          <button mat-button type="button" (click)="customCleared.emit()">
+          <button
+            mat-button
+            type="button"
+            class="custom-reset"
+            [attr.aria-label]="'search.filters.calendar.useSavedAria' | translate"
+            (click)="customCleared.emit()"
+          >
             {{ 'search.filters.calendar.useSaved' | translate }}
           </button>
         </div>

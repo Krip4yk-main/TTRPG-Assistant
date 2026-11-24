@@ -13,8 +13,18 @@
         [calendarMode]="calendarMode()"
         (changed)="onFiltersChanged($event)"
         (resetAll)="onReset()"
-        (customCleared)="useCustomCalendar(null)"
-      />
+        (customCleared)="resetCustomCalendar()"
+        (customRequested)="openCustomCalendar()"
+      >
+        @if (customActive()) {
+          <nri-availability-editor
+            nriCalendarExtra
+            mode="custom"
+            [initial]="customStart()"
+            (changed)="useCustomCalendar($event)"
+          />
+        }
+      </nri-search-filters>
     </aside>
 
     <div class="results">

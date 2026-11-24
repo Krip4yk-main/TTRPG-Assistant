@@ -55,6 +55,26 @@ export const routes: Routes = [
       import('./features/games/game-details/game-details').then((m) => m.GameDetails),
   },
   {
+    path: 'users/:publicId',
+    title: 'titles.profile',
+    loadComponent: () =>
+      import('./features/profile/profile-page/profile-page').then((m) => m.ProfilePage),
+  },
+  {
+    path: 'profile/edit',
+    canActivate: [activeGuard],
+    title: 'titles.profileEdit',
+    loadComponent: () =>
+      import('./features/profile/profile-edit/profile-edit').then((m) => m.ProfileEdit),
+  },
+  {
+    path: 'calendar',
+    canActivate: [activeGuard],
+    title: 'titles.calendar',
+    loadComponent: () =>
+      import('./features/calendar/calendar-page/calendar-page').then((m) => m.CalendarPage),
+  },
+  {
     path: 'about',
     title: 'titles.about',
     loadComponent: () => import('./features/about/about').then((m) => m.About),

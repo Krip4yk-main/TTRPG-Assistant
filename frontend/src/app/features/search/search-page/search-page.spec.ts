@@ -224,6 +224,75 @@ describe('SearchPage', () => {
     expect(router.url).toBe('/');
   });
 
+  it('"change for this search" opens the editor, applies without saving, reset returns to mine', async () => {
+    await setup(me, '/?cal=off', slots);
+    await flush(expectSearch(), { items: [card(1)], nextCursor: null });
+
+    const select = el().querySelector<HTMLSelectElement>('select[name=calendar]')!;
+    select.value = 'custom';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+    // Редактор стартує з копії збереженого календаря — без нового GET.
+    const editor = el().querySelector('nri-availability-editor')!;
+    expect(editor).not.toBeNull();
+    expect(
+      editor.querySelector('[data-day="1"][data-cell="38"]')!.getAttribute('aria-selected'),
+    ).toBe('true');
+    let req = expectSearch();
+    expect(body(req).calendar).toEqual({
+      mode: 'custom',
+      availability: slots,
+      includePartial: false,
+    });
+    await flush(req, { items: [], nextCursor: null });
+
+    // Додаємо суботу 10:00–10:30 і застосовуємо.
+    const sat = editor.querySelector<HTMLElement>('[data-day="5"][data-cell="20"]')!;
+    sat.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    await settle();
+    editor.querySelector<HTMLButtonElement>('button.apply')!.click();
+    await settle();
+    req = expectSearch();
+    expect(body(req).calendar).toMatchObject({
+      mode: 'custom',
+      availability: {
+        slots: [
+          { weekday: 1, startMin: 1140, endMin: 1380 },
+          { weekday: 5, startMin: 600, endMin: 630 },
+        ],
+      },
+    });
+    await flush(req, { items: [], nextCursor: null });
+    expect(router.url).toBe('/?cal=off');
+
+    el().querySelector<HTMLButtonElement>('button.custom-reset')!.click();
+    await settle();
+    expect(el().querySelector('nri-availability-editor')).toBeNull();
+    expect(router.url).toBe('/');
+    expect(body(expectSearch()).calendar?.mode).toBe('mine');
+    http.expectNone((r) => r.method === 'PUT');
+  });
+
+  it('refetches the saved calendar only when the user id changes', async () => {
+    await setup(me, '/', slots);
+    await flush(expectSearch(), { items: [card(1)], nextCursor: null });
+    const auth = TestBed.inject(AuthStore);
+
+    // Той самий користувач (оновлений профіль) — без нового GET.
+    auth.setMe({ ...me, nickname: 'Frodo2' });
+    await settle();
+    http.expectNone('/api/me/availability');
+
+    // Інший користувач — hasSlots скидається, календар запитується знову.
+    auth.setMe({ ...me, id: 2, publicId: 'qqqqqqqqqq' });
+    await settle();
+    http.expectNone((r) => r.url === '/api/games/search');
+    http.expectOne('/api/me/availability').flush({ ...slots, slots: [] });
+    await settle();
+    expect(body(expectSearch()).calendar?.mode).toBe('off');
+  });
+
   it('an invalid cursor silently restarts from page 1', async () => {
     await setup(null);
     await flush(expectSearch(), { items: [card(1)], nextCursor: 'stale' });

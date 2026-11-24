@@ -31,11 +31,11 @@ import {
   MAX_RANGE_DAYS,
   dateRangeError,
   hasActiveFilters,
+  type EffectiveCalendarMode,
   type SearchFilterState,
 } from '../search-query';
 
-/** Режим календаря, що фактично застосовано до пошуку (`null` — ще визначається). */
-export type EffectiveCalendarMode = 'off' | 'mine' | 'custom' | null;
+export type { EffectiveCalendarMode };
 
 let nextId = 0;
 
@@ -75,6 +75,8 @@ export class SearchFilters {
   readonly resetAll = output<void>();
   /** Повернутися від календаря «для цього пошуку» до збереженого. */
   readonly customCleared = output<void>();
+  /** Обрано «Змінити для цього пошуку» — сторінка відкриває редактор календаря. */
+  readonly customRequested = output<void>();
 
   protected readonly uid = `nri-filters-${nextId++}`;
   protected readonly expanded = signal(false);
@@ -134,7 +136,8 @@ export class SearchFilters {
 
   protected onCalendar(event: Event): void {
     const v = this.value(event);
-    this.patch({ calendar: v === 'mine' ? 'mine' : 'off' });
+    if (v === 'custom') this.customRequested.emit();
+    else this.patch({ calendar: v === 'mine' ? 'mine' : 'off' });
   }
 
   protected toggleAge(rating: AgeRating, checked: boolean): void {

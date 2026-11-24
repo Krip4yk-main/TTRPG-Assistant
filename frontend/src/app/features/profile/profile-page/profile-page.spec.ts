@@ -1,0 +1,161 @@
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { Meta } from '@angular/platform-browser';
+import { provideTranslateService } from '@ngx-translate/core';
+import { Subject } from 'rxjs';
+import type { CatalogDto, GameCardDto, MeDto, PublicProfileDto } from '@nri/shared';
+import { ProfilePage } from './profile-page';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { SocketService } from '../../../core/realtime/socket.service';
+
+const me = {
+  id: 1,
+  publicId: 'abcdefghjk',
+  nickname: 'Frodo',
+  avatarUrl: null,
+  birthDate: '1990-01-01',
+  role: 'user',
+  status: 'active',
+  timezone: 'Europe/Kyiv',
+  locale: 'uk',
+  identities: [],
+} satisfies MeDto;
+
+const catalog: CatalogDto = {
+  systems: [
+    { id: 1, slug: 'dnd5e', name: 'D&D 5e', defaultGenreId: 1 },
+    { id: 2, slug: 'coc', name: 'Call of Cthulhu', defaultGenreId: 1 },
+  ],
+  genres: [{ id: 1, slug: 'fantasy' }],
+  contentWarnings: [],
+};
+
+const game: GameCardDto = {
+  id: 7,
+  title: 'Туман над Дніпром',
+  coverUrl: null,
+  system: { id: 1, name: 'D&D 5e' },
+  systemOther: null,
+  genreId: 1,
+  gm: { publicId: 'zzzzzzzzzz', nickname: 'Gandalf', avatarUrl: null },
+  format: 'offline',
+  city: 'Київ',
+  nextSessionAt: null,
+  freeSlots: 2,
+  maxPlayers: 5,
+  priceUah: null,
+  ageRating: 'none',
+  kind: 'campaign',
+  language: 'uk',
+  status: 'recruiting',
+};
+
+describe('ProfilePage', () => {
+  let harness: RouterTestingHarness;
+  let http: HttpTestingController;
+
+  const settle = async () => {
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  };
+  const el = () => harness.routeNativeElement!;
+
+  async function open(user: MeDto | null, publicId: string, profile: PublicProfileDto | 404) {
+    await TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter(
+          [
+            { path: 'users/:publicId', component: ProfilePage },
+            { path: '**', children: [] },
+          ],
+          withComponentInputBinding(),
+        ),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    TestBed.inject(AuthStore).setMe(user);
+    http = TestBed.inject(HttpTestingController);
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(`/users/${publicId}`, ProfilePage);
+    await settle();
+    http.expectOne('/api/catalog').flush(catalog);
+    const req = http.expectOne(`/api/users/${publicId}`);
+    if (profile === 404) req.flush({}, { status: 404, statusText: 'Not Found' });
+    else req.flush(profile);
+    await settle();
+  }
+
+  afterEach(() => http.verify());
+
+  it("does not render hidden fields on someone else's profile", async () => {
+    await open(me, 'zzzzzzzzzz', {
+      publicId: 'zzzzzzzzzz',
+      status: 'active',
+      nickname: 'Gandalf',
+      avatarUrl: null,
+      // bio, city і favoriteSystemIds приховані — їх немає в JSON.
+      preferredFormats: ['online'],
+      experience: 'veteran',
+      gamesAsGm: [game],
+      gamesAsPlayer: [],
+    });
+    const text = el().textContent!;
+    expect(el().querySelector('h1')!.textContent).toContain('Gandalf');
+    expect(el().querySelector('[data-field="bio"]')).toBeNull();
+    expect(el().querySelector('[data-field="city"]')).toBeNull();
+    expect(el().querySelector('[data-field="favoriteSystems"]')).toBeNull();
+    expect(el().querySelector('[data-field="preferredFormats"]')).not.toBeNull();
+    expect(text).toContain('profile.experience.veteran');
+    expect(el().querySelectorAll('nri-game-card')).toHaveLength(1);
+    // Свій профіль редагують, чужий — ні.
+    expect(el().querySelector('a[href="/profile/edit"]')).toBeNull();
+  });
+
+  it('renders visible fields, catalog system names and an edit link on my own profile', async () => {
+    await open(me, me.publicId, {
+      publicId: me.publicId,
+      status: 'active',
+      nickname: 'Frodo',
+      avatarUrl: null,
+      bio: 'Люблю хоррор',
+      city: 'Львів',
+      favoriteSystemIds: [2],
+      preferredFormats: [],
+      gamesAsGm: [],
+      gamesAsPlayer: [],
+    });
+    expect(el().querySelector('[data-field="bio"]')!.textContent).toContain('Люблю хоррор');
+    expect(el().querySelector('[data-field="city"]')!.textContent).toContain('Львів');
+    expect(el().querySelector('[data-field="favoriteSystems"]')!.textContent).toContain(
+      'Call of Cthulhu',
+    );
+    expect(el().querySelector('a[href="/profile/edit"]')).not.toBeNull();
+  });
+
+  it('a deleted user shows only "deleted user" and is not indexed', async () => {
+    await open(null, 'xxxxxxxxxx', { publicId: 'xxxxxxxxxx', status: 'deleted' });
+    expect(el().querySelector('h1')!.textContent).toContain('user.deleted');
+    expect(el().querySelector('[data-field]')).toBeNull();
+    expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');
+  });
+
+  it('shows "not found" for an unknown user', async () => {
+    await open(null, 'nnnnnnnnnn', 404);
+    expect(el().textContent).toContain('profile.page.notFound');
+  });
+});

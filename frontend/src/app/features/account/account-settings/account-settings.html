@@ -9,6 +9,27 @@
     <p class="nri-alert" role="alert">{{ key | translate }}</p>
   }
 
+  <!-- Профіль і календар -->
+  <section class="nri-card" aria-labelledby="profile-links-title">
+    <h2 id="profile-links-title">{{ 'account.profile.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.profile.hint' | translate }}</p>
+    <div class="link-actions">
+      <a mat-flat-button routerLink="/profile/edit">
+        <mat-icon aria-hidden="true">edit</mat-icon>
+        {{ 'account.profile.edit' | translate }}
+      </a>
+      <a mat-stroked-button routerLink="/calendar">
+        <mat-icon aria-hidden="true">calendar_month</mat-icon>
+        {{ 'account.profile.calendar' | translate }}
+      </a>
+      @if (me(); as user) {
+        <a mat-button [routerLink]="['/users', user.publicId]">
+          {{ 'account.profile.view' | translate }}
+        </a>
+      }
+    </div>
+  </section>
+
   <!-- Способи входу -->
   <section class="nri-card" aria-labelledby="identities-title">
     <h2 id="identities-title">{{ 'account.identities.title' | translate }}</h2>

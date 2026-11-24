@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { Meta, Title } from '@angular/platform-browser';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import type { CatalogDto, MeDto, PublicGameDto } from '@nri/shared';
@@ -168,5 +169,20 @@ describe('GameDetails', () => {
       r.flush({ error: { code: 'NOT_FOUND' } }, { status: 404, statusText: 'Not Found' }),
     );
     expect(el().textContent).toContain('games.details.notFound');
+  });
+
+  it('sets per-game meta; GM name links to the profile', async () => {
+    await open(me, (r) => r.flush(game));
+    const meta = TestBed.inject(Meta);
+    expect(TestBed.inject(Title).getTitle()).toContain('Туман над Дніпром');
+    expect(meta.getTag("name='description'")?.content).toContain('Детективна кампанія');
+    expect(meta.getTag("property='og:image'")?.content).toBe('https://example.com/cover.png');
+    expect(meta.getTag("name='robots'")).toBeNull();
+    expect(el().querySelector('a.gm-link')!.getAttribute('href')).toBe('/users/zzzzzzzzzz');
+  });
+
+  it('an 18+ game is not indexed', async () => {
+    await open(me, (r) => r.flush({ ...game, ageRating: '18+' }));
+    expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');
   });
 });

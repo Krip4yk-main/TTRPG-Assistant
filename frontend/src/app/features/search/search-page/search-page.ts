@@ -32,12 +32,14 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { AvailabilityApi } from '../../../core/availability/availability.api';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { AvailabilityEditor } from '../../calendar/availability-editor/availability-editor';
 import { GameCard } from '../game-card/game-card';
 import { SearchFilters, type EffectiveCalendarMode } from '../search-filters/search-filters';
 import {
   EMPTY_FILTERS,
   hasActiveFilters,
   parseSearchParams,
+  resolveCalendarMode,
   toSearchParams,
   toSearchRequest,
   type CalendarRequest,
@@ -76,6 +78,7 @@ function browserTimezone(): string {
     MatFormFieldModule,
     MatInputModule,
     TranslatePipe,
+    AvailabilityEditor,
     GameCard,
     SearchFilters,
   ],
@@ -98,20 +101,25 @@ export class SearchPage {
   });
 
   protected readonly signedIn = this.auth.isAuthenticated;
+  private readonly userId = computed(() => this.auth.me()?.id);
   /** Чи є в користувача збережені слоти; `null` — ще не відомо (або гість). */
   protected readonly hasSlots = signal<boolean | null>(null);
-  /** Календар «для цього пошуку» (Task 12: редактор у режимі `custom`). */
+  /** Збережений календар користувача (`null` — ще не відомо, гість або помилка). */
+  private readonly savedCalendar = signal<AvailabilityDto | null>(null);
+  /** Календар «для цього пошуку»: лише в пам'яті, не в URL і не на сервері. */
   private readonly customCalendar = signal<AvailabilityDto | null>(null);
+  /** З чого почати редактор «для цього пошуку» (копія збереженого або порожній). */
+  protected readonly customStart = signal<AvailabilityDto | null>(null);
+  protected readonly customActive = computed(() => this.customCalendar() !== null);
 
-  protected readonly calendarMode = computed<EffectiveCalendarMode>(() => {
-    if (!this.auth.isAuthenticated()) return 'off';
-    if (this.customCalendar()) return 'custom';
-    const chosen = this.filters().calendar;
-    if (chosen === 'off') return 'off';
-    const slots = this.hasSlots();
-    if (slots === null) return null;
-    return slots ? 'mine' : 'off';
-  });
+  protected readonly calendarMode = computed<EffectiveCalendarMode>(() =>
+    resolveCalendarMode({
+      signedIn: this.auth.isAuthenticated(),
+      custom: this.customCalendar() !== null,
+      chosen: this.filters().calendar,
+      hasSlots: this.hasSlots(),
+    }),
+  );
 
   /** Тіло запиту без курсора; `null` — ще визначається режим календаря. */
   private readonly request = computed<SearchFiltersInput | null>(
@@ -152,15 +160,20 @@ export class SearchPage {
     void inject(CatalogStore).load();
 
     // Збережений календар — лише для залогіненого; помилка = «слотів немає».
+    // Відстежуємо лише id: оновлення профілю (той самий користувач) не перезапитує календар.
     effect((onCleanup) => {
-      const userId = this.auth.me()?.id;
-      if (userId === undefined) {
+      const userId = this.userId();
+      untracked(() => {
         this.hasSlots.set(null);
-        this.customCalendar.set(null);
-        return;
-      }
+        this.savedCalendar.set(null);
+        this.useCustomCalendar(null);
+      });
+      if (userId === undefined) return;
       const sub = this.availabilityApi.get().subscribe({
-        next: (a) => this.hasSlots.set(a.slots.length > 0),
+        next: (a) => {
+          this.savedCalendar.set(a);
+          this.hasSlots.set(a.slots.length > 0);
+        },
         error: () => this.hasSlots.set(false),
       });
       onCleanup(() => sub.unsubscribe());
@@ -184,16 +197,42 @@ export class SearchPage {
    */
   useCustomCalendar(availability: AvailabilityDto | null): void {
     this.customCalendar.set(availability);
+    // Редактор стартує з першого застосованого календаря; подальші «Застосувати» його не скидають.
+    if (!availability) this.customStart.set(null);
+    else if (!this.customStart()) this.customStart.set(availability);
+  }
+
+  /** «Змінити для цього пошуку»: редактор стартує з копії збереженого календаря. */
+  protected openCustomCalendar(): void {
+    const start = this.savedCalendar() ?? {
+      timezone: this.auth.me()?.timezone ?? browserTimezone(),
+      slots: [],
+      busyDates: [],
+    };
+    this.customStart.set(start);
+    this.customCalendar.set(start);
+  }
+
+  /** «Скинути»: назад до збереженого календаря (`mine`), навіть якщо в URL було `cal=off`. */
+  protected resetCustomCalendar(): void {
+    if (this.filters().calendar !== 'off') {
+      this.useCustomCalendar(null);
+      return;
+    }
+    // Спершу прибираємо `cal=off` з URL, потім календар — один перезапуск пошуку, а не два.
+    void this.navigate({ ...this.filters(), calendar: undefined }).then(() =>
+      this.useCustomCalendar(null),
+    );
   }
 
   protected onFiltersChanged(patch: Partial<SearchFilterState>): void {
     if ('calendar' in patch) this.customCalendar.set(null);
-    this.navigate({ ...this.filters(), ...patch });
+    void this.navigate({ ...this.filters(), ...patch });
   }
 
   protected onReset(): void {
     const f = this.filters();
-    this.navigate({
+    void this.navigate({
       ...EMPTY_FILTERS,
       sort: f.sort,
       calendar: f.calendar,
@@ -203,11 +242,11 @@ export class SearchPage {
 
   protected onSort(event: Event): void {
     const sort = (event.target as HTMLSelectElement).value as SearchSort;
-    this.navigate({ ...this.filters(), sort });
+    void this.navigate({ ...this.filters(), sort });
   }
 
-  private navigate(f: SearchFilterState): void {
-    void this.router.navigate([], {
+  private navigate(f: SearchFilterState): Promise<boolean> {
+    return this.router.navigate([], {
       relativeTo: this.route,
       queryParams: toSearchParams(f),
       replaceUrl: true,
