@@ -48,7 +48,10 @@ describe('AuthStore', () => {
     >;
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   it('load() з відповіддю 401 → гість', async () => {
     const done = store.load();
@@ -322,6 +325,49 @@ describe('AuthStore', () => {
       await done;
       expect(await got).toBe('logout');
       peer.close();
+    });
+  });
+
+  describe('локальні чернетки форми гри', () => {
+    const seed = () => {
+      localStorage.setItem('nri.gameDraft.1.new', '{}');
+      localStorage.setItem('nri.gameDraft.1.5', '{}');
+      localStorage.setItem('other.key', 'keep');
+    };
+    const drafts = () => Object.keys(localStorage).filter((k) => k.startsWith('nri.gameDraft.'));
+
+    it('logout() видаляє всі nri.gameDraft.*, інші ключі лишає', async () => {
+      store.setMe(me());
+      seed();
+      const done = store.logout();
+      http.expectOne('/api/auth/logout').flush(null);
+      await done;
+      expect(drafts()).toEqual([]);
+      expect(localStorage.getItem('other.key')).toBe('keep');
+    });
+
+    it('втрата сесії (401 під час перевірки) теж видаляє чернетки', async () => {
+      store.setMe(me());
+      seed();
+      lost$.next('revoked');
+      http
+        .expectOne('/api/me')
+        .flush({ error: { code: 'UNAUTHENTICATED' } }, { status: 401, statusText: 'Unauthorized' });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(drafts()).toEqual([]);
+    });
+
+    it('збій сховища не ламає вихід', async () => {
+      store.setMe(me());
+      vi.spyOn(Storage.prototype, 'key').mockImplementation(() => {
+        throw new Error('denied');
+      });
+      const done = store.logout();
+      http.expectOne('/api/auth/logout').flush(null);
+      await done;
+      expect(store.me()).toBeNull();
+      vi.restoreAllMocks();
     });
   });
 });

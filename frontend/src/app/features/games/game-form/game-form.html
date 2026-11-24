@@ -17,6 +17,11 @@
     @if (closed()) {
       <p class="nri-notice">{{ 'games.form.notEditable' | translate }}</p>
     }
+    @if (staleDropped()) {
+      <p class="nri-notice stale-notice" role="status">
+        {{ 'games.form.staleDraft' | translate }}
+      </p>
+    }
     @if (restored()) {
       <div class="nri-notice restored-notice" role="status">
         <span>{{ 'games.form.restored' | translate }}</span>

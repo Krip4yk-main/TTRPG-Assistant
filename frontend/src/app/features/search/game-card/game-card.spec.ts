@@ -94,6 +94,18 @@ describe('GameCard', () => {
     });
   }
 
+  it('finished/cancelled cards hide the next session and free seats', async () => {
+    for (const status of ['finished', 'cancelled'] as const) {
+      await render({ ...game, status });
+      expect(el.textContent).not.toContain('search.card.next');
+      expect(el.textContent).not.toContain('search.card.slots');
+      expect(el.textContent).toContain('search.card.price');
+    }
+    await render({ ...game, status: 'started' });
+    expect(el.textContent).toContain('search.card.next');
+    expect(el.textContent).toContain('search.card.slots');
+  });
+
   it('restricted card is blurred and never renders details, even if they leak', async () => {
     await render({
       ...restricted,

@@ -70,16 +70,19 @@
         {{ 'games.language.' + g.language | translate }}
       </p>
       <dl class="facts">
-        <div>
-          <dt>{{ 'search.card.next' | translate }}</dt>
-          <dd>{{ nextSession() ?? ('search.card.noNext' | translate) }}</dd>
-        </div>
-        <div>
-          <dt>{{ 'search.card.slots' | translate }}</dt>
-          <dd>
-            {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
-          </dd>
-        </div>
+        <!-- Найближча сесія й вільні місця мають сенс лише для гри, що набирає чи йде. -->
+        @if (g.status === 'recruiting' || g.status === 'started') {
+          <div>
+            <dt>{{ 'search.card.next' | translate }}</dt>
+            <dd>{{ nextSession() ?? ('search.card.noNext' | translate) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'search.card.slots' | translate }}</dt>
+            <dd>
+              {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+            </dd>
+          </div>
+        }
         <div>
           <dt>{{ 'search.card.price' | translate }}</dt>
           <dd>

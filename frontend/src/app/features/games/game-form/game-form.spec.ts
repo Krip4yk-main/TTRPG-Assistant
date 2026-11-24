@@ -316,6 +316,20 @@ describe('GameForm', () => {
       const raw = localStorage.getItem(key);
       return raw === null ? null : (JSON.parse(raw) as { values: Record<string, unknown> });
     };
+    const seedDraft = (
+      key: string,
+      values: Record<string, unknown>,
+      extra: { savedAt?: number; updatedAt?: string | null } = {},
+    ) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          v: 1,
+          savedAt: extra.savedAt ?? Date.now(),
+          updatedAt: extra.updatedAt === undefined ? null : extra.updatedAt,
+          values,
+        }),
+      );
     const titleInput = () => q<HTMLInputElement>('input[formcontrolname="title"]');
     const discardButton = () => el.querySelector<HTMLButtonElement>('button.discard');
 
@@ -329,19 +343,13 @@ describe('GameForm', () => {
     });
 
     it('restores a new game draft on reload and shows a notice', async () => {
-      localStorage.setItem(
-        NEW_KEY,
-        JSON.stringify({
-          v: 1,
-          values: {
-            title: 'Збережена назва',
-            startDate: '2027-03-02',
-            startTime: '19:00',
-            channelLinks: [{ label: 'Discord', url: 'https://discord.gg/x' }],
-            applicationQuestions: ['Чому ви?'],
-          },
-        }),
-      );
+      seedDraft(NEW_KEY, {
+        title: 'Збережена назва',
+        startDate: '2027-03-02',
+        startTime: '19:00',
+        channelLinks: [{ label: 'Discord', url: 'https://discord.gg/x' }],
+        applicationQuestions: ['Чому ви?'],
+      });
       await setup();
       expect(titleInput().value).toBe('Збережена назва');
       expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').value).toBe('19:00');
@@ -353,9 +361,10 @@ describe('GameForm', () => {
     });
 
     it('restores stored values on top of an existing game', async () => {
-      localStorage.setItem(
+      seedDraft(
         'nri.gameDraft.1.5',
-        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+        { title: 'Незбережена назва' },
+        { updatedAt: '2026-11-01T10:00:00.000Z' },
       );
       await setup(5, game({ status: 'draft' }));
       expect(titleInput().value).toBe('Незбережена назва');
@@ -363,19 +372,17 @@ describe('GameForm', () => {
     });
 
     it('a stored copy of another user is not used', async () => {
-      localStorage.setItem(
-        'nri.gameDraft.2.new',
-        JSON.stringify({ v: 1, values: { title: 'Чуже' } }),
-      );
+      seedDraft('nri.gameDraft.2.new', { title: 'Чуже' });
       await setup();
       expect(titleInput().value).toBe('');
       expect(el.querySelector('.restored-notice')).toBeNull();
     });
 
     it('never restores or persists for finished/cancelled games', async () => {
-      localStorage.setItem(
+      seedDraft(
         'nri.gameDraft.1.5',
-        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+        { title: 'Незбережена назва' },
+        { updatedAt: '2026-11-01T10:00:00.000Z' },
       );
       await setup(5, game({ status: 'finished' }));
       expect(titleInput().value).toBe('Тіні Найт-Сіті');
@@ -431,9 +438,10 @@ describe('GameForm', () => {
     });
 
     it('discard on an existing game reloads the server values', async () => {
-      localStorage.setItem(
+      seedDraft(
         'nri.gameDraft.1.5',
-        JSON.stringify({ v: 1, values: { title: 'Незбережена назва' } }),
+        { title: 'Незбережена назва' },
+        { updatedAt: '2026-11-01T10:00:00.000Z' },
       );
       await setup(5, game({ status: 'draft' }));
       open.mockReturnValueOnce({ afterClosed: () => of(true) });
@@ -444,6 +452,39 @@ describe('GameForm', () => {
       expect(titleInput().value).toBe('Тіні Найт-Сіті');
       expect(el.querySelector('.restored-notice')).toBeNull();
       expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+    });
+
+    it('stores the server updatedAt with the copy', async () => {
+      await setup(5, game({ status: 'draft' }));
+      await type('input[formcontrolname="title"]', 'Нова назва');
+      await debounce();
+      const raw = JSON.parse(localStorage.getItem('nri.gameDraft.1.5')!) as {
+        updatedAt: string;
+        savedAt: number;
+      };
+      expect(raw.updatedAt).toBe('2026-11-01T10:00:00.000Z');
+      expect(raw.savedAt).toEqual(expect.any(Number));
+    });
+
+    it('a copy older than the server game is dropped with a notice', async () => {
+      seedDraft(
+        'nri.gameDraft.1.5',
+        { title: 'Застаріла назва' },
+        { updatedAt: '2026-11-01T10:00:00.000Z' },
+      );
+      await setup(5, game({ status: 'draft', updatedAt: '2026-11-02T10:00:00.000Z' }));
+      expect(titleInput().value).toBe('Тіні Найт-Сіті');
+      expect(el.querySelector('.restored-notice')).toBeNull();
+      expect(q<HTMLElement>('.stale-notice').textContent).toContain('games.form.staleDraft');
+      expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+    });
+
+    it('a copy older than 7 days is dropped', async () => {
+      seedDraft(NEW_KEY, { title: 'Давня назва' }, { savedAt: Date.now() - 8 * 86_400_000 });
+      await setup();
+      expect(titleInput().value).toBe('');
+      expect(el.querySelector('.restored-notice')).toBeNull();
+      expect(localStorage.getItem(NEW_KEY)).toBeNull();
     });
 
     it('storage failures never break the form', async () => {

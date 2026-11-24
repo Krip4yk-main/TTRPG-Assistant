@@ -76,7 +76,7 @@ import {
   readGameDraft,
   removeGameDraft,
   writeGameDraft,
-} from './game-draft-storage';
+} from '../../../core/games/game-draft-storage';
 
 type SystemChoice = number | 'other' | null;
 
@@ -256,6 +256,8 @@ export class GameForm {
   private readonly tick = signal(0);
   /** Форму заповнено незбереженими значеннями з `localStorage`. */
   protected readonly restored = signal(false);
+  /** Локальну копію відкинуто: гру тим часом змінено на сервері (інший пристрій). */
+  protected readonly staleDropped = signal(false);
   /** Значення відрізняються від збережених (сервера чи типових для нової гри). */
   protected readonly hasChanges = signal(false);
 
@@ -383,6 +385,7 @@ export class GameForm {
     this.flushDraft();
     this.draftReady = false;
     this.restored.set(false);
+    this.staleDropped.set(false);
     this.hasChanges.set(false);
     const seq = ++this.loadSeq;
     this.game.set(null);
@@ -847,10 +850,20 @@ export class GameForm {
     this.baseline = this.snapshotValues();
     this.draftReady = true;
     const key = this.draftKey();
-    const values = key ? readGameDraft(key) : null;
-    if (!values) return;
+    const stored = key ? readGameDraft(key) : null;
+    if (!key || !stored) return;
+    const serverUpdatedAt = this.game()?.updatedAt ?? null;
+    // Гру змінено після того, як зроблено копію (інший пристрій/вкладка) — копію відкидаємо.
+    const stale =
+      serverUpdatedAt !== null &&
+      !(stored.updatedAt !== null && Date.parse(serverUpdatedAt) <= Date.parse(stored.updatedAt));
+    if (stale) {
+      removeGameDraft(key);
+      this.staleDropped.set(true);
+      return;
+    }
     this.prefilling = true;
-    this.applyStored(values);
+    this.applyStored(stored.values);
     this.prefilling = false;
     this.validate();
     const changed = this.snapshotValues() !== this.baseline;
@@ -896,7 +909,7 @@ export class GameForm {
     set(c.contentWarningIds, values['contentWarningIds'], isNumberArray);
     set(c.showWhenFull, values['showWhenFull'], (x) => typeof x === 'boolean');
     const date = dateFromStored(values['startDate']);
-    if (date !== undefined) c.startDate.setValue(date);
+    if (date !== undefined && !c.startDate.disabled) c.startDate.setValue(date);
     set(this.newCustomWarning, values['newCustomWarning'], isString);
     const strings = (list: FormArray<FormControl<string>>, value: unknown) => {
       if (!isStringArray(value)) return;
@@ -937,7 +950,7 @@ export class GameForm {
       removeGameDraft(key);
       this.restored.set(false);
     } else {
-      writeGameDraft(key, snapshot);
+      writeGameDraft(key, snapshot, this.game()?.updatedAt ?? null);
     }
   }
 
