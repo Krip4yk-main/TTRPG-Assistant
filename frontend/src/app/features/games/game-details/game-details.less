@@ -1,0 +1,205 @@
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  margin-bottom: var(--nri-space-md);
+  color: var(--nri-primary-text);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-md);
+}
+
+h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--nri-radius-md);
+  background: var(--nri-surface-sunken);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+
+  p {
+    margin: 0;
+  }
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px var(--nri-space-sm);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-lg);
+  background: var(--nri-surface-sunken);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.age {
+  border-color: var(--nri-danger);
+  color: var(--nri-danger-text);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+}
+
+.apply-hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nri-space-md);
+  margin: 0;
+
+  dt {
+    color: var(--nri-text-muted);
+    font-size: 0.9rem;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.inline-list {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: inline;
+
+    &:not(:last-child)::after {
+      content: ', ';
+    }
+  }
+}
+
+.block {
+  h2 {
+    margin: 0 0 var(--nri-space-sm);
+    font-size: 1.35rem;
+  }
+}
+
+.text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.chips,
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.links a {
+  color: var(--nri-primary-text);
+}
+
+.restricted {
+  overflow: hidden;
+  background: var(--nri-surface-raised);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-md);
+  box-shadow: var(--nri-shadow-md);
+}
+
+.veil {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 180px;
+  overflow: hidden;
+  background: var(--nri-surface-sunken);
+  color: var(--nri-text-muted);
+
+  // Розмита «імітація» обкладинки — справжньої картинки обмежена гра не має.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: calc(-2 * var(--nri-blur-radius));
+    background: repeating-linear-gradient(
+      135deg,
+      var(--nri-surface-raised) 0 14px,
+      var(--nri-border) 14px 28px
+    );
+    filter: blur(var(--nri-blur-radius));
+  }
+
+  mat-icon {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    font-size: 48px;
+  }
+}
+
+.restricted-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nri-space-sm);
+  padding: var(--nri-space-lg);
+
+  p {
+    margin: 0;
+  }
+}
+
+.restricted-text {
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-blur-overlay);
+}

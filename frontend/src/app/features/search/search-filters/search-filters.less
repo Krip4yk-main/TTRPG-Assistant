@@ -1,0 +1,104 @@
+:host {
+  display: block;
+}
+
+.toggle {
+  display: none;
+  width: 100%;
+}
+
+.count {
+  margin-left: var(--nri-space-xs);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    padding: 0;
+    margin-bottom: var(--nri-space-sm);
+    font-family: var(--nri-font-heading);
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--nri-space-sm);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.custom-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-xs);
+  margin: 0;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--nri-space-sm);
+}
+
+.checks-label {
+  width: 100%;
+  color: var(--nri-text-muted);
+  font-size: 0.9rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--nri-danger-text);
+  font-size: 0.9rem;
+}
+
+.reset {
+  align-self: flex-start;
+}
+
+// Вузька ширина: панель ховається за кнопкою «Фільтри».
+@media (max-width: 899.98px) {
+  .toggle {
+    display: inline-flex;
+  }
+
+  .panel {
+    margin-top: var(--nri-space-md);
+
+    &:not(.open) {
+      display: none;
+    }
+  }
+}

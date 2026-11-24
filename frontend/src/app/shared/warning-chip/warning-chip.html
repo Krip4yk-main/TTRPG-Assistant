@@ -7,7 +7,7 @@
       (click)="toggled.emit()"
     >
       @if (selected()) {
-        <mat-icon class="check" aria-hidden="true" fontIcon="check"></mat-icon>
+        <mat-icon class="check" aria-hidden="true">check</mat-icon>
       }
       @if (labelKey(); as key) {
         {{ key | translate }}
@@ -31,7 +31,7 @@
       [matTooltip]="hint | translate"
       [attr.aria-label]="'common.moreInfo' | translate"
     >
-      <mat-icon aria-hidden="true" fontIcon="info"></mat-icon>
+      <mat-icon aria-hidden="true">info</mat-icon>
     </button>
   }
 </span>

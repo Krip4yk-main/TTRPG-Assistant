@@ -1,0 +1,171 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--nri-surface-raised);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-md);
+  box-shadow: var(--nri-shadow-md);
+  transition: border-color var(--nri-transition);
+
+  &:hover,
+  &:focus-within {
+    border-color: var(--nri-primary);
+  }
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--nri-surface-sunken);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+  padding: var(--nri-space-md);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  padding: 2px var(--nri-space-sm);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-lg);
+  background: var(--nri-surface-sunken);
+  font-size: 0.8rem;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}
+
+.fit[data-fit='full'] {
+  border-color: var(--nri-primary);
+  color: var(--nri-primary-text);
+}
+
+.fit[data-fit='partial'] {
+  border-color: var(--nri-accent);
+  color: var(--nri-accent-text);
+}
+
+.age {
+  border-color: var(--nri-danger);
+  color: var(--nri-danger-text);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+
+  a {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+    }
+  }
+}
+
+.meta {
+  margin: 0;
+  color: var(--nri-text-muted);
+}
+
+.facts {
+  display: grid;
+  gap: 2px;
+  margin: var(--nri-space-xs) 0 0;
+
+  div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--nri-space-xs);
+  }
+
+  dt {
+    color: var(--nri-text-muted);
+
+    &::after {
+      content: ':';
+    }
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.gm {
+  margin-top: auto;
+  padding-top: var(--nri-space-sm);
+}
+
+.restricted {
+  .veil {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--nri-surface-sunken);
+    color: var(--nri-text-muted);
+
+    // Розмита «імітація» обкладинки — справжньої картинки обмежена картка не має.
+    &::before {
+      content: '';
+      position: absolute;
+      inset: calc(-2 * var(--nri-blur-radius));
+      background: repeating-linear-gradient(
+        135deg,
+        var(--nri-surface-raised) 0 14px,
+        var(--nri-border) 14px 28px
+      );
+      filter: blur(var(--nri-blur-radius));
+    }
+
+    mat-icon {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      font-size: 40px;
+    }
+  }
+
+  .restricted-text {
+    margin: 0;
+    padding: var(--nri-space-sm);
+    border-radius: var(--nri-radius-sm);
+    background: var(--nri-blur-overlay);
+  }
+
+  .login {
+    color: var(--nri-primary-text);
+    font-weight: 600;
+  }
+}

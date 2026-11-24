@@ -1,0 +1,226 @@
+<section class="nri-page game-details">
+  <a class="back" routerLink="/">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    {{ 'games.details.back' | translate }}
+  </a>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('notFound') {
+      <div class="nri-card">
+        <h1>{{ 'games.details.notFound' | translate }}</h1>
+        <p class="nri-muted">{{ 'games.details.notFoundHint' | translate }}</p>
+      </div>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'games.details.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (restricted(); as g) {
+        <article class="restricted">
+          <div class="veil" aria-hidden="true">
+            <mat-icon>visibility_off</mat-icon>
+          </div>
+          <div class="restricted-body">
+            <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
+            <h1>{{ g.title }}</h1>
+            <p class="nri-muted">
+              {{ 'search.card.gm' | translate }}:
+              {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+            </p>
+            <p class="restricted-text">{{ 'games.restricted.' + g.ageRating | translate }}</p>
+            @if (!signedIn()) {
+              <a mat-flat-button routerLink="/login" [queryParams]="{ returnTo: returnTo() }">{{
+                'games.restricted.login' | translate
+              }}</a>
+            }
+          </div>
+        </article>
+      } @else if (game(); as g) {
+        <article class="game">
+          @if (g.coverUrl) {
+            <img
+              class="cover"
+              [src]="g.coverUrl"
+              [alt]="'games.details.coverAlt' | translate: { title: g.title }"
+              referrerpolicy="no-referrer"
+            />
+          }
+
+          <header class="head">
+            <div class="badges">
+              @if (g.status !== 'recruiting') {
+                <span class="badge" [attr.data-status]="g.status">{{
+                  'games.status.' + g.status | translate
+                }}</span>
+              }
+              @if (g.ageRating !== 'none') {
+                <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
+              }
+            </div>
+            <h1>{{ g.title }}</h1>
+            <p class="nri-muted sub">
+              {{ systemName() }}
+              @if (genreKey(); as key) {
+                · {{ key | translate }}
+              }
+              · {{ 'games.kind.' + g.kind | translate }}
+            </p>
+            <p class="gm">
+              {{ 'search.card.gm' | translate }}:
+              <strong>{{ g.gm.nickname ?? ('user.deleted' | translate) }}</strong>
+            </p>
+          </header>
+
+          <div class="actions">
+            @if (isGm()) {
+              @if (canEdit()) {
+                <a mat-flat-button [routerLink]="['/games', g.id, 'edit']">
+                  <mat-icon aria-hidden="true">edit</mat-icon>
+                  {{ 'games.actions.edit' | translate }}
+                </a>
+              }
+            } @else {
+              <button
+                mat-flat-button
+                type="button"
+                class="apply"
+                disabled
+                aria-describedby="game-apply-hint"
+              >
+                {{ 'games.details.apply' | translate }}
+              </button>
+              <p id="game-apply-hint" class="nri-muted apply-hint">
+                {{ 'games.details.applySoon' | translate }}
+              </p>
+            }
+          </div>
+
+          <dl class="facts nri-card">
+            <div>
+              <dt>{{ 'games.details.nextSession' | translate }}</dt>
+              <dd>{{ nextSession() ?? ('search.card.noNext' | translate) }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'games.details.duration' | translate }}</dt>
+              <dd>{{ 'games.form.hours' | translate: { h: durationHours() } }}</dd>
+            </div>
+            @if (g.kind === 'campaign') {
+              <div>
+                <dt>{{ 'games.form.recurrence' | translate }}</dt>
+                <dd>{{ 'games.recurrence.' + g.recurrence | translate }}</dd>
+              </div>
+              @if (g.weekdays.length) {
+                <div>
+                  <dt>{{ 'games.form.weekdays' | translate }}</dt>
+                  <dd>
+                    <ul class="inline-list">
+                      @for (d of g.weekdays; track d) {
+                        <li>{{ 'games.weekdaysLong.' + d | translate }}</li>
+                      }
+                    </ul>
+                  </dd>
+                </div>
+              }
+            }
+            <div>
+              <dt>{{ 'games.form.format' | translate }}</dt>
+              <dd>
+                {{ 'games.format.' + g.format | translate }}
+                @if (g.city) {
+                  · {{ g.city }}
+                }
+                @if (g.platform) {
+                  · {{ g.platform }}
+                }
+              </dd>
+            </div>
+            @if (g.address) {
+              <div>
+                <dt>{{ 'games.form.address' | translate }}</dt>
+                <dd>{{ g.address }}</dd>
+              </div>
+            }
+            <div>
+              <dt>{{ 'games.details.players' | translate }}</dt>
+              <dd>
+                {{
+                  'games.details.playersValue'
+                    | translate: { min: g.minPlayers, max: g.maxPlayers, free: g.freeSlots }
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ 'search.card.price' | translate }}</dt>
+              <dd>
+                @if (g.priceUah === null) {
+                  {{ 'search.card.free' | translate }}
+                } @else {
+                  {{ 'search.card.priceValue' | translate: { price: g.priceUah } }}
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>{{ 'games.form.experience' | translate }}</dt>
+              <dd>{{ 'games.experience.' + g.experience | translate }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'games.form.language' | translate }}</dt>
+              <dd>{{ 'games.language.' + g.language | translate }}</dd>
+            </div>
+          </dl>
+
+          @if (g.description) {
+            <section class="block">
+              <h2>{{ 'games.form.description' | translate }}</h2>
+              <p class="text">{{ g.description }}</p>
+            </section>
+          }
+
+          @if (g.requirements) {
+            <section class="block">
+              <h2>{{ 'games.form.requirements' | translate }}</h2>
+              <p class="text">{{ g.requirements }}</p>
+            </section>
+          }
+
+          @if (warningSlugs().length || g.customWarnings.length) {
+            <section class="block">
+              <h2>{{ 'games.form.sections.warnings' | translate }}</h2>
+              <ul class="chips">
+                @for (slug of warningSlugs(); track slug) {
+                  <li><nri-warning-chip [slug]="slug" /></li>
+                }
+                @for (w of g.customWarnings; track $index) {
+                  <li><nri-warning-chip [custom]="w" /></li>
+                }
+              </ul>
+            </section>
+          }
+
+          @if (g.channelLinks?.length) {
+            <section class="block">
+              <h2>{{ 'games.form.sections.channels' | translate }}</h2>
+              <ul class="links">
+                @for (link of g.channelLinks; track $index) {
+                  <li>
+                    <a [href]="link.url" target="_blank" rel="noopener noreferrer">{{
+                      link.label
+                    }}</a>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </article>
+      }
+    }
+  }
+</section>

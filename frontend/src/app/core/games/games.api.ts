@@ -1,7 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { GameCardDto, GameDto, GameInput, GamePatch, GameViewDto } from '@nri/shared';
+import type {
+  GameCardDto,
+  GameDto,
+  GameInput,
+  GamePatch,
+  GameViewDto,
+  SearchFiltersInput,
+  SearchResultDto,
+} from '@nri/shared';
 
 /** Переходи статусу гри (`POST /api/games/:id/<action>`). */
 export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel'] as const;
@@ -23,6 +31,11 @@ export class GamesApi {
 
   get(id: number): Observable<GameViewDto> {
     return this.http.get<GameViewDto>(`/api/games/${id}`);
+  }
+
+  /** Публічний пошук (`calendar.mode = 'mine'` — лише з сесією). */
+  search(filters: SearchFiltersInput): Observable<SearchResultDto> {
+    return this.http.post<SearchResultDto>('/api/games/search', filters);
   }
 
   mine(): Observable<GameCardDto[]> {

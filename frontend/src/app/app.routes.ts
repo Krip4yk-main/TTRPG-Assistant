@@ -7,7 +7,7 @@ export const routes: Routes = [
     pathMatch: 'full',
     canActivate: [notPendingGuard],
     title: 'titles.home',
-    // Вид майстра — «Мої ігри», вид гравця — пошук (Home до Task 11).
+    // Вид майстра — «Мої ігри», вид гравця (і гість) — пошук ігор.
     loadComponent: () => import('./features/home/home-page/home-page').then((m) => m.HomePage),
   },
   {
@@ -47,6 +47,12 @@ export const routes: Routes = [
     canActivate: [activeGuard],
     title: 'titles.editGame',
     loadComponent: () => import('./features/games/game-form/game-form').then((m) => m.GameForm),
+  },
+  {
+    path: 'games/:id',
+    title: 'titles.game',
+    loadComponent: () =>
+      import('./features/games/game-details/game-details').then((m) => m.GameDetails),
   },
   {
     path: 'about',

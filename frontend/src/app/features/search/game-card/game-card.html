@@ -1,0 +1,94 @@
+@if (restricted(); as g) {
+  <article class="card restricted" [attr.data-game-id]="g.id">
+    <div class="veil" aria-hidden="true">
+      <mat-icon>visibility_off</mat-icon>
+    </div>
+    <div class="body">
+      <div class="badges">
+        <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
+      </div>
+      <h2 class="title">
+        <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+      </h2>
+      <p class="restricted-text">{{ 'games.restricted.' + g.ageRating | translate }}</p>
+      @if (guest()) {
+        <a class="login" routerLink="/login" [queryParams]="{ returnTo: returnTo() }">{{
+          'games.restricted.login' | translate
+        }}</a>
+      }
+      <p class="meta gm">
+        {{ 'search.card.gm' | translate }}:
+        {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+      </p>
+    </div>
+  </article>
+} @else if (full(); as g) {
+  <article class="card" [attr.data-game-id]="g.id">
+    @if (g.coverUrl) {
+      <img class="cover" [src]="g.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" />
+    }
+    <div class="body">
+      @if (g.fit || g.ageRating !== 'none' || g.status === 'started') {
+        <div class="badges">
+          @if (g.fit) {
+            <span class="badge fit" [attr.data-fit]="g.fit">
+              <mat-icon aria-hidden="true">{{
+                g.fit === 'full' ? 'event_available' : 'event_note'
+              }}</mat-icon>
+              {{ 'search.fit.' + g.fit | translate }}
+            </span>
+          }
+          @if (g.ageRating !== 'none') {
+            <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
+          }
+          @if (g.status === 'started') {
+            <span class="badge">{{ 'games.status.started' | translate }}</span>
+          }
+        </div>
+      }
+      <h2 class="title">
+        <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+      </h2>
+      <p class="meta">
+        {{ systemName() }}
+        @if (genreKey(); as key) {
+          · {{ key | translate }}
+        }
+      </p>
+      <p class="meta">
+        {{ 'games.format.' + g.format | translate }}
+        @if (g.city) {
+          · {{ g.city }}
+        }
+        · {{ 'games.kind.' + g.kind | translate }} ·
+        {{ 'games.language.' + g.language | translate }}
+      </p>
+      <dl class="facts">
+        <div>
+          <dt>{{ 'search.card.next' | translate }}</dt>
+          <dd>{{ nextSession() ?? ('search.card.noNext' | translate) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'search.card.slots' | translate }}</dt>
+          <dd>
+            {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+          </dd>
+        </div>
+        <div>
+          <dt>{{ 'search.card.price' | translate }}</dt>
+          <dd>
+            @if (g.priceUah === null) {
+              {{ 'search.card.free' | translate }}
+            } @else {
+              {{ 'search.card.priceValue' | translate: { price: g.priceUah } }}
+            }
+          </dd>
+        </div>
+      </dl>
+      <p class="meta gm">
+        {{ 'search.card.gm' | translate }}:
+        {{ g.gm.nickname ?? ('user.deleted' | translate) }}
+      </p>
+    </div>
+  </article>
+}

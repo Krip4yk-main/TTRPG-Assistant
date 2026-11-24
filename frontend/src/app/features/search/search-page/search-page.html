@@ -1,0 +1,98 @@
+<section class="nri-page search">
+  <header class="page-header">
+    <h1>{{ 'search.title' | translate }}</h1>
+    <p class="nri-muted lead">{{ 'search.lead' | translate }}</p>
+  </header>
+
+  <div class="layout">
+    <aside class="filters" [attr.aria-label]="'search.filters.title' | translate">
+      <nri-search-filters
+        [filters]="filters()"
+        [signedIn]="signedIn()"
+        [hasSlots]="hasSlots()"
+        [calendarMode]="calendarMode()"
+        (changed)="onFiltersChanged($event)"
+        (resetAll)="onReset()"
+        (customCleared)="useCustomCalendar(null)"
+      />
+    </aside>
+
+    <div class="results">
+      <div class="results-header">
+        <h2 class="nri-visually-hidden">{{ 'search.results' | translate }}</h2>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="sort">
+          <mat-label>{{ 'search.sort.label' | translate }}</mat-label>
+          <select matNativeControl name="sort" (change)="onSort($event)">
+            @for (s of sorts; track s) {
+              <option [value]="s" [selected]="filters().sort === s">
+                {{ 'search.sort.' + s | translate }}
+              </option>
+            }
+          </select>
+        </mat-form-field>
+      </div>
+
+      <div class="live" aria-live="polite">
+        @if (status() === 'loading') {
+          <p class="nri-muted" role="status">{{ 'search.loading' | translate }}</p>
+        } @else if (status() === 'idle' && items().length === 0 && !nextCursor()) {
+          <div class="nri-card empty">
+            <p class="empty-title">{{ 'search.empty.title' | translate }}</p>
+            <p class="nri-muted">
+              {{
+                (calendarMode() === 'off' ? 'search.empty.hint' : 'search.empty.hintCalendar')
+                  | translate
+              }}
+            </p>
+            @if (anyFilters()) {
+              <button mat-stroked-button type="button" (click)="onReset()">
+                {{ 'search.filters.reset' | translate }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (status() === 'error') {
+        <div class="nri-alert search-error" role="alert">
+          <span>{{ 'search.error' | translate }}</span>
+          <button mat-stroked-button type="button" (click)="retry()">
+            {{ 'common.retry' | translate }}
+          </button>
+        </div>
+      }
+
+      @if (items().length > 0) {
+        <ul class="cards">
+          @for (game of items(); track game.id) {
+            <li>
+              <nri-game-card [game]="game" [guest]="!signedIn()" />
+            </li>
+          }
+        </ul>
+      }
+
+      <div #sentinel class="sentinel" aria-hidden="true"></div>
+
+      @if (status() === 'errorMore') {
+        <div class="nri-alert search-error" role="alert">
+          <span>{{ 'search.errorMore' | translate }}</span>
+          <button mat-stroked-button type="button" (click)="retry()">
+            {{ 'common.retry' | translate }}
+          </button>
+        </div>
+      } @else if (status() === 'loadingMore') {
+        <p class="nri-muted more-status" role="status">{{ 'search.loadingMore' | translate }}</p>
+      } @else if (status() === 'idle' && nextCursor()) {
+        <div class="more">
+          @if (paused() && items().length === 0) {
+            <p class="nri-muted">{{ 'search.keepLooking' | translate }}</p>
+          }
+          <button mat-stroked-button type="button" class="load-more" (click)="loadMore()">
+            {{ 'search.loadMore' | translate }}
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</section>

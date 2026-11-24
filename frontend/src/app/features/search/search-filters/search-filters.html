@@ -1,0 +1,288 @@
+@let f = filters();
+<button
+  mat-stroked-button
+  type="button"
+  class="toggle"
+  [attr.aria-expanded]="expanded()"
+  [attr.aria-controls]="uid"
+  (click)="expanded.set(!expanded())"
+>
+  <mat-icon aria-hidden="true">tune</mat-icon>
+  {{ 'search.filters.toggle' | translate }}
+  @if (activeCount() > 0) {
+    <span class="count">({{ activeCount() }})</span>
+  }
+</button>
+
+<div class="panel" [id]="uid" [class.open]="expanded()">
+  <h2 class="nri-visually-hidden">{{ 'search.filters.title' | translate }}</h2>
+
+  <!-- Календар -->
+  <fieldset class="group">
+    <legend>{{ 'search.filters.calendar.legend' | translate }}</legend>
+    @if (signedIn()) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.calendar.mode' | translate }}</mat-label>
+        <select matNativeControl name="calendar" (change)="onCalendar($event)">
+          <option value="off" [selected]="calendarMode() === 'off'">
+            {{ 'search.filters.calendar.off' | translate }}
+          </option>
+          <option
+            value="mine"
+            [disabled]="hasSlots() === false"
+            [selected]="calendarMode() === 'mine' || calendarMode() === 'custom'"
+          >
+            {{ 'search.filters.calendar.mine' | translate }}
+          </option>
+        </select>
+        @if (hasSlots() === false) {
+          <mat-hint>{{ 'search.filters.calendar.noSlots' | translate }}</mat-hint>
+        }
+      </mat-form-field>
+      @if (calendarMode() === 'custom') {
+        <div class="custom-notice nri-notice" role="status">
+          <span>{{ 'search.filters.calendar.customActive' | translate }}</span>
+          <button mat-button type="button" (click)="customCleared.emit()">
+            {{ 'search.filters.calendar.useSaved' | translate }}
+          </button>
+        </div>
+      }
+      <ng-content select="[nriCalendarExtra]" />
+      <mat-slide-toggle
+        [checked]="f.includePartial"
+        [disabled]="calendarMode() === 'off' || calendarMode() === null"
+        (change)="patch({ includePartial: $event.checked })"
+        >{{ 'search.filters.calendar.partial' | translate }}</mat-slide-toggle
+      >
+    } @else {
+      <p class="nri-muted hint">
+        <a routerLink="/login">{{ 'search.filters.calendar.loginLink' | translate }}</a>
+        {{ 'search.filters.calendar.loginHint' | translate }}
+      </p>
+    }
+  </fieldset>
+
+  <!-- Гра -->
+  <fieldset class="group">
+    <legend>{{ 'search.filters.game' | translate }}</legend>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.systems' | translate }}</mat-label>
+      <mat-select
+        multiple
+        name="systems"
+        [value]="f.systemIds"
+        (selectionChange)="patch({ systemIds: $event.value })"
+      >
+        @for (s of catalog()?.systems ?? []; track s.id) {
+          <mat-option [value]="s.id">{{ s.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.genres' | translate }}</mat-label>
+      <mat-select
+        multiple
+        name="genres"
+        [value]="f.genreIds"
+        (selectionChange)="patch({ genreIds: $event.value })"
+      >
+        @for (g of catalog()?.genres ?? []; track g.id) {
+          <mat-option [value]="g.id">{{ 'genres.' + g.slug | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.kind' | translate }}</mat-label>
+      <select matNativeControl name="kind" (change)="onSelect('kind', $event)">
+        <option value="">{{ 'search.filters.anyKind' | translate }}</option>
+        @for (k of kinds; track k) {
+          <option [value]="k" [selected]="f.kind === k">{{ 'games.kind.' + k | translate }}</option>
+        }
+      </select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.experience' | translate }}</mat-label>
+      <select matNativeControl name="experience" (change)="onSelect('experience', $event)">
+        <option value="">{{ 'search.filters.anyExperience' | translate }}</option>
+        @for (e of experiences; track e) {
+          <option [value]="e" [selected]="f.experience === e">
+            {{ 'games.experience.' + e | translate }}
+          </option>
+        }
+      </select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.language' | translate }}</mat-label>
+      <select matNativeControl name="language" (change)="onSelect('language', $event)">
+        <option value="">{{ 'search.filters.anyLanguage' | translate }}</option>
+        @for (l of languages; track l) {
+          <option [value]="l" [selected]="f.language === l">
+            {{ 'games.language.' + l | translate }}
+          </option>
+        }
+      </select>
+    </mat-form-field>
+  </fieldset>
+
+  <!-- Формат і місце -->
+  <fieldset class="group">
+    <legend>{{ 'search.filters.place' | translate }}</legend>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'search.filters.format' | translate }}</mat-label>
+      <select matNativeControl name="format" (change)="onSelect('format', $event)">
+        <option value="">{{ 'search.filters.anyFormat' | translate }}</option>
+        @for (fm of formats; track fm) {
+          <option [value]="fm" [selected]="f.format === fm">
+            {{ 'games.format.' + fm | translate }}
+          </option>
+        }
+      </select>
+    </mat-form-field>
+
+    @if (f.format !== 'online') {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.city' | translate }}</mat-label>
+        <input
+          matInput
+          name="city"
+          maxlength="80"
+          autocomplete="address-level2"
+          [value]="f.city ?? ''"
+          (change)="onSelect('city', $event)"
+        />
+      </mat-form-field>
+    }
+    @if (f.format !== 'offline') {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.platform' | translate }}</mat-label>
+        <input
+          matInput
+          name="platform"
+          maxlength="60"
+          [value]="f.platform ?? ''"
+          (change)="onSelect('platform', $event)"
+        />
+        <mat-hint>{{ 'search.filters.exactHint' | translate }}</mat-hint>
+      </mat-form-field>
+    }
+  </fieldset>
+
+  <!-- Дати -->
+  <fieldset class="group">
+    <legend>{{ 'search.filters.dates' | translate }}</legend>
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.dateFrom' | translate }}</mat-label>
+        <input
+          matInput
+          type="date"
+          name="dateFrom"
+          [value]="f.dateFrom ?? ''"
+          (change)="onSelect('dateFrom', $event)"
+        />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.dateTo' | translate }}</mat-label>
+        <input
+          matInput
+          type="date"
+          name="dateTo"
+          [min]="f.dateFrom ?? ''"
+          [value]="f.dateTo ?? ''"
+          [attr.aria-describedby]="dateError() ? uid + '-date-error' : null"
+          [attr.aria-invalid]="dateError() ? true : null"
+          (change)="onSelect('dateTo', $event)"
+        />
+      </mat-form-field>
+    </div>
+    @if (dateError(); as err) {
+      <p class="field-error" role="alert" [id]="uid + '-date-error'">
+        {{ 'search.filters.dateError.' + err | translate: { days: maxRangeDays } }}
+      </p>
+    }
+  </fieldset>
+
+  <!-- Умови -->
+  <fieldset class="group">
+    <legend>{{ 'search.filters.terms' | translate }}</legend>
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'search.filters.price' | translate }}</mat-label>
+        <select
+          matNativeControl
+          name="priceMode"
+          (change)="patch({ priceMode: $any(value($event) ?? 'any') })"
+        >
+          @for (p of priceModes; track p) {
+            <option [value]="p" [selected]="f.priceMode === p">
+              {{ 'search.filters.priceMode.' + p | translate }}
+            </option>
+          }
+        </select>
+      </mat-form-field>
+      @if (f.priceMode !== 'free') {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ 'search.filters.priceMax' | translate }}</mat-label>
+          <input
+            matInput
+            type="number"
+            inputmode="numeric"
+            name="priceMax"
+            min="0"
+            max="100000"
+            step="10"
+            [value]="f.priceMax ?? ''"
+            (change)="onPriceMax($event)"
+          />
+        </mat-form-field>
+      }
+    </div>
+
+    <div class="checks" role="group" [attr.aria-labelledby]="uid + '-age'">
+      <span class="checks-label" [id]="uid + '-age'">{{ 'search.filters.age' | translate }}</span>
+      @for (r of ageRatings; track r) {
+        <mat-checkbox
+          [checked]="f.ageRatings.includes(r)"
+          (change)="toggleAge(r, $event.checked)"
+          >{{ 'games.ageRating.' + r | translate }}</mat-checkbox
+        >
+      }
+    </div>
+
+    <mat-checkbox
+      name="hasFreeSlots"
+      [checked]="f.hasFreeSlots"
+      (change)="patch({ hasFreeSlots: $event.checked })"
+      >{{ 'search.filters.freeSlots' | translate }}</mat-checkbox
+    >
+  </fieldset>
+
+  <!-- Попередження -->
+  @if (catalog()?.contentWarnings?.length) {
+    <fieldset class="group">
+      <legend>{{ 'search.filters.excludeWarnings' | translate }}</legend>
+      <p class="nri-muted hint">{{ 'search.filters.excludeWarningsHint' | translate }}</p>
+      <div class="chips">
+        @for (w of catalog()!.contentWarnings; track w.id) {
+          <nri-warning-chip
+            [slug]="w.slug"
+            [selectable]="true"
+            [selected]="f.excludeWarningIds.includes(w.id)"
+            (toggled)="toggleWarning(w.id)"
+          />
+        }
+      </div>
+    </fieldset>
+  }
+
+  @if (active()) {
+    <button mat-button type="button" class="reset" (click)="resetAll.emit()">
+      <mat-icon aria-hidden="true">filter_alt_off</mat-icon>
+      {{ 'search.filters.reset' | translate }}
+    </button>
+  }
+</div>

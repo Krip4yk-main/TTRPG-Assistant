@@ -72,14 +72,21 @@ describe('Shell home by view mode', () => {
     http.expectOne('/api/games/mine').flush([]);
     await settle();
     expect(el.querySelector('nri-my-games')).not.toBeNull();
-    expect(el.querySelector('nri-home')).toBeNull();
+    expect(el.querySelector('nri-search-page')).toBeNull();
   });
 
-  it('player view keeps the Home page on /', async () => {
+  it('player view renders the game search on /', async () => {
     TestBed.inject(ViewModeStore).setMode('player');
     await TestBed.inject(Router).navigateByUrl('/');
     await settle();
-    expect(el.querySelector('nri-home')).not.toBeNull();
+    http.expectOne('/api/catalog').flush({ systems: [], genres: [], contentWarnings: [] });
+    http
+      .expectOne('/api/me/availability')
+      .flush({ timezone: 'Europe/Kyiv', slots: [], busyDates: [] });
+    await settle();
+    http.expectOne('/api/games/search').flush({ items: [], nextCursor: null });
+    await settle();
+    expect(el.querySelector('nri-search-page')).not.toBeNull();
     expect(el.querySelector('nri-my-games')).toBeNull();
   });
 
