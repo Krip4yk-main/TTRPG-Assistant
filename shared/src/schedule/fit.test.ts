@@ -69,6 +69,19 @@ describe('availabilityFit', () => {
     expect(availabilityFit([s], { ...a, busyDates: ['2026-12-05'] })).toBe('none');
   });
 
+  it('wraps Sunday -> Monday', () => {
+    // Нд 2026-12-06 22:00 – Пн 02:00 Kyiv.
+    const s = occ('2026-12-06T20:00:00Z', 240);
+    const sun = { weekday: 6 as const, startMin: 1320, endMin: 1440 };
+    const a: AvailabilityDto = {
+      timezone: 'Europe/Kyiv',
+      slots: [sun, { weekday: 0, startMin: 0, endMin: 120 }],
+      busyDates: [],
+    };
+    expect(availabilityFit([s], a)).toBe('full');
+    expect(availabilityFit([s], { ...a, slots: [sun] })).toBe('none');
+  });
+
   it('crosses midnight only in the player zone', () => {
     // 20:00–23:30 Kyiv (+2) = Пн 22:00 – Вт 01:30 Asia/Dubai (+4).
     const s = occ('2026-11-30T18:00:00Z', 210);

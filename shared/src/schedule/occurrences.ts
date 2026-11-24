@@ -31,8 +31,10 @@ export interface Occurrence {
  * Тривалість — абсолютна (`durationMinutes` хвилин реального часу).
  */
 export function expandOccurrences(s: ScheduleInput, fromUtc: Date, toUtc: Date): Occurrence[] {
-  const first = new Date(s.startsAt);
-  const firstMs = first.getTime();
+  // Якір — ціла хвилина: toZoned відкидає секунди, тож перебудована перша сесія
+  // інакше була б раніше за startsAt і випадала б із видачі.
+  const firstMs = Math.floor(new Date(s.startsAt).getTime() / 60_000) * 60_000;
+  const first = new Date(firstMs);
   const fromMs = Math.max(fromUtc.getTime(), firstMs);
   const toMs = toUtc.getTime();
   if (!(fromMs < toMs) || Number.isNaN(firstMs)) return [];

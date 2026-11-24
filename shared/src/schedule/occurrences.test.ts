@@ -125,6 +125,24 @@ describe('expandOccurrences', () => {
     );
   });
 
+  it('floors startsAt to the whole minute so the first session is kept', () => {
+    const base = {
+      startsAt: '2026-12-01T17:00:30.500Z',
+      durationMinutes: 240,
+      weekdays: [1] as ScheduleInput['weekdays'],
+      timezone: 'Europe/Kyiv',
+    };
+    const range = [d('2026-11-01T00:00:00Z'), d('2026-12-20T00:00:00Z')] as const;
+    expect(iso(expandOccurrences({ ...base, recurrence: 'weekly' }, ...range))).toEqual([
+      '2026-12-01T17:00:00.000Z',
+      '2026-12-08T17:00:00.000Z',
+      '2026-12-15T17:00:00.000Z',
+    ]);
+    const none = expandOccurrences({ ...base, weekdays: [], recurrence: 'none' }, ...range);
+    expect(iso(none)).toEqual(['2026-12-01T17:00:00.000Z']);
+    expect(none[0]!.end.toISOString()).toBe('2026-12-01T21:00:00.000Z');
+  });
+
   it('weekly with empty weekdays yields nothing (game schema must reject it)', () => {
     const s: ScheduleInput = {
       startsAt: '2026-12-01T17:00:00Z',
