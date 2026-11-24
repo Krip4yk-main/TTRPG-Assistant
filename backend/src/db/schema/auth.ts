@@ -30,7 +30,10 @@ export const authIdentities = mysqlTable(
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (t) => [uniqueIndex('auth_identities_provider_subject_uq').on(t.provider, t.subject)],
+  (t) => [
+    uniqueIndex('auth_identities_provider_subject_uq').on(t.provider, t.subject),
+    uniqueIndex('auth_identities_user_provider_uq').on(t.userId, t.provider),
+  ],
 );
 
 export const sessions = mysqlTable(

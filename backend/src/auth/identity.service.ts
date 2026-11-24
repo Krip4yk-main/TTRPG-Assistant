@@ -119,7 +119,8 @@ export async function linkIdentity(
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;
     if (await alreadyMine()) return;
-    throw err;
+    // Дублікат не за (provider, subject) — отже за (user_id, provider).
+    throw new AppError(409, 'PROVIDER_ALREADY_LINKED');
   }
   await logEvent(db, {
     type: 'identity.linked',

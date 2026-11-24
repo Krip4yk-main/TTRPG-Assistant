@@ -1,0 +1,1 @@
+ALTER TABLE `auth_identities` ADD CONSTRAINT `auth_identities_user_provider_uq` UNIQUE(`user_id`,`provider`);

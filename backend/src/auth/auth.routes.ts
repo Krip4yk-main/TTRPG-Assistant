@@ -1,4 +1,5 @@
 import { generateCodeVerifier, generateState } from 'arctic';
+import { timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import type { Request, RequestHandler, Response } from 'express';
 import { eq } from 'drizzle-orm';
@@ -10,10 +11,11 @@ import { linkIdentity, resolveLogin } from './identity.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
 import { defaultOAuthProviders } from './providers/index.js';
 import { logoutHandlers, requireAuth } from './session.middleware.js';
-import { createSession, revokeSession, setSessionCookie } from './session.service.js';
+import { createSession, revokeAllUserSessions, revokeSession, setSessionCookie } from './session.service.js';
 
-// Поля Telegram Login Widget; id/auth_date можуть прийти числом (JSON) — приводимо до рядка.
 const OAUTH_TTL_SEC = 10 * 60;
+const OAUTH_COOKIE = 'nri_oauth';
+const OAUTH_COOKIE_PATH = '/api/auth';
 const REDIRECTABLE_ERRORS = new Set([
   'IDENTITY_TAKEN',
   'IDENTITY_BANNED',
@@ -22,8 +24,18 @@ const REDIRECTABLE_ERRORS = new Set([
 ]);
 
 /** Лише відносний шлях усередині сайту: `/x`, але не `//host` і не `/\\host`. */
-const safeReturnTo = (v: unknown): string =>
-  typeof v === 'string' && /^\/(?![/\\])/.test(v) ? v : '/';
+const safeReturnTo = (v: unknown): string => {
+  if (typeof v !== 'string') return '/';
+  const ok = (x: string) => /^\/(?![/\\])/.test(x);
+  if (!ok(v)) return '/';
+  // Подвійне кодування (`/%5Cevil.com`): перевіряємо й декодований вигляд.
+  try {
+    if (!ok(decodeURIComponent(v))) return '/';
+  } catch {
+    return '/';
+  }
+  return v;
+};
 
 type OAuthState = {
   codeVerifier: string;
@@ -32,6 +44,7 @@ type OAuthState = {
   returnTo: string;
 };
 
+// Поля Telegram Login Widget; id/auth_date можуть прийти числом (JSON) — приводимо до рядка.
 const telegramBody = z
   .object({
     id: z.union([z.string(), z.number()]),
@@ -128,7 +141,13 @@ export function authRouter(deps: AppDeps): Router {
     const q = z
       .object({ mode: z.enum(['login', 'link']).default('login') })
       .parse({ mode: req.query.mode });
-    if (q.mode === 'link' && !req.user) throw new AppError(401, 'UNAUTHENTICATED');
+    if (q.mode === 'link') {
+      if (!req.user) throw new AppError(401, 'UNAUTHENTICATED');
+      if (req.user.isBanned) {
+        await revokeAllUserSessions(deps, req.user.userId);
+        throw new AppError(403, 'ACCOUNT_BANNED');
+      }
+    }
     const state = generateState();
     const codeVerifier = generateCodeVerifier();
     const entry: OAuthState = {
@@ -138,14 +157,32 @@ export function authRouter(deps: AppDeps): Router {
       ...(q.mode === 'link' ? { userId: req.user!.userId } : {}),
     };
     await deps.redis.set(`oauth:${state}`, JSON.stringify(entry), 'EX', OAUTH_TTL_SEC);
+    // Прив'язка state до браузера: проти login CSRF (чужий callback у браузері жертви).
+    res.cookie(OAUTH_COOKIE, state, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: OAUTH_COOKIE_PATH,
+      maxAge: OAUTH_TTL_SEC * 1000,
+    });
     res.redirect(provider.createAuthorizationUrl(state, codeVerifier).toString());
   });
 
   router.get('/:provider/callback', async (req, res) => {
     const provider = providerOf(req);
+    // Кука state очищається за будь-якого результату.
+    res.clearCookie(OAUTH_COOKIE, { path: OAUTH_COOKIE_PATH });
     const invalid = () => res.redirect('/login?error=OAUTH_STATE_INVALID');
     const { code, state } = req.query;
     if (typeof code !== 'string' || typeof state !== 'string' || !code || !state) return invalid();
+    // Звіряємо з кукою ДО GETDEL: чужий callback не спалює і не використовує state.
+    // (Невідповідність кладе state недоступним лише для цього браузера; запис у Redis
+    // залишається до TTL — ініціатор все ще може завершити потік у своєму браузері.)
+    const bound = (req.cookies as Record<string, unknown> | undefined)?.[OAUTH_COOKIE];
+    if (typeof bound !== 'string') return invalid();
+    const a = Buffer.from(bound);
+    const b = Buffer.from(state);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return invalid();
     // GETDEL: запис одноразовий навіть при паралельних callback-ах.
     const raw = await deps.redis.getdel(`oauth:${state}`);
     if (!raw) return invalid();
@@ -166,7 +203,7 @@ export function authRouter(deps: AppDeps): Router {
       }
       const { userId } = await resolveLogin(deps, identity);
       const [u] = await db.select().from(users).where(eq(users.id, userId));
-      if (!u || u.status === 'deleted') return invalid();
+      if (!u || u.status === 'deleted') return res.redirect('/login?error=UNAUTHENTICATED');
       if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
       await startSession(req, res, userId);
       return res.redirect(u.status === 'pending' ? '/complete-profile' : safeReturnTo(st.returnTo));

@@ -61,6 +61,67 @@ describe('google oauth', () => {
     expect(JSON.parse((await redis.get(`oauth:${s2.state}`))!).returnTo).toBe('/games');
   });
 
+  it.each(['/\\evil.com', '/%5Cevil.com', 'https://evil.com', 'javascript:alert(1)'])(
+    'rejects returnTo %s',
+    async (rt) => {
+      const agent = request.agent(createApp(deps));
+      const { state } = await startFlow(agent, `?returnTo=${encodeURIComponent(rt)}`);
+      expect(JSON.parse((await redis.get(`oauth:${state}`))!).returnTo).toBe('/');
+    },
+  );
+
+  it('array returnTo falls back to /', async () => {
+    const agent = request.agent(createApp(deps));
+    const { state } = await startFlow(agent, '?returnTo=/a&returnTo=/b');
+    expect(JSON.parse((await redis.get(`oauth:${state}`))!).returnTo).toBe('/');
+  });
+
+  it('start sets httpOnly nri_oauth cookie bound to state', async () => {
+    const agent = request.agent(createApp(deps));
+    const { res, state } = await startFlow(agent);
+    const c = cookies(res);
+    expect(c).toContain(`nri_oauth=${state}`);
+    expect(c).toMatch(/HttpOnly/i);
+    expect(c).toMatch(/Path=\/api\/auth/);
+    expect(c).toMatch(/SameSite=Lax/i);
+  });
+
+  it('callback without or with a different nri_oauth cookie is rejected (login CSRF)', async () => {
+    const app = createApp(deps);
+    const victimStart = await startFlow(request.agent(app));
+    // «Жертва» без куки
+    const victim = request.agent(app);
+    const r1 = await victim.get(`/api/auth/google/callback?code=c&state=${victimStart.state}`);
+    expect(r1.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+    expect(cookies(r1)).not.toMatch(/nri_sid/);
+    // З чужою кукою
+    const other = request.agent(app);
+    await startFlow(other);
+    const r2 = await other.get(`/api/auth/google/callback?code=c&state=${victimStart.state}`);
+    expect(r2.headers.location).toBe('/login?error=OAUTH_STATE_INVALID');
+    expect(cookies(r2)).not.toMatch(/nri_sid/);
+    expect(await db.select().from(sessions)).toHaveLength(0);
+  });
+
+  it('successful callback clears the nri_oauth cookie', async () => {
+    const agent = request.agent(createApp(deps));
+    const { state } = await startFlow(agent);
+    const res = await agent.get(`/api/auth/google/callback?code=c&state=${state}`);
+    expect(cookies(res)).toMatch(/nri_oauth=;/);
+  });
+
+  it('deleted user is redirected with UNAUTHENTICATED', async () => {
+    const agent = request.agent(createApp(deps));
+    const s1 = await startFlow(agent);
+    await agent.get(`/api/auth/google/callback?code=c&state=${s1.state}`);
+    await db.update(users).set({ status: 'deleted' });
+    await db.delete(sessions);
+    const a2 = request.agent(createApp(deps));
+    const s2 = await startFlow(a2);
+    const res = await a2.get(`/api/auth/google/callback?code=c&state=${s2.state}`);
+    expect(res.headers.location).toBe('/login?error=UNAUTHENTICATED');
+  });
+
   it('unknown/unconfigured provider is 404', async () => {
     const agent = request.agent(createApp(deps));
     expect((await agent.get('/api/auth/discord/start')).status).toBe(404);
@@ -165,6 +226,15 @@ describe('google oauth', () => {
       const rows = await db.select().from(authIdentities).where(eq(authIdentities.userId, userId));
       expect(rows.map((r) => r.provider).sort()).toEqual(['google', 'telegram']);
       expect(await db.select().from(users)).toHaveLength(1);
+    });
+
+    it('link start rejects banned users', async () => {
+      const app = createApp(deps);
+      const a = await loggedInTelegram(app, '1010');
+      await db.update(users).set({ isBanned: true });
+      await redis.flushdb();
+      const res = await a.agent.get('/api/auth/google/start?mode=link');
+      expect(res.status).toBe(403);
     });
 
     it('link start requires a session', async () => {
