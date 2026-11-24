@@ -1,4 +1,6 @@
+import { generateCodeVerifier, generateState } from 'arctic';
 import { Router } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppDeps } from '../app.js';
@@ -6,10 +8,30 @@ import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
+import { defaultOAuthProviders } from './providers/index.js';
 import { logoutHandlers, requireAuth } from './session.middleware.js';
-import { createSession, setSessionCookie } from './session.service.js';
+import { createSession, revokeSession, setSessionCookie } from './session.service.js';
 
 // Поля Telegram Login Widget; id/auth_date можуть прийти числом (JSON) — приводимо до рядка.
+const OAUTH_TTL_SEC = 10 * 60;
+const REDIRECTABLE_ERRORS = new Set([
+  'IDENTITY_TAKEN',
+  'IDENTITY_BANNED',
+  'ACCOUNT_BANNED',
+  'PROVIDER_ALREADY_LINKED',
+]);
+
+/** Лише відносний шлях усередині сайту: `/x`, але не `//host` і не `/\\host`. */
+const safeReturnTo = (v: unknown): string =>
+  typeof v === 'string' && /^\/(?![/\\])/.test(v) ? v : '/';
+
+type OAuthState = {
+  codeVerifier: string;
+  mode: 'login' | 'link';
+  userId?: number;
+  returnTo: string;
+};
+
 const telegramBody = z
   .object({
     id: z.union([z.string(), z.number()]),
@@ -20,7 +42,7 @@ const telegramBody = z
     auth_date: z.union([z.string(), z.number()]),
     hash: z.string(),
   })
-  .strict()
+  .catchall(z.union([z.string(), z.number()]))
   .transform((b) => {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(b)) if (v !== undefined) out[k] = String(v);
@@ -41,6 +63,21 @@ export function authRouter(deps: AppDeps): Router {
   router.post('/logout', auth, logout.logout);
   router.post('/logout-all', auth, logout.logoutAll);
 
+  // Новий вхід завжди відкликає сесію, з якою прийшов запит (проти session fixation).
+  const startSession = async (req: Request, res: Response, userId: number): Promise<void> => {
+    if (req.sessionToken) await revokeSession(deps, req.sessionToken, req.user?.userId);
+    const { token, expiresAt } = await createSession(deps, userId, {
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+    });
+    setSessionCookie(res, token, expiresAt, env);
+  };
+
+  const requireTelegram: RequestHandler = (_req, _res, next) => {
+    if (!env.TELEGRAM_BOT_TOKEN) throw new AppError(404, 'NOT_FOUND');
+    next();
+  };
+
   const verify = (body: unknown) => {
     if (!env.TELEGRAM_BOT_TOKEN) throw new AppError(404, 'NOT_FOUND');
     const data = telegramBody.parse(body);
@@ -58,18 +95,14 @@ export function authRouter(deps: AppDeps): Router {
     const [u] = await db.select().from(users).where(eq(users.id, userId));
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
-    const { token, expiresAt } = await createSession(deps, userId, {
-      userAgent: req.get('user-agent'),
-      ip: req.ip,
-    });
-    setSessionCookie(res, token, expiresAt, env);
+    await startSession(req, res, userId);
     // Тимчасовий «MeDto-lite»; повний MeDto визначає Task 9.
     res.json({
       user: { id: u.id, status: u.status, nickname: u.nickname, avatarUrl: u.avatarUrl },
     });
   });
 
-  router.post('/telegram/link', auth, async (req, res) => {
+  router.post('/telegram/link', requireTelegram, auth, async (req, res) => {
     const identity = verify(req.body);
     await linkIdentity(deps, req.user!.userId, identity);
     const rows = await db
@@ -78,6 +111,71 @@ export function authRouter(deps: AppDeps): Router {
       .where(eq(authIdentities.userId, req.user!.userId))
       .orderBy(authIdentities.id);
     res.json({ identities: rows });
+  });
+
+  // ---- OAuth (Google; Discord пізніше) ----
+  const providers = deps.oauthProviders ?? defaultOAuthProviders(env);
+  const providerOf = (req: Request) => {
+    const p = Object.hasOwn(providers, String(req.params.provider))
+      ? providers[String(req.params.provider)]
+      : undefined;
+    if (!p) throw new AppError(404, 'NOT_FOUND');
+    return p;
+  };
+
+  router.get('/:provider/start', async (req, res) => {
+    const provider = providerOf(req);
+    const q = z
+      .object({ mode: z.enum(['login', 'link']).default('login') })
+      .parse({ mode: req.query.mode });
+    if (q.mode === 'link' && !req.user) throw new AppError(401, 'UNAUTHENTICATED');
+    const state = generateState();
+    const codeVerifier = generateCodeVerifier();
+    const entry: OAuthState = {
+      codeVerifier,
+      mode: q.mode,
+      returnTo: safeReturnTo(req.query.returnTo),
+      ...(q.mode === 'link' ? { userId: req.user!.userId } : {}),
+    };
+    await deps.redis.set(`oauth:${state}`, JSON.stringify(entry), 'EX', OAUTH_TTL_SEC);
+    res.redirect(provider.createAuthorizationUrl(state, codeVerifier).toString());
+  });
+
+  router.get('/:provider/callback', async (req, res) => {
+    const provider = providerOf(req);
+    const invalid = () => res.redirect('/login?error=OAUTH_STATE_INVALID');
+    const { code, state } = req.query;
+    if (typeof code !== 'string' || typeof state !== 'string' || !code || !state) return invalid();
+    // GETDEL: запис одноразовий навіть при паралельних callback-ах.
+    const raw = await deps.redis.getdel(`oauth:${state}`);
+    if (!raw) return invalid();
+    const st = JSON.parse(raw) as OAuthState;
+    if (st.mode === 'link' && req.user?.userId !== st.userId) return invalid();
+
+    let identity;
+    try {
+      identity = await provider.exchange(code, st.codeVerifier);
+    } catch {
+      return invalid();
+    }
+    const errBase = st.mode === 'link' ? '/account' : '/login';
+    try {
+      if (st.mode === 'link') {
+        await linkIdentity(deps, st.userId!, identity);
+        return res.redirect(safeReturnTo(st.returnTo));
+      }
+      const { userId } = await resolveLogin(deps, identity);
+      const [u] = await db.select().from(users).where(eq(users.id, userId));
+      if (!u || u.status === 'deleted') return invalid();
+      if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
+      await startSession(req, res, userId);
+      return res.redirect(u.status === 'pending' ? '/complete-profile' : safeReturnTo(st.returnTo));
+    } catch (err) {
+      if (err instanceof AppError && REDIRECTABLE_ERRORS.has(err.code)) {
+        return res.redirect(`${errBase}?error=${err.code}`);
+      }
+      throw err;
+    }
   });
 
   return router;

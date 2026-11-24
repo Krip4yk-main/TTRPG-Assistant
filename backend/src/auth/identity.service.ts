@@ -102,6 +102,11 @@ export async function linkIdentity(
   };
   if (await alreadyMine()) return;
   await assertNotBanned(deps, identity);
+  const [sameProvider] = await db
+    .select({ id: authIdentities.id })
+    .from(authIdentities)
+    .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, identity.provider)));
+  if (sameProvider) throw new AppError(409, 'PROVIDER_ALREADY_LINKED');
   try {
     await db.transaction(async (tx) => {
       await tx.insert(authIdentities).values({

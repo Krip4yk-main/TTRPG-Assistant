@@ -185,17 +185,53 @@ describe('telegram routes', () => {
       .post('/api/auth/telegram/link')
       .set('x-csrf-token', a.csrf)
       .send(widget('903'));
-    expect(r1.status).toBe(200);
-    expect(r1.body.identities).toHaveLength(2);
-    expect(r1.body.identities[0]).toEqual({ provider: 'telegram', displayName: 'Ada' });
+    // Один провайдер — одна ідентичність на користувача.
+    expect(r1.status).toBe(409);
+    expect(r1.body.error.code).toBe('PROVIDER_ALREADY_LINKED');
 
     const b = await agentWithCsrf(app);
     await b.agent.post('/api/auth/telegram').set('x-csrf-token', b.csrf).send(widget('904'));
     const r2 = await b.agent
       .post('/api/auth/telegram/link')
       .set('x-csrf-token', b.csrf)
-      .send(widget('903'));
+      .send(widget('902'));
     expect(r2.status).toBe(409);
     expect(r2.body.error.code).toBe('IDENTITY_TAKEN');
+  });
+
+  it('accepts extra signed fields (e.g. language_code)', async () => {
+    const { agent, csrf } = await agentWithCsrf(createApp(deps));
+    const body = sign(
+      { id: '910', first_name: 'Ada', auth_date: String(now()), language_code: 'uk' },
+      TOKEN,
+    );
+    const res = await agent.post('/api/auth/telegram').set('x-csrf-token', csrf).send(body);
+    expect(res.status).toBe(200);
+  });
+
+  it('login with an existing session revokes the old session', async () => {
+    const app = createApp(deps);
+    const { agent, csrf } = await agentWithCsrf(app);
+    const r1 = await agent.post('/api/auth/telegram').set('x-csrf-token', csrf).send(widget('920'));
+    const old = /nri_sid=([^;]+)/.exec(cookies(r1))![1]!;
+    const r2 = await agent.post('/api/auth/telegram').set('x-csrf-token', csrf).send(widget('921'));
+    expect(r2.status).toBe(200);
+    const stale = await request(app).get('/api/test/protected').set('Cookie', `nri_sid=${old}`);
+    expect(stale.status).toBe(401);
+    expect(await db.select().from(sessions)).toHaveLength(1);
+  });
+
+  it('telegram/link returns 404 (not 401) when not configured', async () => {
+    const d2 = await testDeps();
+    try {
+      const { agent, csrf } = await agentWithCsrf(createApp(d2));
+      const res = await agent
+        .post('/api/auth/telegram/link')
+        .set('x-csrf-token', csrf)
+        .send(widget());
+      expect(res.status).toBe(404);
+    } finally {
+      await closeDeps(d2);
+    }
   });
 });

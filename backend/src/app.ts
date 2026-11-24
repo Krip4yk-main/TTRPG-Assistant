@@ -6,11 +6,18 @@ import type { Env } from './config/env.js';
 import type { Db } from './db/client.js';
 import type { Redis } from './redis/client.js';
 import { AppError, errorHandler, notFoundHandler } from './http/errors.js';
+import type { OAuthProvider } from './auth/providers/oauth.js';
 import { authRouter } from './auth/auth.routes.js';
 import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
-export type AppDeps = { env: Env; db: Db; redis: Redis };
+export type AppDeps = {
+  env: Env;
+  db: Db;
+  redis: Redis;
+  /** DI для тестів; за відсутності будуються з env. */
+  oauthProviders?: Record<string, OAuthProvider>;
+};
 
 export function createApp(deps: AppDeps): express.Express {
   const { env, redis } = deps;
