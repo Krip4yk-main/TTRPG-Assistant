@@ -7,6 +7,7 @@ import type { AppDeps } from '../app.js';
 import type { Env } from '../config/env.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { getMe } from '../users/users.service.js';
 import { isDuplicateKey, resolveLogin } from './identity.service.js';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -81,7 +82,7 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
       }
       if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
       await startSession(req, res, userId);
-      res.json({ user: { id: u.id, status: u.status, nickname: u.nickname, avatarUrl: u.avatarUrl } });
+      res.json({ user: await getMe(deps, u.id) });
       return;
     }
 
@@ -105,7 +106,7 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
       throw err;
     }
     await startSession(req, res, created.userId);
-    res.json({ user: { id: created.userId, status: 'active', nickname, avatarUrl: null } });
+    res.json({ user: await getMe(deps, created.userId) });
   });
 
   return router;

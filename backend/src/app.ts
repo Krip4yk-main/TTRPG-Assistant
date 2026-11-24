@@ -9,6 +9,7 @@ import { AppError, errorHandler, notFoundHandler } from './http/errors.js';
 import type { OAuthProvider } from './auth/providers/oauth.js';
 import { authRouter } from './auth/auth.routes.js';
 import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
+import { usersRouter } from './users/users.routes.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
 export type AppDeps = {
@@ -41,6 +42,7 @@ export function createApp(deps: AppDeps): express.Express {
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));
+  app.use('/api/me', usersRouter(deps));
 
   // Тестові маршрути — лише в NODE_ENV=test.
   if (env.NODE_ENV === 'test') {

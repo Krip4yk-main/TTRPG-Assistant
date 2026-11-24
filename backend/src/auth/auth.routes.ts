@@ -9,6 +9,7 @@ import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { devLoginEnabled, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
+import { getMe } from '../users/users.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
 import { defaultOAuthProviders } from './providers/index.js';
 import { logoutHandlers, requireAuth } from './session.middleware.js';
@@ -113,10 +114,7 @@ export function authRouter(deps: AppDeps): Router {
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
     await startSession(req, res, userId);
-    // Тимчасовий «MeDto-lite»; повний MeDto визначає Task 9.
-    res.json({
-      user: { id: u.id, status: u.status, nickname: u.nickname, avatarUrl: u.avatarUrl },
-    });
+    res.json({ user: await getMe(deps, userId) });
   });
 
   router.post('/telegram/link', requireTelegram, auth, async (req, res) => {
