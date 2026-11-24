@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@nri/shared": "*",
+    "@socket.io/redis-adapter": "^8.3.0",
     "arctic": "^3.7.0",
+    "cookie": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
@@ -23,6 +25,7 @@
     "ioredis": "^6.1.0",
     "mysql2": "^3.24.6",
     "rate-limit-redis": "^6.0.2",
+    "socket.io": "^4.8.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -31,6 +34,7 @@
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.2.1",
     "drizzle-kit": "^0.31.11",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.3.2",
     "tsx": "^4.23.15",
     "vitest": "^5.1.1"

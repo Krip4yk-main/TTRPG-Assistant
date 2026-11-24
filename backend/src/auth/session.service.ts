@@ -22,7 +22,7 @@ const CACHE_TTL_SEC = 5 * 60;
 const SLIDE_INTERVAL_SEC = 10 * 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Deps = Pick<AppDeps, 'env' | 'db' | 'redis'>;
+type Deps = Pick<AppDeps, 'env' | 'db' | 'redis'> & Pick<Partial<AppDeps>, 'realtime'>;
 type CacheEntry = { user: SessionUser; exp: number };
 
 export const hashToken = (token: string): string =>
@@ -156,7 +156,7 @@ export async function resolveSession(deps: Deps, token: string): Promise<Session
 }
 
 export async function revokeSession(
-  { db, redis }: Deps,
+  { db, redis, realtime }: Deps,
   token: string,
   userId?: number,
 ): Promise<void> {
@@ -167,6 +167,7 @@ export async function revokeSession(
   const multi = redis.multi().del(sessKey(hash), slideKey(hash));
   if (userId !== undefined) multi.srem(userSetKey(userId), hash);
   await multi.exec();
+  realtime?.disconnectSession(hash);
 }
 
 /** Лише очищає Redis-кеш сесій користувача (рядки БД лишаються). */
@@ -176,7 +177,10 @@ export async function evictUserSessionCache({ redis }: Deps, userId: number): Pr
   if (keys.length) await redis.del(...keys);
 }
 
-export async function revokeAllUserSessions({ db, redis }: Deps, userId: number): Promise<void> {
+export async function revokeAllUserSessions(
+  { db, redis, realtime }: Deps,
+  userId: number,
+): Promise<void> {
   const rows = await db
     .select({ tokenHash: sessions.tokenHash })
     .from(sessions)
@@ -195,6 +199,7 @@ export async function revokeAllUserSessions({ db, redis }: Deps, userId: number)
   const late = (await redis.smembers(userSetKey(userId))).filter((h) => !hashes.has(h));
   await purge(late);
   await redis.del(userSetKey(userId));
+  realtime?.disconnectUser(userId);
 }
 
 export function setSessionCookie(

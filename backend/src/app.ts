@@ -10,6 +10,7 @@ import type { OAuthProvider } from './auth/providers/oauth.js';
 import { authRouter } from './auth/auth.routes.js';
 import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
 import { usersRouter } from './users/users.routes.js';
+import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
 export type AppDeps = {
@@ -18,6 +19,8 @@ export type AppDeps = {
   redis: Redis;
   /** DI для тестів; за відсутності будуються з env. */
   oauthProviders?: Record<string, OAuthProvider>;
+  /** Realtime-хаб; відсутній у тестах без сокетів. */
+  realtime?: RealtimeHub;
 };
 
 export function createApp(deps: AppDeps): express.Express {
