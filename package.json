@@ -1,0 +1,24 @@
+{
+  "name": "nri-assistant",
+  "private": true,
+  "version": "0.1.0",
+  "description": "НРІ Асистент — пошук ігор для настільних рольових ігор",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [],
+  "scripts": {
+    "dev:db": "docker compose up -d",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "node scripts/run-workspaces.mjs test",
+    "typecheck": "node scripts/run-workspaces.mjs typecheck"
+  },
+  "devDependencies": {
+    "angular-eslint": "^22.8.0",
+    "eslint": "^10.15.0",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.74.0"
+  }
+}

@@ -10,3 +10,7 @@ coverage/
 .DS_Store
 Thumbs.db
 .superpowers/
+*.log
+backend/.env
+frontend/.env
+bot/.env
