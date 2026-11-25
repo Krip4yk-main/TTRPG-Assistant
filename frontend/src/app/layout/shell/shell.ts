@@ -9,6 +9,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { AuthStore } from '../../core/auth/auth.store';
 import { type ViewMode, ViewModeStore } from '../../core/view-mode/view-mode.store';
 import { UserName } from '../../shared/user-name/user-name';
+import { NotificationBell } from '../../features/notifications/notification-bell/notification-bell';
 
 @Component({
   selector: 'nri-shell',
@@ -21,6 +22,7 @@ import { UserName } from '../../shared/user-name/user-name';
     MatIconModule,
     MatMenuModule,
     MatToolbarModule,
+    NotificationBell,
     TranslatePipe,
     UserName,
   ],

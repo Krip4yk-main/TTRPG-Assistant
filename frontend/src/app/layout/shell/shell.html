@@ -62,6 +62,14 @@
       </mat-button-toggle>
     </mat-button-toggle-group>
   }
+  @if (auth.isActive()) {
+    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване. -->
+    @defer (on idle) {
+      <nri-notification-bell />
+    } @placeholder {
+      <span class="bell-placeholder" aria-hidden="true"></span>
+    }
+  }
   @if (auth.me(); as me) {
     <button
       mat-icon-button

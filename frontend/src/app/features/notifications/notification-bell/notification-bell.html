@@ -1,0 +1,188 @@
+<button
+  #trigger
+  mat-icon-button
+  type="button"
+  class="bell"
+  cdkOverlayOrigin
+  #origin="cdkOverlayOrigin"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="open() ? 'notifications-panel' : null"
+  [attr.aria-label]="
+    count()
+      ? ('notifications.bell.labelUnread' | translate: { count: badge() })
+      : ('notifications.bell.label' | translate)
+  "
+  [matBadge]="badge()"
+  [matBadgeHidden]="count() === 0"
+  matBadgeSize="small"
+  matBadgeOverlap
+  (click)="toggle()"
+>
+  <mat-icon aria-hidden="true">{{ count() ? 'notifications_unread' : 'notifications' }}</mat-icon>
+</button>
+
+<span class="nri-visually-hidden announcer" aria-live="polite" aria-atomic="true">
+  @if (announcement() !== null) {
+    {{ 'notifications.bell.announce' | translate: { count: announcement() } }}
+  }
+</span>
+
+<ng-template
+  cdkConnectedOverlay
+  [cdkConnectedOverlayOrigin]="origin"
+  [cdkConnectedOverlayOpen]="open()"
+  [cdkConnectedOverlayPositions]="positions"
+  cdkConnectedOverlayPanelClass="nri-notifications-overlay"
+  (overlayOutsideClick)="onOutsideClick($event)"
+  (overlayKeydown)="onKeydown($event)"
+  (detach)="close()"
+>
+  <div
+    id="notifications-panel"
+    class="panel"
+    role="dialog"
+    aria-labelledby="notifications-panel-title"
+    cdkTrapFocus
+    [cdkTrapFocusAutoCapture]="true"
+  >
+    <header class="panel-header">
+      <h2 id="notifications-panel-title" class="panel-title">
+        {{ 'notifications.title' | translate }}
+      </h2>
+      <button
+        mat-button
+        type="button"
+        class="mark-all"
+        [disabled]="count() === 0"
+        (click)="markAll()"
+      >
+        {{ 'notifications.panel.markAll' | translate }}
+      </button>
+      <a
+        mat-icon-button
+        class="settings-link"
+        routerLink="/settings/notifications"
+        [attr.aria-label]="'notifications.panel.settings' | translate"
+        (click)="close()"
+      >
+        <mat-icon aria-hidden="true">settings</mat-icon>
+      </a>
+    </header>
+
+    <div class="panel-body" [attr.aria-busy]="store.loading()">
+      <div class="progress">
+        @if (store.loading()) {
+          <mat-progress-bar
+            mode="indeterminate"
+            [attr.aria-label]="'notifications.panel.loading' | translate"
+          />
+        }
+      </div>
+
+      @if (!store.loaded()) {
+        @if (store.error()) {
+          <div class="state" role="alert">
+            <p>{{ 'notifications.panel.error' | translate }}</p>
+            <button mat-stroked-button type="button" (click)="retry()">
+              {{ 'common.retry' | translate }}
+            </button>
+          </div>
+        } @else {
+          <ul class="list skeleton" aria-hidden="true">
+            @for (i of [1, 2, 3, 4]; track i) {
+              <li class="item"><span class="bar"></span><span class="bar short"></span></li>
+            }
+          </ul>
+        }
+      } @else if (rows().length === 0) {
+        <div class="state empty">
+          <mat-icon aria-hidden="true">notifications_none</mat-icon>
+          <p>{{ 'notifications.panel.empty' | translate }}</p>
+          <p class="nri-muted">{{ 'notifications.panel.emptyHint' | translate }}</p>
+        </div>
+      } @else {
+        <ul class="list">
+          @for (row of rows(); track row.n.id) {
+            <li>
+              <a
+                class="item"
+                [class.unread]="!row.n.readAt"
+                [routerLink]="row.n.link"
+                (click)="openItem(row.n)"
+              >
+                <mat-icon class="icon" aria-hidden="true">{{ row.view.icon }}</mat-icon>
+                <span class="content">
+                  @if (!row.n.readAt) {
+                    <span class="nri-visually-hidden"
+                      >{{ 'notifications.panel.unread' | translate }}:
+                    </span>
+                  }
+                  <span class="text">{{
+                    row.view.key
+                      | translate
+                        : {
+                            game: row.view.game ?? ('notifications.unknownGame' | translate),
+                            actor: row.view.actor ?? ('notifications.someone' | translate),
+                            when: row.view.when ?? ('notifications.unknownTime' | translate),
+                            from: row.view.from ?? ('notifications.unknownTime' | translate),
+                            offset: row.view.offset
+                              ? (row.view.offset.key | translate: row.view.offset.params)
+                              : '',
+                          }
+                  }}</span>
+                  @if (row.view.reason; as r) {
+                    <span class="extra">{{
+                      'notifications.reason'
+                        | translate
+                          : {
+                              reason: r.code
+                                ? ('notifications.reasons.' + r.code | translate)
+                                : r.text,
+                            }
+                    }}</span>
+                  }
+                  @if (row.view.thanksKey; as thanks) {
+                    <span class="extra thanks">{{ thanks | translate }}</span>
+                  }
+                  <time
+                    class="time nri-muted"
+                    [attr.datetime]="row.n.createdAt"
+                    [title]="row.time.absolute"
+                  >
+                    @if (row.time.justNow) {
+                      {{ 'notifications.time.justNow' | translate }}
+                    } @else {
+                      {{ row.time.relative ?? row.time.absolute }}
+                    }
+                  </time>
+                </span>
+                @if (!row.n.readAt) {
+                  <span class="dot" aria-hidden="true"></span>
+                }
+              </a>
+            </li>
+          }
+        </ul>
+        @if (store.error()) {
+          <p class="nri-alert load-error" role="alert">
+            {{ 'notifications.panel.error' | translate }}
+          </p>
+        }
+        @if (store.hasMore()) {
+          <div class="more">
+            <button
+              mat-stroked-button
+              type="button"
+              class="load-more"
+              [disabled]="store.loading()"
+              (click)="loadMore()"
+            >
+              {{ 'notifications.panel.more' | translate }}
+            </button>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</ng-template>

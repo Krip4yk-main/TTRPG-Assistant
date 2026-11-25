@@ -60,6 +60,18 @@
     </div>
   </section>
 
+  <!-- Сповіщення -->
+  <section class="nri-card" aria-labelledby="notifications-title">
+    <h2 id="notifications-title">{{ 'account.notifications.title' | translate }}</h2>
+    <p class="nri-muted">{{ 'account.notifications.hint' | translate }}</p>
+    <div class="link-actions">
+      <a mat-stroked-button routerLink="/settings/notifications">
+        <mat-icon aria-hidden="true">notifications</mat-icon>
+        {{ 'account.notifications.link' | translate }}
+      </a>
+    </div>
+  </section>
+
   <!-- Способи входу -->
   <section class="nri-card" aria-labelledby="identities-title">
     <h2 id="identities-title">{{ 'account.identities.title' | translate }}</h2>

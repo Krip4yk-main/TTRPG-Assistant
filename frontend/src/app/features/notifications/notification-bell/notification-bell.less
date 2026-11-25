@@ -1,0 +1,183 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+}
+
+// Панель рендериться в оверлеї, але стилі компонента до неї застосовуються
+// (шаблон належить компоненту).
+.panel {
+  // Фіксована ширина й висота області списку — без зсуву при завантаженні.
+  width: min(380px, calc(100vw - 16px));
+  max-height: min(560px, calc(100vh - 80px));
+  display: flex;
+  flex-direction: column;
+  background: var(--nri-surface-raised);
+  color: var(--nri-text);
+  border: 1px solid var(--nri-overlay-border);
+  border-radius: var(--nri-radius-md);
+  box-shadow: var(--nri-shadow-lg);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  padding: var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-md);
+  border-bottom: 1px solid var(--nri-border);
+}
+
+.panel-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.panel-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// Смужка прогресу поверх (абсолютно) — не зсуває список.
+.progress {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  z-index: 1;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li + li {
+    border-top: 1px solid var(--nri-border);
+  }
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nri-space-sm);
+  min-height: 72px;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  color: var(--nri-text);
+  text-decoration: none;
+  transition: background var(--nri-transition);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--nri-surface-sunken);
+    color: var(--nri-text);
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
+  &.unread {
+    background: var(--nri-new-highlight);
+
+    .text {
+      font-weight: 600;
+    }
+  }
+}
+
+.icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--nri-accent-text);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.extra {
+  font-size: 0.9rem;
+}
+
+.thanks {
+  font-style: italic;
+  color: var(--nri-accent-text);
+}
+
+.time {
+  font-size: 0.8rem;
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--nri-accent);
+}
+
+.skeleton .item {
+  flex-direction: column;
+  justify-content: center;
+}
+
+.bar {
+  display: block;
+  height: 12px;
+  width: 85%;
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-surface-sunken);
+  animation: nri-pulse 1.2s ease-in-out infinite;
+
+  &.short {
+    width: 40%;
+  }
+}
+
+@keyframes nri-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nri-space-xs);
+  min-height: 240px;
+  padding: var(--nri-space-lg);
+  text-align: center;
+
+  p {
+    margin: 0;
+  }
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: var(--nri-text-muted);
+  }
+}
+
+.load-error {
+  margin: var(--nri-space-sm) var(--nri-space-md);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: var(--nri-space-sm);
+  border-top: 1px solid var(--nri-border);
+}

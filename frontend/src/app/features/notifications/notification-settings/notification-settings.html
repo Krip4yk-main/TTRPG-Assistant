@@ -1,0 +1,98 @@
+<section class="nri-page notification-settings">
+  <h1>{{ 'notifications.settings.title' | translate }}</h1>
+  <p class="nri-muted intro">{{ 'notifications.settings.intro' | translate }}</p>
+
+  @if (loading() && !telegram()) {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  } @else if (loadError(); as key) {
+    <div class="nri-alert load-error" role="alert">
+      <p>{{ key | translate }}</p>
+      <button mat-stroked-button type="button" (click)="load()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (telegram(); as tg) {
+    <div class="prefs">
+      <!-- Telegram -->
+      <section class="nri-card" aria-labelledby="telegram-title">
+        <h2 id="telegram-title">{{ 'notifications.settings.telegram.title' | translate }}</h2>
+        <p class="nri-muted">{{ 'notifications.settings.telegram.hint' | translate }}</p>
+
+        @if (!hasTelegram()) {
+          <div class="nri-notice telegram-callout">
+            <p>{{ 'notifications.settings.telegram.notLinked' | translate }}</p>
+            <a mat-stroked-button routerLink="/account">
+              <mat-icon aria-hidden="true">link</mat-icon>
+              {{ 'notifications.settings.telegram.linkAction' | translate }}
+            </a>
+          </div>
+        }
+
+        <ul class="categories">
+          @for (category of categories; track category) {
+            <li>
+              <mat-slide-toggle
+                [attr.data-category]="category"
+                [checked]="tg[category]"
+                [disabled]="!hasTelegram() || saving()"
+                [aria-describedby]="'category-hint-' + category"
+                (change)="setTelegram(category, $event.checked)"
+                >{{
+                  'notifications.categories.' + category + '.label' | translate
+                }}</mat-slide-toggle
+              >
+              <p class="nri-muted hint" [id]="'category-hint-' + category">
+                {{ 'notifications.categories.' + category + '.hint' | translate }}
+              </p>
+            </li>
+          }
+        </ul>
+      </section>
+
+      <!-- Нагадування -->
+      <section class="nri-card" aria-labelledby="reminders-title">
+        <h2 id="reminders-title">{{ 'notifications.settings.reminders.title' | translate }}</h2>
+        <p class="nri-muted" id="reminders-hint">
+          {{ 'notifications.settings.reminders.hint' | translate }}
+        </p>
+        <mat-chip-listbox
+          class="offsets"
+          multiple
+          [attr.aria-label]="'notifications.settings.reminders.label' | translate"
+          aria-describedby="reminders-hint"
+          [disabled]="saving()"
+          (change)="setOffsets($event)"
+        >
+          @for (offset of offsets; track offset) {
+            <mat-chip-option
+              [value]="offset"
+              [selected]="isOffsetSelected(offset)"
+              [attr.data-offset]="offset"
+              >{{
+                'notifications.settings.reminders.offsets.' + offset | translate
+              }}</mat-chip-option
+            >
+          }
+        </mat-chip-listbox>
+        <div aria-live="polite">
+          @if (remindersOff()) {
+            <p class="nri-notice reminders-off">
+              {{ 'notifications.settings.reminders.none' | translate }}
+            </p>
+          }
+        </div>
+      </section>
+
+      <div class="actions">
+        <button mat-flat-button type="button" class="save" [disabled]="saving()" (click)="save()">
+          {{ (saving() ? 'common.saving' : 'common.save') | translate }}
+        </button>
+      </div>
+      <div aria-live="polite">
+        @if (saveError(); as key) {
+          <p class="nri-alert save-error" role="alert">{{ key | translate }}</p>
+        }
+      </div>
+    </div>
+  }
+</section>

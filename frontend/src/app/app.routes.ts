@@ -31,6 +31,15 @@ export const routes: Routes = [
       import('./features/account/account-settings/account-settings').then((m) => m.AccountSettings),
   },
   {
+    path: 'settings/notifications',
+    canActivate: [activeGuard],
+    title: 'titles.notificationSettings',
+    loadComponent: () =>
+      import('./features/notifications/notification-settings/notification-settings').then(
+        (m) => m.NotificationSettings,
+      ),
+  },
+  {
     path: 'my-games',
     canActivate: [activeGuard],
     title: 'titles.myGames',

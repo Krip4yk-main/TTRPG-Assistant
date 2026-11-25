@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, DeferBlockState, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
@@ -61,6 +61,8 @@ describe('Shell home by view mode', () => {
   });
 
   afterEach(() => {
+    // Дзвіночок сповіщень тягне лічильник непрочитаних для активного користувача.
+    http.match('/api/me/notifications/unread-count').forEach((r) => r.flush({ count: 0 }));
     http.verify();
     localStorage.clear();
   });
@@ -103,6 +105,17 @@ describe('Shell home by view mode', () => {
     await settle();
     expect(el.querySelector('a[href="/my-applications"]')).not.toBeNull();
     expect(el.querySelector('a[href="/my-games"]')).toBeNull();
+  });
+
+  it('active user gets the notification bell (deferred chunk, reserved placeholder)', async () => {
+    await settle();
+    const [block] = await fixture.getDeferBlocks();
+    await block!.render(DeferBlockState.Placeholder);
+    expect(el.querySelector('.bell-placeholder')).not.toBeNull();
+    await block!.render(DeferBlockState.Complete);
+    await settle();
+    expect(el.querySelector('nri-notification-bell button.bell')).not.toBeNull();
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 0 });
   });
 
   it('/my-applications renders the page', async () => {
