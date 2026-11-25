@@ -75,7 +75,10 @@
   --nri-shadow-md: 0 6px 14px rgba(0, 0, 0, 0.35);
   --nri-shadow-lg: 0 18px 28px rgba(0, 0, 0, 0.45);
 
-  --nri-bg: var(--qb-wood);
+  // Фон body — пергамент: на :root діє контекст «пергамент» (чорнило), тож усе, що лежить
+  // прямо на body (резервний каркас при збої чанку, банери), читабельне. Дерев'яна стіна —
+  // лише на хості каркаса дизайну (.qb-wall).
+  --nri-bg: var(--qb-parchment);
   --nri-primary: var(--qb-moss);
   --nri-on-primary: var(--qb-on-moss);
   --nri-accent: var(--qb-brass);
@@ -100,6 +103,8 @@
 
   // У Kurale лише звичайне накреслення: без штучного «жирного» заголовків.
   font-synthesis-weight: none;
+  // Скролбари: латунь на темному дереві (на пергаменті — див. нижче).
+  scrollbar-color: var(--qb-brass) var(--qb-wood-dark);
 }
 
 // Контекст «пергамент»: чорнило на папері (і ті самі ролі Material, що в
@@ -175,6 +180,13 @@
 @{qb} {
   .qb-wood {
     .qb-wood-tokens();
+  }
+
+  // Прокручувані пергаментні поверхні (панелі, оверлеї): лінія по пергаменту.
+  .qb-paper,
+  .nri-page,
+  .cdk-overlay-container {
+    scrollbar-color: var(--qb-ink-muted) var(--qb-parchment-dark);
   }
 
   h1,

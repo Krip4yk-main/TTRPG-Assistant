@@ -31,7 +31,8 @@
   padding: 1px 10px;
 }
 
-.fit[data-fit='partial'] {
+// Специфічність вища за глобальний .qb-ribbon бандла дизайну — не залежить від порядку стилів.
+.badge.fit[data-fit='partial'] {
   background: var(--nri-accent);
   color: var(--nri-on-accent);
 }
