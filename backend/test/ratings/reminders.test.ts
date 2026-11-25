@@ -420,7 +420,9 @@ describe('ratings.deadline', () => {
   it('final sets of finished games; a leave set while the game runs (no deadline) → none', async () => {
     const gm = await user('Майстер');
     const a = await user('Alpha');
-    const finished = await fx.game(gm.id, { status: 'finished', finishedAt: ago(29) });
+    // Один момент на фікстуру й перевірку: два виклики ago() можуть розійтись на секунду.
+    const finishedAt = ago(29);
+    const finished = await fx.game(gm.id, { status: 'finished', finishedAt });
     await fx.member(finished, a.id, ago(40));
     await fx.done(finished, ago(35), [a.id]);
     await rate(finished, gm.id, a.id, null, true);
@@ -435,7 +437,7 @@ describe('ratings.deadline', () => {
     expect(rows.map((r) => [r.userId, r.payload.gameId, r.payload.sessionId])).toEqual([
       [a.id, finished, undefined],
     ]);
-    expect(rows[0]!.payload.closesAt).toBe(new Date(ago(29).getTime() + 30 * DAY).toISOString());
+    expect(rows[0]!.payload.closesAt).toBe(new Date(finishedAt.getTime() + 30 * DAY).toISOString());
     expect(rows[0]!.entityType).toBe('game');
   });
 });
