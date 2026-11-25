@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><title>Концепт 5 — Ліхтар</title>
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--night:#161A2E;--night2:#20263F;--text:#ECEAF6;--dim:#9EA3C0;--gold:#F2B84B;--ember:#E26A3B}
+*{box-sizing:border-box;margin:0}
+body{width:1440px;background:var(--night);color:var(--text);font:16px/1.5 'Manrope',sans-serif}
+header{position:absolute;z-index:2;left:0;right:0;display:flex;align-items:center;gap:34px;padding:22px 56px}
+.logo{font:26px 'Yeseva One';display:flex;gap:10px;align-items:center}
+nav{display:flex;gap:26px;color:var(--dim);font-weight:600}
+nav a.on{color:var(--text)}
+.me{margin-left:auto;display:flex;gap:16px;align-items:center;color:var(--dim)}
+.av{width:40px;height:40px;border-radius:50%;background:var(--gold);color:var(--night);display:grid;place-items:center;font-weight:700}
+.hero{position:relative;height:560px;overflow:hidden}
+.hero svg{position:absolute;inset:0}
+.hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(22,26,46,.96) 0,rgba(22,26,46,.7) 40%,rgba(22,26,46,0) 70%),linear-gradient(0deg,var(--night) 0,transparent 40%)}
+.hc{position:absolute;left:56px;bottom:70px;max-width:600px}
+.kick{color:var(--gold);font-weight:700}
+.hc h1{font:76px/1 'Yeseva One';margin:10px 0 16px}
+.hc p{color:#CBCDE2;font-size:18px;max-width:52ch}
+.meta{display:flex;gap:18px;margin:18px 0 26px;color:var(--dim);font-weight:600}
+.meta b{color:var(--text)}
+.btns{display:flex;gap:12px}
+.btn{background:var(--gold);color:var(--night);border:0;border-radius:10px;padding:13px 24px;font:700 16px Manrope}
+.ghost{background:rgba(255,255,255,.08);color:var(--text);border:1px solid rgba(255,255,255,.2)}
+.shelf{padding:10px 56px 30px}
+.shelf h2{font:30px 'Yeseva One';margin-bottom:16px;display:flex;justify-content:space-between;align-items:end}
+.shelf h2 small{font:600 15px Manrope;color:var(--gold)}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.t{border-radius:14px;overflow:hidden;background:var(--night2)}
+.art{height:170px;position:relative}
+.art span{position:absolute;left:12px;top:12px;background:rgba(22,26,46,.75);backdrop-filter:blur(4px);padding:3px 10px;border-radius:8px;font-size:13px;font-weight:700}
+.art span.fit{background:var(--gold);color:var(--night)}
+.info{padding:14px 16px 16px}
+.info h3{font:22px/1.15 'Yeseva One';margin-bottom:4px}
+.info .m{color:var(--dim);font-size:14px}
+.info .f{display:flex;justify-content:space-between;margin-top:10px;font-weight:600;font-size:14.5px}
+.info .f em{font-style:normal;color:var(--gold)}
+</style></head><body>
+<header><div class="logo"><svg width="26" height="30" viewBox="0 0 26 30" fill="none" stroke="#F2B84B" stroke-width="2"><path d="M8 4h10M6 8h14l-2 16H8z"/><path d="M13 12c-3 4 0 7 0 7s3-3 0-7z" fill="#F2B84B"/><path d="M9 28h8"/></svg>НРІ Асистент</div>
+<nav><a class="on">Пошук ігор</a><a>Календар</a><a>Мої заявки</a><a>Оцінки</a></nav><div class="me">🔔 3<div class="av">О</div></div></header>
+<section class="hero">
+ <svg width="1440" height="560" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid slice">
+  <defs><radialGradient id="moon" cx="72%" cy="30%" r="40%"><stop offset="0" stop-color="#C9C3E8"/><stop offset=".12" stop-color="#6E6A9E"/><stop offset="1" stop-color="#1C2140"/></radialGradient>
+  <linearGradient id="fog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#B9B3D9" stop-opacity=".35"/></linearGradient></defs>
+  <rect width="1440" height="560" fill="url(#moon)"/>
+  <circle cx="1040" cy="160" r="62" fill="#EDE8FF" opacity=".9"/>
+  <path d="M760 560V330l40-30 10-70 14 70 30 20v-60l26-50 26 50v80l40 20 12-90 16 90v-40l30-30 30 30v280z" fill="#121528"/>
+  <path d="M1170 560V380l30-40 30 40v-60l20-30 20 30v240z" fill="#121528"/>
+  <rect x="868" y="310" width="8" height="12" fill="#F2B84B"/><rect x="934" y="360" width="8" height="12" fill="#F2B84B" opacity=".7"/>
+  <path d="M600 560c80-60 200-80 300-60s200 40 300 0 160-30 240 0v60z" fill="#0F1222"/>
+  <rect y="380" width="1440" height="180" fill="url(#fog)"/>
+ </svg>
+ <div class="shade"></div>
+ <div class="hc"><span class="kick">Набір до п'ятниці · підходить за твоїм розкладом</span><h1>Прокляття Страда</h1>
+  <p>Готичний жах у туманній Баровії. Повільний темп, багато розмов, мало боїв. Новачкам раді.</p>
+  <div class="meta"><span><b>D&amp;D 5e</b></span><span>Кампанія</span><span>Онлайн</span><span>Пт 19:00</span><span>Майстер <b>Ворон ★ 4.8</b></span><span>2 місця</span></div>
+  <div class="btns"><button class="btn">Подати заявку</button><button class="btn ghost">Детальніше</button></div></div>
+</section>
+<section class="shelf"><h2>Твої вільні вечори <small>Усі 9</small></h2>
+ <div class="row">
+  <article class="t"><div class="art" style="background:linear-gradient(160deg,#1F3B2C,#4E6B3A 60%,#C9A45B)"><svg width="100%" height="170" viewBox="0 0 300 170" preserveAspectRatio="none"><path d="M0 170L60 70l40 50 50-90 60 80 40-40 50 100z" fill="#16261D" opacity=".8"/></svg><span class="fit">Твій розклад</span></div>
+   <div class="info"><h3>Вітер з Карпат</h3><div class="m">Pathfinder 2e · кампанія · Львів</div><div class="f"><span>Нд 12:00</span><em>3 місця</em></div></div></article>
+  <article class="t"><div class="art" style="background:linear-gradient(160deg,#3B2348,#8C3D6B 60%,#F08A5D)"><svg width="100%" height="170" viewBox="0 0 300 170" preserveAspectRatio="none"><g fill="#1E1230" opacity=".85"><rect x="20" y="60" width="40" height="110"/><rect x="70" y="30" width="30" height="140"/><rect x="110" y="80" width="50" height="90"/><rect x="170" y="20" width="35" height="150"/><rect x="215" y="70" width="60" height="100"/></g></svg><span>18+</span></div>
+   <div class="info"><h3>Неонові борги</h3><div class="m">Cyberpunk RED · кампанія · онлайн</div><div class="f"><span>Ср 20:00</span><em>★ 4.9</em></div></div></article>
+  <article class="t"><div class="art" style="background:linear-gradient(160deg,#2A3B23,#7E9A4E 55%,#E8D28A)"><svg width="100%" height="170" viewBox="0 0 300 170" preserveAspectRatio="none"><g fill="#1F2E18" opacity=".7"><path d="M30 170l25-90 25 90z"/><path d="M90 170l30-110 30 110z"/><path d="M200 170l25-80 25 80z"/></g><circle cx="240" cy="40" r="18" fill="#FFF3C4" opacity=".8"/></svg><span class="fit">Твій розклад</span></div>
+   <div class="info"><h3>Лісова пошта</h3><div class="m">Wanderhome · ваншот · онлайн</div><div class="f"><span>Нд 17:00</span><em>★ 4.7</em></div></div></article>
+  <article class="t"><div class="art" style="background:radial-gradient(circle at 70% 30%,#3C4F7A,#0E1226 70%)"><svg width="100%" height="170" viewBox="0 0 300 170"><g fill="#fff"><circle cx="40" cy="30" r="1.5"/><circle cx="120" cy="60" r="1"/><circle cx="260" cy="20" r="1.5"/><circle cx="200" cy="120" r="1"/></g><path d="M110 110l60-20 30 10-60 22z" fill="#8790B5"/><circle cx="215" cy="55" r="22" fill="none" stroke="#E26A3B" stroke-width="2" opacity=".7"/></svg><span>18+</span></div>
+   <div class="info"><h3>Дрейф «Ізоляди»</h3><div class="m">Mothership · ваншот · онлайн</div><div class="f"><span>Сб 21:00</span><em>★ 4.5</em></div></div></article>
+ </div></section>
+</body></html>

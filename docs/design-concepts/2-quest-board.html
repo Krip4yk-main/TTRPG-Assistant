@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><title>Концепт 2 — Дошка завдань</title>
+<link href="https://fonts.googleapis.com/css2?family=Kurale&family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&display=swap" rel="stylesheet">
+<style>
+:root{--wood:#3A2718;--wood2:#2C1D12;--parch:#EADFC4;--ink:#2B1E14;--brass:#C9A227;--wax:#8E1F1A;--moss:#4E5B31}
+*{box-sizing:border-box;margin:0}
+body{width:1440px;color:var(--ink);font:16px/1.5 'Literata',serif;
+ background:repeating-linear-gradient(90deg,var(--wood) 0 180px,var(--wood2) 180px 184px),var(--wood);
+ background-image:repeating-linear-gradient(90deg,transparent 0 179px,rgba(0,0,0,.35) 179px 183px),repeating-linear-gradient(3deg,rgba(255,255,255,.025) 0 2px,transparent 2px 9px),linear-gradient(var(--wood),#2E1F14)}
+header{display:flex;align-items:center;gap:36px;padding:18px 56px;background:linear-gradient(#5A3D25,#47301D);box-shadow:0 6px 0 #24170E,0 14px 24px rgba(0,0,0,.4);color:var(--parch)}
+.logo{font:32px 'Kurale',serif;color:#F3E3B5;display:flex;gap:12px;align-items:center}
+.logo b{width:34px;height:34px;border:2px solid var(--brass);border-radius:50%;display:grid;place-items:center;font:20px 'Kurale';color:var(--brass)}
+nav{display:flex;gap:26px}
+nav a{color:#E7D6AE}
+nav a.on{color:#fff;text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:6px;text-decoration-thickness:2px}
+.me{margin-left:auto;display:flex;gap:16px;align-items:center}
+.lamp{padding:6px 14px;border:1px solid var(--brass);color:#F3E3B5;border-radius:20px}
+.av{width:40px;height:40px;border-radius:50%;background:var(--brass);color:var(--wood2);display:grid;place-items:center;font:20px Kurale}
+.intro{padding:46px 56px 10px;color:#F3E3B5;display:flex;justify-content:space-between;align-items:end}
+h1{font:58px/1 'Kurale',serif;text-shadow:0 2px 0 #000}
+.intro p{color:#D9C69C;margin-top:10px;font-size:18px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;max-width:620px;justify-content:end}
+.chip{background:#EADFC4;color:var(--ink);padding:6px 14px;border-radius:3px;font-weight:600;box-shadow:0 2px 0 #00000055;transform:rotate(-1deg)}
+.chip:nth-child(2n){transform:rotate(1.2deg)}
+.chip.off{background:transparent;color:#E7D6AE;border:1px dashed #E7D6AE;box-shadow:none}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:46px 40px;padding:40px 56px 70px}
+.note{position:relative;background:var(--parch);padding:34px 28px 24px;box-shadow:0 18px 28px rgba(0,0,0,.45),inset 0 0 60px rgba(120,80,30,.25);
+ clip-path:polygon(0 2%,4% 0,30% 1%,55% 0,80% 1.5%,100% 0,99% 30%,100% 60%,98.5% 100%,70% 98.5%,40% 100%,12% 98.8%,0 100%,1% 60%)}
+.note:nth-child(1){transform:rotate(-1.6deg)}.note:nth-child(2){transform:rotate(1.2deg) translateY(14px)}.note:nth-child(3){transform:rotate(-.6deg)}
+.note:nth-child(4){transform:rotate(1.8deg)}.note:nth-child(5){transform:rotate(-1.2deg) translateY(10px)}.note:nth-child(6){transform:rotate(.8deg)}
+.pin{position:absolute;top:10px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#F7D774,#A57F12 60%,#5D470A);box-shadow:0 3px 3px rgba(0,0,0,.5)}
+.sys{font-weight:700;font-size:14px;color:var(--moss);letter-spacing:.02em}
+.note h2{font:31px/1.1 'Kurale',serif;margin:6px 0 10px}
+.note p{color:#4A3725;font-size:15.5px}
+.facts{margin-top:14px;border-top:1px solid #B9A47A;padding-top:12px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:15px}
+.facts dt{color:#7A6447}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
+.gm{display:flex;gap:10px;align-items:center;font-weight:600}
+.gm i{width:34px;height:34px;border-radius:50%;background:#B9A47A;display:grid;place-items:center;font-style:normal;font-family:Kurale}
+.gm small{display:block;color:#7A6447;font-weight:400}
+.seal{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#B5352D,var(--wax) 60%,#5A110E);color:#F3D9C4;display:grid;place-items:center;text-align:center;font:600 12px/1.1 Literata;box-shadow:0 3px 4px rgba(0,0,0,.4);transform:rotate(-12deg)}
+.fit{position:absolute;right:-6px;top:24px;background:var(--moss);color:#EFE8CF;padding:3px 12px;font-size:13px;font-weight:600;transform:rotate(4deg)}
+</style></head><body>
+<header><div class="logo"><b>⚔</b>НРІ Асистент</div><nav><a class="on">Дошка ігор</a><a>Календар</a><a>Мої заявки</a><a>Оцінки</a></nav>
+ <div class="me"><span class="lamp">3 нові сповіщення</span><div class="av">О</div></div></header>
+<div class="intro"><div><h1>Дошка оголошень</h1><p>Майстри шукають гравців. Зірви оголошення — подай заявку.</p></div>
+ <div class="chips"><span class="chip">D&amp;D 5e</span><span class="chip">Pathfinder 2e</span><span class="chip">Пт–Нд, вечір</span><span class="chip">Онлайн або Київ</span><span class="chip off">+ ще фільтр</span></div></div>
+<section class="board">
+ <article class="note"><span class="pin"></span><span class="fit">твій розклад</span><span class="sys">D&amp;D 5e · кампанія</span><h2>Прокляття Страда</h2><p>Готичний жах у туманній Баровії. Повільний темп, багато розмов, мало боїв.</p>
+  <dl class="facts"><dt>Коли</dt><dd>П'ятниця, 19:00, щотижня</dd><dt>Де</dt><dd>Онлайн, Discord</dd><dt>Місця</dt><dd>2 з 5 вільні</dd></dl>
+  <div class="foot"><div class="gm"><i>В</i><span>Ворон<small>майстер, ★ 4.8</small></span></div><div class="seal">без<br>плати</div></div></article>
+ <article class="note"><span class="pin"></span><span class="sys">Call of Cthulhu · ваншот · 16+</span><h2>Тіні над Подолом</h2><p>1923 рік, зниклий антиквар і книга, яку не варто відкривати.</p>
+  <dl class="facts"><dt>Коли</dt><dd>Субота, 14:00</dd><dt>Де</dt><dd>Київ, антикафе «Гриф»</dd><dt>Місця</dt><dd>1 з 4 вільне</dd></dl>
+  <div class="foot"><div class="gm"><i>Л</i><span>Ліра<small>майстриня, ★ 4.6</small></span></div><div class="seal">250<br>грн</div></div></article>
+ <article class="note"><span class="pin"></span><span class="fit">частково</span><span class="sys">Pathfinder 2e · кампанія</span><h2>Вітер з Карпат</h2><p>Пісочниця в горах, натхненна гуцульськими легендами. Від 1-го рівня.</p>
+  <dl class="facts"><dt>Коли</dt><dd>Неділя, 12:00, раз на 2 тижні</dd><dt>Де</dt><dd>Львів</dd><dt>Місця</dt><dd>3 з 4 вільні</dd></dl>
+  <div class="foot"><div class="gm"><i>Т</i><span>Тарас<small>новий майстер</small></span></div><div class="seal">без<br>плати</div></div></article>
+ <article class="note"><span class="pin"></span><span class="sys">Cyberpunk RED · кампанія · 18+</span><h2>Неонові борги</h2><p>Найт-Сіті, 2045. Ваша банда винна не тим людям.</p>
+  <dl class="facts"><dt>Коли</dt><dd>Середа, 20:00</dd><dt>Де</dt><dd>Онлайн, Foundry</dd><dt>Місця</dt><dd>1 з 4 вільне</dd></dl>
+  <div class="foot"><div class="gm"><i>К</i><span>Кіра<small>майстриня, ★ 4.9</small></span></div><div class="seal">150<br>грн</div></div></article>
+ <article class="note"><span class="pin"></span><span class="fit">твій розклад</span><span class="sys">Wanderhome · ваншот</span><h2>Лісова пошта</h2><p>Затишна гра без боїв: звірята-листоноші і довгий шлях через ліс.</p>
+  <dl class="facts"><dt>Коли</dt><dd>Неділя, 17:00</dd><dt>Де</dt><dd>Онлайн</dd><dt>Місця</dt><dd>3 з 5 вільні</dd></dl>
+  <div class="foot"><div class="gm"><i>М</i><span>Мирослава<small>майстриня, ★ 4.7</small></span></div><div class="seal">без<br>плати</div></div></article>
+ <article class="note"><span class="pin"></span><span class="sys">Mothership · ваншот · 18+</span><h2>Дрейф «Ізоляди»</h2><p>Вантажник на мертвій орбіті. Сигнал лиха надходить зсередини.</p>
+  <dl class="facts"><dt>Коли</dt><dd>Субота, 21:00</dd><dt>Де</dt><dd>Онлайн, Discord</dd><dt>Місця</dt><dd>2 з 4 вільні</dd></dl>
+  <div class="foot"><div class="gm"><i>Д</i><span>Данило<small>майстер, ★ 4.5</small></span></div><div class="seal">без<br>плати</div></div></article>
+</section>
+</body></html>

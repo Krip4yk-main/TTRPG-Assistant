@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><title>Концепт 1 — Аркуш персонажа</title>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1F3EF;--ink:#1F2A44;--stamp:#B3261E;--pencil:#7D8592;--field:#E3E6E0;--line:#1F2A44}
+*{box-sizing:border-box;margin:0}
+body{width:1440px;background:var(--paper);color:var(--ink);font:17px/1.5 'Alegreya Sans',sans-serif;
+ background-image:radial-gradient(circle at 20% 10%,rgba(31,42,68,.04),transparent 40%),radial-gradient(circle at 80% 90%,rgba(179,38,30,.04),transparent 40%)}
+header{display:flex;align-items:center;gap:40px;padding:22px 56px;border-bottom:3px double var(--line)}
+.logo{font:800 28px 'Alegreya',serif;display:flex;align-items:center;gap:12px}
+.logo svg{width:38px}
+nav{display:flex;gap:28px;font-weight:500}
+nav a{color:var(--ink);text-decoration:none;padding-bottom:4px}
+nav a.on{border-bottom:2px solid var(--stamp)}
+.me{margin-left:auto;display:flex;gap:18px;align-items:center}
+.bell{position:relative;width:26px;height:26px;border:2px solid var(--ink);border-radius:50% 50% 4px 4px}
+.bell i{position:absolute;top:-6px;right:-8px;background:var(--stamp);color:#fff;font:700 11px/18px sans-serif;width:18px;text-align:center;border-radius:50%;font-style:normal}
+.av{width:40px;height:40px;border:2px solid var(--ink);border-radius:50%;display:grid;place-items:center;font:700 16px 'Alegreya'}
+main{display:grid;grid-template-columns:330px 1fr;gap:48px;padding:40px 56px}
+h1{font:800 46px/1.1 'Alegreya',serif;margin-bottom:6px}
+.sub{color:var(--pencil);margin-bottom:28px}
+.frame{border:2px solid var(--line);outline:1px solid var(--line);outline-offset:4px;padding:20px 20px 16px;margin:6px 6px 28px;position:relative;background:var(--paper)}
+.frame h3{position:absolute;top:-13px;left:16px;background:var(--paper);padding:0 8px;font:700 17px 'Alegreya',serif}
+.field{background:var(--field);border-bottom:2px solid var(--ink);padding:8px 10px;margin:8px 0 14px;font-weight:500}
+.field small{display:block;color:var(--pencil);font-size:13px}
+.checks label{display:flex;gap:10px;align-items:center;margin:8px 0}
+.box{width:18px;height:18px;border:2px solid var(--ink)}
+.box.x{background:linear-gradient(45deg,transparent 44%,var(--ink) 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,var(--ink) 44% 56%,transparent 56%)}
+.days{display:flex;gap:6px}
+.days span{width:34px;height:34px;border:2px solid var(--ink);display:grid;place-items:center;font-weight:700;font-size:14px}
+.days span.on{background:var(--ink);color:var(--paper)}
+.list{display:flex;flex-direction:column;gap:22px}
+.toolbar{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:6px}
+.toolbar .sort{color:var(--pencil)}
+.toolbar .sort b{color:var(--ink)}
+.game{display:grid;grid-template-columns:96px 1fr 210px;gap:28px;align-items:center;border:2px solid var(--line);padding:22px 26px;background:#F7F8F5;
+ clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+.score{width:96px;height:110px;border:2px solid var(--ink);border-radius:46% 46% 46% 46%/30% 30% 70% 70%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score b{font:800 34px/1 'Alegreya',serif}
+.score small{font-size:12px;color:var(--pencil);margin-top:4px;text-align:center;line-height:1.2}
+.game h2{font:800 27px/1.15 'Alegreya',serif;margin-bottom:6px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;color:#3C475E}
+.meta span b{color:var(--ink)}
+.desc{margin-top:8px;color:#3C475E;max-width:62ch}
+.side{text-align:right;display:flex;flex-direction:column;gap:10px;align-items:end}
+.seats{display:flex;gap:5px}
+.seats i{width:16px;height:16px;border:2px solid var(--ink);border-radius:50%}
+.seats i.t{background:var(--ink)}
+.stamp{border:3px solid var(--stamp);color:var(--stamp);font:800 15px 'Alegreya',serif;padding:3px 10px;transform:rotate(-6deg);opacity:.9}
+.price{font:700 20px 'Alegreya',serif}
+.btn{background:var(--ink);color:var(--paper);padding:10px 20px;font-weight:700;border:0}
+.tag{border:1px solid var(--ink);padding:0 8px;font-size:14px}
+</style></head><body>
+<header>
+ <div class="logo"><svg viewBox="0 0 40 40" fill="none" stroke="#1F2A44" stroke-width="2.5"><path d="M20 3 36 12v16L20 37 4 28V12z"/><path d="M20 3v34M4 12l16 9 16-9"/></svg>НРІ Асистент</div>
+ <nav><a class="on">Пошук ігор</a><a>Календар</a><a>Мої заявки</a><a>Оцінки</a></nav>
+ <div class="me"><div class="bell"><i>3</i></div><div class="av">О</div></div>
+</header>
+<main>
+ <aside>
+  <div class="frame"><h3>Що шукаєш</h3>
+   <div class="field"><small>Система</small>D&amp;D 5e, Pathfinder 2e</div>
+   <div class="field"><small>Жанр</small>Будь-який</div>
+   <div class="field"><small>Місто</small>Онлайн або Київ</div>
+  </div>
+  <div class="frame"><h3>Формат</h3>
+   <div class="checks"><label><span class="box x"></span>Кампанія</label><label><span class="box x"></span>Ваншот</label><label><span class="box"></span>Лише безкоштовні</label><label><span class="box x"></span>Підходить за моїм розкладом</label></div>
+  </div>
+  <div class="frame"><h3>Вільні дні</h3>
+   <div class="days"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span class="on">Пт</span><span class="on">Сб</span><span class="on">Нд</span></div>
+  </div>
+ </aside>
+ <section>
+  <h1>Знайди свій стіл</h1><p class="sub">24 ігри набирають гравців. Підібрано під твій розклад: п'ятниця–неділя, вечір.</p>
+  <div class="toolbar"><span>Показано 4 з 24</span><span class="sort">Сортувати: <b>найближча сесія</b></span></div>
+  <div class="list">
+   <article class="game"><div class="score"><b>4.8</b><small>майстер<br>31 оцінка</small></div>
+    <div><h2>Прокляття Страда</h2><div class="meta"><span><b>D&amp;D 5e</b></span><span>Кампанія, жахи</span><span>Онлайн, Discord</span><span>Пт 19:00 · щотижня</span></div>
+    <p class="desc">Готичний жах у туманній Баровії. Повільний темп, багато розмов, мало боїв. Новачкам раді.</p></div>
+    <div class="side"><span class="stamp">Твій розклад</span><div class="seats"><i class="t"></i><i class="t"></i><i class="t"></i><i></i><i></i></div><span>2 вільних місця з 5</span><span class="price">Безкоштовно</span><button class="btn">Подати заявку</button></div></article>
+   <article class="game"><div class="score"><b>4.6</b><small>майстер<br>12 оцінок</small></div>
+    <div><h2>Тіні над Подолом</h2><div class="meta"><span><b>Call of Cthulhu 7e</b></span><span>Ваншот, детектив</span><span>Офлайн, Київ</span><span>Сб 14:00</span><span class="tag">16+</span></div>
+    <p class="desc">1923 рік, зниклий антиквар і книга, яку не варто відкривати. Персонажі готові, приходь як є.</p></div>
+    <div class="side"><div class="seats"><i class="t"></i><i class="t"></i><i class="t"></i><i></i></div><span>1 вільне місце з 4</span><span class="price">250 грн</span><button class="btn">Подати заявку</button></div></article>
+   <article class="game"><div class="score"><b>—</b><small>новий<br>майстер</small></div>
+    <div><h2>Вітер з Карпат</h2><div class="meta"><span><b>Pathfinder 2e</b></span><span>Кампанія, фентезі</span><span>Офлайн, Львів</span><span>Нд 12:00 · раз на 2 тижні</span></div>
+    <p class="desc">Пісочниця в горах, натхненна гуцульськими легендами. Від 1-го рівня, тактичні бої.</p></div>
+    <div class="side"><span class="stamp">Частково</span><div class="seats"><i class="t"></i><i></i><i></i><i></i></div><span>3 вільних місця з 4</span><span class="price">Безкоштовно</span><button class="btn">Подати заявку</button></div></article>
+  </div>
+ </section>
+</main>
+</body></html>
