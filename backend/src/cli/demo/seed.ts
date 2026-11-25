@@ -25,6 +25,7 @@ import {
   type Weekday,
 } from '@nri/shared';
 import type { Db } from '../../db/client.js';
+import type { Tx } from '../../applications/applications.rules.js';
 import {
   applicationConstraintResponses,
   authIdentities,
@@ -32,7 +33,7 @@ import {
   availabilitySlots,
   complaints,
   contentWarnings,
-  events,
+  demoEntities,
   gameApplications,
   gameBans,
   gameContentWarnings,
@@ -66,14 +67,7 @@ import { maybePublish } from '../../ratings/ratings.service.js';
 import { PUBLIC_ID_ALPHABET, PUBLIC_ID_LENGTH } from '../../users/nickname.js';
 import { Deck, Rng, hashSeed } from './random.js';
 import { checkRatingSnapshots, type SnapshotIssue } from './ratings-check.js';
-import {
-  DEMO_IDENTITY_MARKER,
-  DEMO_MANIFEST_EVENT,
-  findDemo,
-  hasDemo,
-  resetDemo,
-  type DemoManifest,
-} from './reset.js';
+import { DEMO_IDENTITY_MARKER, findDemo, hasDemo, resetDemoTx } from './reset.js';
 import * as T from './texts.js';
 
 // ---------- параметри й запобіжник ----------
@@ -96,6 +90,12 @@ export interface SeedDemoOptions {
    * з `nri_test*` і NODE_ENV=test). CLI цього не передає.
    */
   unsafeSkipTargetGuard?: boolean;
+  /** Хост БД з DATABASE_URL (CLI); перевіряється, що він локальний. */
+  dbHost?: string;
+  /** Явний дозвіл на нелокальний хост (`--allow-remote`). */
+  allowRemote?: boolean;
+  /** ЛИШЕ для тестів: точки ін'єкції збою (перевірка, що транзакція нічого не лишає). */
+  testHooks?: { afterGames?: () => void | Promise<void> };
   log?: (msg: string) => void;
 }
 
@@ -113,8 +113,35 @@ export interface SeedDemoResult {
   ratingIssues: SnapshotIssue[];
 }
 
-/** Відмова працювати поза локальною розробкою чи на тестовій БД. */
-export function assertDevTarget(nodeEnv: string | undefined, dbName: string | null): void {
+/** Локальні хости БД: loopback і сервіс docker compose (`mysql`). */
+export const LOCAL_DB_HOSTS = [
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '[::1]',
+  'mysql',
+  'host.docker.internal',
+];
+
+export interface DevTarget {
+  nodeEnv: string | undefined;
+  dbName: string | null;
+  /** Хост з DATABASE_URL; невідомий — відмова (без `allowRemote`). */
+  host: string | undefined;
+  allowRemote?: boolean;
+}
+
+/** Хост з URL підключення (сам URL ніде не друкується). */
+export function dbHostOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Відмова працювати поза локальною розробкою, на тестовій чи нелокальній БД. */
+export function assertDevTarget({ nodeEnv, dbName, host, allowRemote }: DevTarget): void {
   if (nodeEnv !== 'development') {
     throw new Error(`refusing to seed: NODE_ENV must be "development" (got "${nodeEnv ?? ''}")`);
   }
@@ -122,9 +149,14 @@ export function assertDevTarget(nodeEnv: string | undefined, dbName: string | nu
   if (dbName.toLowerCase().startsWith('nri_test')) {
     throw new Error(`refusing to seed: "${dbName}" looks like a test database`);
   }
+  if (!allowRemote && (!host || !LOCAL_DB_HOSTS.includes(host.toLowerCase()))) {
+    throw new Error(
+      'refusing to seed: database host is not local (pass --allow-remote to override)',
+    );
+  }
 }
 
-export async function currentDatabase(db: Db): Promise<string | null> {
+export async function currentDatabase(db: Db | Tx): Promise<string | null> {
   const [rows] = (await db.execute(sql`select database() as name`)) as unknown as [
     { name: string | null }[],
   ];
@@ -323,7 +355,7 @@ export const SUMMARY_TABLES = [
   'game_staleness_log',
 ] as const;
 
-export async function tableCounts(db: Db): Promise<Record<string, number>> {
+export async function tableCounts(db: Db | Tx): Promise<Record<string, number>> {
   const query = SUMMARY_TABLES.map((t) => `SELECT '${t}' AS t, COUNT(*) AS n FROM \`${t}\``).join(
     ' UNION ALL ',
   );
@@ -338,32 +370,43 @@ export async function tableCounts(db: Db): Promise<Record<string, number>> {
  * напряму в таблиці з історичними часовими мітками, повторюючи те, що роблять сервіси
  * (сесії — `expandOccurrences` як у матеріалізації; зрізи рейтингу — справжній
  * `maybePublish` після кожної оцінки за зростанням id; «мертві»/«підозрілі» ігри — правила
- * детектора `staleRule`/`overlapRule`). Події не пишуться (крім маніфесту), сповіщення —
+ * детектора `staleRule`/`overlapRule`). Події не пишуться, сповіщення —
  * одразу рядками `notifications` без Telegram-черги.
  */
 export async function seedDemo(db: Db, options: SeedDemoOptions = {}): Promise<SeedDemoResult> {
   const log = options.log ?? (() => {});
   if (!options.unsafeSkipTargetGuard) {
-    assertDevTarget(process.env.NODE_ENV, await currentDatabase(db));
+    assertDevTarget({
+      nodeEnv: process.env.NODE_ENV,
+      dbName: await currentDatabase(db),
+      host: options.dbHost,
+      allowRemote: options.allowRemote,
+    });
   }
-  const existing = await findDemo(db);
-  if (hasDemo(existing)) {
-    if (!options.reset) {
-      throw new Error('demo data already exists; rerun with --reset to replace it');
+  // Усе — одна транзакція: збій посередині не лишає ні часткових даних, ні «осиротілих» ігор
+  // власника; прибирання (`--reset`) відкочується разом із ним.
+  return db.transaction(async (tx) => {
+    const existing = await findDemo(tx);
+    if (hasDemo(existing)) {
+      if (!options.reset) {
+        throw new Error('demo data already exists; rerun with --reset to replace it');
+      }
+      log(
+        `reset: removing ${existing.userIds.length} demo users, ${existing.gameIds.length} demo games`,
+      );
     }
-    log(
-      `reset: removing ${existing.userIds.length} demo users, ${existing.gameIds.length} demo games`,
-    );
-    await resetDemo(db);
-  }
-  const seeder = new Seeder(db, {
-    scale: options.scale ?? 1,
-    seed: options.seed ?? DEFAULT_SEED,
-    now: at((options.now ?? new Date()).getTime()),
-    ownerNickname: options.ownerNickname ?? DEFAULT_OWNER_NICKNAME,
-    log,
+    // Порожній реєстр без даних теж чиститься.
+    await resetDemoTx(tx);
+    const seeder = new Seeder(tx, {
+      scale: options.scale ?? 1,
+      seed: options.seed ?? DEFAULT_SEED,
+      now: at((options.now ?? new Date()).getTime()),
+      ownerNickname: options.ownerNickname ?? DEFAULT_OWNER_NICKNAME,
+      log,
+      hooks: options.testHooks ?? {},
+    });
+    return seeder.run();
   });
-  return seeder.run();
 }
 
 interface Catalog {
@@ -390,13 +433,14 @@ class Seeder {
   private sanctionNotes: { label: string; nickname: string }[] = [];
 
   constructor(
-    private readonly db: Db,
+    private readonly db: Tx,
     private readonly opts: {
       scale: number;
       seed: number;
       now: Date;
       ownerNickname: string;
       log: (m: string) => void;
+      hooks: NonNullable<SeedDemoOptions['testHooks']>;
     },
   ) {
     this.rng = new Rng(opts.seed);
@@ -419,6 +463,7 @@ class Seeder {
     this.applyBanCascade();
     await this.insertGames();
     log(`games: ${this.plans.length}`);
+    await this.opts.hooks.afterGames?.();
     await this.insertNotes();
     await this.insertBlacklist();
     const ratingCount = await this.insertRatings();
@@ -428,19 +473,6 @@ class Seeder {
     this.planActivityNotifications();
     await this.insertNotifications();
     const ownerGameIds = this.plans.filter((g) => g.isOwnerGame).map((g) => g.id);
-    const manifest: DemoManifest = {
-      version: 1,
-      seed: this.opts.seed,
-      scale: this.scale,
-      ownerId: this.owner?.id ?? null,
-      ownerGameIds,
-    };
-    await this.db.insert(events).values({
-      type: DEMO_MANIFEST_EVENT,
-      payload: manifest,
-      createdAt: this.now,
-      dispatchedAt: this.now,
-    });
     const demoUserIds = this.people.map((p) => p.id);
     const ratingIssues = await checkRatingSnapshots(this.db, [
       ...demoUserIds,
@@ -671,6 +703,11 @@ class Seeder {
       ids.push(...res.map((x) => x.id));
     }
     this.people = people.map((p, i) => ({ ...p, id: ids[i]! }));
+    for (const part of chunk(ids)) {
+      await this.db
+        .insert(demoEntities)
+        .values(part.map((entityId) => ({ entityType: 'user' as const, entityId })));
+    }
     this.gms = this.people.filter((p) => p.isGm);
     this.moderators = this.people.filter((p) => p.role === 'moderator');
     this.banned = this.people.find((p) => p.bannedAt !== null) ?? null;
@@ -1723,7 +1760,11 @@ class Seeder {
     if (!b?.bannedAt) return;
     const banAt = b.bannedAt.getTime();
     for (const g of this.plans) {
-      const activeAtBan = g.status === 'recruiting' || g.status === 'started';
+      // Гра була активною в момент бану (а не зараз): створена до бану й не закінчена до нього.
+      const endedBefore = [g.finishedAt, g.cancelledAt].some(
+        (d) => d !== null && d.getTime() <= banAt,
+      );
+      const activeAtBan = g.createdAt.getTime() <= banAt && !endedBefore;
       g.members = g.members.filter((m) => m.userId !== b.id || m.joinedAt.getTime() < banAt);
       for (const m of g.members) {
         if (m.userId !== b.id || m.leftAt) continue;
@@ -1800,6 +1841,7 @@ class Seeder {
         })
         .$returningId();
       g.id = res!.id;
+      await this.db.insert(demoEntities).values({ entityType: 'game', entityId: g.id });
       if (g.contentWarningIds.length) {
         await this.db
           .insert(gameContentWarnings)
@@ -1969,6 +2011,7 @@ class Seeder {
 
   private async insertBlacklist(): Promise<void> {
     const r = this.rng;
+    const now = this.now.getTime();
     const target = this.n(10, 2);
     const rows = new Map<string, { gmUserId: number; userId: number; createdAt: Date }>();
     const busyWith = (gmId: number, userId: number) =>
@@ -1978,6 +2021,24 @@ class Seeder {
           (g.members.some((m) => m.userId === userId && m.leftAt === null) ||
             g.apps.some((a) => a.userId === userId && a.status === 'pending')),
       );
+    /** Остання активність людини в іграх майстра: чорний список — лише після неї (заявки потім заблоковані). */
+    const lastContact = (gmId: number, userId: number) => {
+      let last = 0;
+      for (const g of this.plans) {
+        if (g.gm.id !== gmId) continue;
+        for (const a of g.apps) {
+          if (a.userId === userId) last = Math.max(last, (a.decidedAt ?? a.createdAt).getTime());
+        }
+        for (const m of g.members)
+          if (m.userId === userId && m.leftAt) last = Math.max(last, m.leftAt.getTime());
+      }
+      return last;
+    };
+    const add = (gmId: number, userId: number, from: number) => {
+      const lo = Math.max(from, lastContact(gmId, userId)) + r.float(0.1, 24) * HOUR;
+      if (lo >= now - MIN) return;
+      rows.set(`${gmId}:${userId}`, { gmUserId: gmId, userId, createdAt: at(lo) });
+    };
     // Спершу — виключені/забанені в грі; далі — випадкові давні співгравці.
     for (const g of r.shuffle(this.plans)) {
       for (const m of g.members) {
@@ -1986,23 +2047,15 @@ class Seeder {
           r.chance(0.8) &&
           !busyWith(g.gm.id, m.userId)
         ) {
-          rows.set(`${g.gm.id}:${m.userId}`, {
-            gmUserId: g.gm.id,
-            userId: m.userId,
-            createdAt: at(m.leftAt!.getTime() + r.float(0.1, 24) * HOUR),
-          });
+          add(g.gm.id, m.userId, m.leftAt!.getTime());
         }
       }
     }
     for (let i = 0; rows.size < target && i < 200; i++) {
       const gm = r.pick(this.gms);
       const u = r.pick(this.people);
-      if (u.id === gm.id || busyWith(gm.id, u.id)) continue;
-      rows.set(`${gm.id}:${u.id}`, {
-        gmUserId: gm.id,
-        userId: u.id,
-        createdAt: at(this.now.getTime() - r.float(1, 90) * DAY),
-      });
+      if (u.id === gm.id || busyWith(gm.id, u.id) || rows.has(`${gm.id}:${u.id}`)) continue;
+      add(gm.id, u.id, now - r.float(1, 90) * DAY);
     }
     if (rows.size) await this.db.insert(gmBlacklist).values([...rows.values()]);
   }
@@ -2013,11 +2066,17 @@ class Seeder {
     return Math.max(1, Math.min(5, Math.round(this.rng.normal(mean, 0.65))));
   }
 
-  private review(role: RatingRole, overall: number, praise: readonly string[]): string {
+  private review(role: RatingRole, overall: number, g: DGame): string {
     const r = this.rng;
     const gm = role === 'gm';
-    if (overall >= 4 && gm && r.chance(0.08)) return r.pick(T.REVIEW_LONG.slice(0, 2));
-    if (overall === 3 && gm && r.chance(0.1)) return T.REVIEW_LONG[2]!;
+    const campaign = g.kind === 'campaign';
+    // Довгі відгуки про «кілька місяців» і «першу сесію» — лише для кампаній.
+    if (overall >= 4 && gm && r.chance(0.08)) {
+      return r.pick(
+        campaign ? [T.REVIEW_LONG[0]!, T.REVIEW_LONG[1]!] : [T.REVIEW_LONG[0]!, T.REVIEW_LONG[3]!],
+      );
+    }
+    if (overall === 3 && gm && campaign && r.chance(0.1)) return T.REVIEW_LONG[2]!;
     const pool =
       overall >= 4
         ? gm
@@ -2030,10 +2089,15 @@ class Seeder {
           : gm
             ? T.REVIEW_GM_BAD
             : T.REVIEW_PLAYER_BAD;
+    // `cancel:` — фраза про скасовані сесії, лише якщо майстер справді скасовував.
+    const hadCancels = g.sessions.some((s) => s.cancelledAt !== null);
+    const usable = pool
+      .filter((p) => !p.startsWith('cancel:') || hadCancels)
+      .map((p) => p.replace(/^cancel:/, ''));
     const n = overall >= 4 && r.chance(0.35) ? 2 : 1;
     return r
-      .sample(pool, n)
-      .map((s) => s.replace('{praise}', r.pick(praise)))
+      .sample(usable, n)
+      .map((s) => s.replace('{praise}', r.pick(g.praise)))
       .join(' ');
   }
 
@@ -2073,9 +2137,7 @@ class Seeder {
         criteria[k] = Math.max(1, Math.min(5, Math.round(overall + r.normal(0, 0.5))));
       }
     }
-    const comment = r.chance(role === 'gm' ? 0.42 : 0.15)
-      ? this.review(role, overall, g.praise)
-      : null;
+    const comment = r.chance(role === 'gm' ? 0.42 : 0.15) ? this.review(role, overall, g) : null;
     return { ...base, declined: false, overall, criteria, comment };
   }
 
@@ -2168,33 +2230,31 @@ class Seeder {
   }
 
   /**
-   * Оцінки — по одній, у хронологічному порядку, кожна у власній транзакції з
-   * `maybePublish` (як `submitRating`): зрізи публікуються тими самими пачками по 5 одиниць.
+   * Оцінки — по одній, у хронологічному порядку, кожна з одразу наступним `maybePublish` (як
+   * `submitRating`, у транзакції сидера): зрізи публікуються тими самими пачками по 5 одиниць.
    */
   private async insertRatings(): Promise<number> {
     const list = this.planRatings();
     const lastAt = new Map<number, Date>();
     for (const x of list) {
-      const id = await this.db.transaction(async (tx) => {
-        const [res] = await tx
-          .insert(ratings)
-          .values({
-            raterId: x.raterId,
-            rateeId: x.rateeId,
-            gameId: x.gameId,
-            sessionId: x.sessionId,
-            kind: x.sessionId === null ? 'final' : 'session',
-            role: x.role,
-            declined: x.declined,
-            overall: x.overall,
-            criteria: x.criteria,
-            comment: x.comment,
-            createdAt: x.createdAt,
-          })
-          .$returningId();
-        await maybePublish(tx, x.rateeId, x.role);
-        return res!.id;
-      });
+      const [res] = await this.db
+        .insert(ratings)
+        .values({
+          raterId: x.raterId,
+          rateeId: x.rateeId,
+          gameId: x.gameId,
+          sessionId: x.sessionId,
+          kind: x.sessionId === null ? 'final' : 'session',
+          role: x.role,
+          declined: x.declined,
+          overall: x.overall,
+          criteria: x.criteria,
+          comment: x.comment,
+          createdAt: x.createdAt,
+        })
+        .$returningId();
+      await maybePublish(this.db, x.rateeId, x.role);
+      const id = res!.id;
       lastAt.set(id, x.createdAt);
     }
     // Момент публікації — час оцінки, що замкнула пачку (а не час запуску сидера).
@@ -2513,6 +2573,7 @@ class Seeder {
           sql`${ratings.overall} <= 2`,
         ),
       )
+      .orderBy(ratings.id)
       .limit(2);
     for (const h of harsh) {
       const when = at(Math.min(now - HOUR, h.createdAt.getTime() + r.float(2, 48) * HOUR));
