@@ -36,7 +36,7 @@ import { users } from './users.js';
 const GAME_FORMATS = ['online', 'offline'] as const satisfies GameFormat[];
 const GAME_KINDS = ['oneshot', 'campaign'] as const satisfies GameKind[];
 const RECURRENCES = ['none', 'weekly', 'biweekly', 'monthly'] as const satisfies Recurrence[];
-const AGE_RATINGS = ['none', '18+', '21+'] as const satisfies AgeRating[];
+const AGE_RATINGS = ['none', '16+', '18+', '21+'] as const satisfies AgeRating[];
 const GAME_EXPERIENCE = ['any', 'beginner', 'experienced'] as const satisfies GameExperience[];
 const GAME_LANGUAGES = ['uk', 'en'] as const satisfies GameLanguage[];
 const GAME_STATUSES = [

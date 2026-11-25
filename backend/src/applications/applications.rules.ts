@@ -16,7 +16,7 @@ export interface CancelledApplication {
   userId: number;
 }
 
-const RATING_RANK: Record<AgeRating, number> = { none: 0, '18+': 1, '21+': 2 };
+const RATING_RANK: Record<AgeRating, number> = { none: 0, '16+': 1, '18+': 2, '21+': 3 };
 
 export const isRatingRaised = (from: AgeRating, to: AgeRating): boolean =>
   RATING_RANK[to] > RATING_RANK[from];

@@ -1,13 +1,14 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { gameBans, gameMembers, gmBlacklist } from '../../src/db/schema/index.js';
-import { closeDeps, resetDb, testDeps } from '../helpers.js';
+import { localDate } from '@nri/shared';
+import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from './fixtures.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
 const app = createApp(deps);
-const { userWithAge, call, createGame } = harness(deps, app);
+const { userWithAge, call, createGame, login } = harness(deps, app);
 
 beforeEach(async () => {
   await redis.flushdb();
@@ -176,6 +177,26 @@ describe('games visibility — age ratings (Review Focus 3)', () => {
     expect(Object.keys(body).sort()).toEqual(RESTRICTED_KEYS);
     const adult = await userWithAge(21);
     expect((await call('get', `/api/games/${id}`, adult.cookie)).body.restricted).toBeUndefined();
+  });
+
+  it('16+ game: restricted for a guest and for the day before the 16th birthday, open on it', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, { ageRating: '16+' }, true);
+    // Дата «сьогодні» за Києвом (пояс користувача за замовчуванням), 16 років тому.
+    const today = localDate(new Date(), 'Europe/Kyiv');
+    const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+    const sixteenToday = `${y - 16}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const tomorrow = new Date(Date.UTC(y - 16, m - 1, d + 1)).toISOString().slice(0, 10);
+    const almost = await createUser(db, { birthDate: tomorrow });
+    const birthday = await createUser(db, { birthDate: sixteenToday });
+    expect(Object.keys((await call('get', `/api/games/${id}`)).body).sort()).toEqual(
+      RESTRICTED_KEYS,
+    );
+    const young = (await call('get', `/api/games/${id}`, await login(almost.id))).body;
+    expect(Object.keys(young).sort()).toEqual(RESTRICTED_KEYS);
+    expect(young.ageRating).toBe('16+');
+    const ok = (await call('get', `/api/games/${id}`, await login(birthday.id))).body;
+    expect(ok.restricted).toBeUndefined();
   });
 });
 

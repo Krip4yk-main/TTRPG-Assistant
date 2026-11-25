@@ -90,7 +90,7 @@ interface Notice {
 type FullGame = PublicGameDto & { address?: string | null; channelLinks?: ChannelLink[] };
 
 /**
- * Сторінка гри (`/games/:id`, публічна). Обмежена гра (18+/21+ для гостя чи молодшого) —
+ * Сторінка гри (`/games/:id`, публічна). Обмежена гра (16+/18+/21+ для гостя чи молодшого) —
  * лише назва, майстер і вікова позначка під блюром; опис та інші поля не рендеряться.
  */
 @Component({
@@ -597,7 +597,7 @@ export class GameDetails {
     }
   }
 
-  /** Назва гри у вкладці й превʼю; 18+/21+, чернетки й скасовані — без індексації. */
+  /** Назва гри у вкладці й превʼю; 16+/18+/21+, чернетки й скасовані — без індексації. */
   private updateSeo(g: GameViewDto): void {
     if (isRestrictedGame(g)) {
       this.seo.set({ title: g.title, noindex: true });

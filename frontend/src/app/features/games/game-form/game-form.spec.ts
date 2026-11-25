@@ -434,13 +434,22 @@ describe('GameForm', () => {
     expect(selectOf('system').disabled).toBe(false);
   });
 
-  it('a user under 18 cannot pick 18+/21+ age ratings', async () => {
+  it('a 16-year-old can pick 16+ but not 18+/21+', async () => {
     const today = new Date();
     const teen = { ...me, birthDate: `${today.getFullYear() - 16}-01-01` };
     await setup(undefined, undefined, teen);
     const options = Array.from(selectOf('ageRating').options);
     const disabled = options.filter((o) => o.disabled).map((o) => o.textContent!.trim());
     expect(disabled).toEqual(['games.ageRating.18+', 'games.ageRating.21+']);
+  });
+
+  it('a 15-year-old cannot pick 16+ either', async () => {
+    const today = new Date();
+    const teen = { ...me, birthDate: `${today.getFullYear() - 15}-01-01` };
+    await setup(undefined, undefined, teen);
+    const options = Array.from(selectOf('ageRating').options);
+    const disabled = options.filter((o) => o.disabled).map((o) => o.textContent!.trim());
+    expect(disabled).toEqual(['games.ageRating.16+', 'games.ageRating.18+', 'games.ageRating.21+']);
   });
 
   describe('autosave', () => {

@@ -19,7 +19,7 @@ export const RECURRENCES = [
   'monthly',
 ] as const satisfies readonly Recurrence[];
 
-export const AGE_RATINGS = ['none', '18+', '21+'] as const satisfies readonly AgeRating[];
+export const AGE_RATINGS = ['none', '16+', '18+', '21+'] as const satisfies readonly AgeRating[];
 
 export const GAME_EXPERIENCE = ['any', 'beginner', 'experienced'] as const;
 export type GameExperience = (typeof GAME_EXPERIENCE)[number];
@@ -254,7 +254,7 @@ export interface MyGameCardDto extends GameCardDto {
   suspicious: boolean;
 }
 
-/** Вид гри 18+/21+ для гостя чи молодшого за вікову позначку — рівно ці ключі. */
+/** Вид гри 16+/18+/21+ для гостя чи молодшого за вікову позначку — рівно ці ключі. */
 export interface RestrictedGameDto {
   id: number;
   title: string;
@@ -388,7 +388,7 @@ export const searchFiltersSchema = z
     dateTo: z.iso.datetime({ offset: true }).optional(),
     priceMode: z.enum(PRICE_MODES).default('any'),
     priceMax: z.number().int().min(0).max(100_000).optional(),
-    ageRatings: z.array(z.enum(AGE_RATINGS)).max(3).optional(),
+    ageRatings: z.array(z.enum(AGE_RATINGS)).max(AGE_RATINGS.length).optional(),
     experience: z.enum(GAME_EXPERIENCE).optional(),
     platform: optFilter(60),
     language: z.enum(GAME_LANGUAGES).optional(),

@@ -1,0 +1,1 @@
+ALTER TABLE `games` MODIFY COLUMN `age_rating` enum('none','16+','18+','21+') NOT NULL DEFAULT 'none';

@@ -1,9 +1,9 @@
 export const MIN_REGISTRATION_AGE = 14;
 export const BIRTH_DATE_CHANGE_COOLDOWN_DAYS = 30;
 
-export type AgeRating = 'none' | '18+' | '21+';
+export type AgeRating = 'none' | '16+' | '18+' | '21+';
 
-const REQUIRED_AGE: Record<AgeRating, number> = { none: 0, '18+': 18, '21+': 21 };
+const REQUIRED_AGE: Record<AgeRating, number> = { none: 0, '16+': 16, '18+': 18, '21+': 21 };
 
 function parse(date: string): [number, number, number] {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);

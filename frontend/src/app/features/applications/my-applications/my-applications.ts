@@ -131,7 +131,7 @@ export class MyApplications {
     });
   }
 
-  /** Повна картка гри або `null` для обмеженої (18+/21+, яку глядач не проходить). */
+  /** Повна картка гри або `null` для обмеженої (16+/18+/21+, яку глядач не проходить). */
   protected fullGame(a: MyApplicationDto): GameCardDto | null {
     return isRestrictedGame(a.game) ? null : a.game;
   }

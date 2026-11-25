@@ -43,7 +43,7 @@ interface GameCardVmBase {
   gm: GmSignatureVm;
 }
 
-/** Обмежена картка (18+/21+, яку глядач не проходить): лише назва, вік і майстер. */
+/** Обмежена картка (16+/18+/21+, яку глядач не проходить): лише назва, вік і майстер. */
 export interface RestrictedGameCardVm extends GameCardVmBase {
   restricted: true;
   /** Пояснення під блюром (`games.restricted.<вік>`). */

@@ -395,7 +395,7 @@
                   </option>
                 }
               </select>
-              @if (!ageAllowed('18+') || !ageAllowed('21+')) {
+              @if (!ageAllowed('21+')) {
                 <mat-hint>{{ 'games.form.ageRatingHint' | translate }}</mat-hint>
               }
             </mat-form-field>
