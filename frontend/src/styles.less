@@ -134,3 +134,8 @@ html .cdk-overlay-dark-backdrop {
   outline: 1px solid var(--nri-overlay-border);
   outline-offset: -1px;
 }
+
+/* Програмний фокус (tabindex="-1") на заголовках і областях повідомлень — без рамки. */
+[tabindex='-1']:focus:not(:focus-visible) {
+  outline: none;
+}

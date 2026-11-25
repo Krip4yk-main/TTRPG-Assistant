@@ -130,6 +130,11 @@ describe('MyGames', () => {
     await settle();
     expect(article(2).querySelector('.status')!.textContent).toContain('games.status.cancelled');
     expect(actions(2)).toEqual([]);
+    // Лічильники картки (учасники, нові заявки) беремо з сервера після переходу.
+    http.expectOne('/api/games/mine').flush([card(2, 'cancelled')]);
+    await settle();
+    expect(article(2).querySelector('.pending-count')).toBeNull();
+    expect(article(1)).toBeNull();
   });
 
   it('a failed transition shows the translated error', async () => {
@@ -172,5 +177,7 @@ describe('MyGames', () => {
     http.expectOne('/api/games/5/start').flush({ ...card(5, 'started'), status: 'started' });
     await settle();
     expect(el.textContent).toContain('games.my.done.start');
+    http.expectOne('/api/games/mine').flush([{ ...card(5, 'started'), memberCount: 2 }]);
+    await settle();
   });
 });

@@ -3,6 +3,7 @@ import {
   APPLICATION_STATUSES,
   CONSTRAINT_RESPONSES,
   ERROR_CODES,
+  SESSION_STATUSES,
 } from '@nri/shared';
 import uk from '../../../assets/i18n/uk.json';
 
@@ -40,5 +41,15 @@ describe('uk.json', () => {
       });
     }
     expect(uk.games.confirm.startBelowMin.text).toContain('Почати все одно?');
+  });
+
+  it('має підписи статусів сесій і підписи, результати для кожної дії над сесією', () => {
+    const sessions = uk.sessions as unknown as Record<string, Record<string, string>>;
+    expect([...SESSION_STATUSES, 'awaiting'].filter((st) => !sessions['status']![st])).toEqual([]);
+    for (const action of ['reschedule', 'cancel', 'finish']) {
+      expect(sessions['actions']![action]).toBeTruthy();
+      expect(sessions['actionsAria']![action]).toContain('{{when}}');
+      expect(sessions['done']![action]).toBeTruthy();
+    }
   });
 });

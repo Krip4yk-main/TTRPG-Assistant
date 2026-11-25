@@ -141,4 +141,40 @@ describe('MembersPanel', () => {
     ].map((b) => b.dataset['action']);
     expect(names).toEqual(['blacklist']);
   });
+
+  it('after removing a member focus moves to the next row, then to the heading', async () => {
+    await create(true);
+    nextDialog(true);
+    await action('aaaaaaaaaa', 'kick');
+    http
+      .expectOne('/api/games/3/members/aaaaaaaaaa/kick')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    expect(document.activeElement).toBe(
+      row('bbbbbbbbbb')!.querySelector<HTMLButtonElement>('button.member-menu'),
+    );
+
+    nextDialog(true);
+    await action('bbbbbbbbbb', 'ban');
+    http
+      .expectOne('/api/games/3/members/bbbbbbbbbb/ban')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    expect(document.activeElement).toBe(el.querySelector('#members-title'));
+  });
+
+  it('a deleted account is named «deleted user» in the confirmation', async () => {
+    await create(true);
+    const deleted = { ...members[0]!, nickname: null };
+    fixture.componentInstance['members'].set([deleted]);
+    await settle();
+    nextDialog(false);
+    await action('aaaaaaaaaa', 'kick');
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({ params: { name: 'user.deleted' } }),
+      }),
+    );
+  });
 });

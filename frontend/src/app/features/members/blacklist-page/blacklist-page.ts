@@ -1,8 +1,16 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import type { BlacklistEntryDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
@@ -33,6 +41,9 @@ export class BlacklistPage {
   private readonly api = inject(MembersApi);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly translate = inject(TranslateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly entries = signal<BlacklistEntryDto[] | null>(null);
   protected readonly loadFailed = signal(false);
@@ -58,7 +69,7 @@ export class BlacklistPage {
 
   protected async unban(e: BlacklistEntryDto): Promise<void> {
     if (this.busyId() !== null) return;
-    const name = e.nickname ?? '';
+    const name = e.nickname ?? this.translate.instant('user.deleted');
     const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
       data: {
         title: 'members.blacklist.confirm.title',
@@ -74,7 +85,13 @@ export class BlacklistPage {
     this.message.set(null);
     try {
       await firstValueFrom(this.api.removeFromBlacklist(e.publicId));
-      this.entries.update((list) => (list ?? []).filter((x) => x.publicId !== e.publicId));
+      const list = this.entries() ?? [];
+      const index = list.findIndex((x) => x.publicId === e.publicId);
+      const rest = list.filter((x) => x.publicId !== e.publicId);
+      this.entries.set(rest);
+      // Фокус — на сусідній рядок (наступний, інакше попередній), а без рядків — на заголовок.
+      const next = rest[Math.min(index, rest.length - 1)];
+      this.focus(next ? `[data-user-id="${next.publicId}"] button.unban` : 'h1');
       this.message.set({ kind: 'info', key: 'members.blacklist.removed', name });
     } catch (err) {
       const { code } = toApiError(err);
@@ -84,5 +101,12 @@ export class BlacklistPage {
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  /** Фокус на елементі після рендеру (кнопки вже не `disabled`). */
+  private focus(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 }

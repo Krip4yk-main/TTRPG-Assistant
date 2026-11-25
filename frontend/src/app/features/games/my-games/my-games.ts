@@ -65,6 +65,15 @@ export class MyGames {
     }
   }
 
+  /** Тихе оновлення карток; помилка лишає наявний список. */
+  private async refresh(): Promise<void> {
+    try {
+      this.games.set(await firstValueFrom(this.api.mine()));
+    } catch {
+      // Список уже показано; лічильники оновляться при наступному відкритті.
+    }
+  }
+
   protected actionsFor(status: GameStatus): GameAction[] {
     return ACTIONS[status];
   }
@@ -121,6 +130,8 @@ export class MyGames {
         ),
       );
       this.message.set({ kind: 'info', key: `games.my.done.${action}` });
+      // Перехід змінює й лічильники (скасовані заявки, склад) — беремо їх із сервера.
+      void this.refresh();
     } catch (err) {
       const { code } = toApiError(err);
       // 401 уже обробив authInterceptor.

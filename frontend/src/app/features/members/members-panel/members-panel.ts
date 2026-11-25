@@ -1,6 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   effect,
   inject,
   input,
@@ -12,7 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import type { MemberDto } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
@@ -50,6 +53,9 @@ export class MembersPanel {
   private readonly api = inject(MembersApi);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly translate = inject(TranslateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly gameId = input.required<number>();
   /** Глядач — майстер цієї гри (показує меню керування). */
@@ -85,7 +91,7 @@ export class MembersPanel {
   /** Дія з учасником — лише після підтвердження. */
   protected async run(m: MemberDto, action: MemberAction): Promise<void> {
     if (this.busy()) return;
-    const name = m.nickname ?? '';
+    const name = m.nickname ?? this.translate.instant('user.deleted');
     const data: ConfirmDialogData = {
       title: `members.confirm.${action}.title`,
       text: `members.confirm.${action}.text`,
@@ -112,8 +118,16 @@ export class MembersPanel {
       await firstValueFrom(request);
       if (action !== 'blacklist') {
         // Чорний список не виключає з поточних ігор (рішення власника).
-        this.members.update((list) => (list ?? []).filter((x) => x.publicId !== m.publicId));
+        const list = this.members() ?? [];
+        const index = list.findIndex((x) => x.publicId === m.publicId);
+        const rest = list.filter((x) => x.publicId !== m.publicId);
+        this.members.set(rest);
         this.changed.emit();
+        // Фокус — на сусідній рядок (наступний, інакше попередній), а без рядків — на заголовок.
+        const next = rest[Math.min(index, rest.length - 1)];
+        this.focus(
+          next ? `[data-member-id="${next.publicId}"] button.member-menu` : '#members-title',
+        );
       }
       this.message.set({ kind: 'info', key: `members.done.${action}`, name });
     } catch (err) {
@@ -124,6 +138,13 @@ export class MembersPanel {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Фокус на елементі після рендеру (кнопки вже не `disabled`). */
+  private focus(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 
   private async load(gameId: number, silent = false): Promise<void> {

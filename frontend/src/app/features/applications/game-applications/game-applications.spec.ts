@@ -241,4 +241,98 @@ describe('GameApplications', () => {
     expect(card(11).closest('section')!.getAttribute('data-status')).toBe('rejected');
     expect(el.textContent).toContain('games.applications.gm.rejected');
   });
+
+  it('after a decision focus moves to the next pending card, else to the message', async () => {
+    dialogOpen = vi.fn();
+    const second: GameApplicationDto = {
+      ...pending,
+      id: 13,
+      constraints: [],
+      createdAt: '2026-11-21T10:00:00.000Z',
+      applicant: { publicId: 'rrrrrrrrrr', nickname: 'Pippin', avatarUrl: null },
+    };
+    await TestBed.configureTestingModule({
+      imports: [GameApplications],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        { provide: MatDialog, useValue: { open: dialogOpen } },
+      ],
+    }).compileComponents();
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(GameApplications);
+    fixture.componentRef.setInput('id', '7');
+    el = fixture.nativeElement as HTMLElement;
+    await settle();
+    http.expectOne('/api/games/7').flush(game);
+    http.expectOne('/api/games/7/applications').flush([pending, second]);
+    http.expectOne('/api/games/7/members').flush([]);
+    await settle();
+    await settle();
+
+    card(11).querySelector<HTMLButtonElement>('button.approve')!.click();
+    await settle();
+    http.expectOne('/api/applications/11/approve').flush({ ...pending, status: 'approved' });
+    await settle();
+    expect(document.activeElement).toBe(card(13));
+
+    nextDialog(true);
+    card(13).querySelector<HTMLButtonElement>('button.reject')!.click();
+    await settle();
+    http.expectOne('/api/applications/13/reject').flush({ ...second, status: 'rejected' });
+    await settle();
+    expect(document.activeElement).toBe(el.querySelector('.message-area'));
+  });
+
+  it('approving with unsaved constraint responses warns in the confirmation', async () => {
+    await create();
+    await pick('aaaaaaaa', 'cannot_guarantee');
+    nextDialog(false);
+    card(11).querySelector<HTMLButtonElement>('button.approve')!.click();
+    await settle();
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({ title: 'games.applications.gm.confirmUnsaved.title' }),
+      }),
+    );
+    http.expectNone('/api/applications/11/approve');
+  });
+
+  it('over the maximum with unsaved responses: one confirmation with an extra warning', async () => {
+    await create([member('m1'), member('m2')]);
+    await pick('aaaaaaaa', 'cannot_guarantee');
+    nextDialog(false);
+    card(11).querySelector<HTMLButtonElement>('button.approve')!.click();
+    await settle();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'games.applications.gm.confirmOverMax.title',
+          note: 'games.applications.gm.unsavedNote',
+        }),
+      }),
+    );
+  });
+
+  it('the reject confirmation names a deleted applicant «deleted user»', async () => {
+    await create();
+    fixture.componentInstance['items'].update((list) =>
+      (list ?? []).map((a) => ({ ...a, applicant: { ...a.applicant, nickname: null } })),
+    );
+    await settle();
+    nextDialog(false);
+    card(11).querySelector<HTMLButtonElement>('button.reject')!.click();
+    await settle();
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({ params: { name: 'user.deleted' } }),
+      }),
+    );
+  });
 });

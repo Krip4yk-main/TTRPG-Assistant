@@ -17,7 +17,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   APPLICATION_STATUSES,
   CONSTRAINT_COMMENT_MAX,
@@ -92,6 +92,7 @@ export class GameApplications {
   private readonly members = inject(MembersApi);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly translate = inject(TranslateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
 
@@ -206,20 +207,41 @@ export class GameApplications {
     }
   }
 
-  /** Затвердити; якщо гра вже заповнена — спершу попередження з підтвердженням. */
+  /**
+   * Затвердити. Якщо гра вже заповнена чи є незбережені відповіді на обмеження — спершу
+   * одне підтвердження (про незбережені відповіді — окремим попередженням у ньому).
+   */
   protected async approve(a: GameApplicationDto): Promise<void> {
     const g = this.game();
     if (!g || this.busyId() !== null) return;
+    const unsaved = this.hasUnsaved(a);
     if (this.full()) {
       const ok = await this.confirm({
         title: 'games.applications.gm.confirmOverMax.title',
         text: 'games.applications.gm.confirmOverMax.text',
         confirm: 'games.applications.gm.confirmOverMax.confirm',
         params: { count: this.memberCount(), max: g.maxPlayers },
+        ...(unsaved ? { note: 'games.applications.gm.unsavedNote' } : {}),
+      });
+      if (!ok) return;
+    } else if (unsaved) {
+      const ok = await this.confirm({
+        title: 'games.applications.gm.confirmUnsaved.title',
+        text: 'games.applications.gm.confirmUnsaved.text',
+        confirm: 'games.applications.gm.confirmUnsaved.confirm',
       });
       if (!ok) return;
     }
     await this.decide(a, 'approve');
+  }
+
+  /** Є чернетки відповідей, що відрізняються від збережених. */
+  private hasUnsaved(a: GameApplicationDto): boolean {
+    const drafts = this.drafts();
+    return a.constraints.some((c) => {
+      const d = drafts[draftKey(a.id, c.id)];
+      return !!d && (d.response !== c.response || d.comment.trim() !== (c.comment ?? '').trim());
+    });
   }
 
   protected async reject(a: GameApplicationDto): Promise<void> {
@@ -228,7 +250,7 @@ export class GameApplications {
       title: 'games.applications.gm.confirmReject.title',
       text: 'games.applications.gm.confirmReject.text',
       confirm: 'games.applications.gm.confirmReject.confirm',
-      params: { name: a.applicant.nickname ?? '' },
+      params: { name: a.applicant.nickname ?? this.translate.instant('user.deleted') },
       danger: true,
     });
     if (ok) await this.decide(a, 'reject');
@@ -237,6 +259,11 @@ export class GameApplications {
   private async decide(a: GameApplicationDto, action: 'approve' | 'reject'): Promise<void> {
     this.busyId.set(a.id);
     this.message.set(null);
+    // Картка переходить в іншу групу: фокус — на наступну заявку, що чекає, інакше на повідомлення.
+    const waiting = this.groups().find((g) => g.status === 'pending')?.items ?? [];
+    const index = waiting.findIndex((x) => x.id === a.id);
+    const rest = waiting.filter((x) => x.id !== a.id);
+    const next = rest[Math.min(index, rest.length - 1)];
     try {
       const dto = await firstValueFrom(
         action === 'approve' ? this.api.approve(a.id) : this.api.reject(a.id),
@@ -250,6 +277,7 @@ export class GameApplications {
             ? 'games.applications.gm.approved'
             : 'games.applications.gm.rejected',
       });
+      this.focus(next ? `[data-application-id="${next.id}"]` : '.message-area');
     } catch (err) {
       this.fail(err);
     } finally {

@@ -9,6 +9,7 @@ import type {
   GameTransitionDto,
   GameViewDto,
   MyGameCardDto,
+  ScheduleRuleInput,
   SearchFiltersInput,
   SearchResultDto,
 } from '@nri/shared';
@@ -39,6 +40,16 @@ export class GamesApi {
   /** «Мої ігри» майстра: картки з кількістю учасників і нових заявок. */
   mine(): Observable<MyGameCardDto[]> {
     return this.http.get<MyGameCardDto[]>('/api/games/mine');
+  }
+
+  /** Нове правило розкладу кампанії (майбутні сесії з правила перебудовуються). */
+  changeSchedule(id: number, input: ScheduleRuleInput): Observable<GameDto> {
+    return this.http.put<GameDto>(`/api/games/${id}/schedule`, input);
+  }
+
+  /** Ваншот → кампанія з новим правилом регулярності. */
+  convertToCampaign(id: number, input: ScheduleRuleInput): Observable<GameDto> {
+    return this.http.post<GameDto>(`/api/games/${id}/convert-to-campaign`, input);
   }
 
   transition(id: number, action: GameAction): Observable<GameTransitionDto> {

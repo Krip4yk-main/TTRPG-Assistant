@@ -89,4 +89,33 @@ describe('BlacklistPage', () => {
     await create([]);
     expect(el.textContent).toContain('members.blacklist.empty');
   });
+
+  it('after unban focus moves to the next row, then to the heading', async () => {
+    await create();
+    dialogOpen.mockReturnValue({ afterClosed: () => of(true) });
+    row('aaaaaaaaaa')!.querySelector<HTMLButtonElement>('button.unban')!.click();
+    await settle();
+    http
+      .expectOne('/api/me/blacklist/aaaaaaaaaa')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    expect(document.activeElement).toBe(
+      row('bbbbbbbbbb')!.querySelector<HTMLButtonElement>('button.unban'),
+    );
+
+    row('bbbbbbbbbb')!.querySelector<HTMLButtonElement>('button.unban')!.click();
+    await settle();
+    // Видалений акаунт у підтвердженні — «Видалений користувач».
+    expect(dialogOpen).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        data: expect.objectContaining({ params: { name: 'user.deleted' } }),
+      }),
+    );
+    http
+      .expectOne('/api/me/blacklist/bbbbbbbbbb')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    expect(document.activeElement).toBe(el.querySelector('h1'));
+  });
 });

@@ -1,0 +1,98 @@
+<section class="block sessions-list" aria-labelledby="sessions-title">
+  <h2 id="sessions-title" tabindex="-1">{{ 'sessions.title' | translate }}</h2>
+
+  <div class="message-area" aria-live="polite">
+    @if (message(); as msg) {
+      <p
+        [class.nri-alert]="msg.kind === 'error'"
+        [class.nri-notice]="msg.kind === 'info'"
+        [attr.role]="msg.kind === 'error' ? 'alert' : null"
+      >
+        {{ msg.key | translate }}
+      </p>
+    }
+  </div>
+
+  @if (loadFailed()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'sessions.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retry()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (sessions(); as list) {
+    @if (list.length === 0) {
+      <p class="nri-muted">{{ 'sessions.empty' | translate }}</p>
+    }
+    @if (upcoming().length) {
+      <h3>{{ 'sessions.upcoming' | translate }}</h3>
+      <ul class="sessions upcoming">
+        @for (s of upcoming(); track s.id) {
+          <ng-container *ngTemplateOutlet="row; context: { $implicit: s }" />
+        }
+      </ul>
+    }
+    @if (past().length) {
+      <h3>{{ 'sessions.past' | translate }}</h3>
+      <ul class="sessions past">
+        @for (s of past(); track s.id) {
+          <ng-container *ngTemplateOutlet="row; context: { $implicit: s }" />
+        }
+      </ul>
+    }
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>
+
+<ng-template #row let-s>
+  <li
+    class="session"
+    tabindex="-1"
+    [attr.data-session-id]="s.id"
+    [attr.aria-labelledby]="'session-when-' + s.id"
+  >
+    <div class="line">
+      <time class="when" [id]="'session-when-' + s.id" [attr.datetime]="s.startsAt">{{
+        when(s)
+      }}</time>
+      <span class="nri-muted duration">{{ 'games.form.hours' | translate: { h: hours(s) } }}</span>
+      <span class="status" [attr.data-status]="s.status">{{ statusKey(s) | translate }}</span>
+      @if (s.rescheduled) {
+        <span class="rescheduled">
+          <mat-icon aria-hidden="true">update</mat-icon>
+          {{ 'sessions.rescheduled' | translate }}
+        </span>
+      }
+    </div>
+    @if (s.status === 'cancelled' && s.cancelReason) {
+      <p class="reason">
+        <span class="label">{{ 'sessions.cancelReason' | translate }}:</span> {{ s.cancelReason }}
+      </p>
+    }
+    @if (s.summary) {
+      <p class="summary">
+        <span class="label">{{ 'sessions.summary' | translate }}:</span> {{ s.summary }}
+      </p>
+    }
+    @if (actions(s); as list) {
+      @if (list.length) {
+        <div class="actions">
+          @for (a of list; track a) {
+            <button
+              mat-stroked-button
+              type="button"
+              [attr.data-action]="a"
+              [class.danger]="a === 'cancel'"
+              [disabled]="busy()"
+              [attr.aria-label]="'sessions.actionsAria.' + a | translate: { when: when(s) }"
+              (click)="run(s, a)"
+            >
+              {{ 'sessions.actions.' + a | translate }}
+            </button>
+          }
+        </div>
+      }
+    }
+  </li>
+</ng-template>

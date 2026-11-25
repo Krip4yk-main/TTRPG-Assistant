@@ -13,6 +13,8 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { browserZone } from '../../../core/i18n/dates';
 import { ApplyDialog } from '../../applications/apply-dialog/apply-dialog';
+import { LeaveDialog } from '../../members/leave-dialog/leave-dialog';
+import { ScheduleRuleDialog } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 
 const me = {
@@ -230,9 +232,12 @@ describe('GameDetails', () => {
       );
       expect(el().querySelector('.relation')!.textContent).toContain('games.details.member');
       expect(applyButton()).toBeNull();
-      // Учасник бачить склад гри, але без меню керування.
+      // Учасник бачить склад гри (без меню керування), сесії й свою заявку.
       http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      http.expectOne('/api/me/applications').flush([]);
       await settle();
+      expect(el().querySelector('nri-sessions-list')).not.toBeNull();
       expect(el().querySelector('nri-members-panel')).not.toBeNull();
       expect(el().querySelector('button.member-menu')).toBeNull();
     });
@@ -275,8 +280,101 @@ describe('GameDetails', () => {
       .flush([
         { publicId: 'pppppppppp', nickname: 'Sam', avatarUrl: null, joinedAt: game.createdAt },
       ]);
+    http.expectOne('/api/games/7/sessions').flush([]);
     await settle();
     expect(el().querySelector('[data-member-id="pppppppppp"] button.member-menu')).not.toBeNull();
+    // Майстер не подає заявок — власні заявки не запитуються; кнопки виходу немає.
+    http.expectNone('/api/me/applications');
+    expect(el().querySelector('button.leave')).toBeNull();
+  });
+
+  describe('members and the GM', () => {
+    const asMember = { ...game, viewer: { relation: 'member', applicationId: null } } as const;
+    const flushMemberExtras = async (applications: unknown[] = []) => {
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      http.expectOne('/api/me/applications').flush(applications);
+      await settle();
+    };
+
+    it('a member sees the GM answers to their constraints', async () => {
+      await open(me, (r) => r.flush(asMember));
+      await flushMemberExtras([
+        {
+          ...application,
+          id: 50,
+          status: 'rejected',
+          constraints: [{ id: 'x', text: 'Старе', response: null, comment: null }],
+        },
+        {
+          ...application,
+          status: 'approved',
+          constraints: [
+            { id: 'aaaaaaaa', text: 'Без павуків', response: 'partial', comment: 'Лише згадки' },
+            { id: 'bbbbbbbb', text: 'До 22:00', response: null, comment: null },
+          ],
+        },
+        { ...application, id: 60, gameId: 8, status: 'approved' },
+      ]);
+      const block = el().querySelector<HTMLElement>('.my-constraints')!;
+      expect(block.textContent).toContain('Без павуків');
+      expect(block.textContent).toContain('games.applications.constraintResponse.partial');
+      expect(block.textContent).toContain('Лише згадки');
+      expect(block.textContent).toContain('games.applications.constraintResponse.none');
+      expect(block.textContent).not.toContain('Старе');
+    });
+
+    it('leave opens the dialog; after leaving the game reloads with a notice', async () => {
+      await open(me, (r) => r.flush(asMember));
+      await flushMemberExtras();
+      nextDialog(undefined);
+      el().querySelector<HTMLButtonElement>('button.leave')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        LeaveDialog,
+        expect.objectContaining({ data: { gameId: 7, title: game.title } }),
+      );
+      http.expectNone('/api/games/7');
+
+      nextDialog(true);
+      el().querySelector<HTMLButtonElement>('button.leave')!.click();
+      await settle();
+      expectGame().flush(game);
+      await settle();
+      await settle();
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.details.left');
+      expect(el().querySelector('nri-sessions-list')).toBeNull();
+      expect(document.activeElement).toBe(el().querySelector('.notice-area'));
+    });
+
+    it('a member of a finished game cannot leave', async () => {
+      await open(me, (r) => r.flush({ ...asMember, status: 'finished' }));
+      await flushMemberExtras();
+      expect(el().querySelector('button.leave')).toBeNull();
+    });
+
+    it('GM of a oneshot: «convert to campaign» opens the rule dialog and reloads', async () => {
+      const own = { ...game, kind: 'oneshot', recurrence: 'none', weekdays: [] } as const;
+      await open(me, (r) => r.flush({ ...own, gm: { ...game.gm, publicId: me.publicId } }));
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      await settle();
+      expect(el().querySelector('button.change-schedule')).toBeNull();
+      nextDialog({ ...own, kind: 'campaign' });
+      el().querySelector<HTMLButtonElement>('button.convert')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        ScheduleRuleDialog,
+        expect.objectContaining({ data: expect.objectContaining({ mode: 'convert' }) }),
+      );
+      expectGame().flush({ ...own, kind: 'campaign', gm: { ...game.gm, publicId: me.publicId } });
+      await settle();
+      http.expectOne('/api/games/7/sessions').flush([]);
+      await settle();
+      await settle();
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.details.converted');
+      expect(el().querySelector('button.change-schedule')).not.toBeNull();
+    });
   });
 
   it('a non-member does not request the member list', async () => {

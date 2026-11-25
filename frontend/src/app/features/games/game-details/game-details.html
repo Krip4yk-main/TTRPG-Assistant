@@ -109,6 +109,31 @@
                   {{ 'games.details.applications' | translate }}
                 </a>
               }
+              @if (manageable()) {
+                @if (g.kind === 'campaign') {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="change-schedule"
+                    [disabled]="busy()"
+                    (click)="changeRule('schedule')"
+                  >
+                    <mat-icon aria-hidden="true">event_repeat</mat-icon>
+                    {{ 'games.details.changeSchedule' | translate }}
+                  </button>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="convert"
+                    [disabled]="busy()"
+                    (click)="changeRule('convert')"
+                  >
+                    <mat-icon aria-hidden="true">autorenew</mat-icon>
+                    {{ 'games.details.convert' | translate }}
+                  </button>
+                }
+              }
             } @else if (!signedIn()) {
               @if (accepting()) {
                 <a
@@ -126,6 +151,18 @@
                 <mat-icon aria-hidden="true">how_to_reg</mat-icon>
                 {{ 'games.details.member' | translate }}
               </span>
+              @if (canLeave()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="leave danger"
+                  [disabled]="busy()"
+                  (click)="leave()"
+                >
+                  <mat-icon aria-hidden="true">logout</mat-icon>
+                  {{ 'games.details.leave' | translate }}
+                </button>
+              }
             } @else if (relation() === 'pending') {
               <span class="badge relation" data-relation="pending">
                 <mat-icon aria-hidden="true">hourglass_top</mat-icon>
@@ -157,7 +194,7 @@
             }
           </div>
 
-          <div class="notice-area" aria-live="polite">
+          <div class="notice-area" aria-live="polite" tabindex="-1">
             @if (notice(); as n) {
               <p
                 [class.nri-alert]="n.kind === 'error'"
@@ -254,6 +291,14 @@
           </dl>
 
           @if (showMembers()) {
+            <nri-sessions-list
+              class="nri-card sessions"
+              [gameId]="g.id"
+              [timezone]="g.timezone"
+              [isGm]="isGm()"
+              [manageable]="manageable()"
+              (changed)="membersChanged()"
+            />
             <nri-members-panel
               class="nri-card members"
               [gameId]="g.id"
@@ -261,6 +306,28 @@
               [manageable]="manageable()"
               (changed)="membersChanged()"
             />
+          }
+
+          @if (myConstraints(); as list) {
+            @if (list.length) {
+              <section class="block my-constraints" aria-labelledby="my-constraints-title">
+                <h2 id="my-constraints-title">{{ 'games.details.myConstraints' | translate }}</h2>
+                <ul class="constraints">
+                  @for (c of list; track c.id) {
+                    <li>
+                      <span class="constraint-text">{{ c.text }}</span>
+                      <span class="response" [attr.data-response]="c.response ?? 'none'">{{
+                        'games.applications.constraintResponse.' + (c.response ?? 'none')
+                          | translate
+                      }}</span>
+                      @if (c.comment) {
+                        <span class="comment">{{ c.comment }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
           }
 
           @if (g.description) {

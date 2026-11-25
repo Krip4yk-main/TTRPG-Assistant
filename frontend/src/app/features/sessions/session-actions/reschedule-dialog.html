@@ -1,0 +1,64 @@
+<h2 mat-dialog-title>{{ 'sessions.reschedule.title' | translate }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p class="nri-muted zone-hint">
+      {{ 'sessions.zoneHint' | translate }} <strong>{{ data.timezone }}</strong>
+    </p>
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'sessions.reschedule.date' | translate }}</mat-label>
+        <input
+          matInput
+          class="date"
+          required
+          [matDatepicker]="picker"
+          [min]="minDate"
+          formControlName="date"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker />
+        <mat-hint>{{ 'games.form.startDateHint' | translate }}</mat-hint>
+        @if (
+          form.controls.date.hasError('past') || form.controls.date.hasError('matDatepickerMin')
+        ) {
+          <mat-error>{{ pastKey | translate }}</mat-error>
+        } @else if (form.controls.date.hasError('required')) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'sessions.reschedule.time' | translate }}</mat-label>
+        <input matInput class="time" type="time" step="60" required formControlName="time" />
+        @if (form.controls.time.invalid && form.controls.time.touched) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
+        <select matNativeControl formControlName="durationMinutes">
+          @for (m of durations; track m) {
+            <option [ngValue]="m">{{ 'games.form.hours' | translate: { h: hours(m) } }}</option>
+          }
+        </select>
+      </mat-form-field>
+    </div>
+    @if (preview(); as p) {
+      <p class="nri-muted preview" aria-live="polite">
+        {{ 'sessions.viewerPreview' | translate: { when: p } }}
+      </p>
+    }
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" [disabled]="submitting()">
+      {{ 'sessions.reschedule.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

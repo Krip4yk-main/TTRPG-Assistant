@@ -1,0 +1,62 @@
+<h2 mat-dialog-title>{{ 'sessions.finish.title' | translate: { when: data.when } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <fieldset class="attendance" formArrayName="present">
+      <legend>{{ 'sessions.finish.attendance' | translate }}</legend>
+      @if (loadFailed()) {
+        <div class="nri-alert load-error" role="alert">
+          <span>{{ 'members.loadError' | translate }}</span>
+          <button mat-stroked-button type="button" (click)="load()">
+            {{ 'common.retry' | translate }}
+          </button>
+        </div>
+      } @else if (members(); as list) {
+        @if (list.length === 0) {
+          <p class="nri-muted">{{ 'sessions.finish.noMembers' | translate }}</p>
+        } @else {
+          <p class="nri-muted hint">{{ 'sessions.finish.attendanceHint' | translate }}</p>
+          <ul class="members">
+            @for (m of list; track m.publicId; let i = $index) {
+              <li [attr.data-member-id]="m.publicId">
+                <mat-checkbox [formControlName]="i">{{
+                  m.nickname ?? ('user.deleted' | translate)
+                }}</mat-checkbox>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+      }
+    </fieldset>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'sessions.finish.summary' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="summary"
+        rows="5"
+        formControlName="summary"
+        [attr.maxlength]="max"
+      ></textarea>
+      <mat-hint>{{ 'sessions.finish.summaryHint' | translate }}</mat-hint>
+      @if (form.controls.summary.invalid) {
+        <mat-error>{{ 'games.form.errors.tooLong' | translate: { max } }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" [disabled]="submitting() || !members()">
+      {{ 'sessions.finish.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

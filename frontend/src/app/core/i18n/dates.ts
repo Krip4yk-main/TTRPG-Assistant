@@ -5,6 +5,7 @@ import {
   NativeDateAdapter,
   provideNativeDateAdapter,
 } from '@angular/material/core';
+import { toZoned, zonedToUtc } from '@nri/shared';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -127,4 +128,29 @@ export function formatTime(iso: string, timeZone: string): string {
       new Date(iso),
     );
   }
+}
+
+/**
+ * Календарна дата з datepicker-а + `HH:mm` як місцевий час у поясі `timeZone` → момент UTC
+ * (ISO, ціла хвилина). Неповні чи некоректні дані — `null`.
+ */
+export function zonedInputToUtc(date: Date | null, time: string, timeZone: string): string | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!date || Number.isNaN(date.getTime()) || !m) return null;
+  return zonedToUtc(
+    {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: Number(m[1]),
+      minute: Number(m[2]),
+    },
+    timeZone,
+  ).toISOString();
+}
+
+/** Момент `iso` як поля форми в поясі `timeZone`: дата (місцева північ) і `HH:mm`. */
+export function utcToZonedInput(iso: string, timeZone: string): { date: Date; time: string } {
+  const z = toZoned(new Date(iso), timeZone);
+  return { date: new Date(z.year, z.month - 1, z.day), time: `${pad(z.hour)}:${pad(z.minute)}` };
 }

@@ -1,0 +1,32 @@
+// Спільні стилі діалогів сесій і розкладу (підключаються через @import).
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.content p {
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+
+  > * {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+}
+
+.field-error {
+  color: var(--nri-danger-text);
+  font-size: 0.9rem;
+}
+
+.danger {
+  --mat-button-filled-container-color: var(--nri-danger);
+  --mat-button-filled-label-text-color: var(--nri-on-danger);
+}

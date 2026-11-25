@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>{{ 'members.leave.title' | translate: { title: data.title } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p class="intro">{{ 'members.leave.intro' | translate }}</p>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'members.leave.noteForGm' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="note-gm"
+        rows="3"
+        required
+        formControlName="noteForGm"
+        [attr.maxlength]="limits.max"
+      ></textarea>
+      <mat-hint>{{ 'members.leave.gmHint' | translate: limits }}</mat-hint>
+      @if (errorKey(form.controls.noteForGm); as key) {
+        <mat-error>{{ key | translate: limits }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'members.leave.noteForAdmin' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="note-admin"
+        rows="3"
+        formControlName="noteForAdmin"
+        [attr.maxlength]="limits.max"
+      ></textarea>
+      <mat-hint>{{ 'members.leave.adminHint' | translate }}</mat-hint>
+      @if (errorKey(form.controls.noteForAdmin); as key) {
+        <mat-error>{{ key | translate: limits }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" cdkFocusInitial (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="danger" [disabled]="submitting()">
+      {{ (submitting() ? 'members.leave.submitting' : 'members.leave.submit') | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { BlacklistEntryDto, MemberDto } from '@nri/shared';
+import type { BlacklistEntryDto, LeaveGameInput, MemberDto } from '@nri/shared';
 
 /** Тонкий шар над HTTP API складу гри й чорного списку майстра. */
 @Injectable({ providedIn: 'root' })
@@ -10,6 +10,11 @@ export class MembersApi {
 
   list(gameId: number): Observable<MemberDto[]> {
     return this.http.get<MemberDto[]>(`/api/games/${gameId}/members`);
+  }
+
+  /** Вийти з гри (учасник): пояснення для майстра й, за бажанням, для адміністрації. */
+  leave(gameId: number, input: LeaveGameInput): Observable<void> {
+    return this.http.post<void>(`/api/games/${gameId}/leave`, input);
   }
 
   /** Виключити учасника (може подати заявку знову). */

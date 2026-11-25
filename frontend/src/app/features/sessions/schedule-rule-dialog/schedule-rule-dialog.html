@@ -1,0 +1,100 @@
+<h2 mat-dialog-title>
+  {{ (convert ? 'sessions.rule.convertTitle' : 'sessions.rule.title') | translate }}
+</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p>{{ (convert ? 'sessions.rule.convertIntro' : 'sessions.rule.intro') | translate }}</p>
+    <p class="nri-muted zone-hint">
+      {{ 'sessions.zoneHint' | translate }} <strong>{{ data.game.timezone }}</strong>
+    </p>
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.startDate' | translate }}</mat-label>
+        <input
+          matInput
+          class="date"
+          required
+          [matDatepicker]="picker"
+          [min]="minDate"
+          formControlName="date"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker />
+        <mat-hint>{{ 'sessions.rule.futureHint' | translate }}</mat-hint>
+        @if (
+          form.controls.date.hasError('past') || form.controls.date.hasError('matDatepickerMin')
+        ) {
+          <mat-error>{{ pastKey | translate }}</mat-error>
+        } @else if (form.controls.date.hasError('required')) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
+        <input matInput class="time" type="time" step="60" required formControlName="time" />
+        @if (form.controls.time.invalid && form.controls.time.touched) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
+        <select matNativeControl formControlName="durationMinutes">
+          @for (m of durations; track m) {
+            <option [ngValue]="m">{{ 'games.form.hours' | translate: { h: hours(m) } }}</option>
+          }
+        </select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.recurrence' | translate }}</mat-label>
+        <select matNativeControl class="recurrence" formControlName="recurrence">
+          @for (r of recurrences; track r) {
+            <option [ngValue]="r">{{ 'games.recurrence.' + r | translate }}</option>
+          }
+        </select>
+      </mat-form-field>
+    </div>
+    @if (isWeekly(value().recurrence)) {
+      <div class="field" role="group" aria-labelledby="rule-weekdays-label">
+        <span id="rule-weekdays-label" class="group-label">{{
+          'games.form.weekdays' | translate
+        }}</span>
+        <mat-button-toggle-group
+          multiple
+          class="weekdays"
+          formControlName="weekdays"
+          aria-labelledby="rule-weekdays-label"
+          [attr.aria-describedby]="weekdaysError() ? 'rule-weekdays-error' : 'rule-weekdays-hint'"
+        >
+          @for (d of weekdays; track d) {
+            <mat-button-toggle
+              [value]="d"
+              [attr.aria-label]="'games.weekdaysLong.' + d | translate"
+              >{{ 'games.weekdays.' + d | translate }}</mat-button-toggle
+            >
+          }
+        </mat-button-toggle-group>
+        <p id="rule-weekdays-hint" class="nri-muted hint">
+          {{ 'games.form.weekdaysHint' | translate }}
+        </p>
+        @if (weekdaysError(); as key) {
+          <p id="rule-weekdays-error" class="field-error" role="alert">{{ key | translate }}</p>
+        }
+      </div>
+    }
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" [disabled]="submitting()">
+      {{ (convert ? 'sessions.rule.convertSubmit' : 'sessions.rule.submit') | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

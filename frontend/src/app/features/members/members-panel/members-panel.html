@@ -1,5 +1,5 @@
 <section class="block members-panel" aria-labelledby="members-title">
-  <h2 id="members-title">
+  <h2 id="members-title" tabindex="-1">
     {{ 'members.title' | translate }}
     @if (members(); as list) {
       <span class="count">({{ list.length }})</span>
@@ -49,7 +49,10 @@
                 class="member-menu"
                 [matMenuTriggerFor]="menu"
                 [disabled]="busy()"
-                [attr.aria-label]="'members.menuAria' | translate: { name: m.nickname ?? '' }"
+                [attr.aria-label]="
+                  'members.menuAria'
+                    | translate: { name: m.nickname ?? ('user.deleted' | translate) }
+                "
               >
                 <mat-icon aria-hidden="true">more_vert</mat-icon>
               </button>

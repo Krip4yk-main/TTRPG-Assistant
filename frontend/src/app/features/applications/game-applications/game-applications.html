@@ -40,7 +40,7 @@
         </p>
       }
 
-      <div class="message-area" aria-live="polite">
+      <div class="message-area" aria-live="polite" tabindex="-1">
         @if (message(); as msg) {
           <p
             [class.nri-alert]="msg.kind === 'error'"
@@ -67,9 +67,14 @@
           <ul class="cards">
             @for (a of group.items; track a.id) {
               <li>
-                <article class="nri-card application" [attr.data-application-id]="a.id">
+                <article
+                  class="nri-card application"
+                  tabindex="-1"
+                  [attr.data-application-id]="a.id"
+                  [attr.aria-labelledby]="'applicant-' + a.id"
+                >
                   <header class="app-header">
-                    <h3 class="applicant">
+                    <h3 class="applicant" [id]="'applicant-' + a.id">
                       @if (a.applicant.nickname) {
                         <a class="applicant-link" [routerLink]="['/users', a.applicant.publicId]">{{
                           a.applicant.nickname
@@ -211,7 +216,8 @@
                         [disabled]="busyId() !== null || !a.meetsAgeRating"
                         [attr.aria-label]="
                           'games.applications.gm.approveAria'
-                            | translate: { name: a.applicant.nickname ?? '' }
+                            | translate
+                              : { name: a.applicant.nickname ?? ('user.deleted' | translate) }
                         "
                         (click)="approve(a)"
                       >
@@ -224,7 +230,8 @@
                         [disabled]="busyId() !== null"
                         [attr.aria-label]="
                           'games.applications.gm.rejectAria'
-                            | translate: { name: a.applicant.nickname ?? '' }
+                            | translate
+                              : { name: a.applicant.nickname ?? ('user.deleted' | translate) }
                         "
                         (click)="reject(a)"
                       >

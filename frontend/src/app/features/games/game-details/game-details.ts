@@ -1,11 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   input,
   signal,
+  untracked,
+  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,7 +19,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   isRestrictedGame,
+  type ApplicationConstraintDto,
   type ChannelLink,
+  type GameDto,
   type GameStatus,
   type GameViewDto,
   type GameViewerDto,
@@ -44,7 +51,13 @@ import {
   type ApplyDialogData,
   type ApplyDialogResult,
 } from '../../applications/apply-dialog/apply-dialog';
+import { LeaveDialog, type LeaveDialogData } from '../../members/leave-dialog/leave-dialog';
 import { MembersPanel } from '../../members/members-panel/members-panel';
+import {
+  ScheduleRuleDialog,
+  type ScheduleRuleDialogData,
+} from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
+import { SessionsList } from '../../sessions/sessions-list/sessions-list';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -66,7 +79,15 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
  */
 @Component({
   selector: 'nri-game-details',
-  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe, WarningChip, MembersPanel],
+  imports: [
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    TranslatePipe,
+    WarningChip,
+    MembersPanel,
+    SessionsList,
+  ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -78,6 +99,9 @@ export class GameDetails {
   private readonly seo = inject(SeoService);
   private readonly applications = inject(ApplicationsApi);
   private readonly dialog = inject(MatDialog);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private readonly sessionsList = viewChild(SessionsList);
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
@@ -117,11 +141,21 @@ export class GameDetails {
     if (!g) return false;
     return this.isGm() ? g.status !== 'draft' : this.relation() === 'member';
   });
+  /** Відповіді майстра на обмеження з моєї затвердженої заявки (лише учаснику). */
+  protected readonly myConstraints = signal<ApplicationConstraintDto[] | null>(null);
+  /** Гра, для якої вже запитано мою заявку (щоб тихе оновлення не повторювало запит). */
+  private constraintsFor: number | null = null;
+
   /** Майстер може виключати й банити, поки гра набирає чи триває. */
   protected readonly manageable = computed(() => {
     const s = this.game()?.status;
     return s === 'recruiting' || s === 'started';
   });
+
+  /** Учасник може вийти, поки гра набирає чи триває (як на бекенді). */
+  protected readonly canLeave = computed(
+    () => !this.isGm() && this.relation() === 'member' && this.manageable(),
+  );
 
   /** Стосунок глядача до гри (сервер віддає лише автентифікованому). */
   protected readonly relation = computed(() => this.game()?.viewer?.relation ?? null);
@@ -184,11 +218,78 @@ export class GameDetails {
       const id = Number(this.id());
       void this.load(id);
     });
+    // Учасник бачить відповіді майстра на свої обмеження.
+    effect(() => {
+      const g = this.game();
+      const member = !this.isGm() && this.relation() === 'member';
+      untracked(() => {
+        if (!g || !member) {
+          this.myConstraints.set(null);
+          this.constraintsFor = null;
+        } else if (this.constraintsFor !== g.id) {
+          this.constraintsFor = g.id;
+          void this.loadMyConstraints(g.id);
+        }
+      });
+    });
   }
 
-  /** Склад змінився (виключення/бан) — тихо оновлюємо вільні місця. */
+  /** Склад чи сесії змінились — тихо оновлюємо вільні місця й найближчу сесію. */
   protected async membersChanged(): Promise<void> {
     await this.load(Number(this.id()), true);
+  }
+
+  /** «Вийти з гри»: діалог робить запит сам; після виходу приватне зникає зі сторінки. */
+  protected async leave(): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.canLeave()) return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const ref = this.dialog.open<LeaveDialog, LeaveDialogData, boolean>(LeaveDialog, {
+        data: { gameId: g.id, title: g.title },
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+        width: '560px',
+        maxWidth: 'calc(100vw - 32px)',
+      });
+      if (!(await firstValueFrom(ref.afterClosed()))) return;
+      await this.load(g.id, true);
+      this.notice.set({ kind: 'info', key: 'games.details.left' });
+      this.focusNotice();
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** «Змінити розклад» (кампанія) чи «Перетворити на кампанію» (ваншот). */
+  protected async changeRule(mode: ScheduleRuleDialogData['mode']): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.isGm() || !this.manageable()) return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const ref = this.dialog.open<ScheduleRuleDialog, ScheduleRuleDialogData, GameDto>(
+        ScheduleRuleDialog,
+        {
+          data: { game: g, mode },
+          autoFocus: 'first-tabbable',
+          restoreFocus: true,
+          width: '600px',
+          maxWidth: 'calc(100vw - 32px)',
+        },
+      );
+      if (!(await firstValueFrom(ref.afterClosed()))) return;
+      await this.load(g.id, true);
+      await this.sessionsList()?.reload();
+      this.notice.set({
+        kind: 'info',
+        key: mode === 'convert' ? 'games.details.converted' : 'games.details.scheduleChanged',
+      });
+      this.focusNotice();
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async retry(): Promise<void> {
@@ -258,6 +359,28 @@ export class GameDetails {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private async loadMyConstraints(gameId: number): Promise<void> {
+    try {
+      const mine = await firstValueFrom(this.applications.mine());
+      if (this.constraintsFor !== gameId) return;
+      // Затверджена заявка на цю гру; якщо їх кілька (виключили й прийняли знову) — новіша.
+      const approved = mine
+        .filter((a) => a.gameId === gameId && a.status === 'approved')
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      this.myConstraints.set(approved?.constraints ?? []);
+    } catch {
+      // Блок необов'язковий: без нього сторінка гри працює.
+      this.myConstraints.set(null);
+    }
+  }
+
+  private focusNotice(): void {
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('.notice-area')?.focus(),
+      { injector: this.injector },
+    );
   }
 
   private setViewer(viewer: GameViewerDto): void {
