@@ -50,7 +50,6 @@ const TABLES = [
   'reminder_log',
   'notifications',
   'notification_prefs',
-  'ban_appeals',
   'calendar_pinned_games',
   'user_settings',
   'notes',

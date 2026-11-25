@@ -183,6 +183,13 @@
       "when": 1795612907953,
       "tag": "0025_plan6_member_left_banned_by_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1795617104279,
+      "tag": "0026_plan6_drop_ban_appeals",
+      "breakpoints": true
     }
   ]
 }

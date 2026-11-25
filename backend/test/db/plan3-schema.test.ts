@@ -1,7 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import {
-  banAppeals,
   gameApplications,
   gameMembers,
   games,
@@ -137,14 +136,9 @@ describe('plan 3 schema', () => {
     expect(row!.body).toHaveLength(200_000);
   });
 
-  it('one appeal per user and ban epoch; ban_epoch defaults to 0', async () => {
+  it('ban_epoch defaults to 0', async () => {
     const u = await createUser(db, { isBanned: true });
     expect(u.banEpoch).toBe(0);
-    await db.insert(banAppeals).values({ userId: u.id, message: 'a', banEpoch: 0 });
-    await expect(
-      db.insert(banAppeals).values({ userId: u.id, message: 'b', banEpoch: 0 }),
-    ).rejects.toThrow(DUP);
-    await db.insert(banAppeals).values({ userId: u.id, message: 'c', banEpoch: 1 });
   });
 
   it('user settings default to automatic calendar busy time', async () => {
@@ -169,7 +163,6 @@ describe('plan 3 schema', () => {
       'notes',
       'user_settings',
       'calendar_pinned_games',
-      'ban_appeals',
     ])
       expect(names).toContain(t);
   });

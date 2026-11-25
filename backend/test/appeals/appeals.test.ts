@@ -2,13 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
-import {
-  banAppeals,
-  events,
-  sanctionAppeals,
-  sanctions,
-  users,
-} from '../../src/db/schema/index.js';
+import { events, sanctionAppeals, sanctions, users } from '../../src/db/schema/index.js';
 import { decideAppeal } from '../../src/moderation/appeals.service.js';
 import { imposeSanction, liftSanction } from '../../src/moderation/sanctions.service.js';
 import { createSession } from '../../src/auth/session.service.js';
@@ -128,7 +122,6 @@ describe('POST /api/appeals', () => {
       entityType: 'sanction_appeal',
       entityId: rows[0]!.id,
     });
-    expect(await db.select().from(banAppeals)).toHaveLength(0);
 
     // токен одноразовий
     expect((await appeal(token, 'ще раз')).status).toBe(401);

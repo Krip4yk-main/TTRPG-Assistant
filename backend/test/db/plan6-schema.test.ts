@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { asc, eq, sql } from 'drizzle-orm';
+import { bigint, datetime, int, mysqlTable, text } from 'drizzle-orm/mysql-core';
 import {
-  banAppeals,
   complaints,
   games,
   gameSystems,
@@ -37,6 +37,23 @@ const DATA_STATEMENTS = readFileSync('src/db/migrations/0023_plan6_moderation.sq
   .split('--> statement-breakpoint')
   .map((s) => s.trim())
   .filter((s) => /INSERT INTO/.test(s));
+
+/**
+ * Застаріла таблиця `ban_appeals` видалена міграцією 0026; для перевірки перенесення даних 0023
+ * її тимчасово відтворюють тим самим `CREATE TABLE`, що й у 0008 (FK не потрібен).
+ */
+const LEGACY_CREATE = readFileSync('src/db/migrations/0008_plan3.sql', 'utf8')
+  .split('--> statement-breakpoint')
+  .map((s) => s.trim())
+  .find((s) => s.startsWith('CREATE TABLE `ban_appeals`'))!;
+const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
+const banAppeals = mysqlTable('ban_appeals', {
+  id: id('id').autoincrement().primaryKey(),
+  userId: id('user_id').notNull(),
+  message: text('message').notNull(),
+  banEpoch: int('ban_epoch').notNull(),
+  createdAt: datetime('created_at').notNull(),
+});
 
 async function makeGame(gmUserId: number) {
   const [sys] = await db.select({ id: gameSystems.id }).from(gameSystems).limit(1);
@@ -142,7 +159,23 @@ describe('plan 6 schema', () => {
   });
 });
 
+describe('migration 0026', () => {
+  it('drops the legacy ban_appeals table', async () => {
+    const [rows] = await db.execute(
+      sql`SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ban_appeals'`,
+    );
+    expect(rows).toEqual([]);
+  });
+});
+
 describe('migration 0023: ban_appeals → sanctions + sanction_appeals', () => {
+  beforeEach(async () => {
+    await db.execute(sql.raw(LEGACY_CREATE));
+  });
+  afterEach(async () => {
+    await db.execute(sql`DROP TABLE IF EXISTS \`ban_appeals\``);
+  });
+
   it('has the data statements', () => {
     expect(DATA_STATEMENTS).toHaveLength(4);
   });

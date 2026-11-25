@@ -1,4 +1,3 @@
-import * as appeals from './appeals.js';
 import * as applications from './applications.js';
 import * as availability from './availability.js';
 import * as auth from './auth.js';
@@ -16,7 +15,6 @@ import * as sessions from './sessions.js';
 import * as users from './users.js';
 import * as views from './views.js';
 
-export * from './appeals.js';
 export * from './applications.js';
 export * from './auth.js';
 export * from './availability.js';
@@ -46,7 +44,6 @@ export const schema = {
   ...sessions,
   ...notes,
   ...calendar,
-  ...appeals,
   ...jobs,
   ...notifications,
   ...views,
