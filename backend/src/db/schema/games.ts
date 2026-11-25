@@ -158,10 +158,12 @@ export const gameMembers = mysqlTable(
     /** Заявка, з якої з'явилось членство (`game_applications.id`). */
     // FK свідомо не оголошено: applications.ts імпортує games.ts (циклічний імпорт схеми); рядки прибирають ті самі каскади гри/користувача.
     applicationId: id('application_id'),
-    joinedAt: datetime('joined_at')
+    // Мілісекунди: виходи порівнюються з `done_at` і «зараз» (права й запрошення оцінити) —
+    // без округлення MySQL до секунди щойно записаний вихід не опиняється «в майбутньому».
+    joinedAt: datetime('joined_at', { fsp: 3 })
       .notNull()
-      .default(sql`CURRENT_TIMESTAMP`),
-    leftAt: datetime('left_at'),
+      .default(sql`CURRENT_TIMESTAMP(3)`),
+    leftAt: datetime('left_at', { fsp: 3 }),
     leftReason: mysqlEnum('left_reason', MEMBER_LEFT_REASONS),
     leaveNoteGm: text('leave_note_gm'),
     leaveNoteAdmin: text('leave_note_admin'),

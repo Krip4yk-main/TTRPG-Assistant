@@ -1,4 +1,4 @@
-import { and, eq, exists, gt, lte, or } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, lte, or } from 'drizzle-orm';
 import { FINAL_RATING_WINDOW_DAYS, SESSION_RATING_WINDOW_DAYS } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { isDuplicateKey, isTransientDbError } from '../db/errors.js';
@@ -86,10 +86,23 @@ export async function sendRatingDeadlines(
     // Сталий порядок вставок у журнал: паралельні прогони не блокують одне одного по колу.
     .sort((a, b) => a.raterId - b.raterId || a.gameId - b.gameId || slot(a) - slot(b));
 
+  // Дата сесії — у тексті нагадування для сесійних наборів.
+  const sessionIds = [...new Set(due.flatMap((x) => x.sessionId ?? []))];
+  const startsOf = new Map(
+    (sessionIds.length
+      ? await deps.db
+          .select({ id: gameSessions.id, startsAt: gameSessions.startsAt })
+          .from(gameSessions)
+          .where(inArray(gameSessions.id, sessionIds))
+      : []
+    ).map((r) => [r.id, r.startsAt]),
+  );
+
   const created: NotificationRow[] = [];
   for (const set of due) {
     try {
-      const row = await remindSet(deps, set, titleOf.get(set.gameId) ?? null);
+      const startsAt = set.sessionId !== null ? startsOf.get(set.sessionId) : undefined;
+      const row = await remindSet(deps, set, titleOf.get(set.gameId) ?? null, startsAt);
       if (row) {
         emitNotificationsNew(deps, [row]);
         created.push(row);
@@ -111,6 +124,7 @@ async function remindSet(
   deps: AppDeps,
   set: OpenRatingSet,
   gameTitle: string | null,
+  startsAt: Date | undefined,
 ): Promise<NotificationRow | null> {
   return deps.db.transaction(async (tx) => {
     try {
@@ -133,6 +147,7 @@ async function remindSet(
         gameId: set.gameId,
         gameTitle,
         ...(set.sessionId !== null ? { sessionId: set.sessionId } : {}),
+        ...(startsAt ? { startsAt: startsAt.toISOString() } : {}),
         closesAt: set.closesAt!.toISOString(),
       },
       entityType: set.sessionId !== null ? 'session' : 'game',

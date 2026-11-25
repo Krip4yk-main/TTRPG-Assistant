@@ -50,8 +50,8 @@ const toInsert = (n: NewNotification) => ({
 });
 
 /**
- * Вставляє сповіщення з подій і викликає `afterNotificationsCreated` для нових. Пара
- * (event_id, user_id), що вже є, пропускається (UNIQUE + `ON DUPLICATE KEY UPDATE id = id`).
+ * Вставляє сповіщення з подій і викликає `afterNotificationsCreated` для нових. Трійка
+ * (event_id, user_id, category), що вже є, пропускається (UNIQUE + `ON DUPLICATE KEY UPDATE id = id`).
  * Викликати в транзакції, що тримає блокування цих подій.
  */
 export async function insertEventNotifications(

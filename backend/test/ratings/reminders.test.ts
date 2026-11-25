@@ -204,6 +204,65 @@ describe('rating invitations from events', () => {
     expect(await ratingNotes()).toEqual([]);
   });
 
+  it('game.cancelled → leave pairs only: co-player and leaver invited, not someone who rated', async () => {
+    const gm = await user('Майстер');
+    const a = await user('Leaver');
+    const b = await user('Stayed');
+    const c = await user('RatedLeaver');
+    const gameId = await fx.game(gm.id);
+    for (const u of [a, b, c]) await fx.member(gameId, u.id, ago(20));
+    await fx.done(gameId, ago(10), [a.id, b.id, c.id]);
+    await leave(gameId, a.id, ago(5));
+    await rate(gameId, gm.id, a.id, null);
+    await rate(gameId, c.id, a.id, null);
+    const cancelledAt = ago(0);
+    await db.update(games).set({ status: 'cancelled', cancelledAt }).where(eq(games.id, gameId));
+    await logEvent(db, {
+      type: 'game.cancelled',
+      userId: gm.id,
+      entityType: 'game',
+      entityId: gameId,
+      payload: { from: 'started', to: 'cancelled' },
+    });
+    await dispatchEvents(deps);
+    const rows = await ratingNotes();
+    // Майстер і RatedLeaver уже оцінили того, хто вийшов; між тими, хто лишився, — пар немає.
+    expect(brief(rows)).toEqual([
+      [a.id, 'rating.final_open'],
+      [b.id, 'rating.final_open'],
+    ]);
+    expect(rows[0]!.payload).toEqual({
+      gameId,
+      gameTitle: 'Гра',
+      closesAt: new Date(cancelledAt.getTime() + 30 * DAY).toISOString(),
+    });
+  });
+
+  it('leave right before dispatch (same second) is already seen — millisecond timestamps', async () => {
+    const gm = await user('Майстер');
+    const a = await user('Quick');
+    const gameId = await fx.game(gm.id);
+    await fx.member(gameId, a.id, ago(10));
+    await fx.done(gameId, ago(5), [a.id]);
+    // Вихід «щойно»: зберігається з мілісекундами (без округлення до секунди «в майбутнє»).
+    const leftAt = new Date();
+    await leave(gameId, a.id, leftAt);
+    const [m] = await db.select({ leftAt: gameMembers.leftAt }).from(gameMembers);
+    expect(m!.leftAt!.getTime()).toBe(leftAt.getTime());
+    await logEvent(db, {
+      type: 'member.left',
+      userId: a.id,
+      entityType: 'game',
+      entityId: gameId,
+      payload: { gameId },
+    });
+    await dispatchEvents(deps);
+    expect(brief(await ratingNotes())).toEqual([
+      [gm.id, 'rating.member_left'],
+      [a.id, 'rating.final_open'],
+    ]);
+  });
+
   it('game.finished → everyone with open final targets, including former members', async () => {
     const gm = await user('Майстер');
     const a = await user('Former');
@@ -315,7 +374,14 @@ describe('ratings.deadline', () => {
       ].sort(),
     );
     const closesAt = new Date(doneAt.getTime() + 14 * DAY).toISOString();
-    expect(first[0]!.payload).toEqual({ gameId, gameTitle: 'Гра', sessionId: closing, closesAt });
+    expect(first[0]!.payload).toEqual({
+      gameId,
+      gameTitle: 'Гра',
+      sessionId: closing,
+      // Дата сесії — для тексту нагадування (фікстура: початок за 4 год до завершення).
+      startsAt: new Date(doneAt.getTime() - 4 * 3600_000).toISOString(),
+      closesAt,
+    });
     expect(first[0]!.category).toBe('ratings');
     expect(notificationLink('rating.deadline', first[0]!.payload)).toBe(
       `/games/${gameId}/rate?session=${closing}`,

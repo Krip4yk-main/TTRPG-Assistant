@@ -41,7 +41,7 @@ export const gameSessions = mysqlTable(
     rescheduled: boolean('rescheduled').notNull().default(false),
     cancelReason: varchar('cancel_reason', { length: 300 }),
     summary: text('summary'),
-    doneAt: datetime('done_at'),
+    doneAt: datetime('done_at', { fsp: 3 }),
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),

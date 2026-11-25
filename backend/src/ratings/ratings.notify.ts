@@ -4,8 +4,6 @@ import { games, users } from '../db/schema/index.js';
 import type { EventRow, NewNotification } from '../notifications/recipients.js';
 import { openRatingSets, type OpenRatingSet, type Q } from './ratings.eligibility.js';
 
-const ROUNDING_SLACK_MS = 1000;
-
 type Payload = Record<string, unknown>;
 const asPayload = (p: unknown): Payload =>
   p && typeof p === 'object' && !Array.isArray(p) ? (p as Payload) : {};
@@ -28,7 +26,9 @@ function triggerOf(ev: EventRow): Trigger | null {
       const sessionId = ev.entityType === 'session' ? num(ev.entityId) : undefined;
       return gameId && sessionId ? { ev, gameId, sessionId } : null;
     }
-    case 'game.finished': {
+    case 'game.finished':
+    case 'game.cancelled': {
+      // Скасована гра: підсумковий набір — лише «вихідні» пари (з дедлайном 30 днів).
       const gameId = ev.entityType === 'game' ? num(ev.entityId) : undefined;
       return gameId ? { ev, gameId } : null;
     }
@@ -52,8 +52,8 @@ function triggerOf(ev: EventRow): Trigger | null {
  * UNIQUE сповіщень включає категорію). Стан — на момент обробки (`now`):
  * - `session.done` → `rating.session_open` кожному присутньому, у кого в сесійному наборі є
  *   кого оцінити;
- * - `game.finished` → `rating.final_open` кожному (зокрема тим, хто вийшов), у кого в
- *   підсумковому наборі є `open` цілі;
+ * - `game.finished` / `game.cancelled` → `rating.final_open` кожному (зокрема тим, хто
+ *   вийшов), у кого в підсумковому наборі є `open` цілі (у скасованій — лише «вихідні» пари);
  * - вихід/виключення/бан → `rating.member_left` (`ratee` — той, хто вийшов) кожному, хто грав
  *   із ним і ще не оцінив його й не відмовився; а тому, хто вийшов, — `rating.final_open`,
  *   якщо йому є кого оцінити.
@@ -67,11 +67,7 @@ export async function planRatingNotifications(
   const triggers = batch.flatMap((ev) => triggerOf(ev) ?? []);
   if (triggers.length === 0) return [];
   const gameIds = [...new Set(triggers.map((t) => t.gameId))];
-  // `left_at`/`done_at` — DATETIME без дробової частини: MySQL округлює до найближчої секунди,
-  // тож щойно записаний вихід може бути до 0,5 с «у майбутньому» для диспетчера, що обробляє
-  // подію одразу. Запас у секунду, щоб такий вихід уже враховувався (вікно, закрите < 1 с тому,
-  // ще дасть запрошення — нешкідливо).
-  const sets = await openRatingSets(q, gameIds, new Date(now.getTime() + ROUNDING_SLACK_MS));
+  const sets = await openRatingSets(q, gameIds, now);
   if (sets.length === 0) return [];
 
   const titleRows = await q

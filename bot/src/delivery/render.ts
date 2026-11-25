@@ -105,6 +105,10 @@ export function renderNotification(
     for (const m of missing) {
       if (m && lookup(dict, `${key}_${m}`) !== undefined) key = `${key}_${m}`;
     }
+    // Нагадування про дедлайн сесійного набору — з датою сесії.
+    if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
+      key = 'notify.rating.deadline_session';
+    }
     parts.push(t(key, vars));
     // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
     const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;

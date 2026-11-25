@@ -64,7 +64,7 @@ describe('renderNotification', () => {
     });
     expect(left.text).toBe(
       [
-        '⭐ Арагорн більше не грає в «Гра» — можеш оцінити вашу спільну гру.',
+        '⭐ Арагорн більше не грає в «Гра» — можеш оцінити цього гравця.',
         '',
         'Детальніше: https://nri.example/games/12/rate',
       ].join('\n'),
@@ -80,6 +80,18 @@ describe('renderNotification', () => {
       '⏳ Вікно оцінювання в грі «Гра» скоро закриється — ще встигнеш оцінити тих, з ким грав(-ла).',
     );
     expect(deadline.text).toContain(`Оцінити можна до ${formatWhen(closesAt)}.`);
+    const startsAt = '2026-11-27T17:00:00.000Z';
+    const sessionDeadline = render('rating.deadline', {
+      gameId: 12,
+      gameTitle: 'Гра',
+      sessionId: 56,
+      startsAt,
+      closesAt,
+    });
+    expect(sessionDeadline.text.split('\n')[0]).toBe(
+      `⏳ Вікно оцінювання сесії ${formatWhen(startsAt)} у грі «Гра» скоро закриється — ще встигнеш оцінити тих, з ким грав(-ла).`,
+    );
+    expect(sessionDeadline.text).toContain('https://nri.example/games/12/rate?session=56');
     expect(
       renderNotification('rating.deadline', { gameId: 12, closesAt }, null, {
         siteUrl: SITE,

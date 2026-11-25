@@ -66,7 +66,7 @@ export interface NotificationParams {
   gameTitle?: string | null;
   applicationId?: number;
   sessionId?: number;
-  /** Початок сесії (ISO UTC); для перенесення — новий час. */
+  /** Початок сесії (ISO UTC); для перенесення — новий час; у `rating.deadline` сесійного набору — дата тієї сесії. */
   startsAt?: string;
   /** Старий час перенесеної сесії (ISO UTC). */
   from?: string;
