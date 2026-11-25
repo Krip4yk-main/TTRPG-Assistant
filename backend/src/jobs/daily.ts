@@ -11,6 +11,7 @@ import {
   sessions,
   users,
 } from '../db/schema/index.js';
+import { purgeTelegramOutbox } from '../notifications/telegram-outbox.js';
 import { materializeSessions } from '../sessions/materialize.js';
 
 export const DAILY_JOB = 'maintenance.daily';
@@ -161,6 +162,7 @@ export async function runDaily(deps: AppDeps, now = new Date()): Promise<void> {
     ['purgePendingUsers', () => purgePendingUsers(deps, now)],
     ['purgeReadNotifications', () => purgeReadNotifications(deps, now)],
     ['purgeReminderLog', () => purgeReminderLog(deps, now)],
+    ['purgeTelegramOutbox', () => purgeTelegramOutbox(deps, now)],
   ];
   let failure: unknown;
   for (const [name, step] of steps) {

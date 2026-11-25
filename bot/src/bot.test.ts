@@ -9,7 +9,7 @@ const from = { id: 42, username: 'hero_tg', first_name: 'Hero' };
 
 function setup(match: string, result: LinkResult) {
   const reply = vi.fn<(text: string) => Promise<void>>(async () => undefined);
-  const client: BackendClient = { linkTelegram: vi.fn(async () => result) };
+  const client: Pick<BackendClient, 'linkTelegram'> = { linkTelegram: vi.fn(async () => result) };
   return { reply, client, ctx: { match, from, reply } };
 }
 
@@ -104,5 +104,44 @@ describe('createBackendClient', () => {
   it('network failure -> error', async () => {
     const { client } = make(new Error('down'));
     expect(await client.linkTelegram('t', 1, 'n')).toEqual({ ok: false, reason: 'error' });
+  });
+});
+
+describe('createBackendClient outbox', () => {
+  const make = (res: Response) => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => res);
+    return {
+      f,
+      client: createBackendClient('http://x/api/internal', 'k', f as unknown as typeof fetch),
+    };
+  };
+
+  it('claim POSTs the limit with the key and returns items', async () => {
+    const items = [
+      { id: 1, chatId: '5', kind: 'game.started', params: {}, buttons: null, attempts: 0 },
+    ];
+    const { f, client } = make(new Response(JSON.stringify({ items }), { status: 200 }));
+    expect(await client.claimOutbox(20)).toEqual(items);
+    const [url, init] = f.mock.calls[0]!;
+    expect(url).toBe('http://x/api/internal/telegram/outbox/claim');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['x-internal-key']).toBe('k');
+    expect(JSON.parse(init.body as string)).toEqual({ limit: 20 });
+  });
+
+  it('sent / failed hit the right paths; non-2xx throws', async () => {
+    const { f, client } = make(new Response(null, { status: 204 }));
+    await client.markSent(3);
+    await client.markFailed(4, { retryable: false, error: 'e' });
+    expect(f.mock.calls.map((c) => c[0])).toEqual([
+      'http://x/api/internal/telegram/outbox/3/sent',
+      'http://x/api/internal/telegram/outbox/4/failed',
+    ]);
+    expect(JSON.parse(f.mock.calls[1]![1].body as string)).toEqual({
+      retryable: false,
+      error: 'e',
+    });
+    const bad = make(new Response('{}', { status: 401 }));
+    await expect(bad.client.claimOutbox(1)).rejects.toThrow('backend responded 401');
   });
 });

@@ -1,0 +1,127 @@
+import {
+  NOTIFICATION_TYPES,
+  notificationLink,
+  type NotificationParams,
+  type NotificationType,
+  type TelegramButton,
+} from '@nri/shared';
+import uk from '../i18n/uk.json' with { type: 'json' };
+import { lookup, makeT, type Translate } from '../i18n/t.js';
+import { encodeCallback } from './callback-data.js';
+
+/** Ліміт Telegram на текст повідомлення, символи. */
+export const TELEGRAM_TEXT_MAX = 4096;
+/** Часовий пояс дат у повідомленнях (поки що один для всіх — аудиторія в Україні). */
+export const DEFAULT_TIME_ZONE = 'Europe/Kyiv';
+
+export type InlineButton = { text: string; callback_data: string };
+
+export type RenderOptions = {
+  /** Базова адреса сайту (фронтенду), без слеша в кінці, напр. `https://nri.example`. */
+  siteUrl: string;
+  t?: Translate;
+  dict?: Record<string, unknown>;
+  timeZone?: string;
+};
+
+export type Rendered = {
+  /** Простий текст: надсилається БЕЗ `parse_mode`, тож `<b>`, `&` тощо — просто символи. */
+  text: string;
+  /** Рядки inline-клавіатури; `undefined` — без кнопок. */
+  keyboard: InlineButton[][] | undefined;
+};
+
+const isType = (k: string): k is NotificationType =>
+  (NOTIFICATION_TYPES as readonly string[]).includes(k);
+
+/** `пт, 28 листопада о 19:00` у вказаному поясі; зіпсована дата — `null`. */
+export function formatWhen(iso: string | undefined, timeZone = DEFAULT_TIME_ZONE): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const date = new Intl.DateTimeFormat('uk-UA', {
+    timeZone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+  }).format(d);
+  const time = new Intl.DateTimeFormat('uk-UA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(d);
+  return `${date} о ${time}`;
+}
+
+/**
+ * Текст і кнопки Telegram-сповіщення з `kind` (тип) + `params` (знімок із бекенду):
+ * шаблон `notify.<type>` (варіант `_account_deleted` для причини `account_deleted`), для
+ * `game.finished` — подяка `thanks.<genreSlug>` (або `thanks.default`), у кінці — посилання
+ * на сайт. Значення підставляються як є — без HTML-розмітки (повідомлення йде без `parse_mode`).
+ */
+export function renderNotification(
+  kind: string,
+  params: NotificationParams,
+  buttons: TelegramButton[] | null,
+  opts: RenderOptions,
+): Rendered {
+  const dict = opts.dict ?? uk;
+  const t = opts.t ?? makeT(dict);
+  const tz = opts.timeZone ?? DEFAULT_TIME_ZONE;
+  const vars: Record<string, string> = {
+    game: params.gameTitle || t('notify.unknownGame'),
+    actor: params.actor?.nickname || t('notify.someone'),
+    when: formatWhen(params.startsAt, tz) ?? t('notify.unknownTime'),
+    from: formatWhen(params.from, tz) ?? t('notify.unknownTime'),
+    offset: offsetPhrase(params.offsetMin, t),
+  };
+
+  const parts: string[] = [];
+  if (isType(kind)) {
+    const variant = `notify.${kind}_${params.reason ?? ''}`;
+    const key =
+      params.reason === 'account_deleted' && lookup(dict, variant) !== undefined
+        ? variant
+        : `notify.${kind}`;
+    parts.push(t(key, vars));
+    if (kind === 'session.cancelled' && params.reason) {
+      parts.push(t('notify.reason', { reason: params.reason }));
+    }
+    if (kind === 'game.finished') {
+      const thanks = params.genreSlug ? lookup(dict, `thanks.${params.genreSlug}`) : undefined;
+      parts.push('', thanks ?? t('thanks.default'));
+    }
+    const url = `${opts.siteUrl.replace(/\/+$/, '')}${notificationLink(kind, params)}`;
+    parts.push('', t('notify.link', { url }));
+  } else {
+    parts.push(t('notify.generic'));
+  }
+
+  let text = parts.join('\n');
+  if (text.length > TELEGRAM_TEXT_MAX) text = `${text.slice(0, TELEGRAM_TEXT_MAX - 1)}…`;
+
+  const row = (buttons ?? []).map((b): InlineButton => ({
+    text: buttonText(b, t),
+    callback_data: encodeCallback(b),
+  }));
+  return { text, keyboard: row.length ? [row] : undefined };
+}
+
+function offsetPhrase(offsetMin: number | undefined, t: Translate): string {
+  if (offsetMin === undefined) return '';
+  const key = `notify.offset.${offsetMin}`;
+  const s = t(key);
+  return s === key ? t('notify.offset.other', { n: String(offsetMin) }) : s;
+}
+
+function buttonText(b: TelegramButton, t: Translate): string {
+  switch (b.action) {
+    case 'approve':
+      return t('notify.buttons.approve');
+    case 'reject':
+      return t('notify.buttons.reject');
+    case 'rsvp':
+      return t(b.value === 'going' ? 'notify.buttons.going' : 'notify.buttons.notGoing');
+  }
+}

@@ -3,6 +3,7 @@ import {
   bigint,
   datetime,
   index,
+  int,
   json,
   mysqlEnum,
   mysqlTable,
@@ -10,7 +11,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
-import type { NotificationCategory, NotificationParams } from '@nri/shared';
+import type { NotificationCategory, NotificationParams, TelegramButton } from '@nri/shared';
 import { gameSessions } from './sessions.js';
 import { users } from './users.js';
 
@@ -104,5 +105,49 @@ export const reminderLog = mysqlTable(
     ),
     index('reminder_log_user_id_idx').on(t.userId),
     index('reminder_log_sent_at_idx').on(t.sentAt),
+  ],
+);
+
+export const TELEGRAM_OUTBOX_STATUSES = ['pending', 'sent', 'failed'] as const;
+
+/**
+ * Черга Telegram-повідомлень (Task 4). Рядок ставиться в транзакції, що створила сповіщення,
+ * лише якщо в користувача є Telegram-ідентичність і категорія ввімкнена; UNIQUE(notification_id)
+ * — одне повідомлення на сповіщення. Бот забирає пачки через внутрішній API
+ * (`locked_until` — лок видачі), рендерить `kind` + `params` своїм i18n. `chat_id` — Telegram
+ * id користувача (приватний чат). Надіслані/невдалі, старші 30 днів, чистить щоденна задача.
+ */
+export const telegramOutbox = mysqlTable(
+  'telegram_outbox',
+  {
+    id: id('id').autoincrement().primaryKey(),
+    notificationId: id('notification_id')
+      .notNull()
+      .references(() => notifications.id, { onDelete: 'cascade' }),
+    userId: id('user_id').notNull(),
+    chatId: varchar('chat_id', { length: 32 }).notNull(),
+    kind: varchar('kind', { length: 64 }).notNull(),
+    params: json('params').$type<NotificationParams>().notNull(),
+    buttons: json('buttons').$type<TelegramButton[]>(),
+    status: mysqlEnum('status', TELEGRAM_OUTBOX_STATUSES).notNull().default('pending'),
+    attempts: int('attempts').notNull().default(0),
+    nextTryAt: datetime('next_try_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`),
+    lockedUntil: datetime('locked_until', { fsp: 3 }),
+    lastError: varchar('last_error', { length: 255 }),
+    createdAt: datetime('created_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`),
+    updatedAt: datetime('updated_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`)
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('telegram_outbox_notification_id_uq').on(t.notificationId),
+    index('telegram_outbox_status_next_try_at_idx').on(t.status, t.nextTryAt),
+    index('telegram_outbox_chat_id_status_idx').on(t.chatId, t.status),
+    index('telegram_outbox_updated_at_idx').on(t.updatedAt),
   ],
 );

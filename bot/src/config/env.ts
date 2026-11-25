@@ -4,6 +4,8 @@ const schema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1),
   BACKEND_INTERNAL_URL: z.url(),
   INTERNAL_API_KEY: z.string().min(32),
+  // Адреса сайту для посилань у сповіщеннях.
+  PUBLIC_BASE_URL: z.url().default('http://localhost:4200'),
 });
 export type BotEnv = z.infer<typeof schema>;
 

@@ -4,9 +4,11 @@ import { Bot } from 'grammy';
 import { createBackendClient } from './api/backend-client.js';
 import type { BackendClient } from './api/backend-client.js';
 import { loadEnv } from './config/env.js';
-import uk from './i18n/uk.json' with { type: 'json' };
+import { startPoller } from './delivery/poller.js';
+import { renderNotification } from './delivery/render.js';
+import { makeT, type Translate } from './i18n/t.js';
 
-export type Translate = (key: string, vars?: Record<string, string>) => string;
+export { makeT, type Translate };
 
 /** Мінімум від grammY-контексту, потрібний обробнику (спрощує тести). */
 export type StartCtx = {
@@ -15,19 +17,10 @@ export type StartCtx = {
   reply(text: string): Promise<unknown>;
 };
 
-export function makeT(dict: Record<string, unknown> = uk): Translate {
-  return (key, vars = {}) => {
-    let node: unknown = dict;
-    for (const part of key.split('.')) node = (node as Record<string, unknown> | undefined)?.[part];
-    if (typeof node !== 'string') return key;
-    return node.replace(/\{(\w+)\}/g, (m, name: string) => vars[name] ?? m);
-  };
-}
-
 /** `/start` без токена — привітання; `/start <token>` — прив'язка Telegram до акаунта. */
 export async function handleStart(
   ctx: StartCtx,
-  client: BackendClient,
+  client: Pick<BackendClient, 'linkTelegram'>,
   t: Translate,
 ): Promise<void> {
   const token = ctx.match.trim();
@@ -61,7 +54,19 @@ export async function main(): Promise<void> {
       err.error instanceof Error ? err.error.name : 'unknown',
     );
   });
-  const stop = (): void => void bot.stop();
+  // Доставка сповіщень: опитування черги бекенда кожні 3 с.
+  const poller = startPoller({
+    client,
+    api: bot.api,
+    render: (item) =>
+      renderNotification(item.kind, item.params, item.buttons, {
+        siteUrl: env.PUBLIC_BASE_URL,
+        t,
+      }),
+  });
+  const stop = (): void => {
+    void poller.stop().finally(() => void bot.stop());
+  };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   await bot.start({ onStart: (me) => console.log(`Бот @${me.username} запущено (long polling)`) });

@@ -1,3 +1,5 @@
+import type { TelegramOutboxFailedInput, TelegramOutboxItem } from '@nri/shared';
+
 export type LinkResult =
   | { ok: true; nickname: string }
   | { ok: false; reason: 'taken' | 'expired' | 'banned' | 'already' | 'error' };
@@ -8,7 +10,21 @@ export type BackendClient = {
     telegramId: number | string,
     displayName: string,
   ): Promise<LinkResult>;
+  /** Забирає пачку Telegram-повідомлень (лок на 2 хв). Кидає при збої. */
+  claimOutbox(limit: number): Promise<TelegramOutboxItem[]>;
+  /** Позначає повідомлення надісланим. Кидає при збої. */
+  markSent(id: number): Promise<void>;
+  /** Повідомляє про невдачу (тимчасову чи остаточну). Кидає при збої. */
+  markFailed(id: number, input: TelegramOutboxFailedInput): Promise<void>;
 };
+
+/** Помилка виклику внутрішнього API (лише статус — без URL і тіла). */
+export class BackendError extends Error {
+  constructor(readonly status: number) {
+    super(`backend responded ${status}`);
+    this.name = 'BackendError';
+  }
+}
 
 const REASONS: Record<string, 'taken' | 'expired' | 'banned' | 'already'> = {
   IDENTITY_TAKEN: 'taken',
@@ -24,7 +40,28 @@ export function createBackendClient(
   timeoutMs = 10_000,
 ): BackendClient {
   const base = baseUrl.replace(/\/+$/, '');
+  const post = async (path: string, body: unknown): Promise<Response> => {
+    const res = await fetchImpl(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-internal-key': apiKey },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new BackendError(res.status);
+    return res;
+  };
   return {
+    async claimOutbox(limit) {
+      const res = await post('/telegram/outbox/claim', { limit });
+      const data = (await res.json()) as { items?: TelegramOutboxItem[] };
+      return Array.isArray(data.items) ? data.items : [];
+    },
+    async markSent(id) {
+      await post(`/telegram/outbox/${id}/sent`, {});
+    },
+    async markFailed(id, input) {
+      await post(`/telegram/outbox/${id}/failed`, input);
+    },
     async linkTelegram(token, telegramId, displayName) {
       try {
         const res = await fetchImpl(`${base}/telegram/link`, {

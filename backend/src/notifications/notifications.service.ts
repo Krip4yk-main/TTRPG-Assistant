@@ -18,13 +18,14 @@ import type { Db } from '../db/client.js';
 import { notificationPrefs, notifications } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import type { NewNotification } from './recipients.js';
+import { enqueueTelegram } from './telegram-outbox.js';
 
 export type NotificationRow = typeof notifications.$inferSelect;
 type DbLike = Db | Tx;
 
 /**
- * Точка розширення: викликається в транзакції, що створила сповіщення (лише нові рядки).
- * Task 4 ставить тут рядки `telegram_outbox` (за прив'язкою Telegram і `prefs.telegram`).
+ * Викликається в транзакції, що створила сповіщення (лише нові рядки): ставить рядки
+ * `telegram_outbox` (за прив'язкою Telegram і `prefs.telegram`, див. `enqueueTelegram`).
  * Працює ВСЕРЕДИНІ транзакції пачки диспетчера (і транзакції викликача `createNotification`):
  * лише записи через `tx`, без мережевих викликів; помилка тут відкочує всю пачку — диспетчер
  * повторить події поодинці, а подію, що падає й сама, пропустить із `dispatch_error`.
@@ -34,10 +35,8 @@ export async function afterNotificationsCreated(
   rows: NotificationRow[],
   tx: DbLike,
 ): Promise<void> {
-  // no-op до Task 4 (telegram_outbox)
   void deps;
-  void rows;
-  void tx;
+  await enqueueTelegram(tx, rows);
 }
 
 const toInsert = (n: NewNotification) => ({

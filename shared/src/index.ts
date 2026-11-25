@@ -18,3 +18,4 @@ export * from './contracts/notes.js';
 export * from './contracts/events.js';
 export * from './contracts/appeals.js';
 export * from './contracts/notifications.js';
+export * from './contracts/telegram.js';
