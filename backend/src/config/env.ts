@@ -24,6 +24,8 @@ const schema = z.object({
   TELEGRAM_LOGIN_MAX_AGE_SEC: z.coerce.number().int().positive().default(86400),
   GOOGLE_CLIENT_ID: optional,
   GOOGLE_CLIENT_SECRET: optional,
+  DISCORD_CLIENT_ID: optional,
+  DISCORD_CLIENT_SECRET: optional,
   DEV_LOGIN_ENABLED: bool,
   DEV_OWNER_KEY: optional,
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),

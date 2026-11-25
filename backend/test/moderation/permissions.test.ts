@@ -27,6 +27,7 @@ const MATRIX: Record<StaffAction, [boolean, boolean, boolean, boolean]> = {
   'appeals.decide_ban': [false, false, true, true],
   'roles.moderator': [false, false, true, true],
   'log.view': [false, false, true, true],
+  'catalog.edit': [false, false, true, true],
   'roles.admin': [false, false, false, true],
   'owner.transfer': [false, false, false, true],
 };

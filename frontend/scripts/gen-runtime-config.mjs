@@ -26,6 +26,7 @@ const get = (key) => process.env[key] ?? fileVars[key] ?? '';
 const config = {
   telegramBotUsername: get('NG_APP_TELEGRAM_BOT_USERNAME').replace(/^@/, ''),
   googleLogin: get('NG_APP_GOOGLE_LOGIN') === 'true',
+  discordLogin: get('NG_APP_DISCORD_LOGIN') === 'true',
   devLogin: get('NG_APP_DEV_LOGIN') === 'true',
 };
 
@@ -35,6 +36,8 @@ export interface RuntimeConfig {
   readonly telegramBotUsername: string;
   /** Показувати вхід / прив'язку через Google. */
   readonly googleLogin: boolean;
+  /** Показувати вхід / прив'язку через Discord. */
+  readonly discordLogin: boolean;
   /** Показувати форму dev-входу. */
   readonly devLogin: boolean;
 }

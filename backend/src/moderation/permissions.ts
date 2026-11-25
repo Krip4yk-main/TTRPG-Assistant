@@ -13,7 +13,7 @@ export const ROLE_RANK: Record<Role, number> = { user: 0, moderator: 1, admin: 2
  *   `appeals.decide` (апеляції на ці санкції), `games.moderate` («Мертві ігри»: закрити гру чи
  *   зняти позначку, План 7) — модератор+;
  * - `sanctions.ban` (глобальний бан/розбан), `appeals.decide_ban`, `roles.moderator`
- *   (призначити/зняти модератора), `log.view` — адмін+;
+ *   (призначити/зняти модератора), `log.view`, `catalog.edit` (каталог систем, План 7) — адмін+;
  * - `roles.admin` (призначити/зняти адміна), `owner.transfer` — лише власник.
  */
 export type StaffAction =
@@ -27,6 +27,7 @@ export type StaffAction =
   | 'roles.moderator'
   | 'roles.admin'
   | 'log.view'
+  | 'catalog.edit'
   | 'owner.transfer';
 
 /** Мінімальна роль для кожної дії. */
@@ -40,6 +41,7 @@ export const ACTION_MIN_ROLE: Record<StaffAction, Role> = {
   'appeals.decide_ban': 'admin',
   'roles.moderator': 'admin',
   'log.view': 'admin',
+  'catalog.edit': 'admin',
   'roles.admin': 'owner',
   'owner.transfer': 'owner',
 };

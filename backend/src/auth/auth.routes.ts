@@ -145,7 +145,7 @@ export function authRouter(deps: AppDeps): Router {
     res.json({ identities: rows });
   });
 
-  // ---- OAuth (Google; Discord пізніше) ----
+  // ---- OAuth (Google, Discord) ----
   const providers = deps.oauthProviders ?? defaultOAuthProviders(env);
   const providerOf = (req: Request) => {
     const p = Object.hasOwn(providers, String(req.params.provider))

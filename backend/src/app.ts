@@ -13,6 +13,7 @@ import { loadSession, requireActive, requireAuth } from './auth/session.middlewa
 import { internalRouter } from './internal/internal.routes.js';
 import { usersRouter } from './users/users.routes.js';
 import { catalogRouter } from './catalog/catalog.routes.js';
+import { adminCatalogRouter } from './catalog/catalog.admin.routes.js';
 import { profileRouter, publicUsersRouter } from './profiles/profiles.routes.js';
 import { availabilityRouter } from './availability/availability.routes.js';
 import { calendarRouter } from './calendar/calendar.routes.js';
@@ -111,6 +112,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/admin/complaints', adminComplaintsRouter(deps));
   app.use('/api/admin/log', adminLogRouter(deps));
   app.use('/api/admin/dead-games', adminDeadGamesRouter(deps));
+  app.use('/api/admin/catalog', adminCatalogRouter(deps));
   app.use('/api/admin', adminSanctionsRouter(deps));
   app.use('/api/admin', adminRouter(deps));
   app.use('/api/og', ogRouter(deps));

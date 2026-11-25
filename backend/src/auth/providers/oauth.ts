@@ -11,9 +11,8 @@ export interface OAuthFlowParams {
 
 /**
  * Модульний OAuth2/OIDC-провайдер. Google — OIDC через `openid-client`
- * (discovery + перевірка ID Token). Discord (План 5) реалізує той самий інтерфейс,
- * але він не OIDC: там буде звичайний OAuth2-потік `openid-client`
- * (`authorizationCodeGrant` без `idTokenExpected`) + запит до userinfo-ендпоінта.
+ * (discovery + перевірка ID Token). Discord (План 7) — звичайний OAuth2 (code + PKCE)
+ * через `fetch` + `GET /api/users/@me`.
  */
 export interface OAuthProvider {
   id: 'google' | 'discord';

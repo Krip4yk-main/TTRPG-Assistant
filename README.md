@@ -42,10 +42,10 @@ npm run dev -w bot
 ```bash
 docker build -f backend/Dockerfile -t nri-backend .
 docker build -f bot/Dockerfile -t nri-bot .
-docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRAM_BOT_USERNAME=<bot_username>   --build-arg NG_APP_GOOGLE_LOGIN=true .
+docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRAM_BOT_USERNAME=<bot_username>   --build-arg NG_APP_GOOGLE_LOGIN=true   --build-arg NG_APP_DISCORD_LOGIN=true .
 ```
 
-Фронтенд налаштовується на етапі збірки (build args `NG_APP_TELEGRAM_BOT_USERNAME`, `NG_APP_GOOGLE_LOGIN`, `NG_APP_DEV_LOGIN`, останній за замовчуванням `false`), образ — nginx зі статикою на порту 8080 (SPA: `try_files … /index.html`). Бекенд слухає порт 3000. Запускайте контейнери з `docker run --init` (або `init: true` у compose), щоб сигнали та зомбі-процеси оброблялися коректно.
+Фронтенд налаштовується на етапі збірки (build args `NG_APP_TELEGRAM_BOT_USERNAME`, `NG_APP_GOOGLE_LOGIN`, `NG_APP_DISCORD_LOGIN`, `NG_APP_DEV_LOGIN`, останній за замовчуванням `false`), образ — nginx зі статикою на порту 8080 (SPA: `try_files … /index.html`). Бекенд слухає порт 3000. Запускайте контейнери з `docker run --init` (або `init: true` у compose), щоб сигнали та зомбі-процеси оброблялися коректно.
 
 ### Змінні середовища
 
@@ -61,6 +61,7 @@ docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRA
 - `PUBLIC_BASE_URL` — публічний https-URL застосунку; `IDENTITY_PEPPER`, `INTERNAL_API_KEY` — унікальні випадкові значення (≥32 символи, `openssl rand -base64 32`), `INTERNAL_API_KEY` однаковий у backend і bot. Бот теж потребує `PUBLIC_BASE_URL` (посилання в Telegram-сповіщеннях): з `NODE_ENV=production` (так у `bot/Dockerfile`) без нього бот не стартує — локальна заглушка `http://localhost:4200` діє лише в dev/test.
 - `IDENTITY_PEPPER` **ніколи не змінюйте** після запуску: ротація анулює всі надгробки ідентичностей, зокрема бани видалених акаунтів;
 - Redis у production — лише в приватній мережі і **з автентифікацією** (`requirepass` або ACL-користувач, `REDIS_URL=redis://user:password@host:6379`): бекенд довіряє вмісту Redis (кеш сесій, надгробки відкликаних сесій, OAuth state), тож доступ до Redis рівнозначний доступу до будь-якого акаунта;
+- вхід через Google / Discord — необов'язковий: задайте `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` чи `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` (redirect URI — `${PUBLIC_BASE_URL}/api/auth/<google|discord>/callback`) і збирайте фронтенд з відповідним `NG_APP_GOOGLE_LOGIN=true` / `NG_APP_DISCORD_LOGIN=true`; без змінних ендпоінти провайдера відповідають NOT_FOUND;
 - MySQL і Redis не публікуйте назовні: локальний `docker-compose.yml` прив'язує їхні порти лише до `127.0.0.1`.
 
 ### Reverse proxy

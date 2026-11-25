@@ -7,7 +7,8 @@ import { assertCan, type Role } from './permissions.js';
 import { refsOf } from './sanctions.service.js';
 
 /** Цілі записів журналу. */
-export type LogTargetType = 'user' | 'complaint' | 'sanction' | 'appeal' | 'rating' | 'game';
+export type LogTargetType =
+  'user' | 'complaint' | 'sanction' | 'appeal' | 'rating' | 'game' | 'game_system';
 
 export interface LogEntry {
   /** `null` — система (задача строків тощо). */
