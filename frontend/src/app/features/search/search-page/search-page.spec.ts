@@ -66,6 +66,7 @@ function card(id: number): SearchGameCardDto {
     kind: 'oneshot',
     language: 'uk',
     status: 'recruiting',
+    gmRating: null,
   };
 }
 

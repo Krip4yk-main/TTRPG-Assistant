@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GameCardDto, RestrictedGameDto } from './games.js';
+import type { UserRatingsDto } from './ratings.js';
 import type { UserStatus } from './me.js';
 
 export const EXPERIENCE_LEVELS = ['none', 'beginner', 'intermediate', 'veteran'] as const;
@@ -65,7 +66,7 @@ export type ProfileInput = z.input<typeof profileInputSchema>;
 
 /**
  * Публічний профіль (`GET /api/users/:publicId`). Приховані поля відсутні в JSON.
- * Видалений користувач — лише `{ publicId, status: 'deleted' }`.
+ * Видалений користувач — лише `{ publicId, status: 'deleted', ratings }` (рейтинги — `null`).
  */
 export interface PublicProfileDto {
   publicId: string;
@@ -85,4 +86,6 @@ export interface PublicProfileDto {
   gamesAsGm?: (GameCardDto | RestrictedGameDto)[];
   /** Ігри, де користувач — учасник (`game_members`); ті самі правила. */
   gamesAsPlayer?: (GameCardDto | RestrictedGameDto)[];
+  /** Опубліковані рейтинги (лише зрізи пачок); видалений користувач — усі `null`. */
+  ratings: UserRatingsDto;
 }

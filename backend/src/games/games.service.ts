@@ -32,8 +32,10 @@ import {
   gameSessions,
   gameSystems,
   genres,
+  publishedRatings,
   users,
 } from '../db/schema/index.js';
+import { publishedOverall, round1 } from '../ratings/ratings.aggregate.js';
 import {
   applyAgeRatingRaise,
   cancelPendingForGames,
@@ -74,6 +76,11 @@ export interface Loaded {
   memberCount: number;
   /** Матеріалізовані сесії; `null` — у гри їх немає (тоді найближча — з правила). */
   sessions: SessionStats | null;
+  /**
+   * Опублікований загальний рейтинг майстра як у БД (2 знаки; ключ сортування `gm_rating`);
+   * `null` — немає зрізу.
+   */
+  gmOverall: number | null;
 }
 
 /** Зведення матеріалізованих сесій гри для `nextSessionAt`. */
@@ -105,10 +112,16 @@ export async function loadGames(
       gmNickname: users.nickname,
       gmAvatarUrl: users.avatarUrl,
       systemName: gameSystems.name,
+      gmOverall: publishedRatings.overall,
+      gmUnits: publishedRatings.units,
     })
     .from(games)
     .innerJoin(users, eq(users.id, games.gmUserId))
     .leftJoin(gameSystems, eq(gameSystems.id, games.systemId))
+    .leftJoin(
+      publishedRatings,
+      and(eq(publishedRatings.userId, games.gmUserId), eq(publishedRatings.role, 'gm')),
+    )
     .where(where)
     .orderBy(...order);
   const rows = await (limit === undefined ? query : query.limit(limit));
@@ -138,6 +151,7 @@ export async function loadGames(
     systemName: r.systemName,
     memberCount: byGame.get(r.row.id) ?? 0,
     sessions: stats.get(r.row.id) ?? null,
+    gmOverall: publishedOverall(r.gmOverall, r.gmUnits),
   }));
 }
 
@@ -282,6 +296,7 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
     cancelledAt: iso(l.row.cancelledAt),
     createdAt: l.row.createdAt.toISOString(),
     updatedAt: l.row.updatedAt.toISOString(),
+    gmRating: l.gmOverall === null ? null : round1(l.gmOverall),
   };
 }
 
@@ -306,6 +321,7 @@ export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
     kind: r.kind,
     language: r.language,
     status: r.status,
+    gmRating: l.gmOverall === null ? null : round1(l.gmOverall),
   };
 }
 

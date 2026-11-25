@@ -29,6 +29,7 @@ const card: GameCardDto = {
   kind: 'campaign',
   language: 'uk',
   status: 'recruiting',
+  gmRating: null,
 };
 
 const base: MyApplicationDto = {

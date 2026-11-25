@@ -39,7 +39,7 @@ import type { AppDeps } from '../app.js';
 import type { SessionUser } from '../auth/session.service.js';
 import { getAvailability } from '../availability/availability.service.js';
 import { gameBusyIntervals, type GameBusy } from '../calendar/game-busy.service.js';
-import { gameContentWarnings, gameMembers, games } from '../db/schema/index.js';
+import { gameContentWarnings, gameMembers, games, publishedRatings } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { loadGames, resolveViewer, toCardDto, type Loaded } from './games.service.js';
 import { toCardView, viewerAge, type Viewer } from './games.visibility.js';
@@ -56,8 +56,9 @@ const DATE_ONLY_FROM_SPAN_MS = 366 * DAY_MS;
 
 /**
  * Курсор — непрозорий токен: AES-256-GCM над JSON `{ s, r, k, id }` (сортування, ранг
- * статусу (0 — набір, 1 — гра вже йде), ключ сортування останнього виданого рядка (ISO)
- * та його id), base64url(`iv | tag | шифротекст`).
+ * статусу (0 — набір, 1 — гра вже йде), ключ сортування останнього виданого рядка (ISO; для
+ * `gm_rating` — опублікований рейтинг майстра як у БД або `null`) та його id),
+ * base64url(`iv | tag | шифротекст`).
  * Шифрування не дає вичитати `starts_at`/`published_at` прихованої (18+/21+) гри.
  * Ключ — HKDF-SHA256 від `IDENTITY_PEPPER` з окремою міткою. Підроблений, сміттєвий
  * курсор чи курсор іншого сортування → 400.
@@ -66,10 +67,11 @@ const cursorSchema = z
   .object({
     s: z.enum(SEARCH_SORTS),
     r: z.union([z.literal(0), z.literal(1)]),
-    k: z.iso.datetime(),
+    k: z.union([z.iso.datetime(), z.number().min(0).max(9.99), z.null()]),
     id: z.number().int().positive(),
   })
-  .strict();
+  .strict()
+  .refine((c) => (c.s === 'gm_rating' ? typeof c.k !== 'string' : typeof c.k === 'string'));
 type Cursor = z.output<typeof cursorSchema>;
 
 const IV_BYTES = 12;
@@ -87,9 +89,12 @@ function cursorKey(deps: AppDeps): Buffer {
   return key;
 }
 
-function sortKey(row: Loaded['row'], sort: SearchSort): Date {
+type SortKey = Date | number | null;
+
+function sortKey(l: Loaded, sort: SearchSort): SortKey {
+  if (sort === 'gm_rating') return l.gmOverall;
   // Видимі ігри (recruiting/started) завжди опубліковані — `published_at` не NULL.
-  return sort === 'soonest' ? row.startsAt : row.publishedAt!;
+  return sort === 'soonest' ? l.row.startsAt : l.row.publishedAt!;
 }
 
 /** Ранг статусу: ігри, що вже йдуть (`started`), — після всіх, що набирають гравців. */
@@ -97,18 +102,19 @@ function statusRank(row: Loaded['row']): 0 | 1 {
   return row.status === 'started' ? 1 : 0;
 }
 
-type After = { r: 0 | 1; k: Date; id: number };
+type After = { r: 0 | 1; k: SortKey; id: number };
 
-function afterOf(row: Loaded['row'], sort: SearchSort): After {
-  return { r: statusRank(row), k: sortKey(row, sort), id: row.id };
+function afterOf(l: Loaded, sort: SearchSort): After {
+  return { r: statusRank(l.row), k: sortKey(l, sort), id: l.row.id };
 }
 
-function encodeCursor(deps: AppDeps, row: Loaded['row'], sort: SearchSort): string {
+function encodeCursor(deps: AppDeps, l: Loaded, sort: SearchSort): string {
+  const k = sortKey(l, sort);
   const c: Cursor = {
     s: sort,
-    r: statusRank(row),
-    k: sortKey(row, sort).toISOString(),
-    id: row.id,
+    r: statusRank(l.row),
+    k: k instanceof Date ? k.toISOString() : k,
+    id: l.row.id,
   };
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv('aes-256-gcm', cursorKey(deps), iv);
@@ -144,28 +150,52 @@ function decodeCursor(deps: AppDeps, raw: string, sort: SearchSort): Cursor {
  * за `nextSessionAt`: так порядок стабільний у SQL і курсор не «пливе» з часом. Кампанії,
  * що вже йдуть (`started`), завдяки рангу статусу стоять у КІНЦІ списку, хоч їхня перша
  * сесія й у минулому; кампанії в наборі з першою сесією в минулому — на початку свого рангу.
- * `newest` — за `published_at` спадно. Нічиї — за id у тому ж напрямку.
+ * `newest` — за `published_at` спадно. `gm_rating` — за опублікованим рейтингом майстра
+ * спадно, ігри майстрів без рейтингу — після (у межах рангу статусу). Нічиї — за id у тому ж
+ * напрямку (для `soonest` — зростання, для інших — спадання).
  * Порядок свідомо лишається за правилом розкладу: `nextSessionAt` у картках береться з
  * матеріалізованих сесій (перенесення/скасування враховано), тож для гри з перенесеною
  * найближчою сесією порядок і показана дата можуть трохи розходитися.
  */
 const rankSql = sql<number>`(case when ${games.status} = 'started' then 1 else 0 end)`;
 
+const gmOverallSql = publishedRatings.overall;
+
 function ordering(sort: SearchSort) {
   const withRank = (within: (c: After) => SQL | undefined) => (c: After) =>
     or(sql`${rankSql} > ${c.r}`, and(sql`${rankSql} = ${c.r}`, within(c)));
+  const date = (k: SortKey) => k as Date;
   if (sort === 'soonest') {
     return {
       order: [asc(rankSql), asc(games.startsAt), asc(games.id)],
       after: withRank((c) =>
-        or(gt(games.startsAt, c.k), and(eq(games.startsAt, c.k), gt(games.id, c.id))),
+        or(gt(games.startsAt, date(c.k)), and(eq(games.startsAt, date(c.k)), gt(games.id, c.id))),
+      ),
+    };
+  }
+  if (sort === 'gm_rating') {
+    // `overall` — DECIMAL(3,2): ключ курсора порівнюємо як той самий тип, без похибки double.
+    const k = (c: After) => sql`cast(${c.k} as decimal(3,2))`;
+    return {
+      order: [asc(rankSql), sql`${gmOverallSql} is null`, desc(gmOverallSql), desc(games.id)],
+      after: withRank((c) =>
+        c.k === null
+          ? and(isNull(gmOverallSql), lt(games.id, c.id))
+          : or(
+              isNull(gmOverallSql),
+              sql`${gmOverallSql} < ${k(c)}`,
+              and(sql`${gmOverallSql} = ${k(c)}`, lt(games.id, c.id)),
+            ),
       ),
     };
   }
   return {
     order: [asc(rankSql), desc(games.publishedAt), desc(games.id)],
     after: withRank((c) =>
-      or(lt(games.publishedAt, c.k), and(eq(games.publishedAt, c.k), lt(games.id, c.id))),
+      or(
+        lt(games.publishedAt, date(c.k)),
+        and(eq(games.publishedAt, date(c.k)), lt(games.id, c.id)),
+      ),
     ),
   };
 }
@@ -366,7 +396,7 @@ export async function searchGames(
   let after: After | null = null;
   if (f.cursor !== undefined) {
     const c = decodeCursor(deps, f.cursor, f.sort);
-    after = { r: c.r, k: new Date(c.k), id: c.id };
+    after = { r: c.r, k: typeof c.k === 'string' ? new Date(c.k) : c.k, id: c.id };
   }
   const now = new Date();
   const [availability, viewer, busy] = await Promise.all([
@@ -410,15 +440,15 @@ export async function searchGames(
       exhausted = true;
       break;
     }
-    after = afterOf(last!.row, f.sort);
+    after = afterOf(last!, f.sort);
   }
 
   let nextCursor: string | null = null;
   if (picked.length > f.limit) {
     picked.length = f.limit;
-    nextCursor = encodeCursor(deps, picked.at(-1)!.l.row, f.sort);
+    nextCursor = encodeCursor(deps, picked.at(-1)!.l, f.sort);
   } else if (!exhausted && last) {
-    nextCursor = encodeCursor(deps, last.row, f.sort);
+    nextCursor = encodeCursor(deps, last, f.sort);
   }
 
   const items = picked.map(({ l, fit }) => {

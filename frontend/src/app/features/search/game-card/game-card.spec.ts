@@ -27,6 +27,7 @@ const game: SearchGameCardDto = {
   kind: 'campaign',
   language: 'uk',
   status: 'recruiting',
+  gmRating: null,
   fit: 'partial',
 };
 

@@ -44,6 +44,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
     kind: 'oneshot',
     language: 'uk',
     status,
+    gmRating: null,
     minPlayers: 2,
     memberCount: 1,
     pendingApplications: 0,

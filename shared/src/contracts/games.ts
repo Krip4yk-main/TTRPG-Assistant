@@ -229,6 +229,11 @@ export interface GameCardDto {
   kind: GameKind;
   language: GameLanguage;
   status: GameStatus;
+  /**
+   * Опублікований загальний рейтинг майстра (1 знак після коми); `null` — ще немає
+   * (менше 5 одиниць). Деталі (критерії, кількість) — лише в профілі.
+   */
+  gmRating: number | null;
 }
 
 /** Картка «Мої ігри» (`GET /api/games/mine`, лише майстру): склад і нові заявки. */
@@ -287,6 +292,8 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Опублікований загальний рейтинг майстра (див. `GameCardDto.gmRating`). */
+  gmRating: number | null;
   /** Лише у `GET /api/games/:id` для автентифікованого глядача. */
   viewer?: GameViewerDto;
   /**
@@ -310,7 +317,11 @@ export const isRestrictedGame = (g: object): g is RestrictedGameDto =>
 
 // ---------- пошук ----------
 
-export const SEARCH_SORTS = ['soonest', 'newest'] as const;
+/**
+ * `gm_rating` — за опублікованим рейтингом майстра спадно (ігри майстрів без рейтингу — після);
+ * як і в інших сортуваннях, ігри, що вже йдуть, — у кінці.
+ */
+export const SEARCH_SORTS = ['soonest', 'newest', 'gm_rating'] as const;
 export type SearchSort = (typeof SEARCH_SORTS)[number];
 
 export const PRICE_MODES = ['any', 'free', 'paid'] as const;

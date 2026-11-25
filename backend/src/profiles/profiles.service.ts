@@ -13,6 +13,8 @@ import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
 import { listProfileGames } from '../games/games.service.js';
 import type { Viewer } from '../games/games.visibility.js';
+import { NO_RATINGS } from '../ratings/ratings.aggregate.js';
+import { userRatings } from '../ratings/ratings.service.js';
 
 type ProfileRow = Omit<typeof userProfiles.$inferSelect, 'userId'>;
 export type ProfilePatch = z.output<typeof profileInputSchema>;
@@ -102,7 +104,9 @@ export async function getPublicProfile(
 ): Promise<PublicProfileDto> {
   const [u] = await deps.db.select().from(users).where(eq(users.publicId, publicId));
   if (!u || u.status === 'pending') throw new AppError(404, 'NOT_FOUND');
-  if (u.status === 'deleted') return { publicId: u.publicId, status: 'deleted' };
+  if (u.status === 'deleted') {
+    return { publicId: u.publicId, status: 'deleted', ratings: { ...NO_RATINGS } };
+  }
   const row = await loadRow(deps, u.id);
   const visible = resolvePrivacy(row.privacy);
   const dto: PublicProfileDto = {
@@ -110,6 +114,7 @@ export async function getPublicProfile(
     nickname: u.nickname,
     avatarUrl: u.avatarUrl,
     status: u.status,
+    ratings: await userRatings(deps, u.id),
   };
   if (visible.bio && row.bio !== null) dto.bio = row.bio;
   if (visible.city && row.city !== null) dto.city = row.city;

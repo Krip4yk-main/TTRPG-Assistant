@@ -52,6 +52,7 @@ const game: GameCardDto = {
   kind: 'campaign',
   language: 'uk',
   status: 'recruiting',
+  gmRating: null,
 };
 
 describe('ProfilePage', () => {
@@ -114,6 +115,7 @@ describe('ProfilePage', () => {
       experience: 'veteran',
       gamesAsGm: [game],
       gamesAsPlayer: [],
+      ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
     });
     const text = el().textContent!;
     expect(el().querySelector('h1')!.textContent).toContain('Gandalf');
@@ -139,6 +141,7 @@ describe('ProfilePage', () => {
       preferredFormats: [],
       gamesAsGm: [],
       gamesAsPlayer: [],
+      ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
     });
     expect(el().querySelector('[data-field="bio"]')!.textContent).toContain('Люблю хоррор');
     expect(el().querySelector('[data-field="city"]')!.textContent).toContain('Львів');
@@ -149,7 +152,11 @@ describe('ProfilePage', () => {
   });
 
   it('a deleted user shows only "deleted user" and is not indexed', async () => {
-    await open(null, 'xxxxxxxxxx', { publicId: 'xxxxxxxxxx', status: 'deleted' });
+    await open(null, 'xxxxxxxxxx', {
+      publicId: 'xxxxxxxxxx',
+      status: 'deleted',
+      ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
+    });
     expect(el().querySelector('h1')!.textContent).toContain('user.deleted');
     expect(el().querySelector('[data-field]')).toBeNull();
     expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');

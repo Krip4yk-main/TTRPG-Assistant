@@ -10,6 +10,7 @@ import {
   games,
   gameSystems,
   genres,
+  publishedRatings,
 } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from './fixtures.js';
@@ -536,5 +537,113 @@ describe('POST /api/games/search — paging and visibility', () => {
       ['ageRating', 'gm', 'id', 'restricted', 'title'].sort(),
     );
     expect(res.body.items[0]).toMatchObject({ id, restricted: true, ageRating: '18+' });
+  });
+});
+
+describe('POST /api/games/search — gm_rating', () => {
+  /** Майстер з опублікованим рейтингом (`overall` — як у БД, 2 знаки). */
+  async function gmWith(overall: number | null, units = 5): Promise<number> {
+    const u = await createUser(db, { nickname: `Gm ${overall}` });
+    if (overall !== null || units > 0) {
+      await db.insert(publishedRatings).values({
+        userId: u.id,
+        role: 'gm',
+        overall,
+        overallUnits: units,
+        units,
+        criteria: {},
+        lastRatingId: 1,
+        publishedAt: new Date(),
+      });
+    }
+    return u.id;
+  }
+
+  async function collect(body: object) {
+    const pages: number[][] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await search({ ...body, ...(cursor ? { cursor } : {}) });
+      expect(res.status).toBe(200);
+      pages.push(ids(res));
+      cursor = res.body.nextCursor;
+    } while (cursor && pages.length < 20);
+    return pages;
+  }
+
+  it('orders by GM rating desc, unrated after, running campaigns last; cursor across pages', async () => {
+    const top = await gmWith(4.85);
+    const mid = await gmWith(4.25);
+    const placeholder = await gmWith(null, 0); // заготовка без зрізу — як без рейтингу
+    const none = await createUser(db, { nickname: 'New Gm' });
+    const a = await insertGame({ gmUserId: mid });
+    const b = await insertGame({ gmUserId: top });
+    const c = await insertGame({ gmUserId: mid }); // нічия з `a` → за id спадно
+    const d = await insertGame({ gmUserId: none.id });
+    const e = await insertGame({ gmUserId: placeholder });
+    const running = await insertGame({
+      gmUserId: top,
+      status: 'started',
+      showWhenFull: true,
+      recurrence: 'weekly',
+      weekdays: [0],
+      startsAt: new Date(Date.now() - 20 * DAY_MS),
+    });
+    const runningUnrated = await insertGame({
+      gmUserId: none.id,
+      status: 'started',
+      showWhenFull: true,
+      recurrence: 'weekly',
+      weekdays: [0],
+      startsAt: new Date(Date.now() - 20 * DAY_MS),
+    });
+    const expected = [b, c, a, e, d, running, runningUnrated];
+    const all = await search({ sort: 'gm_rating' });
+    expect(ids(all)).toEqual(expected);
+    expect(all.body.items.map((i: { gmRating: number | null }) => i.gmRating)).toEqual([
+      4.9,
+      4.3,
+      4.3,
+      null,
+      null,
+      4.9,
+      null,
+    ]);
+    for (const limit of [1, 2, 3]) {
+      const pages = await collect({ sort: 'gm_rating', limit });
+      expect(pages.flat()).toEqual(expected);
+    }
+    // Курсор іншого сортування — 400.
+    const first = await search({ sort: 'gm_rating', limit: 1 });
+    expect((await search({ sort: 'soonest', cursor: first.body.nextCursor })).status).toBe(400);
+    const soon = await search({ sort: 'soonest', limit: 1 });
+    expect((await search({ sort: 'gm_rating', cursor: soon.body.nextCursor })).status).toBe(400);
+  });
+
+  it('gmRating on cards and details; null below 5 units; no rating on a restricted card', async () => {
+    const rated = await gmWith(3.95);
+    const few = await gmWith(4.7, 4);
+    const g = await insertGame({ gmUserId: rated });
+    const h = await insertGame({ gmUserId: few });
+    const adult = await insertGame({ gmUserId: rated, ageRating: '18+' });
+    const res = await search({ sort: 'gm_rating' });
+    const byId = new Map(res.body.items.map((i: { id: number }) => [i.id, i]));
+    expect(byId.get(g)).toMatchObject({ gmRating: 4 });
+    expect(byId.get(h)).toMatchObject({ gmRating: null });
+    expect(byId.get(adult)).not.toHaveProperty('gmRating');
+    expect(Object.keys(byId.get(adult) as object).sort()).toEqual(
+      ['ageRating', 'gm', 'id', 'restricted', 'title'].sort(),
+    );
+    const details = await call('get', `/api/games/${g}`);
+    expect(details.status).toBe(200);
+    expect(details.body.gmRating).toBe(4);
+    expect((await call('get', `/api/games/${h}`)).body.gmRating).toBeNull();
+    const restricted = await call('get', `/api/games/${adult}`);
+    expect(restricted.body).not.toHaveProperty('gmRating');
+    // Картка — лише загальна: ні кількості, ні критеріїв, ні полів окремих оцінок.
+    const json = JSON.stringify(res.body);
+    for (const leak of ['units', 'criteria', 'raterId', 'comment', 'lastRatingId']) {
+      expect(json).not.toContain(leak);
+    }
   });
 });

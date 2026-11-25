@@ -1,17 +1,21 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   criteriaForRole,
+  RATING_BATCH_UNITS,
+  RATING_MIN_UNITS,
   ratingInputSchema,
   type RatingInput,
   type RatingRole,
   type RatingTargetDto,
+  type UserRatingsDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import type { Tx } from '../applications/applications.rules.js';
 import { isDuplicateKey } from '../db/errors.js';
-import { games, ratings, users } from '../db/schema/index.js';
+import { games, publishedRatings, ratings, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
+import { computeRating, toPublishedDto } from './ratings.aggregate.js';
 import {
   accessRatingGame,
   assertSessionOfGame,
@@ -21,12 +25,85 @@ import {
 } from './ratings.eligibility.js';
 
 /**
- * Перевірка пачки й публікація зрізу рейтингу (Task 3). Викликається в транзакції збереження
- * оцінки; `true` — зріз опубліковано (після коміту — подія `rating.published`).
+ * Блокує рядок зрізу (`published_ratings`) для (людина, роль) — X-лок до кінця транзакції;
+ * відсутній рядок створюється заготовкою (`units` = 0, `overall` NULL). INSERT … ON DUPLICATE
+ * KEY UPDATE бере X-лок і на вже наявному рядку, тож паралельні вставки заготовки не падають
+ * з дублем і не впираються в дедлок апгрейду S→X (як було б з «INSERT, дубль → SELECT FOR
+ * UPDATE»). Повертає поточну кількість опублікованих одиниць.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- заглушка до Task 3, підпис фіксований
+export async function lockPublished(tx: Tx, userId: number, role: RatingRole): Promise<number> {
+  await tx
+    .insert(publishedRatings)
+    .values({ userId, role })
+    .onDuplicateKeyUpdate({ set: { units: sql`${publishedRatings.units}` } });
+  const [row] = await tx
+    .select({ units: publishedRatings.units })
+    .from(publishedRatings)
+    .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)))
+    .for('update');
+  return row!.units;
+}
+
+/**
+ * Перевірка пачки й публікація зрізу рейтингу. Викликається в транзакції збереження оцінки
+ * (після INSERT); `true` — зріз опубліковано (після коміту — подія `rating.published`).
+ * Поточні одиниці — за всіма не-відмовами (людина, роль); публікація, якщо одиниць ≥ 5 і
+ * з'явилось ≥ 5 нових від останнього зрізу (без зрізу — 0, тож перша — рівно від 5).
+ * Серіалізація паралельних оцінок — лок рядка зрізу (`lockPublished`); `submitRating` бере
+ * його ДО першого неблокуючого читання, щоб знімок транзакції бачив усі оцінки, закомічені
+ * попереднім власником лока.
+ */
 export async function maybePublish(tx: Tx, userId: number, role: RatingRole): Promise<boolean> {
-  return false;
+  const publishedUnits = await lockPublished(tx, userId, role);
+  const rows = await tx
+    .select({
+      id: ratings.id,
+      raterId: ratings.raterId,
+      gameId: ratings.gameId,
+      overall: ratings.overall,
+      criteria: ratings.criteria,
+    })
+    .from(ratings)
+    .where(and(eq(ratings.rateeId, userId), eq(ratings.role, role), eq(ratings.declined, false)));
+  const scored = rows.filter((r) => r.overall !== null).map((r) => ({ ...r, overall: r.overall! }));
+  const computed = computeRating(scored);
+  if (computed.units < RATING_MIN_UNITS) return false;
+  if (computed.units - publishedUnits < RATING_BATCH_UNITS) return false;
+  const lastRatingId = scored.reduce((m, r) => Math.max(m, r.id), 0);
+  await tx
+    .update(publishedRatings)
+    .set({
+      overall: computed.overall,
+      overallUnits: computed.overallUnits,
+      criteria: computed.criteria,
+      units: computed.units,
+      lastRatingId,
+      publishedAt: new Date(),
+    })
+    .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)));
+  return true;
+}
+
+/** Опубліковані рейтинги людини (профіль): лише зрізи; менше 5 одиниць — `null`. */
+export async function userRatings(
+  deps: Pick<AppDeps, 'db'>,
+  userId: number,
+): Promise<UserRatingsDto> {
+  const rows = await deps.db
+    .select({
+      role: publishedRatings.role,
+      overall: publishedRatings.overall,
+      units: publishedRatings.units,
+      criteria: publishedRatings.criteria,
+    })
+    .from(publishedRatings)
+    .where(eq(publishedRatings.userId, userId));
+  const by = new Map(rows.map((r) => [r.role, r]));
+  return {
+    gm: toPublishedDto(by.get('gm')),
+    playerFromGm: toPublishedDto(by.get('player_from_gm')),
+    playerFromPlayer: toPublishedDto(by.get('player_from_player')),
+  };
 }
 
 /**
@@ -85,6 +162,8 @@ export async function submitRating(
       .where(eq(games.id, gameId))
       .for('share');
     if (!locked) throw new AppError(404, 'NOT_FOUND');
+    // Лок зрізу — до першого неблокуючого SELECT (див. `maybePublish`).
+    await lockPublished(tx, ratee.id, role);
     const sets = await candidateSetsFor(tx, locked, raterId, now);
     const set = sets.find((s) => s.sessionId === sessionId);
     if (!set || !set.rateeIds.includes(ratee.id)) throw new AppError(403, 'RATING_NOT_ALLOWED');

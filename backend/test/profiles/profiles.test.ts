@@ -3,7 +3,9 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { createSession } from '../../src/auth/session.service.js';
-import { events, gameMembers, gameSystems } from '../../src/db/schema/index.js';
+import { events, gameMembers, gameSystems, ratings } from '../../src/db/schema/index.js';
+import { maybePublish } from '../../src/ratings/ratings.service.js';
+import { ratingFixtures } from '../ratings/fixtures.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
 
@@ -83,7 +85,11 @@ describe('profiles', () => {
     const u = await createUser(db, { status: 'deleted' });
     const res = await request(app).get(`/api/users/${u.publicId}`);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ publicId: u.publicId, status: 'deleted' });
+    expect(res.body).toEqual({
+      publicId: u.publicId,
+      status: 'deleted',
+      ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
+    });
   });
 
   it('unknown publicId is 404', async () => {
@@ -224,5 +230,59 @@ describe('profile games', () => {
     const seen = (await request(app).get(`/api/users/${gm.publicId}`).set('Cookie', adult.cookie))
       .body;
     expect(seen.gamesAsGm[0].restricted).toBeUndefined();
+  });
+});
+
+describe('profile ratings (Review Focus 5)', () => {
+  const fx = ratingFixtures(db);
+
+  /** `n` оцінювачів, кожен в окремій грі майстра → `n` одиниць ролі `role`. */
+  async function rated(ratee: number, gmOf: number, n: number, role: 'gm' | 'player_from_gm') {
+    const raters = [];
+    for (let i = 0; i < n; i++) {
+      const r = await createUser(db, { nickname: `Rater-${role}-${i}` });
+      const g = await fx.game(gmOf);
+      await db.insert(ratings).values({
+        raterId: role === 'gm' ? r.id : gmOf,
+        rateeId: ratee,
+        gameId: g,
+        kind: 'final',
+        role,
+        overall: i % 2 ? 5 : 4,
+        criteria: role === 'gm' ? { preparation: 5, safety: i < 4 ? 2 : undefined } : null,
+        comment: `секрет-${i}`,
+      });
+      raters.push(r);
+    }
+    await db.transaction((tx) => maybePublish(tx, ratee, role));
+    return raters;
+  }
+
+  it('shows published GM rating with criteria ≥5 units; nothing below 5; no raw fields', async () => {
+    const gm = await createUser(db, { nickname: 'Gm' });
+    const player = await createUser(db, { nickname: 'Player' });
+    const raters = await rated(gm.id, gm.id, 5, 'gm');
+    // Лише 4 одиниці «від майстрів» — `null`, а не «4.5 (4)».
+    const otherGm = await createUser(db);
+    await rated(player.id, otherGm.id, 4, 'player_from_gm');
+
+    const res = await request(app).get(`/api/users/${gm.publicId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.ratings).toEqual({
+      gm: { overall: 4.4, units: 5, criteria: { preparation: 5 } },
+      playerFromGm: null,
+      playerFromPlayer: null,
+    });
+    // Картки ігор у профілі несуть загальний рейтинг майстра.
+    expect(res.body.gamesAsGm.length).toBe(5);
+    for (const card of res.body.gamesAsGm) expect(card.gmRating).toBe(4.4);
+    const json = JSON.stringify(res.body);
+    for (const leak of ['raterId', 'comment', 'секрет', 'createdAt', 'lastRatingId', 'Rater']) {
+      expect(json).not.toContain(leak);
+    }
+    for (const r of raters) expect(json).not.toContain(r.publicId);
+
+    const p = await request(app).get(`/api/users/${player.publicId}`);
+    expect(p.body.ratings).toEqual({ gm: null, playerFromGm: null, playerFromPlayer: null });
   });
 });
