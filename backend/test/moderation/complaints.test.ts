@@ -431,6 +431,47 @@ describe('POST /api/admin/complaints/:id/dismiss | action', () => {
     expect((await dismiss(999_999, owner.cookie)).status).toBe(404);
   });
 
+  it('game complaints follow the GM role: moderator-GM cannot see/dismiss their own game; admin/owner games hidden from moderators', async () => {
+    const owner = await user('Owner', 'owner');
+    const admin = await user('Admin', 'admin');
+    const mod = await user('Mod', 'moderator');
+    const plainGm = await user('PlainGm');
+    const rep = await user('Reporter');
+    const ownGame = await seedComplaint(rep.id, { gameId: await fx.game(mod.id) });
+    const adminGame = await seedComplaint(rep.id, { gameId: await fx.game(admin.id) });
+    const ownerGame = await seedComplaint(rep.id, { gameId: await fx.game(owner.id) });
+    const userGame = await seedComplaint(rep.id, { gameId: await fx.game(plainGm.id) });
+    const ids = (body: { items: { id: number }[] }) => body.items.map((i) => i.id).sort();
+    expect(ids((await queue(mod.cookie)).body)).toEqual([userGame]);
+    expect(ids((await queue(admin.cookie)).body)).toEqual([ownGame, userGame].sort());
+    expect(ids((await queue(owner.cookie)).body)).toEqual(
+      [ownGame, adminGame, ownerGame, userGame].sort(),
+    );
+    expect((await dismiss(ownGame, mod.cookie)).status).toBe(404);
+    expect((await action(adminGame, mod.cookie, { sanction })).status).toBe(404);
+    expect((await dismiss(adminGame, admin.cookie)).status).toBe(404);
+    expect((await dismiss(ownGame, admin.cookie)).status).toBe(200);
+  });
+
+  it('owner viewing complaints about themselves or their game does not see the reporter', async () => {
+    const owner = await user('Owner', 'owner');
+    const rep = await user('Reporter');
+    const aboutOwner = await seedComplaint(rep.id, { userId: owner.id });
+    const aboutGame = await seedComplaint(rep.id, { gameId: await fx.game(owner.id) });
+    const other = await user('Other');
+    const aboutOther = await seedComplaint(rep.id, { userId: other.id });
+    const q = await queue(owner.cookie);
+    const byId = new Map(
+      (q.body.items as { id: number; reporter: unknown }[]).map((i) => [i.id, i.reporter]),
+    );
+    expect(byId.get(aboutOwner)).toBeNull();
+    expect(byId.get(aboutGame)).toBeNull();
+    expect(byId.get(aboutOther)).toMatchObject({ publicId: rep.publicId });
+    const d = await dismiss(aboutOwner, owner.cookie);
+    expect(d.status).toBe(200);
+    expect(d.body.reporter).toBeNull();
+  });
+
   it('anonymity: the target sees no complaint and no reporter anywhere', async () => {
     const { mod, reporter, target, id } = await setup();
     expect((await queue(target.cookie)).status).toBe(403);

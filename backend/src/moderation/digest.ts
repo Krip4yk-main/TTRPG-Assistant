@@ -38,9 +38,17 @@ export function kyivLocal(t: Date): { date: string; hour: number } {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
 }
 
-/** Чи `runAt` — слот зведення: рівно початок години, і за Києвом це 09:00. */
+/**
+ * Слот задачі, якому належить `runAt`: початок години. Повтор після збою воркер ставить на
+ * `finishedAt + backoff` (не рівно на годину) — він усе одно належить своєму слоту.
+ */
+export function digestSlot(runAt: Date): Date {
+  return new Date(Math.floor(runAt.getTime() / DIGEST_EVERY_MS) * DIGEST_EVERY_MS);
+}
+
+/** Чи `runAt` (зокрема повтор) належить слоту зведення — годині, що за Києвом є 09:00. */
 export function isDigestSlot(runAt: Date): boolean {
-  return runAt.getTime() % DIGEST_EVERY_MS === 0 && kyivLocal(runAt).hour === DIGEST_LOCAL_HOUR;
+  return kyivLocal(digestSlot(runAt)).hour === DIGEST_LOCAL_HOUR;
 }
 
 /**
@@ -54,7 +62,7 @@ export function isDigestSlot(runAt: Date): boolean {
  */
 export async function sendModerationDigest(deps: AppDeps, runAt: Date): Promise<NotificationRow[]> {
   if (!isDigestSlot(runAt)) return [];
-  const { date } = kyivLocal(runAt);
+  const { date } = kyivLocal(digestSlot(runAt));
   const staff = await deps.db
     .select({ id: users.id, role: users.role })
     .from(users)

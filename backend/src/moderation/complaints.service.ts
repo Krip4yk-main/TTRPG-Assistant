@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import {
   complaintActionSchema,
@@ -119,29 +119,31 @@ export async function submitComplaint(
 
 /**
  * Ролі цілей, скарги на яких бачить роль `viewer`: модератор — на користувачів; адмін — ще й на
- * модераторів; власник — на всіх (зокрема на адмінів і на себе). Скарги на ігри бачить увесь
- * персонал.
+ * модераторів; власник — на всіх (зокрема на адмінів і на себе). Для скарги на гру роль цілі —
+ * роль її майстра (модератор не бачить скарг на гру модератора, зокрема на власну, чи адміна).
  */
 export function visibleTargetRoles(viewer: Role): Role[] {
   if (viewer === 'owner') return ROLES;
   return ROLES.filter((r) => ROLE_RANK[r] < ROLE_RANK[viewer]);
 }
 
-export function complaintVisibleTo(viewer: Role, targetRole: Role | null): boolean {
-  return targetRole === null || visibleTargetRoles(viewer).includes(targetRole);
+/** `targetRole` — роль людини-цілі або майстра гри-цілі. */
+export function complaintVisibleTo(viewer: Role, targetRole: Role): boolean {
+  return visibleTargetRoles(viewer).includes(targetRole);
 }
 
 const reporterU = alias(users, 'complaint_reporter');
 const targetU = alias(users, 'complaint_target');
 const resolverU = alias(users, 'complaint_resolver');
+const gameGmU = alias(users, 'complaint_game_gm');
 
-/** Умова видимості скарги для ролі (запит має приєднати `targetU`). */
+/** Роль цілі скарги: людини або майстра гри (запит має приєднати `targetU`, `games`, `gameGmU`). */
+const subjectRole = sql`COALESCE(${targetU.role}, ${gameGmU.role})`;
+
+/** Умова видимості скарги для ролі (запит має приєднати `targetU`, `games`, `gameGmU`). */
 function visibleWhere(viewer: Role): SQL {
   const roles = visibleTargetRoles(viewer);
-  return or(
-    isNull(complaints.targetUserId),
-    roles.length ? inArray(targetU.role, roles) : sql`FALSE`,
-  )!;
+  return roles.length ? inArray(subjectRole, roles) : sql`FALSE`;
 }
 
 function baseQuery(db: DbLike) {
@@ -160,15 +162,25 @@ function baseQuery(db: DbLike) {
         role: resolverU.role,
       },
       game: { id: games.id, title: games.title },
+      gameGmId: games.gmUserId,
     })
     .from(complaints)
     .innerJoin(reporterU, eq(reporterU.id, complaints.reporterId))
     .leftJoin(targetU, eq(targetU.id, complaints.targetUserId))
     .leftJoin(resolverU, eq(resolverU.id, complaints.resolvedBy))
-    .leftJoin(games, eq(games.id, complaints.targetGameId));
+    .leftJoin(games, eq(games.id, complaints.targetGameId))
+    .leftJoin(gameGmU, eq(gameGmU.id, games.gmUserId));
 }
 
 type Row = Awaited<ReturnType<ReturnType<typeof baseQuery>['execute']>>[number];
+
+/**
+ * Чи переглядач — сам суб'єкт скарги (людина-ціль або майстер гри-цілі; буває лише у власника):
+ * тоді скаржника не показуємо — анонімність діє й для персоналу, на якого скаржились.
+ */
+function isSubject(r: Row, viewerId: number): boolean {
+  return r.c.targetUserId === viewerId || (r.c.targetGameId !== null && r.gameGmId === viewerId);
+}
 
 /**
  * Скарга для персоналу; `showReporter: false` — без скаржника (картка цілі для модератора, Task
@@ -211,7 +223,7 @@ export async function listComplaints(
     .limit(limit + 1);
   const page = rows.slice(0, limit);
   return {
-    items: page.map((r) => toComplaintDto(r, { showReporter: true })),
+    items: page.map((r) => toComplaintDto(r, { showReporter: !isSubject(r, viewer.userId) })),
     nextCursor: rows.length > limit ? page[page.length - 1]!.c.id : null,
   };
 }
@@ -226,6 +238,8 @@ export async function countVisibleComplaints(
     .select({ n: count() })
     .from(complaints)
     .leftJoin(targetU, eq(targetU.id, complaints.targetUserId))
+    .leftJoin(games, eq(games.id, complaints.targetGameId))
+    .leftJoin(gameGmU, eq(gameGmU.id, games.gmUserId))
     .where(and(eq(complaints.status, status), visibleWhere(viewer)));
   return r?.n ?? 0;
 }
@@ -246,12 +260,18 @@ async function lockNew(tx: Tx, viewer: StaffViewer, id: number) {
     .where(eq(complaints.id, id))
     .for('update');
   if (!c) throw new AppError(404, 'NOT_FOUND');
-  let targetRole: Role | null = null;
-  if (c.targetUserId !== null) {
-    const [t] = await tx
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, c.targetUserId));
+  // Роль цілі: людини або майстра гри-цілі.
+  let subjectId = c.targetUserId;
+  if (subjectId === null) {
+    const [g] = await tx
+      .select({ gmUserId: games.gmUserId })
+      .from(games)
+      .where(eq(games.id, c.targetGameId!));
+    subjectId = g?.gmUserId ?? null;
+  }
+  let targetRole: Role = 'user';
+  if (subjectId !== null) {
+    const [t] = await tx.select({ role: users.role }).from(users).where(eq(users.id, subjectId));
     targetRole = t?.role ?? 'user';
   }
   if (!complaintVisibleTo(viewer.role, targetRole)) throw new AppError(404, 'NOT_FOUND');
@@ -278,9 +298,9 @@ async function notifyReporter(
   });
 }
 
-async function complaintDto(db: DbLike, id: number): Promise<ComplaintDto> {
+async function complaintDto(db: DbLike, id: number, viewer: StaffViewer): Promise<ComplaintDto> {
   const [r] = await baseQuery(db).where(eq(complaints.id, id));
-  return toComplaintDto(r!, { showReporter: true });
+  return toComplaintDto(r!, { showReporter: !isSubject(r!, viewer.userId) });
 }
 
 /** `POST /api/admin/complaints/:id/dismiss {note?}`: відхилити; журнал; скаржнику — сповіщення. */
@@ -306,7 +326,7 @@ export async function dismissComplaint(
       reason: note ?? null,
     });
     const row = await notifyReporter(deps, tx, c.reporterId, id);
-    return { dto: await complaintDto(tx, id), row };
+    return { dto: await complaintDto(tx, id, viewer), row };
   });
   if (row) emitNotificationsNew(deps, [row]);
   return dto;
@@ -362,7 +382,7 @@ export async function actionComplaint(
       meta: { sanctionId: s.id },
     });
     const row = await notifyReporter(deps, tx, c.reporterId, id);
-    return { dto: await complaintDto(tx, id), row, afterCommit };
+    return { dto: await complaintDto(tx, id, viewer), row, afterCommit };
   });
   // Побічні ефекти санкції (сесії, каскад, пінги) — лише після коміту скарги.
   await afterCommit();

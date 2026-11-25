@@ -19,6 +19,7 @@ import {
   sendModerationDigest,
 } from '../../src/moderation/digest.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
+import { ratingFixtures } from '../ratings/fixtures.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
@@ -58,8 +59,10 @@ describe('digest schedule (Europe/Kyiv, DST)', () => {
       expect(slots, day).toHaveLength(1);
       expect(kyivLocal(new Date(slots[0]!)), day).toEqual({ date: day, hour: 9 });
     }
-    // Не на початку години — не слот.
-    expect(isDigestSlot(new Date('2026-12-01T07:30:00.000Z'))).toBe(false);
+    // Повтор після збою (не рівно на годину) належить своєму слоту.
+    expect(isDigestSlot(new Date('2026-12-01T07:30:00.000Z'))).toBe(true);
+    expect(isDigestSlot(new Date('2026-12-01T08:00:00.000Z'))).toBe(false);
+    expect(isDigestSlot(new Date('2026-12-01T06:59:59.999Z'))).toBe(false);
   });
 
   it('registered as an hourly recurring job whose handler uses job.runAt', async () => {
@@ -78,6 +81,23 @@ describe('digest schedule (Europe/Kyiv, DST)', () => {
     await handler(deps, null, { ...job, runAt: new Date('2026-12-01T08:00:00.000Z') });
     const rows = await db.select().from(notifications);
     expect(rows).toEqual([expect.objectContaining({ userId: mod.id, type: 'moderation.digest' })]);
+  });
+
+  it('a retry of the 09:00 slot (runAt = failure + backoff) still sends', async () => {
+    resetRegistry();
+    registerJobs();
+    const mod = await createUser(db, { role: 'moderator' });
+    const rep = await createUser(db);
+    await db
+      .insert(complaints)
+      .values({ reporterId: rep.id, targetUserId: rep.id, reason: 'other' });
+    const handler = getHandler(DIGEST_JOB)!;
+    const retry = { runAt: new Date('2026-12-01T07:00:37.000Z') } as typeof jobs.$inferSelect;
+    await handler(deps, null, retry);
+    const rows = await db.select().from(notifications);
+    expect(rows).toEqual([expect.objectContaining({ userId: mod.id, type: 'moderation.digest' })]);
+    const [log] = await db.select().from(moderationDigestLog);
+    expect(log!.digestDate).toBe('2026-12-01');
   });
 });
 
@@ -125,6 +145,19 @@ describe('sendModerationDigest', () => {
       category: 'moderation',
       payload: { count: 2 },
     });
+  });
+
+  it('game complaints are counted by the GM role', async () => {
+    const s = await staff();
+    const rep = await createUser(db);
+    const gameOf = (gm: number) => ratingFixtures(db).game(gm);
+    await db.insert(complaints).values([
+      { reporterId: rep.id, targetGameId: await gameOf(s.plain.id), reason: 'other' },
+      { reporterId: rep.id, targetGameId: await gameOf(s.mod.id), reason: 'other' },
+      { reporterId: rep.id, targetGameId: await gameOf(s.admin.id), reason: 'other' },
+    ]);
+    await sendModerationDigest(deps, WINTER_9);
+    expect(await counts()).toEqual({ [s.mod.id]: 1, [s.admin.id]: 2, [s.owner.id]: 3 });
   });
 
   it('only staff with something visible: moderator with 0 visible gets nothing', async () => {
