@@ -60,11 +60,11 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   }
 
   /** Ще одне оголошення на тій самій «сторінці». */
-  async function create(id = game.id) {
+  async function create(id = game.id, patch: Partial<SearchGameCardDto> = {}) {
     const fixture = TestBed.createComponent(QuestBoardGameCard);
     fixture.componentRef.setInput(
       'game',
-      toGameCardVm({ ...game, id }, null, { guest: false, genreKey: () => null }),
+      toGameCardVm({ ...game, id, ...patch }, null, { guest: false, genreKey: () => null }),
     );
     fixture.detectChanges();
     await fixture.whenStable();
@@ -232,5 +232,97 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     await Promise.resolve();
     click(article(f));
     expect(navigate).toHaveBeenCalledTimes(2);
+  });
+
+  describe('короткий опис, обрис і вкладка-обкладинка', () => {
+    const COVER = 'https://example.com/cover.png';
+    const attachment = (f: ComponentFixture<QuestBoardGameCard>) =>
+      f.nativeElement.querySelector('nri-qb-attachment') as HTMLElement | null;
+
+    it('опис під назвою (з підказкою), без опису — нічого', async () => {
+      await mount();
+      const f = await create(8, { summary: 'Готичний жах у тумані.' });
+      const desc = article(f).querySelector('h2 + .desc')!;
+      expect(desc.textContent).toContain('Готичний жах у тумані.');
+      const plain = await create(9);
+      expect(article(plain).querySelector('.desc')).toBeNull();
+    });
+
+    it('обрис пергаменту — за id, у сусідніх ігор різний', async () => {
+      await mount();
+      const papers = [];
+      for (const id of [10, 11, 12]) papers.push(article(await create(id)).dataset['paper']);
+      expect(new Set(papers).size).toBe(3);
+    });
+
+    it('без обкладинки вкладки немає; з обкладинкою — кнопка з назвою гри', async () => {
+      const f = await mount();
+      expect(attachment(f)).toBeNull();
+      const withCover = await create(8, { coverUrl: COVER });
+      const button = attachment(withCover)!.querySelector('button')!;
+      expect(button.getAttribute('aria-label')).toBe('Арт до гри: Туман над Дніпром');
+      const img = button.querySelector('img')!;
+      expect(img.getAttribute('src')).toBe(COVER);
+      expect(img.getAttribute('alt')).toBe('');
+      expect(img.getAttribute('loading')).toBe('lazy');
+      expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
+    });
+
+    it('клік по вкладці перемикає її наперед і назад, гру не відкриває', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      click(button);
+      f.detectChanges();
+      expect(host.classList).toContain('front');
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      expect(article(f).classList).not.toContain('qb-tearing');
+      click(button);
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('Esc чи дотик деінде повертають вкладку під аркуш', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      click(button);
+      f.detectChanges();
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      click(button);
+      f.detectChanges();
+      click(document.body);
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+    });
+
+    it('фокус з клавіатури виносить вкладку наперед, втрата фокуса — повертає', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      vi.spyOn(button, 'matches').mockImplementation((sel) => sel === ':focus-visible');
+      button.dispatchEvent(new FocusEvent('focus'));
+      f.detectChanges();
+      expect(host.classList).toContain('front');
+      button.dispatchEvent(new FocusEvent('blur'));
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+    });
+
+    it('картинка не завантажилась — вкладку сховано', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      host.querySelector('img')!.dispatchEvent(new Event('error'));
+      f.detectChanges();
+      expect(host.classList).toContain('failed');
+      expect(getComputedStyle(host).display).toBe('none');
+    });
   });
 });

@@ -54,6 +54,13 @@
   --qb-parchment: #eadfc4;
   --qb-parchment-light: #f3ebd6;
   --qb-parchment-dark: #ddcfad;
+  // Старий пергамент оголошень (.qb-torn) і його темніша облямівка.
+  --qb-vellum: #e6d5ae;
+  --qb-vellum-rim: #9c7a4a;
+  // Чорнило на старому пергаменті — темніше за звичайне (папір плямистий і темніший).
+  --qb-vellum-muted: #4d3a27;
+  --qb-vellum-moss: #344020;
+  --qb-vellum-brass: #4d3906;
   --qb-ink: #2b1e14;
   --qb-ink-soft: #4a3725;
   --qb-ink-muted: #654f36;
@@ -85,9 +92,12 @@
 
   // Оголошенням у сітці (.nri-card-grid) потрібне місце для шпильки, печатки й нахилу;
   // ширина — 310–380px, щоб папірець лишався майже квадратним (не «альбомний» аркуш).
+  // Проміжки вміщують нахил і зсув аркуша, нерівний край, тінь і вкладку-обкладинку, що
+  // визирає з-під аркуша вгору-праворуч (~35px угору, 14px праворуч): сусіди не
+  // перекриваються.
   --nri-card-grid-min: 310px;
   --nri-card-grid-max: 380px;
-  --nri-card-grid-gap: var(--nri-space-2xl) var(--nri-space-xl);
+  --nri-card-grid-gap: 4.5rem 2rem;
   // Планка шапки 72px + торець 6px.
   --nri-header-height: 78px;
 
@@ -280,25 +290,54 @@
       inset 0 0 60px rgba(120, 80, 30, 0.2);
   }
 
-  // «Рваний» край — лише для оголошень (не для полів вводу й форм).
+  // ---- Старий пергамент оголошень (концепт docs/design-concepts/notices2/medieval-1.html) ----
+  // Грубий нерівний обрис (полігон у полі 300×380), «оживлений» шумом feTurbulence +
+  // feDisplacementMap, — маска (data-URI SVG) двох шарів під вмістом: темніша облямівка
+  // (::before, той самий обрис) і сам папір (::after, підрізаний на 1.5px — облямівка видна
+  // тонким краєм). Шари виходять за коробку аркуша на 6px (нерівний край виступає назовні),
+  // тож аркуш з обрізанням вмісту має overflow-clip-margin. Шість варіантів обрису
+  // (data-paper, за id гри) — оголошення різні, але маски растеризуються лише шість разів.
+  // Тінь — drop-shadow на хості оголошення (повторює обрис).
   .qb-torn {
-    clip-path: polygon(
-      0 2%,
-      4% 0,
-      30% 1%,
-      55% 0,
-      80% 1.5%,
-      100% 0,
-      99% 30%,
-      100% 60%,
-      98.5% 100%,
-      70% 98.5%,
-      40% 100%,
-      12% 98.8%,
-      0 100%,
-      1% 60%
-    );
+    // Темніші ролі тексту: на найтемніших місцях паперу під текстом контраст ≥ 4.5.
+    --nri-text-muted: var(--qb-vellum-muted);
+    --nri-primary-text: var(--qb-vellum-moss);
+    --nri-success-text: var(--qb-vellum-moss);
+    --nri-accent-text: var(--qb-vellum-brass);
+    --mat-sys-outline: var(--qb-vellum-muted);
+
+    position: relative;
+    isolation: isolate;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      z-index: -1;
+      mask-size: 100% 100%;
+      mask-repeat: no-repeat;
+      pointer-events: none;
+    }
+
+    &::before {
+      background: var(--qb-vellum-rim);
+      .qb-torn-rim-mask(11);
+    }
+
+    &::after {
+      .qb-vellum();
+
+      background-size: 100% 100%;
+      .qb-torn-paper-mask(11);
+    }
   }
+
+  .qb-torn-variants(1);
 
   // Латунна шпилька.
   .qb-pin {
@@ -365,9 +404,9 @@
   // перераховані в координати клаптя.
   .qb-tearing {
     clip-path: polygon(
-      0 2%,
-      4% 0,
-      36.1% 0.3%,
+      -10px -10px,
+      37% -10px,
+      37% 0.4%,
       37.6% 0.4%,
       38.35% 0.47%,
       39.03% 1.33%,
@@ -403,17 +442,10 @@
       60.85% 3.3%,
       61.9% 0.97%,
       62.4% 0.5%,
-      63.9% 0.4%,
-      80% 1.5%,
-      100% 0,
-      99% 30%,
-      100% 60%,
-      98.5% 100%,
-      70% 98.5%,
-      40% 100%,
-      12% 98.8%,
-      0 100%,
-      1% 60%
+      63% -10px,
+      calc(100% + 10px) -10px,
+      calc(100% + 10px) calc(100% + 10px),
+      -10px calc(100% + 10px)
     );
     transform-origin: 35% 0;
     animation: qb-tear 520ms cubic-bezier(0.55, 0, 0.8, 0.4) forwards;
@@ -424,8 +456,11 @@
     }
   }
 
-  // Клапоть під шпилькою: папір із рваним краєм — окремий шар (::before з clip-path), а шпилька
-  // лежить над ним і не обрізається.
+  // Клапоть під шпилькою — той самий пергамент: облямівка (::before) і папір (::after) з
+  // обрисом і фактурою свого оголошення (маска й фон розміром з усе оголошення, вирівняні
+  // по його верху й центру), знизу — та сама лінія відриву (clip-path). Шари на 6px вищі за
+  // клапоть: нерівний верхній край виступає над ним, як і в аркуша. Точки лінії відриву —
+  // у координатах цього шару (висота клаптя 9.5% від 23.75rem + 6px).
   .qb-tear-stub {
     position: absolute;
     top: 0;
@@ -436,51 +471,71 @@
     transform: translateX(-50%);
     pointer-events: none;
 
-    &::before {
+    @w: calc(100% / 0.26 + 12px);
+    @h: calc(23.75rem + 12px);
+
+    &::before,
+    &::after {
       content: '';
       position: absolute;
-      inset: 0;
-      background-color: var(--qb-parchment);
-      box-shadow: inset 0 0 12px rgba(120, 80, 30, 0.25);
+      inset: -6px 0 0;
+      mask-size: @w @h;
+      mask-position: 50% 0;
+      mask-repeat: no-repeat;
       clip-path: polygon(
         0 0,
         100% 0,
-        97.69% 5.26%,
-        95.77% 10.21%,
-        91.73% 34.74%,
-        88.65% 23.16%,
-        86.77% 37.89%,
-        84.42% 43.26%,
-        80.42% 56.42%,
-        78.81% 68.42%,
-        76.04% 64.53%,
-        72.04% 64%,
-        69.85% 76.21%,
-        66.54% 75.16%,
-        63.92% 75.26%,
-        60.85% 67.79%,
-        58.81% 70%,
-        54.77% 78.95%,
-        52.5% 85.79%,
-        50.54% 72%,
-        48.08% 88%,
-        44.08% 90.84%,
-        41.5% 77.68%,
-        38.38% 62.11%,
-        35.69% 73.05%,
-        33.69% 70.95%,
-        30.58% 71.89%,
-        26.77% 65.47%,
-        24% 61.16%,
-        22.08% 53.89%,
-        18.42% 45.16%,
-        15.46% 36.63%,
-        13.69% 47.47%,
-        10.85% 33.26%,
-        7.81% 14%,
-        5.19% 4.95%,
-        2.31% 4.21%
+        100% 14.25%,
+        97.69% 18.76%,
+        95.77% 23.01%,
+        91.73% 44.04%,
+        88.65% 34.11%,
+        86.77% 46.74%,
+        84.42% 51.35%,
+        80.42% 62.63%,
+        78.81% 72.92%,
+        76.04% 69.59%,
+        72.04% 69.13%,
+        69.85% 79.6%,
+        66.54% 78.7%,
+        63.92% 78.79%,
+        60.85% 72.38%,
+        58.81% 74.28%,
+        54.77% 81.95%,
+        52.5% 87.82%,
+        50.54% 75.99%,
+        48.08% 89.71%,
+        44.08% 92.15%,
+        41.5% 80.86%,
+        38.38% 67.51%,
+        35.69% 76.89%,
+        33.69% 75.09%,
+        30.58% 75.9%,
+        26.77% 70.39%,
+        24% 66.7%,
+        22.08% 60.46%,
+        18.42% 52.98%,
+        15.46% 45.66%,
+        13.69% 54.96%,
+        10.85% 42.77%,
+        7.81% 26.26%,
+        5.19% 18.5%,
+        2.31% 17.86%,
+        0 14.25%
       );
+    }
+
+    &::before {
+      background: var(--qb-vellum-rim);
+      .qb-torn-rim-mask(11);
+    }
+
+    &::after {
+      .qb-vellum();
+
+      background-position: 50% 0;
+      background-size: @w @h;
+      .qb-torn-paper-mask(11);
     }
 
     .qb-pin {
@@ -529,7 +584,10 @@
 
     :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
       .qb-paper-tokens();
+    }
 
+    // Оголошення (.qb-torn) — без прямокутного фону й тіні: папір і тінь — за обрисом.
+    :is(.nri-panel, .nri-card, .nri-alert, .nri-notice):not(.qb-torn) {
       background-color: var(--qb-parchment);
       box-shadow: var(--nri-shadow-md);
     }
@@ -537,9 +595,14 @@
     .nri-panel {
       padding: var(--nri-space-md);
     }
+
+    // Над першим рядом оголошень — місце для вкладок-обкладинок, що визирають угору.
+    .nri-card-grid {
+      padding-top: var(--nri-space-lg);
+    }
   }
 
-  .nri-card {
+  .nri-card:not(.qb-torn) {
     background-color: var(--nri-surface-raised);
     border-color: var(--nri-border);
   }
@@ -589,4 +652,51 @@
     margin-top: var(--nri-space-md);
     margin-bottom: var(--nri-space-lg);
   }
+}
+
+// ---- Пергамент оголошень: маски обрису й фактура (див. .qb-torn) ----
+// Обрис аркуша (полігон у полі 300×380) + шум зсуву: scale 12, baseFrequency 0.035.
+@qb-torn-svg-head: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-6 -6 312 392' preserveAspectRatio='none'%3E%3Cfilter id='r' x='-5%25' y='-5%25' width='110%25' height='110%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035' numOctaves='3' seed='";
+@qb-torn-svg-tail: "%3C/filter%3E%3Cpolygon points='0,8 12,0 90,4 165,0 240,6 300,0 297,114 300,228 296,380 210,374 120,380 36,375 0,380 3,228' fill='white' filter='url(%23r)'/%3E%3C/svg%3E";
+
+// Облямівка: обрис без підрізання.
+.qb-torn-rim-mask(@seed) {
+  mask-image: url("@{qb-torn-svg-head}@{seed}'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='12'/%3E@{qb-torn-svg-tail}");
+}
+
+// Папір: той самий обрис, підрізаний на 1.5px (feMorphology erode).
+.qb-torn-paper-mask(@seed) {
+  mask-image: url("@{qb-torn-svg-head}@{seed}'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='12'/%3E%3CfeMorphology operator='erode' radius='1.5'/%3E@{qb-torn-svg-tail}");
+}
+
+// Варіанти обрису 1–5 (варіант 0 — типовий у .qb-torn): той самий полігон з іншим зерном шуму.
+// Клапоть під шпилькою (.qb-tear-stub) бере обрис свого оголошення.
+.qb-torn-variants(@i) when (@i < 6) {
+  @seed: (11 + @i);
+
+  [data-paper='@{i}']:is(.qb-torn, .qb-tear-stub) {
+    &::before {
+      .qb-torn-rim-mask(@seed);
+    }
+
+    &::after {
+      .qb-torn-paper-mask(@seed);
+    }
+  }
+
+  .qb-torn-variants((@i + 1));
+}
+
+// Старий пергамент: основа + потемнілі краї, пляма, великі розводи (шум 0.012), волокна
+// (шум, витягнутий по горизонталі) і дрібне зерно — усе SVG feTurbulence у data-URI. Розводи
+// бліді: текст лежить і на найтемніших місцях (контраст — у шапці файлу).
+.qb-vellum() {
+  background-color: var(--qb-vellum);
+  background-image:
+    radial-gradient(ellipse at 50% 48%, transparent 58%, rgba(120, 75, 25, 0.3) 100%),
+    radial-gradient(ellipse 30% 20% at 85% 85%, rgba(130, 90, 40, 0.12), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='380'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.3 0 0 0 0 0.12 0 0 0 0.95 -0.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='380'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.015 0.35' numOctaves='3' stitchTiles='stitch' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.38 0 0 0 0 0.2 0 0 0 0.6 -0.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='380'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch' seed='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.33 0 0 0 0 0.18 0 0 0 0.5 -0.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
 }

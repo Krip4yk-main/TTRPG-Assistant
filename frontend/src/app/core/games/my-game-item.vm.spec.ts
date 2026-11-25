@@ -5,6 +5,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
   return {
     id,
     title: `Гра ${id}`,
+    summary: null,
     coverUrl: null,
     system: { id: 1, name: 'D&D 5e' },
     systemOther: null,
@@ -46,6 +47,12 @@ describe('toMyGameItemVm', () => {
     expect(edit).toMatchObject({ link: ['/games', 2, 'edit'], emphasis: 'stroked' });
     const cancel = vm(card(2, 'recruiting')).actions.find((a) => a.id === 'cancel')!;
     expect(cancel).toMatchObject({ danger: true, link: null, labelKey: 'games.actions.cancel' });
+  });
+
+  it('cover: passed through (null — none)', () => {
+    expect(vm(card(1, 'recruiting')).coverUrl).toBeNull();
+    const url = 'https://example.com/c.png';
+    expect(vm({ ...card(1, 'recruiting'), coverUrl: url }).coverUrl).toBe(url);
   });
 
   it('«all ok» and «close» come first, for stale and dead games only', () => {

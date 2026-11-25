@@ -33,6 +33,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
   return {
     id,
     title: `Гра ${id}`,
+    summary: null,
     coverUrl: null,
     system: { id: 1, name: 'D&D 5e' },
     systemOther: null,

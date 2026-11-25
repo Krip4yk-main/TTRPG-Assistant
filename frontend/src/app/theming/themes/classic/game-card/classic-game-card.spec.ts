@@ -12,6 +12,7 @@ import { toGameCardVm } from '../../../../core/games/game-card.vm';
 const game: SearchGameCardDto = {
   id: 5,
   title: 'Туман над Дніпром',
+  summary: 'Готичний жах у тумані.',
   coverUrl: 'https://example.com/cover.png',
   system: { id: 1, name: 'D&D 5e' },
   systemOther: null,

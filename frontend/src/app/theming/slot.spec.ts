@@ -16,6 +16,7 @@ import { CLASSIC_SLOTS } from './themes/classic/slots';
 const game: MyGameCardDto = {
   id: 2,
   title: 'Гра 2',
+  summary: null,
   coverUrl: null,
   system: { id: 1, name: 'D&D 5e' },
   systemOther: null,

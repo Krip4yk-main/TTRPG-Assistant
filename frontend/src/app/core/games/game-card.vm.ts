@@ -54,6 +54,8 @@ export interface RestrictedGameCardVm extends GameCardVmBase {
 
 export interface FullGameCardVm extends GameCardVmBase {
   restricted: false;
+  /** Короткий опис (бекенд уже обрізав його до ~200 символів); `null` — опису немає. */
+  summary: string | null;
   coverUrl: string | null;
   systemName: string;
   genreKey: string | null;
@@ -157,6 +159,7 @@ export function toGameCardVm(
     title: game.title,
     badges,
     gm: gm(game.gmRating, true),
+    summary: game.summary?.trim() || null,
     coverUrl: game.coverUrl,
     systemName,
     genreKey: genre,

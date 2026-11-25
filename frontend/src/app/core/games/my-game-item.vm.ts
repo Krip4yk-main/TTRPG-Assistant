@@ -43,6 +43,8 @@ export interface MyGameItemVm {
   title: string;
   status: GameStatus;
   statusKey: string;
+  /** Обкладинка гри; `null` — немає. */
+  coverUrl: string | null;
   /** Бейдж «Нове» / «Оновлено». */
   seen: SeenBadge | null;
   /** Позначки в порядку важливості. */
@@ -144,6 +146,7 @@ export function toMyGameItemVm(
     title: game.title,
     status: game.status,
     statusKey: `games.status.${game.status}`,
+    coverUrl: game.coverUrl,
     seen,
     flags: deadFlags(game).map((flag) => ({
       flag,

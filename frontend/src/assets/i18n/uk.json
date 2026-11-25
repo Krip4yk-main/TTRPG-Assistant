@@ -74,6 +74,9 @@
       "free": "без плати",
       "price": "{{price}} грн"
     },
+    "attachment": {
+      "label": "Арт до гри: {{title}}"
+    },
     "shell": {
       "navMenu": "Навігація"
     }

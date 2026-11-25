@@ -1,4 +1,4 @@
-// Тінь — через filter на хості: clip-path «рваного» краю обрізав би box-shadow аркуша.
+// Тінь — через filter на хості: повторює нерівний обрис пергаменту (.qb-torn).
 // Розмір оголошення сталий (ширину задає сітка, висота — тут): довгі рядки обрізаються.
 :host {
   position: relative;
@@ -7,53 +7,78 @@
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
 }
 
-// Аркуш, що відривається й падає, — над сусідніми оголошеннями.
+// Аркуш, що відривається й падає, — над сусідніми оголошеннями; вкладка (обкладинка) не
+// падає разом з ним, а зникає.
 :host(.leaving) {
   z-index: 5;
+
+  nri-qb-attachment {
+    opacity: 0;
+    transition: opacity 200ms;
+  }
 }
 
+// Вкладка — під аркушем, у верхньому правому куті (видно ~40%).
+nri-qb-attachment {
+  top: -18px;
+  right: -14px;
+}
+
+// Вміст обрізається по коробці аркуша, а нерівний край пергаменту (шари на 6px назовні) —
+// ні (overflow-clip-margin).
 .note {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  overflow: hidden;
-  padding: 34px 24px 20px;
+  overflow: clip;
+  overflow-clip-margin: 8px;
+  padding: 34px 24px 18px;
   transition: transform var(--nri-transition);
 }
 
-// Нахил з набору ±1.6° — лише на ширших екранах і без prefers-reduced-motion.
+// Нахил і невеликий зсув униз з набору — лише на ширших екранах і без prefers-reduced-motion.
+// Найбільший кут (1.5°) зсуває кути аркуша на ~5px; разом з краєм (6px), зсувом (до 10px) і
+// тінню це менше за проміжки сітки дизайну, тож сусіди не перекриваються.
 @media (min-width: 600.02px) and (prefers-reduced-motion: no-preference) {
   .note {
     &[data-tilt='0'] {
-      transform: rotate(-1.6deg);
+      transform: rotate(-1.4deg);
     }
 
     &[data-tilt='1'] {
-      transform: rotate(1.2deg);
+      transform: rotate(1deg) translateY(10px);
     }
 
     &[data-tilt='2'] {
-      transform: rotate(-0.6deg);
+      transform: rotate(-0.5deg);
     }
 
     &[data-tilt='3'] {
-      transform: rotate(1.6deg);
+      transform: rotate(1.5deg) translateY(4px);
     }
 
     &[data-tilt='4'] {
-      transform: rotate(-1.2deg);
+      transform: rotate(-1deg) translateY(7px);
     }
 
     &[data-tilt='5'] {
-      transform: rotate(0.8deg);
+      transform: rotate(0.6deg) translateY(2px);
     }
 
     &:hover,
     &:focus-within {
       transform: none;
     }
+  }
+}
+
+// На вузькому екрані оголошення на всю ширину — вкладка лише трохи виходить за край.
+@media (max-width: 600px) {
+  nri-qb-attachment {
+    right: -6px;
   }
 }
 
@@ -64,23 +89,11 @@
   transform: rotate(4deg);
 }
 
-.cover {
-  display: block;
-  width: 100%;
-  flex: none;
-  height: 64px;
-  margin: 0 0 var(--nri-space-sm);
-  object-fit: cover;
-  border: 4px solid var(--qb-parchment-light);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  filter: sepia(0.25);
-}
-
 .sys {
   flex: none;
   margin: 0;
   color: var(--nri-primary-text);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -93,13 +106,9 @@
   white-space: nowrap;
 }
 
-// Місце під стрічку «твій розклад» (під обкладинкою вона рядку системи вже не заважає).
+// Місце під стрічку «твій розклад».
 .ribbon ~ .sys {
   padding-right: 96px;
-}
-
-.cover ~ .sys {
-  padding-right: 0;
 }
 
 // Бейджі: до трьох (решта — «+N»), не більше двох рядків — широкі переносяться, а не
@@ -123,9 +132,9 @@
 
 .title {
   flex: none;
-  margin: 6px 0 var(--nri-space-sm);
-  font-size: 1.6rem;
-  line-height: 1.2;
+  margin: 4px 0 6px;
+  font-size: 1.5rem;
+  line-height: 1.15;
 
   // Назва — до двох рядків з «…».
   a {
@@ -145,7 +154,25 @@
   }
 }
 
-// Факти — єдиний блок, що стискається: якщо згори забагато (стрічка, обкладинка, бейджі),
+// Короткий опис — до трьох рядків (з бейджами — до двох), повний — у підказці.
+.desc {
+  display: -webkit-box;
+  flex: none;
+  margin: 0 0 10px;
+  overflow: hidden;
+  color: var(--qb-ink-soft);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.stamps ~ .desc {
+  -webkit-line-clamp: 2;
+}
+
+// Факти — єдиний блок, що стискається: якщо згори забагато (стрічка, бейджі, опис),
 // обрізаються вони, а не підвал із майстром і печаткою.
 .facts {
   flex: 0 1 auto;
@@ -153,11 +180,12 @@
   overflow: hidden;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 14px;
+  gap: 2px 14px;
   margin: 0;
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--qb-rule);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
 
   dt {
     color: var(--nri-text-muted);
@@ -175,7 +203,7 @@
   justify-content: space-between;
   gap: var(--nri-space-sm);
   margin-top: auto;
-  padding-top: var(--nri-space-sm);
+  padding-top: 6px;
 }
 
 // Печатка завжди поруч із підписом: довгий нік обрізається «…».

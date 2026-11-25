@@ -5,6 +5,7 @@ import { toGameCardVm, type FullGameCardVm, type RestrictedGameCardVm } from './
 const game: SearchGameCardDto = {
   id: 5,
   title: 'Туман над Дніпром',
+  summary: 'Готичний жах у тумані.',
   coverUrl: 'https://example.com/cover.png',
   system: { id: 1, name: 'D&D 5e' },
   systemOther: null,
@@ -56,6 +57,18 @@ describe('toGameCardVm', () => {
       gm: { nickname: 'Gandalf', blocked: false, rating: null, showRating: true },
     });
     expect(full({ ...game, system: null, systemOther: 'Своя' }).systemName).toBe('Своя');
+  });
+
+  it('short description: from the card, blank → null, never on a restricted card', () => {
+    expect(full(game).summary).toBe('Готичний жах у тумані.');
+    expect(full({ ...game, summary: '   ' }).summary).toBeNull();
+    expect(full({ ...game, summary: null }).summary).toBeNull();
+    // Старий бекенд без поля — теж без опису.
+    const legacy: Partial<SearchGameCardDto> = { ...game };
+    delete legacy.summary;
+    expect(full(legacy).summary).toBeNull();
+    const vm = toGameCardVm({ ...restricted, summary: 'SECRET' } as never, null, opts);
+    expect(JSON.stringify(vm)).not.toContain('SECRET');
   });
 
   it('one-line summaries: system · kind · genre and format · city · language', () => {

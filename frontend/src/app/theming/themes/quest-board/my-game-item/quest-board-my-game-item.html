@@ -1,5 +1,9 @@
 @let game = item();
-<article class="note qb-paper qb-torn" [attr.data-game-id]="game.id">
+<!-- Обкладинка — вкладка під аркушем (як на дошці пошуку). -->
+@if (game.coverUrl; as cover) {
+  <nri-qb-attachment [src]="cover" [title]="game.title" />
+}
+<article class="note qb-paper qb-torn" [attr.data-game-id]="game.id" [attr.data-paper]="paper()">
   <span class="qb-pin" aria-hidden="true"></span>
   <header class="head">
     <span class="status" [attr.data-status]="game.status">{{ game.statusKey | translate }}</span>

@@ -37,6 +37,7 @@ const DESIGNS: [string, ThemeSlots][] = [
 const game: SearchGameCardDto = {
   id: 5,
   title: 'Туман над Дніпром',
+  summary: 'Готичний жах у тумані над Дніпром.',
   coverUrl: null,
   system: { id: 1, name: 'D&D 5e' },
   systemOther: null,
@@ -115,6 +116,7 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       const el = (await mount(slots['game-card'], { game: cardVm(game) })).nativeElement;
       const text = el.textContent as string;
       expect(text).toContain('Туман над Дніпром');
+      expect(text).toContain('Готичний жах у тумані над Дніпром.'); // короткий опис
       expect(text).toContain('D&D 5e');
       expect(text).toContain('Київ');
       expect(text).toContain('19:00'); // найближча сесія
@@ -126,6 +128,15 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(el.querySelector('a[href="/games/5"]')).not.toBeNull();
       expect(el.querySelector('a[href="/users/zzzzzzzzzz"]')!.textContent).toContain('Gandalf');
       expect(text).toContain('4,3');
+    });
+
+    it('short description: shown in full (tooltip when clamped); absent — no empty block', async () => {
+      const long = 'Довгий опис кампанії, що не вміщається в кілька рядків. '.repeat(4).trim();
+      const fixture = await mount(slots['game-card'], { game: cardVm({ ...game, summary: long }) });
+      expect(fixture.nativeElement.textContent).toContain(long);
+      expect(tooltips(fixture.debugElement)).toContain(long);
+      const none = await mount(slots['game-card'], { game: cardVm({ ...game, summary: null }) });
+      expect(none.nativeElement.textContent).not.toContain('Готичний жах');
     });
 
     it('free game says so; no rating yet is stated', async () => {

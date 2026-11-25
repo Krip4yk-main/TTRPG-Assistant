@@ -1,7 +1,9 @@
 @let g = game();
 <!-- Клапоть під шпилькою, що лишається на стіні, коли оголошення відривається. -->
 @if (tearing()) {
-  <span class="qb-tear-stub" aria-hidden="true"><span class="qb-pin"></span></span>
+  <span class="qb-tear-stub" aria-hidden="true" [attr.data-paper]="paper()"
+    ><span class="qb-pin"></span
+  ></span>
 }
 @if (g.restricted) {
   <article
@@ -10,6 +12,7 @@
     [class.qb-tearing]="tearing()"
     [attr.data-game-id]="g.id"
     [attr.data-tilt]="tilt()"
+    [attr.data-paper]="paper()"
   >
     <span class="qb-pin" aria-hidden="true"></span>
     <div class="veil" aria-hidden="true">
@@ -40,19 +43,22 @@
     <footer class="foot gm"><nri-qb-gm-signature [gm]="g.gm" /></footer>
   </article>
 } @else {
+  <!-- Обкладинка — вкладка під аркушем у верхньому правому куті (поза аркушем: він її
+       накриває, а наперед вона виходить над ним). -->
+  @if (g.coverUrl; as cover) {
+    <nri-qb-attachment [src]="cover" [title]="g.title" />
+  }
   <article
     class="note qb-paper qb-torn"
     [class.qb-tearable]="tearEnabled()"
     [class.qb-tearing]="tearing()"
     [attr.data-game-id]="g.id"
     [attr.data-tilt]="tilt()"
+    [attr.data-paper]="paper()"
   >
     <span class="qb-pin" aria-hidden="true"></span>
     @if (ribbon(); as r) {
       <span class="ribbon"><nri-qb-badge [badge]="r" /></span>
-    }
-    @if (g.coverUrl) {
-      <img class="cover" [src]="g.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" />
     }
     @let sys = g.systemLine | nriLine;
     <p class="sys" [nriTruncateTooltip]="sys">{{ sys }}</p>
@@ -75,6 +81,9 @@
     <h2 class="title">
       <a #open class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
     </h2>
+    @if (g.summary; as summary) {
+      <p class="desc" [nriTruncateTooltip]="summary">{{ summary }}</p>
+    }
     <dl class="facts">
       @if (g.showSchedule) {
         <dt>{{ 'questBoard.card.when' | translate }}</dt>

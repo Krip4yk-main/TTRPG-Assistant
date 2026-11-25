@@ -38,6 +38,9 @@
       <h2 class="title">
         <a [routerLink]="['/games', g.id]" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
       </h2>
+      @if (g.summary; as summary) {
+        <p class="summary" [nriTruncateTooltip]="summary">{{ summary }}</p>
+      }
       <p class="meta">
         {{ g.systemName }}
         @if (g.genreKey; as key) {

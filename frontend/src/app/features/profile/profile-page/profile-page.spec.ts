@@ -39,6 +39,7 @@ const catalog: CatalogDto = {
 const game: GameCardDto = {
   id: 7,
   title: 'Туман над Дніпром',
+  summary: null,
   coverUrl: null,
   system: { id: 1, name: 'D&D 5e' },
   systemOther: null,

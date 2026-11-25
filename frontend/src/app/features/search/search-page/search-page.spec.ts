@@ -53,6 +53,7 @@ function card(id: number): SearchGameCardDto {
   return {
     id,
     title: `Гра ${id}`,
+    summary: null,
     coverUrl: null,
     system: { id: 1, name: 'D&D 5e' },
     systemOther: null,

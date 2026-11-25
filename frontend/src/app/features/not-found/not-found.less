@@ -42,8 +42,10 @@
 }
 
 :host-context([data-theme='quest-board']) {
+  // Тінь — за нерівним обрисом пергаменту (.qb-torn), а не прямокутна.
   .notice {
     transform: rotate(-1.5deg);
+    filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
   }
 
   .qb-pin {

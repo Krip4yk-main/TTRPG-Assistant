@@ -69,6 +69,16 @@
   color: var(--nri-text-muted);
 }
 
+// Короткий опис — до трьох рядків з «…» (решта — у підказці).
+.summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .facts {
   display: grid;
   gap: 2px;
