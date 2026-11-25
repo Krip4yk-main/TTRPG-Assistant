@@ -105,13 +105,9 @@ describe('notificationLink', () => {
     expect(notificationLink('application.rejected', { gameId: 5 })).toBe('/my-applications');
     expect(notificationLink('session.cancelled', { gameId: 5, sessionId: 2 })).toBe('/games/5');
     expect(notificationLink('game.finished', {})).toBe('/');
-    const deadGameTypes = [
-      'game.stale_reminder',
-      'game.dead',
-      'game.suspicious',
-      'game.closed_by_admin',
-    ] as const;
-    for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/games/5');
+    const deadGameTypes = ['game.stale_reminder', 'game.dead', 'game.suspicious'] as const;
+    for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/my-games');
+    expect(notificationLink('game.closed_by_admin', { gameId: 5 })).toBe('/games/5');
   });
 
   it('rating notifications lead to the rate page (session set via ?session=)', () => {

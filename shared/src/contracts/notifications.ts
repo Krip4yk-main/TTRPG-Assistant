@@ -191,6 +191,10 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   if (type === 'sanction.imposed' || type === 'sanction.lifted' || type === 'appeal.decided') {
     return '/my-sanctions';
   }
+  // Позначки детектора «мертвих» ігор — до «Моїх ігор»: там пояснення й дії «Все ок» / «Закрити».
+  if (type === 'game.stale_reminder' || type === 'game.dead' || type === 'game.suspicious') {
+    return '/my-games';
+  }
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'rating.session_open':

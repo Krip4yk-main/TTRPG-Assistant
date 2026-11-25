@@ -33,7 +33,18 @@ describe('renderNotification', () => {
     expect(text).not.toContain('notify.');
     expect(text).not.toMatch(/\{\w+\}/);
     expect(text).toContain('Прокляття Страда');
-    expect(text).toMatch(/Детальніше: https:\/\/nri\.example\/(games\/12|my-applications)/);
+    expect(text).toMatch(
+      /Детальніше: https:\/\/nri\.example\/(games\/12|my-applications|my-games)/,
+    );
+  });
+
+  it('dead game notices link to «my games»; closed by admin links to the game', () => {
+    for (const kind of ['game.stale_reminder', 'game.dead', 'game.suspicious']) {
+      expect(render(kind).text).toContain('Детальніше: https://nri.example/my-games');
+    }
+    expect(render('game.closed_by_admin').text).toContain(
+      'Детальніше: https://nri.example/games/12',
+    );
   });
 
   it('moderation: resolved complaint without details; digest with the count and the queue link', () => {
