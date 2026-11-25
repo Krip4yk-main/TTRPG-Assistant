@@ -4,6 +4,9 @@ import type { AppDeps } from './app.js';
 import { createHttpServer } from './http-server.js';
 import { createDb } from './db/client.js';
 import { createRedis } from './redis/client.js';
+import { registerJobs } from './jobs/index.js';
+import { ensureRecurring } from './jobs/registry.js';
+import { startWorker, type Worker } from './jobs/worker.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -17,11 +20,20 @@ httpServer.listen(env.PORT, () => {
   console.log(`API listening on :${env.PORT}`);
 });
 
+// Фоновий воркер черги задач (у тестах не запускається — тести викликають runDueJobs).
+let worker: Worker | undefined;
+if (env.NODE_ENV !== 'test') {
+  registerJobs();
+  await ensureRecurring(deps);
+  worker = startWorker(deps);
+}
+
 let shuttingDown = false;
 const shutdown = async (): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
+    await worker?.stop(); // чекає поточну задачу, поки БД/Redis/сокети ще доступні
     await deps.realtime?.close(); // закриває й HTTP-сервер
     if (httpServer.listening) await new Promise<void>((r) => httpServer.close(() => r()));
     await redis.quit();

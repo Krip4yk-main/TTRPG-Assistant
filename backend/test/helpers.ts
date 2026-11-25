@@ -53,6 +53,7 @@ const TABLES = [
   'availability_slots',
   'user_profiles',
   'events',
+  'jobs',
   'identity_tombstones',
   'sessions',
   'auth_identities',

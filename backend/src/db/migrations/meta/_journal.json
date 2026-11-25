@@ -78,6 +78,13 @@
       "when": 1795556171798,
       "tag": "0010_plan3_account_deleted",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1795573777752,
+      "tag": "0011_plan4_jobs",
+      "breakpoints": true
     }
   ]
 }

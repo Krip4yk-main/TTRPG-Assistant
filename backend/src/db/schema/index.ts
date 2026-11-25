@@ -6,6 +6,7 @@ import * as calendar from './calendar.js';
 import * as catalog from './catalog.js';
 import * as events from './events.js';
 import * as games from './games.js';
+import * as jobs from './jobs.js';
 import * as notes from './notes.js';
 import * as profiles from './profiles.js';
 import * as sessions from './sessions.js';
@@ -19,6 +20,7 @@ export * from './calendar.js';
 export * from './catalog.js';
 export * from './events.js';
 export * from './games.js';
+export * from './jobs.js';
 export * from './notes.js';
 export * from './profiles.js';
 export * from './sessions.js';
@@ -37,4 +39,5 @@ export const schema = {
   ...notes,
   ...calendar,
   ...appeals,
+  ...jobs,
 };
