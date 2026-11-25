@@ -433,6 +433,38 @@ describe('GameDetails', () => {
       expect(document.activeElement).toBe(el().querySelector('.notice-area'));
     });
 
+    it('after leaving, «Rate members» appears without a page reload', async () => {
+      await open(me, (r) => r.flush(asMember));
+      await flushMemberExtras();
+      http.expectOne(targetsUrl).flush(emptyTargets);
+      await settle();
+      expect(el().querySelector('a.rate-members-link')).toBeNull();
+
+      nextDialog(true);
+      el().querySelector<HTMLButtonElement>('button.leave')!.click();
+      await settle();
+      expectGame().flush({
+        ...game,
+        viewer: { relation: 'none', applicationId: null, wasMember: true },
+      });
+      await settle();
+      http.expectOne(targetsUrl).flush({
+        ...emptyTargets,
+        targets: [
+          {
+            publicId: 'gggggggggg',
+            nickname: 'Gandalf',
+            avatarUrl: null,
+            role: 'gm',
+            state: 'open',
+            closesAt: null,
+          },
+        ],
+      });
+      await settle();
+      expect(el().querySelector('a.rate-members-link')!.getAttribute('href')).toBe('/games/7/rate');
+    });
+
     it('a member sees the private and the shared notes', async () => {
       await open(me, (r) => r.flush(asMember));
       await flushMemberExtras();

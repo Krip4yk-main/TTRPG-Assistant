@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { RatingInput } from '@nri/shared';
-import { users } from '../../src/db/schema/index.js';
+import { gameSessions, users } from '../../src/db/schema/index.js';
 import {
   pendingRatings,
   playedTogether,
@@ -233,6 +233,19 @@ describe('submission and pending', () => {
     const t = await ratingTargets(deps, a.id, g, null, days(8));
     expect(t.targets.map((x) => x.state)).toEqual(['rated']);
     expect(await code(rate(a, g, gm, days(8)))).toBe('409 RATING_EXISTS');
+  });
+
+  it('a done session without done_at counts from its start (prefilter matches loadFacts)', async () => {
+    const { gm, a } = await people();
+    const g = await fx.game(gm.id);
+    await fx.member(g, a.id, days(0));
+    const s = await fx.done(g, days(3), [a.id]);
+    await db.update(gameSessions).set({ doneAt: null }).where(eq(gameSessions.id, s));
+    // Початок сесії — за 4 год до days(3): вікно 14 днів від нього.
+    const inside = days(16);
+    const p = await pendingRatings(deps, a.id, inside);
+    expect(p.map((x) => [x.gameId, x.sessionId, ids(x)])).toEqual([[g, s, [gm.publicId]]]);
+    expect(await pendingRatings(deps, a.id, days(17))).toEqual([]);
   });
 
   it('pending lists only sets with an open target, nearest deadline first', async () => {

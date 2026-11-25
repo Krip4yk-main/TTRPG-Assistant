@@ -8,7 +8,7 @@ import {
   emitNotificationsNew,
   type NotificationRow,
 } from '../notifications/notifications.service.js';
-import { openRatingSets, type OpenRatingSet } from './ratings.eligibility.js';
+import { openRatingSets, sessionDoneAt, type OpenRatingSet } from './ratings.eligibility.js';
 
 export const RATING_DEADLINE_JOB = 'ratings.deadline';
 export const RATING_DEADLINE_EVERY_MS = 3_600_000;
@@ -50,8 +50,8 @@ export async function sendRatingDeadlines(
       and(
         eq(gameSessions.gameId, games.id),
         eq(gameSessions.status, 'done'),
-        gt(gameSessions.doneAt, s.from),
-        lte(gameSessions.doneAt, s.to),
+        gt(sessionDoneAt, s.from),
+        lte(sessionDoneAt, s.to),
       ),
     );
   const candidates = await deps.db

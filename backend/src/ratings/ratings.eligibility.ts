@@ -26,6 +26,8 @@ export type Q = Db | Tx;
 
 const DAY_MS = 86_400_000;
 const addDays = (d: Date, days: number) => new Date(d.getTime() + days * DAY_MS);
+/** Момент завершення сесії для вікон: `done_at`, а без нього — `starts_at` (як у `loadFacts`). */
+export const sessionDoneAt = sql<Date>`coalesce(${gameSessions.doneAt}, ${gameSessions.startsAt})`;
 /** Вікно, що вже закрите (`finished`/`cancelled` без мітки часу — узгоджено з `pendingRatings`). */
 const CLOSED = new Date(0);
 
@@ -439,7 +441,8 @@ export async function pendingRatings(
       and(
         eq(gameSessions.gameId, games.id),
         eq(gameSessions.status, 'done'),
-        gte(gameSessions.doneAt, sessionSince),
+        // Як у `loadFacts`: без `done_at` (старі записи) — від початку сесії.
+        gte(sessionDoneAt, sessionSince),
       ),
     );
   const list = await db

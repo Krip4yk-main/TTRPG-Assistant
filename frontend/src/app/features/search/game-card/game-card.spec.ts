@@ -123,12 +123,12 @@ describe('GameCard', () => {
     expect(el.querySelector('a[href^="/login"]')).toBeNull();
   });
 
-  it('shows the GM overall rating; nothing when there is none yet', async () => {
+  it('shows the GM overall rating; "no rating yet" when there is none', async () => {
     await render({ ...game, gmRating: 4.25 });
     expect(el.querySelector('.gm .gm-rating')!.textContent).toContain('4,3');
     await render(game);
     expect(el.querySelector('.gm-rating')).toBeNull();
-    expect(el.textContent).not.toContain('ratings.gmRating.none');
+    expect(el.querySelector('.gm .none')!.textContent).toContain('ratings.gmRating.none');
   });
 
   it('restricted card has no rating even if it leaks', async () => {

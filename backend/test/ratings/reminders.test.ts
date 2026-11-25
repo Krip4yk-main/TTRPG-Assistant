@@ -6,6 +6,7 @@ import {
   events,
   gameMembers,
   games,
+  gameSessions,
   notificationPrefs,
   notifications,
   ratingReminderLog,
@@ -401,6 +402,19 @@ describe('ratings.deadline', () => {
     await fx.done(gameId, ago(13), [a.id]);
     expect(await sendRatingDeadlines(deps, new Date(Date.now() - 3 * DAY))).toEqual([]);
     expect(await sendRatingDeadlines(deps, new Date())).toHaveLength(2);
+  });
+
+  it('a done session without done_at is reminded by its start time', async () => {
+    const gm = await user('Майстер');
+    const a = await user('Alpha');
+    const gameId = await fx.game(gm.id);
+    await fx.member(gameId, a.id, ago(20));
+    // Початок — за 4 год до «завершення» 13 днів тому; вікно від початку закривається за ~1 день.
+    const s = await fx.done(gameId, ago(13), [a.id]);
+    await db.update(gameSessions).set({ doneAt: null }).where(eq(gameSessions.id, s));
+    const rows = await sendRatingDeadlines(deps, new Date());
+    expect(rows.map((r) => r.userId).sort()).toEqual([gm.id, a.id].sort());
+    expect(rows[0]!.payload).toMatchObject({ sessionId: s });
   });
 
   it('final sets of finished games; a leave set while the game runs (no deadline) → none', async () => {

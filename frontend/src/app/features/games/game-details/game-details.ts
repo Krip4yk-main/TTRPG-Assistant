@@ -316,6 +316,14 @@ export class GameDetails {
   protected async membersChanged(): Promise<void> {
     this.quiet();
     await this.load(Number(this.id()), true);
+    this.refreshRatingTargets();
+  }
+
+  /** Склад змінився (вихід, виключення) — могли з'явитися «вихідні» оцінки. */
+  private refreshRatingTargets(): void {
+    const g = this.game();
+    const key = this.ratingKey;
+    if (g && key) void this.loadRatingTargets(g.id, key);
   }
 
   /** Власна дія глядача: її ж пінги не мають піднімати банер. */
@@ -348,6 +356,7 @@ export class GameDetails {
       ]);
       if (sessionsOk === false) failed.push('sessions');
       if (membersOk === false) failed.push('members');
+      if (scopes.has('members')) this.refreshRatingTargets();
       // Не вдалося перечитати — області повертаються, банер лишається.
       handle.restore(failed.filter((s) => scopes.has(s)));
     } finally {
@@ -383,6 +392,7 @@ export class GameDetails {
       if (!(await firstValueFrom(ref.afterClosed()))) return;
       this.quiet();
       await this.load(g.id, true);
+      this.refreshRatingTargets();
       this.notice.set({ kind: 'info', key: 'games.details.left' });
       this.focusNotice();
     } finally {
