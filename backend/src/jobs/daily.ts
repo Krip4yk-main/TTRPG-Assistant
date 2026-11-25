@@ -1,6 +1,7 @@
 import { and, eq, inArray, lt, notExists, sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { revokeTokenHashes } from '../auth/session.service.js';
+import { isTransientDbError } from '../db/errors.js';
 import {
   gameApplications,
   gameMembers,
@@ -23,7 +24,8 @@ const PURGE_BATCH = 1000;
 
 /**
  * Зсуває 28-денне вікно сесій для всіх ігор, що набирають або йдуть (ідемпотентно —
- * `materializeSessions`). Збій однієї гри не зупиняє інші (лог), помилка — в кінці.
+ * `materializeSessions`). Збій однієї гри не зупиняє інші (лог);
+ * тимчасова помилка БД прокидається в кінці (задача повторить), інша — лише логується.
  * Повертає кількість створених сесій.
  */
 export async function materializeAll(deps: Pick<AppDeps, 'db'>, now = new Date()): Promise<number> {
@@ -38,7 +40,7 @@ export async function materializeAll(deps: Pick<AppDeps, 'db'>, now = new Date()
       created += await materializeSessions(deps, id, now);
     } catch (err) {
       console.error(`daily: materialize game ${id} failed`, err);
-      failure ??= err;
+      if (isTransientDbError(err)) failure ??= err;
     }
   }
   if (failure) throw failure;
@@ -46,7 +48,8 @@ export async function materializeAll(deps: Pick<AppDeps, 'db'>, now = new Date()
 }
 
 /**
- * Видаляє незавершені реєстрації (`pending`), старші 7 днів, без заявок, ігор і членств.
+ * Видаляє незавершені реєстрації (`pending`, не забанені), старші 7 днів, без заявок, ігор і
+ * членств.
  * Видалення акаунта (`deleteAccount`) — надгробок для активних користувачів; у `pending`
  * немає публічних слідів, тож рядок видаляється повністю (FK — CASCADE: ідентичності,
  * сесії, профіль тощо). Умови повторюються в самому DELETE (гонка з завершенням
@@ -59,6 +62,8 @@ export async function purgePendingUsers(
   const cutoff = new Date(now.getTime() - PENDING_USER_TTL_DAYS * DAY_MS);
   const stale = and(
     eq(users.status, 'pending'),
+    // Забанений pending-акаунт лишається: видалення стерло б бан, і людина зареєструвалась би знову.
+    eq(users.isBanned, false),
     lt(users.createdAt, cutoff),
     notExists(
       deps.db
@@ -147,7 +152,8 @@ export async function purgeReminderLog(
 
 /**
  * Щоденне обслуговування (03:00 UTC). Кроки ізольовані: збій одного логується й не
- * скасовує інші; якщо щось упало — помилка в кінці (задача повторить; усі кроки ідемпотентні).
+ * скасовує інші. Якщо був тимчасовий збій БД — помилка в кінці (задача повторить; усі кроки
+ * ідемпотентні); нетимчасові помилки лише логуються (повтор їх не виправить).
  */
 export async function runDaily(deps: AppDeps, now = new Date()): Promise<void> {
   const steps: [string, () => Promise<number>][] = [
@@ -162,7 +168,7 @@ export async function runDaily(deps: AppDeps, now = new Date()): Promise<void> {
       await step();
     } catch (err) {
       console.error(`daily: ${name} failed`, err);
-      failure ??= err;
+      if (isTransientDbError(err)) failure ??= err;
     }
   }
   if (failure) throw failure;

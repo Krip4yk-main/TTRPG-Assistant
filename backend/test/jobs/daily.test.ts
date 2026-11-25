@@ -90,13 +90,14 @@ describe('materializeAll', () => {
     expect(await materializeAll(deps, new Date(NOW.getTime() + 7 * DAY))).toBe(0);
   });
 
-  it('one failing game does not stop the others; the error surfaces at the end', async () => {
+  it('a non-transient failure of one game is logged and does not stop the others or fail the job', async () => {
     // Невідомий пояс — розгортання правила падає саме для цієї гри.
     await insertGame({ timezone: 'Nowhere/Invalid' });
     const b = await insertGame();
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      await expect(materializeAll(deps, NOW)).rejects.toThrow();
+      expect(await materializeAll(deps, NOW)).toBe(4);
+      expect(spy).toHaveBeenCalled();
     } finally {
       spy.mockRestore();
     }
@@ -105,7 +106,7 @@ describe('materializeAll', () => {
 });
 
 describe('purgePendingUsers', () => {
-  it('deletes stale pending users without applications/games/memberships, keeps the rest', async () => {
+  it('deletes stale pending users without applications/games/memberships, keeps the rest (incl. banned)', async () => {
     const stale = await createUser(db, { status: 'pending', createdAt: daysAgo(8) });
     await db
       .insert(authIdentities)
@@ -114,6 +115,11 @@ describe('purgePendingUsers', () => {
     expect(await resolveSession(deps, token)).not.toBeNull(); // кеш сесії в Redis
 
     const fresh = await createUser(db, { status: 'pending', createdAt: daysAgo(6) });
+    const banned = await createUser(db, {
+      status: 'pending',
+      isBanned: true,
+      createdAt: daysAgo(30),
+    });
     const active = await createUser(db, { status: 'active', createdAt: daysAgo(30) });
     const gm = await createUser(db, { status: 'pending', createdAt: daysAgo(30) });
     await insertGame({ gmUserId: gm.id, status: 'draft', publishedAt: null });
@@ -132,10 +138,10 @@ describe('purgePendingUsers', () => {
       await db
         .select({ id: users.id })
         .from(users)
-        .where(inArray(users.id, [stale.id, fresh.id, active.id, gm.id, applicant.id]))
+        .where(inArray(users.id, [stale.id, fresh.id, banned.id, active.id, gm.id, applicant.id]))
     ).map((u) => u.id);
     expect(left.sort((x, y) => x - y)).toEqual(
-      [fresh.id, active.id, gm.id, applicant.id].sort((x, y) => x - y),
+      [fresh.id, banned.id, active.id, gm.id, applicant.id].sort((x, y) => x - y),
     );
     expect(
       await db.select().from(authIdentities).where(eq(authIdentities.userId, stale.id)),
@@ -193,7 +199,8 @@ describe('purges', () => {
     const gameId = await insertGame();
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      await expect(runDaily(deps, NOW)).rejects.toThrow();
+      await expect(runDaily(deps, NOW)).resolves.toBeUndefined(); // не-тимчасова — без повтору
+      expect(spy).toHaveBeenCalled();
     } finally {
       spy.mockRestore();
     }

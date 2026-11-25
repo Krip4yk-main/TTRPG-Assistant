@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
 import { DEFAULT_REMINDER_OFFSETS, REMINDER_OFFSETS } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { isDuplicateKey, isTransientDbError } from '../db/errors.js';
@@ -39,8 +39,8 @@ type Planned = { session: SessionCandidate; userId: number; offsetMin: number };
 
 /**
  * Нагадування перед сесіями для вікна задачі, що запланована на `runAt`: офсет `o`
- * спрацьовує, якщо момент `starts_at − o` ∈ (runAt − запас, runAt + 5 хв], а сесія ще не
- * почалась (`starts_at > now`). Лише `scheduled` сесії опублікованих ігор, що набирають або
+ * спрацьовує, якщо момент `starts_at − o` ∈ [max(runAt, now) − запас, runAt + 5 хв), а сесія ще
+ * не почалась (`starts_at > now`). Лише `scheduled` сесії опублікованих ігор, що набирають або
  * йдуть. Отримувачі — майстер і активні учасники (`left_at IS NULL`, акаунт активний, не
  * забанений), у чиїх `reminderOffsets` є цей офсет (без рядка prefs — за замовчуванням).
  *
@@ -48,21 +48,24 @@ type Planned = { session: SessionCandidate; userId: number; offsetMin: number };
  * паралельний прогін нічого не дублює, а перенесена сесія отримує нагадування за новим часом.
  * Кожна сесія — окрема транзакція (рядок сесії під S-блокуванням і перевіркою, що вона досі
  * `scheduled` з тим самим часом). Пінги `notification.new` — після коміту.
- * Якщо якась сесія впала, решта все одно обробляються, а помилка прокидається в кінці
- * (задача повторить; уже надіслане не дублюється).
+ * Тимчасова помилка БД прокидається (задача повторить; надіслане не дублюється); інша
+ * помилка однієї сесії логується, решта сесій обробляються, задача завершується успішно.
  */
 export async function sendReminders(
   deps: AppDeps,
   runAt: Date,
   now: Date = new Date(),
 ): Promise<NotificationRow[]> {
-  const windowFrom = runAt.getTime() - REMINDER_GRACE_MS;
+  // Напіввідкрите вікно [from, to): сусідні слоти не перетинаються на межі. Нижня межа
+  // прив'язана й до реального часу: задача, що прокинулась через години після свого слоту,
+  // не «доганяє» нагадування старші за запас (P4-13).
+  const windowFrom = Math.max(runAt.getTime(), now.getTime()) - REMINDER_GRACE_MS;
   const windowTo = runAt.getTime() + REMINDERS_EVERY_MS;
+  if (windowFrom >= windowTo) return [];
   const offsets = [...REMINDER_OFFSETS];
   const minOff = Math.min(...offsets) * MIN;
   const maxOff = Math.max(...offsets) * MIN;
 
-  const lower = new Date(Math.max(now.getTime(), windowFrom + minOff));
   const sessions: SessionCandidate[] = await deps.db
     .select({
       id: gameSessions.id,
@@ -76,8 +79,9 @@ export async function sendReminders(
     .where(
       and(
         eq(gameSessions.status, 'scheduled'),
-        gt(gameSessions.startsAt, lower),
-        lte(gameSessions.startsAt, new Date(windowTo + maxOff)),
+        gt(gameSessions.startsAt, now),
+        gte(gameSessions.startsAt, new Date(windowFrom + minOff)),
+        lt(gameSessions.startsAt, new Date(windowTo + maxOff)),
         inArray(games.status, [...RUNNING_GAME_STATUSES]),
         isNotNull(games.publishedAt),
       ),
@@ -88,7 +92,7 @@ export async function sendReminders(
     if (start <= now.getTime()) return [];
     const hit = offsets.filter((o) => {
       const moment = start - o * MIN;
-      return moment > windowFrom && moment <= windowTo;
+      return moment >= windowFrom && moment < windowTo;
     });
     return hit.length ? [{ session: s, offsets: hit }] : [];
   });
@@ -138,19 +142,19 @@ export async function sendReminders(
   }
 
   const created: NotificationRow[] = [];
-  let failure: unknown;
   for (const planned of bySession.values()) {
+    // Сталий порядок вставок у reminder_log: паралельні прогони не блокують одне одного по колу.
+    planned.sort((a, b) => a.userId - b.userId || a.offsetMin - b.offsetMin);
     try {
       const rows = await remindSession(deps, planned);
       emitNotificationsNew(deps, rows);
       created.push(...rows);
     } catch (err) {
       if (isTransientDbError(err)) throw err;
+      // Нетимчасова помилка однієї сесії не валить задачу (повтор її не виправить).
       console.error(`reminders: session ${planned[0]!.session.id} failed`, err);
-      failure ??= err;
     }
   }
-  if (failure) throw failure;
   return created;
 }
 
@@ -158,6 +162,9 @@ async function remindSession(deps: AppDeps, planned: Planned[]): Promise<Notific
   const { session } = planned[0]!;
   return deps.db.transaction(async (tx) => {
     // Скасування/перенесення бере X-блокування рядка: після нього сесію вже не впізнаємо.
+    // Членство й статус гри тут свідомо не перевіряються повторно: вихід/виключення чи
+    // завершення гри в ці мілісекунди дасть щонайбільше одне зайве нагадування (прийнято;
+    // завершення/скасування гри й так скасовує майбутні сесії під X-блокуванням).
     const [still] = await tx
       .select({ id: gameSessions.id })
       .from(gameSessions)

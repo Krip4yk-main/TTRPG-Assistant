@@ -132,6 +132,24 @@ describe('session reminders', () => {
     expect(await reminders()).toHaveLength(0);
   });
 
+  it('half-open window: a moment at runAt fires in that run, at runAt + 5 min only in the next', async () => {
+    await party();
+    const moment = runFor(T, 60).getTime();
+    await sendReminders(deps, at(moment - 5 * MIN)); // момент рівно на межі вікна — не цей запуск
+    expect(await reminders()).toHaveLength(0);
+    await sendReminders(deps, at(moment)); // наступний слот: момент = runAt
+    expect(await reminders()).toHaveLength(3);
+  });
+
+  it('a job that runs hours after its slot does not catch up stale reminders', async () => {
+    await party();
+    const runAt = runFor(T, 1440); // слот «за 24 год»
+    await sendReminders(deps, runAt, at(runAt.getTime() + 2 * HOUR)); // воркер лежав 2 год
+    expect(await reminders()).toHaveLength(0);
+    await sendReminders(deps, runAt, at(runAt.getTime() + 10 * MIN)); // у межах запасу — так
+    expect(await reminders()).toHaveLength(3);
+  });
+
   it('rerun, overlapping windows and concurrent runs do not duplicate', async () => {
     await party();
     const runAt = runFor(T, 60);
