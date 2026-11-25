@@ -1,0 +1,72 @@
+<p class="nri-muted intro">
+  {{ (isOwner() ? 'admin.roles.introOwner' : 'admin.roles.introAdmin') | translate }}
+</p>
+
+<form class="toolbar search" role="search" [formGroup]="form" (ngSubmit)="search()">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="query">
+    <mat-label>{{ 'admin.users.search' | translate }}</mat-label>
+    <input matInput class="q" formControlName="q" maxlength="32" autocomplete="off" />
+    <mat-hint>{{ 'admin.users.searchHint' | translate }}</mat-hint>
+  </mat-form-field>
+  <button mat-flat-button type="submit" class="find">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    {{ 'admin.users.find' | translate }}
+  </button>
+</form>
+
+<ul class="list users">
+  @for (u of list.items(); track u.publicId) {
+    @let opts = options(u);
+    <li class="nri-card row" [attr.data-user]="u.publicId">
+      <a class="name" [routerLink]="['/admin/users', u.publicId]">
+        @if (u.status === 'deleted') {
+          <span class="nri-muted">{{ 'user.deleted' | translate }}</span>
+        } @else {
+          {{ u.nickname || ('user.noNickname' | translate) }}
+        }
+      </a>
+      @if (opts.length) {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="role-field">
+          <mat-label>{{ 'admin.roles.role' | translate }}</mat-label>
+          <mat-select
+            class="role-select"
+            [value]="selected(u)"
+            (selectionChange)="pick(u, $event.value)"
+          >
+            @for (r of opts; track r) {
+              <mat-option [value]="r">{{ 'admin.roles.names.' + r | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button
+          mat-stroked-button
+          type="button"
+          class="save"
+          [disabled]="selected(u) === u.role || busy() === u.publicId"
+          (click)="save(u)"
+        >
+          {{ 'common.save' | translate }}
+        </button>
+      } @else {
+        <span class="status role">{{ 'admin.roles.names.' + u.role | translate }}</span>
+      }
+      @if (isOwner() && u.role === 'admin' && u.status === 'active' && !u.isBanned) {
+        <button mat-button type="button" class="transfer danger" (click)="transfer(u)">
+          {{ 'admin.transfer.button' | translate }}
+        </button>
+      }
+      @if (notice(); as n) {
+        @if (n.publicId === u.publicId) {
+          <p
+            class="row-notice"
+            [class.nri-alert]="n.error"
+            [attr.role]="n.error ? 'alert' : 'status'"
+          >
+            {{ n.key | translate }}
+          </p>
+        }
+      }
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" emptyKey="admin.users.empty" />

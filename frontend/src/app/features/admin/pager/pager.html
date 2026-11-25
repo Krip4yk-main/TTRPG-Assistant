@@ -1,0 +1,19 @@
+@let l = list();
+@if (l.error()) {
+  <div class="nri-alert load-error" role="alert">
+    <span>{{ 'admin.loadError' | translate }}</span>
+    <button mat-stroked-button type="button" (click)="retry()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+} @else if (l.loading()) {
+  <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+} @else if (l.loaded() && !l.items().length) {
+  <p class="nri-muted empty">{{ emptyKey() | translate }}</p>
+} @else if (l.hasMore()) {
+  <div class="more">
+    <button mat-stroked-button type="button" class="load-more" (click)="l.more()">
+      {{ 'admin.more' | translate }}
+    </button>
+  </div>
+}

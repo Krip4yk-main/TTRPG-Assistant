@@ -1,0 +1,47 @@
+<h2 mat-dialog-title>{{ data.title | translate: data.params }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    @if (data.text) {
+      <p class="explain">{{ data.text | translate: data.params }}</p>
+    }
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ data.label | translate }}</mat-label>
+      <textarea
+        matInput
+        class="text"
+        rows="4"
+        [required]="data.required"
+        formControlName="text"
+        [attr.maxlength]="max"
+      ></textarea>
+      <mat-hint align="end">{{
+        'moderation.counter' | translate: { count: length(), max: max }
+      }}</mat-hint>
+      @if (text.hasError('required')) {
+        <mat-error>{{ 'admin.reasonRequired' | translate }}</mat-error>
+      } @else if (text.hasError('maxlength')) {
+        <mat-error>{{ 'moderation.tooLong' | translate: { max: max } }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" cdkFocusInitial (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      class="confirm"
+      [class.danger]="data.danger"
+      [disabled]="submitting()"
+    >
+      {{ data.confirm | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

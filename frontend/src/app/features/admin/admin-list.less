@@ -1,0 +1,113 @@
+// Спільна розкладка вкладок адмінки: фільтри, список карток, статуси, дії.
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-md);
+  margin-bottom: var(--nri-space-md);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+
+  p {
+    margin: 0;
+  }
+}
+
+.item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+
+  h2,
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--nri-space-xs) var(--nri-space-lg);
+  margin: 0;
+
+  dt {
+    color: var(--nri-text-muted);
+    font-size: 0.8rem;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border-left: 3px solid var(--nri-border);
+  background: var(--nri-surface-sunken);
+  border-radius: var(--nri-radius-sm);
+}
+
+.status {
+  padding: 0 var(--nri-space-sm);
+  border: 1px solid var(--nri-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: nowrap;
+
+  &[data-status='new'],
+  &[data-status='pending'],
+  &[data-status='active'] {
+    border-color: var(--nri-new-highlight-border);
+    background: var(--nri-new-highlight);
+  }
+
+  &[data-status='actioned'],
+  &[data-status='rejected'] {
+    color: var(--nri-danger-text);
+  }
+
+  &[data-status='accepted'] {
+    color: var(--nri-success-text);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nri-space-sm);
+}
+
+.danger {
+  color: var(--nri-danger-text);
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-md);
+}
+
+.notice-area {
+  outline: none;
+}

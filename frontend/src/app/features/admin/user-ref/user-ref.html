@@ -1,0 +1,16 @@
+@if (user(); as u) {
+  <a class="user-link" [routerLink]="['/admin/users', u.publicId]">
+    @if (u.nickname) {
+      {{ u.nickname }}
+    } @else {
+      <span class="deleted">{{ 'user.deleted' | translate }}</span>
+    }
+  </a>
+  @if (u.role !== 'user') {
+    <span class="role" [attr.data-role]="u.role">{{
+      'admin.roles.names.' + u.role | translate
+    }}</span>
+  }
+} @else {
+  <span class="empty">{{ emptyKey() | translate }}</span>
+}

@@ -97,6 +97,12 @@
           <mat-icon aria-hidden="true">settings</mat-icon>
           <span>{{ 'shell.account' | translate }}</span>
         </a>
+        @if (isStaff()) {
+          <a mat-menu-item class="admin-link" routerLink="/admin">
+            <mat-icon aria-hidden="true">shield</mat-icon>
+            <span>{{ 'shell.admin' | translate }}</span>
+          </a>
+        }
       }
       <button mat-menu-item type="button" (click)="logout()">
         <mat-icon aria-hidden="true">logout</mat-icon>

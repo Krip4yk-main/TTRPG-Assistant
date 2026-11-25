@@ -1,0 +1,71 @@
+<div class="toolbar">
+  <mat-button-toggle-group
+    class="filter"
+    hideSingleSelectionIndicator
+    [value]="filter()"
+    (change)="setFilter($event.value)"
+    [attr.aria-label]="'admin.filter' | translate"
+  >
+    @for (f of filters; track f) {
+      <mat-button-toggle [value]="f">{{
+        'admin.ratings.filter.' + f | translate
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</div>
+
+<ul class="list">
+  @for (r of list.items(); track r.id) {
+    <li class="nri-card item rating" [attr.data-rating]="r.id">
+      <div class="item-head">
+        <h2>
+          <span class="score">{{ 'admin.ratings.overall' | translate: { n: r.overall } }}</span>
+        </h2>
+        <span class="status">{{ 'admin.ratings.roles.' + r.role | translate }}</span>
+        <span class="status">{{ 'admin.ratings.kinds.' + r.kind | translate }}</span>
+        <span class="nri-muted">{{ r.createdAt | adminDate }}</span>
+      </div>
+      <dl class="meta">
+        <div>
+          <dt>{{ 'admin.ratings.rater' | translate }}</dt>
+          <dd><nri-admin-user-ref [user]="r.rater" emptyKey="user.deleted" /></dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.ratings.ratee' | translate }}</dt>
+          <dd><nri-admin-user-ref [user]="r.ratee" emptyKey="user.deleted" /></dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.ratings.game' | translate }}</dt>
+          <dd>
+            <a [routerLink]="['/games', r.game.id]">{{ r.game.title }}</a>
+          </dd>
+        </div>
+      </dl>
+      @if (criteria(r); as list) {
+        @if (list.length) {
+          <ul class="criteria">
+            @for (c of list; track c.key) {
+              <li>{{ 'ratings.criteria.' + c.key + '.name' | translate }}: {{ c.value }}</li>
+            }
+          </ul>
+        }
+      }
+      @if (r.comment) {
+        <p class="text comment">{{ r.comment }}</p>
+      } @else {
+        <p class="nri-muted">{{ 'admin.ratings.noComment' | translate }}</p>
+      }
+      <div class="actions">
+        @if (r.comment) {
+          <button mat-stroked-button type="button" class="hide-text" (click)="hideText(r)">
+            {{ 'admin.ratings.hide' | translate }}
+          </button>
+        }
+        <button mat-stroked-button type="button" class="cancel-rating danger" (click)="cancel(r)">
+          {{ 'admin.ratings.cancel' | translate }}
+        </button>
+      </div>
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" emptyKey="admin.ratings.empty" />

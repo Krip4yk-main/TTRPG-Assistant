@@ -1,0 +1,78 @@
+<div class="toolbar">
+  <mat-button-toggle-group
+    class="filter"
+    hideSingleSelectionIndicator
+    [value]="filter()"
+    (change)="setFilter($event.value)"
+    [attr.aria-label]="'admin.filter' | translate"
+  >
+    @for (f of filters; track f) {
+      <mat-button-toggle [value]="f">{{
+        'admin.appeals.filter.' + f | translate
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</div>
+
+<ul class="list">
+  @for (a of list.items(); track a.id) {
+    <li class="nri-card item appeal" [attr.data-appeal]="a.id">
+      <div class="item-head">
+        <h2><nri-admin-user-ref [user]="a.user" emptyKey="user.deleted" /></h2>
+        <span class="status" [attr.data-status]="a.status">{{
+          'admin.appeals.status.' + a.status | translate
+        }}</span>
+        <span class="nri-muted">{{ a.createdAt | adminDate }}</span>
+      </div>
+      <dl class="meta">
+        <div>
+          <dt>{{ 'admin.appeals.sanction' | translate }}</dt>
+          <dd>
+            {{ 'moderation.sanctionTypes.' + a.sanctionType | translate }}
+            ·
+            @if (a.sanctionEndsAt) {
+              {{ 'moderation.until' | translate: { date: (a.sanctionEndsAt | adminDate) } }}
+            } @else {
+              {{ 'moderation.forever' | translate }}
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.appeals.sanctionReason' | translate }}</dt>
+          <dd>{{ a.sanctionReason }}</dd>
+        </div>
+        @if (a.status !== 'pending') {
+          <div>
+            <dt>{{ 'admin.appeals.decided' | translate }}</dt>
+            <dd class="decided">
+              @if (migrated(a)) {
+                <span class="nri-muted migrated">{{ 'admin.appeals.migrated' | translate }}</span>
+              } @else {
+                <nri-admin-user-ref [user]="a.decidedBy" />
+                <span class="nri-muted">{{ a.decidedAt | adminDate }}</span>
+              }
+            </dd>
+          </div>
+        }
+      </dl>
+      <p class="text message">{{ a.message }}</p>
+      @if (a.decisionNote) {
+        <p class="note">
+          <span class="nri-muted">{{ 'admin.appeals.note' | translate }}:</span>
+          {{ a.decisionNote }}
+        </p>
+      }
+      @if (a.status === 'pending') {
+        <div class="actions">
+          <button mat-stroked-button type="button" class="reject" (click)="decide(a, false)">
+            {{ 'admin.appeals.reject' | translate }}
+          </button>
+          <button mat-flat-button type="button" class="accept" (click)="decide(a, true)">
+            {{ 'admin.appeals.accept' | translate }}
+          </button>
+        </div>
+      }
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" />

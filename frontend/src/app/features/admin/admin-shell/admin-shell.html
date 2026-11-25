@@ -1,0 +1,24 @@
+<section class="nri-page admin">
+  <h1>{{ 'admin.title' | translate }}</h1>
+  <nav
+    mat-tab-nav-bar
+    class="tabs"
+    [tabPanel]="panel"
+    [attr.aria-label]="'admin.title' | translate"
+  >
+    @for (t of tabs(); track t.path) {
+      <a
+        mat-tab-link
+        [routerLink]="t.path"
+        routerLinkActive
+        #rla="routerLinkActive"
+        [active]="rla.isActive"
+        [attr.data-tab]="t.path"
+        >{{ t.label | translate }}</a
+      >
+    }
+  </nav>
+  <mat-tab-nav-panel #panel class="panel">
+    <router-outlet />
+  </mat-tab-nav-panel>
+</section>

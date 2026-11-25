@@ -1,0 +1,74 @@
+<div class="toolbar">
+  <mat-button-toggle-group
+    class="filter"
+    hideSingleSelectionIndicator
+    [value]="filter()"
+    (change)="setFilter($event.value)"
+    [attr.aria-label]="'admin.filter' | translate"
+  >
+    @for (f of filters; track f) {
+      <mat-button-toggle [value]="f">{{
+        'admin.complaints.filter.' + f | translate
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</div>
+
+<ul class="list">
+  @for (c of items(); track c.id) {
+    <li class="nri-card item complaint" [attr.data-complaint]="c.id">
+      <div class="item-head">
+        <h2>{{ 'moderation.reasons.' + c.reason | translate }}</h2>
+        <span class="status" [attr.data-status]="c.status">{{
+          'admin.complaints.status.' + c.status | translate
+        }}</span>
+        <span class="nri-muted">{{ c.createdAt | adminDate }}</span>
+      </div>
+      <dl class="meta">
+        <div>
+          <dt>{{ 'admin.complaints.target' | translate }}</dt>
+          <dd class="target">
+            @if (c.targetGame; as g) {
+              {{ 'admin.complaints.game' | translate }}
+              <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+            } @else {
+              <nri-admin-user-ref [user]="c.targetUser" emptyKey="user.deleted" />
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.complaints.reporter' | translate }}</dt>
+          <dd class="reporter">
+            <nri-admin-user-ref [user]="c.reporter" emptyKey="admin.hidden" />
+          </dd>
+        </div>
+        @if (c.status !== 'new') {
+          <div>
+            <dt>{{ 'admin.complaints.resolved' | translate }}</dt>
+            <dd>
+              <nri-admin-user-ref [user]="c.resolvedBy" />
+              <span class="nri-muted">{{ c.resolvedAt | adminDate }}</span>
+            </dd>
+          </div>
+        }
+      </dl>
+      @if (c.message) {
+        <p class="text">{{ c.message }}</p>
+      } @else {
+        <p class="nri-muted">{{ 'admin.complaints.noMessage' | translate }}</p>
+      }
+      @if (c.status === 'new') {
+        <div class="actions">
+          <button mat-stroked-button type="button" class="dismiss" (click)="dismiss(c)">
+            {{ 'admin.complaints.dismiss' | translate }}
+          </button>
+          <button mat-flat-button type="button" class="take-action" (click)="action(c)">
+            <mat-icon aria-hidden="true">gavel</mat-icon>
+            {{ 'admin.complaints.action' | translate }}
+          </button>
+        </div>
+      }
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" />

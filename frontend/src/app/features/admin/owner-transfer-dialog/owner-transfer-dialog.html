@@ -1,0 +1,33 @@
+<h2 mat-dialog-title>{{ 'admin.transfer.title' | translate }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p class="nri-alert warning">
+      {{ 'admin.transfer.warning' | translate: { name: data.nickname } }}
+    </p>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{
+        'admin.transfer.confirmLabel' | translate: { name: data.nickname }
+      }}</mat-label>
+      <input matInput class="nickname" formControlName="nickname" autocomplete="off" />
+      <mat-hint>{{ 'admin.transfer.confirmHint' | translate }}</mat-hint>
+    </mat-form-field>
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" cdkFocusInitial (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      class="confirm danger"
+      [disabled]="!matches() || submitting()"
+    >
+      {{ 'admin.transfer.confirm' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -129,6 +129,11 @@ export const routes: Routes = [
       import('./features/calendar/calendar-page/calendar-page').then((m) => m.CalendarPage),
   },
   {
+    // Розділ персоналу — окремий чанк; доступ за роллю перевіряє guard усередині.
+    path: 'admin',
+    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+  },
+  {
     path: 'about',
     title: 'titles.about',
     loadComponent: () => import('./features/about/about').then((m) => m.About),

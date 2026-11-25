@@ -1,0 +1,172 @@
+<a class="back" routerLink="/admin/users">
+  <mat-icon aria-hidden="true">arrow_back</mat-icon>
+  {{ 'admin.users.back' | translate }}
+</a>
+
+@switch (state()) {
+  @case ('loading') {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+  @case ('notFound') {
+    <p class="nri-card">{{ 'admin.users.notFound' | translate }}</p>
+  }
+  @case ('error') {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'admin.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retry()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+  @case ('ready') {
+    @if (user(); as u) {
+      <header class="nri-card item head">
+        <div class="item-head">
+          <h2 class="name">
+            @if (u.status === 'deleted') {
+              {{ 'user.deleted' | translate }}
+            } @else {
+              {{ u.nickname || ('user.noNickname' | translate) }}
+            }
+          </h2>
+          <span class="status role">{{ 'admin.roles.names.' + u.role | translate }}</span>
+          @if (u.isBanned) {
+            <span class="status" data-status="actioned">{{
+              'moderation.blocked' | translate
+            }}</span>
+          }
+        </div>
+        <dl class="meta">
+          <div>
+            <dt>{{ 'admin.users.publicId' | translate }}</dt>
+            <dd class="public-id">{{ u.publicId }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'admin.users.accountStatus' | translate }}</dt>
+            <dd>{{ 'admin.users.statuses.' + u.status | translate }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'admin.users.registered' | translate }}</dt>
+            <dd>{{ u.createdAt | adminDate }}</dd>
+          </div>
+        </dl>
+        <div class="actions">
+          @if (u.status !== 'deleted') {
+            <a mat-button [routerLink]="['/users', u.publicId]">
+              {{ 'admin.users.publicProfile' | translate }}
+            </a>
+          }
+          @if (imposable().length) {
+            <button mat-flat-button type="button" class="impose" (click)="impose()">
+              <mat-icon aria-hidden="true">gavel</mat-icon>
+              {{ 'admin.users.impose' | translate }}
+            </button>
+          }
+        </div>
+        <div class="notice-area" aria-live="polite">
+          @if (notice(); as key) {
+            <p class="nri-notice">{{ key | translate }}</p>
+          }
+        </div>
+      </header>
+
+      <section class="block" aria-labelledby="user-sanctions">
+        <h2 id="user-sanctions">{{ 'admin.users.sanctions' | translate }}</h2>
+        <ul class="list">
+          @for (s of u.sanctions; track s.id) {
+            @let st = sanctionState(s);
+            <li class="nri-card item sanction" [attr.data-sanction]="s.id">
+              <div class="item-head">
+                <h3>{{ 'moderation.sanctionTypes.' + s.type | translate }}</h3>
+                <span class="status" [attr.data-status]="st">{{
+                  'admin.users.sanctionState.' + st | translate
+                }}</span>
+              </div>
+              <p class="text">{{ s.reason }}</p>
+              <dl class="meta">
+                <div>
+                  <dt>{{ 'admin.users.period' | translate }}</dt>
+                  <dd>
+                    {{ s.startsAt | adminDate }} —
+                    @if (s.endsAt) {
+                      {{ s.endsAt | adminDate }}
+                    } @else {
+                      {{ 'moderation.forever' | translate }}
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ 'admin.users.imposedBy' | translate }}</dt>
+                  <dd><nri-admin-user-ref [user]="s.imposedBy" /></dd>
+                </div>
+                @if (st === 'lifted') {
+                  <div>
+                    <dt>{{ 'admin.users.liftedBy' | translate }}</dt>
+                    <dd>
+                      <nri-admin-user-ref [user]="s.liftedBy" />
+                      <span class="nri-muted">{{ s.liftedAt | adminDate }}</span>
+                    </dd>
+                  </div>
+                }
+                @if (s.appealStatus) {
+                  <div>
+                    <dt>{{ 'admin.users.appeal' | translate }}</dt>
+                    <dd>{{ 'admin.appeals.status.' + s.appealStatus | translate }}</dd>
+                  </div>
+                }
+              </dl>
+              @if (canLift(s)) {
+                <div class="actions">
+                  <button mat-stroked-button type="button" class="lift" (click)="lift(s)">
+                    {{ 'admin.users.lift' | translate }}
+                  </button>
+                </div>
+              }
+            </li>
+          } @empty {
+            <li class="nri-muted">{{ 'admin.users.noSanctions' | translate }}</li>
+          }
+        </ul>
+      </section>
+
+      <section class="block" aria-labelledby="user-complaints">
+        <h2 id="user-complaints">{{ 'admin.users.complaints' | translate }}</h2>
+        <ul class="list">
+          @for (c of u.complaints; track c.id) {
+            <li class="nri-card item complaint" [attr.data-complaint]="c.id">
+              <div class="item-head">
+                <h3>{{ 'moderation.reasons.' + c.reason | translate }}</h3>
+                <span class="status" [attr.data-status]="c.status">{{
+                  'admin.complaints.status.' + c.status | translate
+                }}</span>
+                <span class="nri-muted">{{ c.createdAt | adminDate }}</span>
+              </div>
+              <dl class="meta">
+                @if (c.targetGame; as g) {
+                  <div>
+                    <dt>{{ 'admin.complaints.target' | translate }}</dt>
+                    <dd>
+                      {{ 'admin.complaints.game' | translate }}
+                      <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+                    </dd>
+                  </div>
+                }
+                <div>
+                  <dt>{{ 'admin.complaints.reporter' | translate }}</dt>
+                  <dd class="reporter">
+                    <nri-admin-user-ref [user]="c.reporter" emptyKey="admin.hidden" />
+                  </dd>
+                </div>
+              </dl>
+              @if (c.message) {
+                <p class="text">{{ c.message }}</p>
+              }
+            </li>
+          } @empty {
+            <li class="nri-muted">{{ 'admin.users.noComplaints' | translate }}</li>
+          }
+        </ul>
+      </section>
+    }
+  }
+}

@@ -1,0 +1,70 @@
+<h2 mat-dialog-title>{{ 'admin.sanction.title' | translate: { name: data.name } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    @if (data.gmOfGame) {
+      <p class="nri-muted gm-note">
+        {{ 'admin.sanction.gmOfGame' | translate: { title: data.gmOfGame } }}
+      </p>
+    }
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.sanction.type' | translate }}</mat-label>
+      <mat-select class="type" formControlName="type" required>
+        @for (t of types; track t) {
+          <mat-option [value]="t">{{ 'moderation.sanctionTypes.' + t | translate }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.type.hasError('required')) {
+        <mat-error>{{ 'admin.sanction.typeRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.sanction.duration' | translate }}</mat-label>
+      <mat-select class="duration" formControlName="duration" required>
+        @for (d of durations; track d) {
+          <mat-option [value]="d">{{ 'admin.durations.' + d | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.sanction.reason' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="reason"
+        rows="4"
+        required
+        formControlName="reason"
+        [attr.maxlength]="max"
+      ></textarea>
+      <mat-hint>{{ 'admin.sanction.reasonHint' | translate }}</mat-hint>
+      <mat-hint align="end">{{
+        'moderation.counter' | translate: { count: length(), max: max }
+      }}</mat-hint>
+      @if (form.controls.reason.hasError('required')) {
+        <mat-error>{{ 'admin.reasonRequired' | translate }}</mat-error>
+      } @else if (form.controls.reason.hasError('maxlength')) {
+        <mat-error>{{ 'moderation.tooLong' | translate: { max: max } }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (isBan()) {
+      <p class="nri-alert ban-note">{{ 'admin.sanction.banNote' | translate }}</p>
+    }
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="send danger" [disabled]="submitting()">
+      {{ 'admin.sanction.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

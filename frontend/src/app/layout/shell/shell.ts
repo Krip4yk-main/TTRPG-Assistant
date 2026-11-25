@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -38,6 +38,11 @@ export class Shell {
   protected readonly auth = inject(AuthStore);
   protected readonly viewMode = inject(ViewModeStore);
   private readonly router = inject(Router);
+  /** Персонал (модератор і вище) бачить у меню «Адмінку». */
+  protected readonly isStaff = computed(() => {
+    const role = this.auth.me()?.role;
+    return this.auth.isActive() && !!role && role !== 'user';
+  });
 
   protected setMode(mode: ViewMode): void {
     this.viewMode.setMode(mode);

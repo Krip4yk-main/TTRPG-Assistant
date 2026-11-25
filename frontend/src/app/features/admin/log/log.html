@@ -1,0 +1,26 @@
+<ul class="list log">
+  @for (e of list.items(); track e.id) {
+    <li class="nri-card entry" [attr.data-entry]="e.id">
+      <span class="when nri-muted">{{ e.createdAt | adminDate }}</span>
+      <span class="actor"><nri-admin-user-ref [user]="e.actor" /></span>
+      <span class="action">
+        @if (actionKey(e.action); as key) {
+          {{ key | translate }}
+        } @else {
+          <code>{{ e.action }}</code>
+        }
+      </span>
+      <span class="target">
+        @if (e.targetUser) {
+          <nri-admin-user-ref [user]="e.targetUser" />
+        } @else {
+          {{ 'admin.log.target' | translate: { type: e.targetType, id: e.targetId } }}
+        }
+      </span>
+      @if (e.reason) {
+        <p class="reason">{{ e.reason }}</p>
+      }
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" emptyKey="admin.log.empty" />
