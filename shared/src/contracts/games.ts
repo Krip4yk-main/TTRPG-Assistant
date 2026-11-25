@@ -230,6 +230,15 @@ export interface GameCardDto {
   status: GameStatus;
 }
 
+/** Картка «Мої ігри» (`GET /api/games/mine`, лише майстру): склад і нові заявки. */
+export interface MyGameCardDto extends GameCardDto {
+  minPlayers: number;
+  /** Активні учасники (без майстра). */
+  memberCount: number;
+  /** Заявки зі статусом `pending`. */
+  pendingApplications: number;
+}
+
 /** Вид гри 18+/21+ для гостя чи молодшого за вікову позначку — рівно ці ключі. */
 export interface RestrictedGameDto {
   id: number;

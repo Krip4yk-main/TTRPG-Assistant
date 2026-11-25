@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>{{ data.title | translate }}</h2>
 <mat-dialog-content>
-  <p>{{ data.text | translate }}</p>
+  <p>{{ data.text | translate: data.params }}</p>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button type="button" [mat-dialog-close]="false" cdkFocusInitial>

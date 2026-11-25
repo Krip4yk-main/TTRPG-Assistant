@@ -3,11 +3,12 @@ import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import type {
   GameAction,
-  GameCardDto,
   GameDto,
   GameInput,
   GamePatch,
+  GameTransitionDto,
   GameViewDto,
+  MyGameCardDto,
   SearchFiltersInput,
   SearchResultDto,
 } from '@nri/shared';
@@ -35,11 +36,12 @@ export class GamesApi {
     return this.http.post<SearchResultDto>('/api/games/search', filters);
   }
 
-  mine(): Observable<GameCardDto[]> {
-    return this.http.get<GameCardDto[]>('/api/games/mine');
+  /** «Мої ігри» майстра: картки з кількістю учасників і нових заявок. */
+  mine(): Observable<MyGameCardDto[]> {
+    return this.http.get<MyGameCardDto[]>('/api/games/mine');
   }
 
-  transition(id: number, action: GameAction): Observable<GameDto> {
-    return this.http.post<GameDto>(`/api/games/${id}/${action}`, {});
+  transition(id: number, action: GameAction): Observable<GameTransitionDto> {
+    return this.http.post<GameTransitionDto>(`/api/games/${id}/${action}`, {});
   }
 }

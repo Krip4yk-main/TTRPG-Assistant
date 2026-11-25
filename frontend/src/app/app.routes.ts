@@ -58,6 +58,22 @@ export const routes: Routes = [
     loadComponent: () => import('./features/games/game-form/game-form').then((m) => m.GameForm),
   },
   {
+    path: 'games/:id/applications',
+    canActivate: [activeGuard],
+    title: 'titles.gameApplications',
+    loadComponent: () =>
+      import('./features/applications/game-applications/game-applications').then(
+        (m) => m.GameApplications,
+      ),
+  },
+  {
+    path: 'blacklist',
+    canActivate: [activeGuard],
+    title: 'titles.blacklist',
+    loadComponent: () =>
+      import('./features/members/blacklist-page/blacklist-page').then((m) => m.BlacklistPage),
+  },
+  {
     path: 'games/:id',
     title: 'titles.game',
     loadComponent: () =>

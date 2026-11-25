@@ -116,7 +116,11 @@ export class MyApplications {
     } catch (err) {
       const { code } = toApiError(err);
       // 401 уже обробив authInterceptor.
-      if (code !== 'UNAUTHENTICATED') this.message.set({ kind: 'error', key: `errors.${code}` });
+      if (code !== 'UNAUTHENTICATED') {
+        this.message.set({ kind: 'error', key: `errors.${code}` });
+        // Стан заявки міг змінитись (затверджено/скасовано) — тихо оновлюємо список.
+        void this.load();
+      }
     } finally {
       this.busyId.set(null);
     }

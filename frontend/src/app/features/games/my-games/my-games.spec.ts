@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
-import type { GameCardDto, MeDto } from '@nri/shared';
+import type { MeDto, MyGameCardDto } from '@nri/shared';
 import { MyGames } from './my-games';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
@@ -23,7 +23,7 @@ const me = {
   identities: [],
 } satisfies MeDto;
 
-function card(id: number, status: GameCardDto['status']): GameCardDto {
+function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
   return {
     id,
     title: `Гра ${id}`,
@@ -43,6 +43,9 @@ function card(id: number, status: GameCardDto['status']): GameCardDto {
     kind: 'oneshot',
     language: 'uk',
     status,
+    minPlayers: 2,
+    memberCount: 1,
+    pendingApplications: 0,
   };
 }
 
@@ -91,7 +94,13 @@ describe('MyGames', () => {
     await settle();
     http
       .expectOne('/api/games/mine')
-      .flush([card(1, 'draft'), card(2, 'recruiting'), card(3, 'started'), card(4, 'finished')]);
+      .flush([
+        card(1, 'draft'),
+        { ...card(2, 'recruiting'), pendingApplications: 3 },
+        { ...card(3, 'started'), memberCount: 2 },
+        card(4, 'finished'),
+        { ...card(5, 'recruiting'), memberCount: 2 },
+      ]);
     await settle();
   });
 
@@ -132,5 +141,36 @@ describe('MyGames', () => {
       .flush({ error: { code: 'GAME_IN_PAST' } }, { status: 422, statusText: 'Unprocessable' });
     await settle();
     expect(el.textContent).toContain('errors.GAME_IN_PAST');
+  });
+
+  it('shows the number of new applications with a link to the applications page', () => {
+    const link = article(2).querySelector<HTMLAnchorElement>('a.applications-link')!;
+    expect(link.getAttribute('href')).toBe('/games/2/applications');
+    expect(link.textContent).toContain('games.my.applications');
+    expect(article(2).querySelector('.pending-count')!.getAttribute('data-count')).toBe('3');
+    // Чернетка заявок не приймає — посилання немає; без нових заявок — без лічильника.
+    expect(article(1).querySelector('a.applications-link')).toBeNull();
+    expect(article(3).querySelector('.pending-count')).toBeNull();
+  });
+
+  it('start below the minimum asks «start anyway?» before calling the API', async () => {
+    open.mockReturnValueOnce({ afterClosed: () => of(false) });
+    article(2).querySelector<HTMLButtonElement>('[data-action="start"]')!.click();
+    await settle();
+    expect(open.mock.calls[0]![1].data).toMatchObject({
+      title: 'games.confirm.startBelowMin.title',
+      text: 'games.confirm.startBelowMin.text',
+    });
+    http.expectNone('/api/games/2/start');
+  });
+
+  it('start with enough members uses the regular confirmation', async () => {
+    open.mockReturnValueOnce({ afterClosed: () => of(true) });
+    article(5).querySelector<HTMLButtonElement>('[data-action="start"]')!.click();
+    await settle();
+    expect(open.mock.calls[0]![1].data.title).toBe('games.confirm.start.title');
+    http.expectOne('/api/games/5/start').flush({ ...card(5, 'started'), status: 'started' });
+    await settle();
+    expect(el.textContent).toContain('games.my.done.start');
   });
 });

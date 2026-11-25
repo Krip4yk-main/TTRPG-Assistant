@@ -1,0 +1,243 @@
+<section class="nri-page game-applications">
+  <a class="back" routerLink="/my-games">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    {{ 'games.applications.gm.back' | translate }}
+  </a>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ errorKey() ?? 'games.applications.gm.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      <header class="page-header">
+        <h1>{{ 'games.applications.gm.title' | translate }}</h1>
+        @if (game(); as g) {
+          <p class="game-ref">
+            <a class="game-link" [routerLink]="['/games', g.id]">{{ g.title }}</a>
+            <span class="nri-muted">
+              ·
+              {{
+                'games.applications.gm.members'
+                  | translate: { count: memberCount(), max: g.maxPlayers }
+              }}</span
+            >
+          </p>
+        }
+      </header>
+
+      @if (full()) {
+        <p class="nri-notice full-warning">
+          <mat-icon aria-hidden="true">warning</mat-icon>
+          {{ 'games.applications.gm.fullWarning' | translate }}
+        </p>
+      }
+
+      <div class="message-area" aria-live="polite">
+        @if (message(); as msg) {
+          <p
+            [class.nri-alert]="msg.kind === 'error'"
+            [class.nri-notice]="msg.kind === 'info'"
+            [attr.role]="msg.kind === 'error' ? 'alert' : null"
+          >
+            {{ msg.key | translate }}
+          </p>
+        }
+      </div>
+
+      @if (groups().length === 0) {
+        <div class="nri-card empty">
+          <p>{{ 'games.applications.gm.empty' | translate }}</p>
+        </div>
+      }
+
+      @for (group of groups(); track group.status) {
+        <section class="group" [attr.data-status]="group.status">
+          <h2>
+            {{ 'games.applications.statusGroup.' + group.status | translate }}
+            <span class="count">({{ group.items.length }})</span>
+          </h2>
+          <ul class="cards">
+            @for (a of group.items; track a.id) {
+              <li>
+                <article class="nri-card application" [attr.data-application-id]="a.id">
+                  <header class="app-header">
+                    <h3 class="applicant">
+                      @if (a.applicant.nickname) {
+                        <a class="applicant-link" [routerLink]="['/users', a.applicant.publicId]">{{
+                          a.applicant.nickname
+                        }}</a>
+                      } @else {
+                        {{ 'user.deleted' | translate }}
+                      }
+                    </h3>
+                    <span class="status" [attr.data-status]="a.status">{{
+                      'games.applications.status.' + a.status | translate
+                    }}</span>
+                  </header>
+                  <p class="nri-muted meta">
+                    {{ 'games.applications.my.submitted' | translate: { date: when(a.createdAt) } }}
+                  </p>
+                  @if (!a.meetsAgeRating) {
+                    <p class="nri-alert age-warning">
+                      {{ 'games.applications.gm.ageWarning' | translate }}
+                    </p>
+                  }
+
+                  @if (a.answers.length) {
+                    <div class="block">
+                      <h4>{{ 'games.applications.gm.answers' | translate }}</h4>
+                      <dl class="answers">
+                        @for (item of qa(a); track $index) {
+                          <dt>
+                            {{ item.question ?? ('games.applications.gm.noQuestion' | translate) }}
+                          </dt>
+                          <dd>{{ item.answer }}</dd>
+                        }
+                      </dl>
+                    </div>
+                  }
+
+                  @if (a.message) {
+                    <div class="block">
+                      <h4>{{ 'games.applications.gm.message' | translate }}</h4>
+                      <p class="text">{{ a.message }}</p>
+                    </div>
+                  }
+
+                  @if (a.constraints.length) {
+                    <div class="block">
+                      <h4>{{ 'games.applications.gm.constraints' | translate }}</h4>
+                      <ul class="constraints">
+                        @for (c of a.constraints; track c.id) {
+                          <li [attr.data-constraint-id]="c.id">
+                            @if (canEdit(a)) {
+                              @let d = draft(a, c);
+                              <fieldset class="constraint" [id]="'c-' + a.id + '-' + c.id">
+                                <legend class="constraint-text">{{ c.text }}</legend>
+                                <mat-radio-group
+                                  class="responses"
+                                  [value]="d.response"
+                                  [attr.aria-label]="c.text"
+                                  [attr.aria-describedby]="
+                                    d.error && !d.response ? 'err-' + a.id + '-' + c.id : null
+                                  "
+                                  (change)="setResponse(a, c, $event.value)"
+                                >
+                                  @for (r of responses; track r) {
+                                    <mat-radio-button [value]="r">{{
+                                      'games.applications.constraintResponse.' + r | translate
+                                    }}</mat-radio-button>
+                                  }
+                                </mat-radio-group>
+                                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                                  <mat-label>{{
+                                    (d.response === 'partial'
+                                      ? 'games.applications.gm.commentRequiredLabel'
+                                      : 'games.applications.gm.comment'
+                                    ) | translate
+                                  }}</mat-label>
+                                  <textarea
+                                    matInput
+                                    rows="2"
+                                    [value]="d.comment"
+                                    [required]="d.response === 'partial'"
+                                    [attr.maxlength]="commentMax"
+                                    [attr.aria-invalid]="d.error && d.response ? 'true' : null"
+                                    [attr.aria-describedby]="
+                                      d.error && d.response ? 'err-' + a.id + '-' + c.id : null
+                                    "
+                                    (input)="setComment(a, c, $event)"
+                                  ></textarea>
+                                </mat-form-field>
+                                @if (d.error) {
+                                  <p class="field-error" [id]="'err-' + a.id + '-' + c.id">
+                                    {{ d.error | translate: { max: commentMax } }}
+                                  </p>
+                                }
+                                <div class="constraint-actions">
+                                  <button
+                                    mat-stroked-button
+                                    type="button"
+                                    class="save-constraint"
+                                    [disabled]="busyId() !== null"
+                                    [attr.aria-label]="
+                                      'games.applications.gm.saveResponseAria'
+                                        | translate: { text: c.text }
+                                    "
+                                    (click)="saveConstraint(a, c)"
+                                  >
+                                    {{ 'games.applications.gm.saveResponse' | translate }}
+                                  </button>
+                                  <span
+                                    class="response current"
+                                    [attr.data-response]="c.response ?? 'none'"
+                                    >{{
+                                      'games.applications.constraintResponse.' +
+                                        (c.response ?? 'none') | translate
+                                    }}</span
+                                  >
+                                </div>
+                              </fieldset>
+                            } @else {
+                              <span class="constraint-text">{{ c.text }}</span>
+                              <span class="response" [attr.data-response]="c.response ?? 'none'">{{
+                                'games.applications.constraintResponse.' + (c.response ?? 'none')
+                                  | translate
+                              }}</span>
+                              @if (c.comment) {
+                                <span class="comment">{{ c.comment }}</span>
+                              }
+                            }
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+
+                  @if (a.status === 'pending') {
+                    <div class="actions">
+                      <button
+                        mat-flat-button
+                        type="button"
+                        class="approve"
+                        [disabled]="busyId() !== null || !a.meetsAgeRating"
+                        [attr.aria-label]="
+                          'games.applications.gm.approveAria'
+                            | translate: { name: a.applicant.nickname ?? '' }
+                        "
+                        (click)="approve(a)"
+                      >
+                        {{ 'games.applications.gm.approve' | translate }}
+                      </button>
+                      <button
+                        mat-button
+                        type="button"
+                        class="reject danger"
+                        [disabled]="busyId() !== null"
+                        [attr.aria-label]="
+                          'games.applications.gm.rejectAria'
+                            | translate: { name: a.applicant.nickname ?? '' }
+                        "
+                        (click)="reject(a)"
+                      >
+                        {{ 'games.applications.gm.reject' | translate }}
+                      </button>
+                    </div>
+                  }
+                </article>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  }
+</section>

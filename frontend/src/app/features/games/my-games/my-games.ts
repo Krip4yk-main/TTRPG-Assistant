@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { GameAction, GameCardDto, GameStatus } from '@nri/shared';
+import type { GameAction, GameStatus, MyGameCardDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -25,6 +25,8 @@ const ACTIONS: Record<GameStatus, GameAction[]> = {
 };
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
+/** Статуси, у яких у гри можуть бути заявки (чернетка — ще ні). */
+const HAS_APPLICATIONS = new Set<GameStatus>(['recruiting', 'started', 'finished', 'cancelled']);
 
 /** Повідомлення сторінки: ключ i18n. */
 interface Message {
@@ -45,7 +47,7 @@ export class MyGames {
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
 
-  protected readonly games = signal<GameCardDto[] | null>(null);
+  protected readonly games = signal<MyGameCardDto[] | null>(null);
   protected readonly loadFailed = signal(false);
   protected readonly busyId = signal<number | null>(null);
   protected readonly message = signal<Message | null>(null);
@@ -71,22 +73,29 @@ export class MyGames {
     return EDITABLE.has(status);
   }
 
-  protected systemName(g: GameCardDto): string {
+  protected hasApplications(status: GameStatus): boolean {
+    return HAS_APPLICATIONS.has(status);
+  }
+
+  protected systemName(g: MyGameCardDto): string {
     return g.system?.name ?? g.systemOther ?? '';
   }
 
-  protected when(game: GameCardDto, iso: string): string {
+  protected when(game: MyGameCardDto, iso: string): string {
     const tz = viewerTimeZone(this.auth.me());
     return formatDateTime(iso, tz, { showZone: differentZones(tz, game.timezone) });
   }
 
   /** Перехід статусу — лише після підтвердження в діалозі. */
-  protected async run(game: GameCardDto, action: GameAction): Promise<void> {
+  protected async run(game: MyGameCardDto, action: GameAction): Promise<void> {
     if (this.busyId() !== null) return;
+    // Старт не має «пробного» режиму: попередження про мінімум — до запиту, за даними картки.
+    const key = action === 'start' && game.memberCount < game.minPlayers ? 'startBelowMin' : action;
     const data: ConfirmDialogData = {
-      title: `games.confirm.${action}.title`,
-      text: `games.confirm.${action}.text`,
-      confirm: `games.confirm.${action}.confirm`,
+      title: `games.confirm.${key}.title`,
+      text: `games.confirm.${key}.text`,
+      confirm: `games.confirm.${key}.confirm`,
+      params: { count: game.memberCount, min: game.minPlayers },
       danger: action === 'cancel' || action === 'finish',
     };
     const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {

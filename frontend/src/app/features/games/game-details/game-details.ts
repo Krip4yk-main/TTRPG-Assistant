@@ -44,6 +44,7 @@ import {
   type ApplyDialogData,
   type ApplyDialogResult,
 } from '../../applications/apply-dialog/apply-dialog';
+import { MembersPanel } from '../../members/members-panel/members-panel';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -65,7 +66,7 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
  */
 @Component({
   selector: 'nri-game-details',
-  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe, WarningChip],
+  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe, WarningChip, MembersPanel],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -108,6 +109,18 @@ export class GameDetails {
   protected readonly canEdit = computed(() => {
     const g = this.game();
     return this.isGm() && !!g && EDITABLE.has(g.status);
+  });
+
+  /** Склад гри бачать майстер (крім чернетки) і активні учасники — як на бекенді. */
+  protected readonly showMembers = computed(() => {
+    const g = this.game();
+    if (!g) return false;
+    return this.isGm() ? g.status !== 'draft' : this.relation() === 'member';
+  });
+  /** Майстер може виключати й банити, поки гра набирає чи триває. */
+  protected readonly manageable = computed(() => {
+    const s = this.game()?.status;
+    return s === 'recruiting' || s === 'started';
   });
 
   /** Стосунок глядача до гри (сервер віддає лише автентифікованому). */
@@ -171,6 +184,11 @@ export class GameDetails {
       const id = Number(this.id());
       void this.load(id);
     });
+  }
+
+  /** Склад змінився (виключення/бан) — тихо оновлюємо вільні місця. */
+  protected async membersChanged(): Promise<void> {
+    await this.load(Number(this.id()), true);
   }
 
   protected async retry(): Promise<void> {

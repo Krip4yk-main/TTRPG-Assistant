@@ -230,6 +230,11 @@ describe('GameDetails', () => {
       );
       expect(el().querySelector('.relation')!.textContent).toContain('games.details.member');
       expect(applyButton()).toBeNull();
+      // Учасник бачить склад гри, але без меню керування.
+      http.expectOne('/api/games/7/members').flush([]);
+      await settle();
+      expect(el().querySelector('nri-members-panel')).not.toBeNull();
+      expect(el().querySelector('button.member-menu')).toBeNull();
     });
 
     for (const relation of ['banned', 'blacklisted'] as const) {
@@ -264,6 +269,20 @@ describe('GameDetails', () => {
     await open(me, (r) => r.flush({ ...game, gm: { ...game.gm, publicId: me.publicId } }));
     expect(el().querySelector('a[href="/games/7/edit"]')).not.toBeNull();
     expect(el().querySelector('button.apply')).toBeNull();
+    expect(el().querySelector('a[href="/games/7/applications"]')).not.toBeNull();
+    http
+      .expectOne('/api/games/7/members')
+      .flush([
+        { publicId: 'pppppppppp', nickname: 'Sam', avatarUrl: null, joinedAt: game.createdAt },
+      ]);
+    await settle();
+    expect(el().querySelector('[data-member-id="pppppppppp"] button.member-menu')).not.toBeNull();
+  });
+
+  it('a non-member does not request the member list', async () => {
+    await open(me, (r) => r.flush(game));
+    http.expectNone('/api/games/7/members');
+    expect(el().querySelector('nri-members-panel')).toBeNull();
   });
 
   it('restricted game: blurred view without details, even if they leak; guest gets a login link', async () => {

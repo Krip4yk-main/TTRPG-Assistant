@@ -8,6 +8,8 @@ export interface ConfirmDialogData {
   title: string;
   text: string;
   confirm: string;
+  /** Параметри для `text` (інтерполяція ngx-translate). */
+  params?: Record<string, unknown>;
   /** Небезпечна дія — кнопка підтвердження червона. */
   danger?: boolean;
 }

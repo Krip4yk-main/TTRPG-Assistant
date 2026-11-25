@@ -27,4 +27,18 @@ describe('uk.json', () => {
       [],
     );
   });
+
+  it('має підписи, підтвердження й результати для кожної дії майстра з учасником', () => {
+    const m = uk.members as unknown as Record<string, Record<string, unknown>>;
+    for (const action of ['kick', 'ban', 'blacklist']) {
+      expect(m['actions']![action]).toBeTruthy();
+      expect(m['done']![action]).toBeTruthy();
+      expect(m['confirm']![action]).toMatchObject({
+        title: expect.any(String),
+        text: expect.any(String),
+        confirm: expect.any(String),
+      });
+    }
+    expect(uk.games.confirm.startBelowMin.text).toContain('Почати все одно?');
+  });
 });

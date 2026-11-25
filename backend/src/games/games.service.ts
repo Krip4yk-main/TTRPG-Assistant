@@ -9,6 +9,7 @@ import {
   scheduleRuleInputSchema,
   type GameAction,
   type GameCardDto,
+  type MyGameCardDto,
   type GameDto,
   type GameInput,
   type GameStatus,
@@ -706,17 +707,16 @@ export async function transitionGame(
 export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Promise<GameViewDto> {
   const l = await loadOne(deps, id);
   if (!l) throw new AppError(404, 'NOT_FOUND');
-  const rel = viewer ? await viewerRelation(deps, l.row, viewer.userId) : null;
   const now = new Date();
-  const view = toGameView(
-    toGameDto(l, await warningIdsOf(deps, id), now),
-    l.row.gmUserId,
-    viewer,
-    rel?.relation === 'member',
-    now,
-  );
-  if (!view) throw new AppError(404, 'NOT_FOUND');
-  return rel && !isRestrictedGame(view) ? { ...view, viewer: rel } : view;
+  const dto = toGameDto(l, await warningIdsOf(deps, id), now);
+  const base = toGameView(dto, l.row.gmUserId, viewer, false, now);
+  if (!base) throw new AppError(404, 'NOT_FOUND');
+  // Стосунок (4 запити) — лише для автентифікованого глядача з повним видом.
+  if (!viewer || isRestrictedGame(base)) return base;
+  const rel = await viewerRelation(deps, l.row, viewer.userId);
+  const view =
+    rel.relation === 'member' ? (toGameView(dto, l.row.gmUserId, viewer, true, now) ?? base) : base;
+  return { ...view, viewer: rel };
 }
 
 /** Стосунок автентифікованого глядача до гри (див. `GameViewerDto`). */
@@ -762,9 +762,30 @@ async function viewerRelation(deps: AppDeps, g: GameRow, userId: number): Promis
 }
 
 /** «Мої ігри»: усі ігри майстра в усіх статусах. */
-export async function listMyGames(deps: AppDeps, userId: number): Promise<GameCardDto[]> {
+export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGameCardDto[]> {
   const now = new Date();
-  return (await loadGames(deps, eq(games.gmUserId, userId))).map((l) => toCardDto(l, now));
+  const loaded = await loadGames(deps, eq(games.gmUserId, userId));
+  if (loaded.length === 0) return [];
+  const pending = await deps.db
+    .select({ gameId: gameApplications.gameId, n: count() })
+    .from(gameApplications)
+    .where(
+      and(
+        inArray(
+          gameApplications.gameId,
+          loaded.map((l) => l.row.id),
+        ),
+        eq(gameApplications.status, 'pending'),
+      ),
+    )
+    .groupBy(gameApplications.gameId);
+  const byGame = new Map(pending.map((p) => [p.gameId, p.n]));
+  return loaded.map((l) => ({
+    ...toCardDto(l, now),
+    minPlayers: l.row.minPlayers,
+    memberCount: l.memberCount,
+    pendingApplications: byGame.get(l.row.id) ?? 0,
+  }));
 }
 
 /**

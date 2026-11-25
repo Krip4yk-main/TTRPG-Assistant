@@ -1,10 +1,16 @@
 <section class="nri-page my-games">
   <header class="page-header">
     <h1>{{ 'games.my.title' | translate }}</h1>
-    <a mat-flat-button routerLink="/games/new">
-      <mat-icon aria-hidden="true">add</mat-icon>
-      {{ 'games.my.newGame' | translate }}
-    </a>
+    <div class="header-actions">
+      <a mat-stroked-button routerLink="/blacklist">
+        <mat-icon aria-hidden="true">block</mat-icon>
+        {{ 'games.my.blacklist' | translate }}
+      </a>
+      <a mat-flat-button routerLink="/games/new">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'games.my.newGame' | translate }}
+      </a>
+    </div>
   </header>
 
   <div aria-live="polite">
@@ -61,6 +67,18 @@
               <p class="meta">
                 {{ 'games.my.slots' | translate: { free: game.freeSlots, max: game.maxPlayers } }}
               </p>
+              @if (hasApplications(game.status)) {
+                <p class="meta applications">
+                  <a class="applications-link" [routerLink]="['/games', game.id, 'applications']">{{
+                    'games.my.applications' | translate
+                  }}</a>
+                  @if (game.pendingApplications > 0) {
+                    <span class="pending-count" [attr.data-count]="game.pendingApplications">{{
+                      'games.my.pendingCount' | translate: { count: game.pendingApplications }
+                    }}</span>
+                  }
+                </p>
+              }
               <div class="actions">
                 @if (canEdit(game.status)) {
                   <a

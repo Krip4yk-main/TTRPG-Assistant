@@ -166,6 +166,23 @@ describe('MyApplications', () => {
     expect(el.textContent).toContain('games.applications.my.withdrawn');
   });
 
+  it('withdraw conflict: shows the error and silently reloads the list', async () => {
+    await create();
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(true) });
+    card$(1).querySelector<HTMLButtonElement>('button.withdraw')!.click();
+    await settle();
+    http
+      .expectOne('/api/applications/1')
+      .flush({ error: { code: 'APPLICATION_CLOSED' } }, { status: 409, statusText: 'Conflict' });
+    await settle();
+    expect(el.textContent).toContain('errors.APPLICATION_CLOSED');
+    http.expectOne('/api/me/applications').flush([{ ...base, status: 'approved' }]);
+    await settle();
+    expect(group('pending')).toBeNull();
+    expect(group('approved')).not.toBeNull();
+    expect(el.querySelector('[role="status"]')?.textContent ?? '').not.toContain('common.loading');
+  });
+
   it('empty list shows a call to action', async () => {
     await create([]);
     expect(el.textContent).toContain('games.applications.my.empty');

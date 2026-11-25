@@ -1,0 +1,79 @@
+<section class="block members-panel" aria-labelledby="members-title">
+  <h2 id="members-title">
+    {{ 'members.title' | translate }}
+    @if (members(); as list) {
+      <span class="count">({{ list.length }})</span>
+    }
+  </h2>
+
+  <div class="message-area" aria-live="polite">
+    @if (message(); as msg) {
+      <p
+        [class.nri-alert]="msg.kind === 'error'"
+        [class.nri-notice]="msg.kind === 'info'"
+        [attr.role]="msg.kind === 'error' ? 'alert' : null"
+      >
+        {{ msg.key | translate: { name: msg.name } }}
+      </p>
+    }
+  </div>
+
+  @if (loadFailed()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'members.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retry()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (members(); as list) {
+    @if (list.length === 0) {
+      <p class="nri-muted">{{ 'members.empty' | translate }}</p>
+    } @else {
+      <ul class="members">
+        @for (m of list; track m.publicId) {
+          <li class="member" [attr.data-member-id]="m.publicId">
+            <span class="who">
+              @if (m.nickname) {
+                <a class="member-link" [routerLink]="['/users', m.publicId]">{{ m.nickname }}</a>
+              } @else {
+                {{ 'user.deleted' | translate }}
+              }
+              <span class="nri-muted joined">{{
+                'members.joined' | translate: { date: when(m.joinedAt) }
+              }}</span>
+            </span>
+            @if (isGm()) {
+              <button
+                mat-icon-button
+                type="button"
+                class="member-menu"
+                [matMenuTriggerFor]="menu"
+                [disabled]="busy()"
+                [attr.aria-label]="'members.menuAria' | translate: { name: m.nickname ?? '' }"
+              >
+                <mat-icon aria-hidden="true">more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                @for (action of actions(); track action) {
+                  <button
+                    mat-menu-item
+                    type="button"
+                    [attr.data-action]="action"
+                    (click)="run(m, action)"
+                  >
+                    <mat-icon aria-hidden="true">{{
+                      action === 'kick' ? 'person_remove' : 'block'
+                    }}</mat-icon>
+                    <span>{{ 'members.actions.' + action | translate }}</span>
+                  </button>
+                }
+              </mat-menu>
+            }
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>

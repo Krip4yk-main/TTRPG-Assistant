@@ -99,6 +99,16 @@
                   {{ 'games.actions.edit' | translate }}
                 </a>
               }
+              @if (g.status !== 'draft') {
+                <a
+                  mat-stroked-button
+                  class="applications-link"
+                  [routerLink]="['/games', g.id, 'applications']"
+                >
+                  <mat-icon aria-hidden="true">assignment</mat-icon>
+                  {{ 'games.details.applications' | translate }}
+                </a>
+              }
             } @else if (!signedIn()) {
               @if (accepting()) {
                 <a
@@ -242,6 +252,16 @@
               <dd>{{ 'games.language.' + g.language | translate }}</dd>
             </div>
           </dl>
+
+          @if (showMembers()) {
+            <nri-members-panel
+              class="nri-card members"
+              [gameId]="g.id"
+              [isGm]="isGm()"
+              [manageable]="manageable()"
+              (changed)="membersChanged()"
+            />
+          }
 
           @if (g.description) {
             <section class="block">

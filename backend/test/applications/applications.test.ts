@@ -443,3 +443,23 @@ describe('Task 3 carry-overs', () => {
     expect((await apply(gameId, adult.cookie)).body.error.code).toBe('APPLICATION_CLOSED');
   });
 });
+
+describe('GET /api/games/mine — pending counts (Task 9)', () => {
+  it('carries pendingApplications, memberCount and minPlayers for each own game', async () => {
+    const { gm, gameId } = await setup();
+    const other = await createGame(gm.cookie, {}, true);
+    const a = await userWithAge(25);
+    const b = await userWithAge(25);
+    const c = await userWithAge(25);
+    await apply(gameId, a.cookie);
+    await apply(gameId, b.cookie);
+    const approved = await apply(gameId, c.cookie);
+    await call('post', `/api/applications/${approved.body.id}/approve`, gm.cookie);
+    const res = await call('get', '/api/games/mine', gm.cookie);
+    expect(res.status).toBe(200);
+    const byId = new Map(res.body.map((g: { id: number }) => [g.id, g]));
+    expect(byId.get(gameId)).toMatchObject({ pendingApplications: 2, memberCount: 1 });
+    expect(byId.get(gameId)).toHaveProperty('minPlayers', expect.any(Number));
+    expect(byId.get(other)).toMatchObject({ pendingApplications: 0, memberCount: 0 });
+  });
+});
