@@ -58,6 +58,7 @@ import {
   toZoned,
   weekdayOf,
   zonedToUtc,
+  type SanctionActiveDetails,
 } from '@nri/shared';
 import { firstValueFrom, fromEvent, merge } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
@@ -66,6 +67,8 @@ import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { fromIsoDate, provideUkDates } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
+import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
+import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -218,6 +221,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
     MatRadioModule,
     TranslatePipe,
     WarningChip,
+    SanctionActiveNotice,
   ],
   providers: [provideUkDates()],
   templateUrl: './game-form.html',
@@ -256,6 +260,8 @@ export class GameForm {
   protected readonly submitted = signal(false);
   /** Загальна помилка форми (ключ i18n). */
   protected readonly formError = signal<string | null>(null);
+  /** Відмова через санкцію (409 `SANCTION_ACTIVE`, напр. платна гра під забороною). */
+  protected readonly sanction = signal<SanctionActiveDetails | null>(null);
   /** Помилки API біля полів: контрол → ключ i18n. */
   protected readonly apiErrors = signal<Readonly<Record<string, string>>>({});
   /** Значення контролів у момент помилки API: зміна значення прибирає помилку. */
@@ -523,6 +529,7 @@ export class GameForm {
     }
     this.busy.set(true);
     this.formError.set(null);
+    this.sanction.set(null);
     this.setApiErrors({});
     try {
       const id = this.gameId();
@@ -560,8 +567,15 @@ export class GameForm {
   }
 
   private showApiError(err: unknown): void {
-    const { code, details } = toApiError(err);
+    const apiError = toApiError(err);
+    const { code, details } = apiError;
     if (code === 'UNAUTHENTICATED') return;
+    const sanction = sanctionActiveDetails(apiError);
+    if (sanction) {
+      this.sanction.set(sanction);
+      this.focusSanction();
+      return;
+    }
     const fieldErrors: Record<string, string> = {};
     const d = (details ?? {}) as { field?: unknown; reason?: unknown };
     if (code === 'GAME_FIELD_LOCKED' && typeof d.field === 'string') {
@@ -1004,6 +1018,14 @@ export class GameForm {
       label: new FormControl(link.label, { nonNullable: true }),
       url: new FormControl(link.url, { nonNullable: true }),
     });
+  }
+
+  /** Пояснення санкції — у live-регіоні; фокус на ньому, щоб його було видно й почуто. */
+  private focusSanction(): void {
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('.sanction-notice')?.focus(),
+      { injector: this.injector },
+    );
   }
 
   /** Фокус на першому полі з помилкою після рендеру. */

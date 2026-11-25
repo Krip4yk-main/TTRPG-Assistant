@@ -141,6 +141,27 @@ describe('Login — banned account', () => {
     expect(el().querySelector('nri-banned-notice form')).toBeNull();
   });
 
+  it('OAuth `appealStatus` shows the appeal decision; it is removed from the URL too', async () => {
+    await open('/login?error=ACCOUNT_BANNED&appeal=tok-s&sent=1&appealStatus=rejected');
+    expect(TestBed.inject(Router).url).toBe('/login');
+    const line = el().querySelector('nri-banned-notice .appeal-status')!;
+    expect(line.getAttribute('data-status')).toBe('rejected');
+    expect(line.textContent).toContain('banned.status.rejected');
+  });
+
+  it('ACCOUNT_BANNED details with appealStatus show the decision on the ban screen', async () => {
+    await open('/login', () =>
+      TestBed.inject(AuthStore).accountBanned({
+        appealToken: 'tok-a',
+        appealSent: true,
+        appealStatus: 'accepted',
+      }),
+    );
+    expect(el().querySelector('nri-banned-notice .appeal-status')!.textContent).toContain(
+      'banned.status.accepted',
+    );
+  });
+
   it('mid-session ban: takes the in-memory appeal details and clears the error from the URL', async () => {
     await open('/login?error=ACCOUNT_BANNED&returnTo=%2Fcalendar', () =>
       TestBed.inject(AuthStore).accountBanned({ appealToken: 'tok-m', appealSent: false }),

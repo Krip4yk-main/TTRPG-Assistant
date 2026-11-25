@@ -2,7 +2,7 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService } from '@ngx-translate/core';
-import { APPEAL_MESSAGE_MAX } from '@nri/shared';
+import { APPEAL_MESSAGE_MAX, type SanctionAppealStatus } from '@nri/shared';
 import { BannedNotice } from './banned-notice';
 
 describe('BannedNotice', () => {
@@ -16,7 +16,7 @@ describe('BannedNotice', () => {
     fixture.detectChanges();
   };
 
-  async function create(appealSent = false) {
+  async function create(appealSent = false, appealStatus: SanctionAppealStatus | null = null) {
     await TestBed.configureTestingModule({
       imports: [BannedNotice],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideTranslateService()],
@@ -25,6 +25,7 @@ describe('BannedNotice', () => {
     fixture = TestBed.createComponent(BannedNotice);
     fixture.componentRef.setInput('appealToken', 'tok-1');
     fixture.componentRef.setInput('appealSent', appealSent);
+    fixture.componentRef.setInput('appealStatus', appealStatus);
     el = fixture.nativeElement as HTMLElement;
     document.body.appendChild(el);
     await settle();
@@ -90,6 +91,27 @@ describe('BannedNotice', () => {
     await create(true);
     expect(stateTitle()).toBe('banned.sent.title');
     expect(el.querySelector('form')).toBeNull();
+  });
+
+  it.each(['pending', 'accepted', 'rejected'] as const)(
+    'shows the appeal status «%s» from the login details',
+    async (status) => {
+      await create(true, status);
+      expect(stateTitle()).toBe('banned.sent.title');
+      const line = el.querySelector('.appeal-status')!;
+      expect(line.getAttribute('data-status')).toBe(status);
+      expect(line.textContent).toContain(`banned.status.${status}`);
+      expect(el.querySelector('form')).toBeNull();
+    },
+  );
+
+  it('a just-sent appeal is shown as pending', async () => {
+    await create();
+    await type('Помилка');
+    await submit();
+    http.expectOne('/api/appeals').flush({ id: 1 }, { status: 201, statusText: 'Created' });
+    await settle();
+    expect(el.querySelector('.appeal-status')!.textContent).toContain('banned.status.pending');
   });
 
   it('validates the message: empty/whitespace and over the limit are not sent', async () => {

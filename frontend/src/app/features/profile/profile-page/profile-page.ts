@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import type { PublicProfileDto } from '@nri/shared';
@@ -22,6 +23,11 @@ import { SeoService } from '../../../core/seo/seo.service';
 import { UserName } from '../../../shared/user-name/user-name';
 import { GameCard } from '../../search/game-card/game-card';
 import { RatingSummary } from '../../ratings/rating-summary/rating-summary';
+import { BlockedBadge } from '../../../shared/blocked-badge/blocked-badge';
+import {
+  ComplaintDialog,
+  type ComplaintDialogData,
+} from '../../moderation/complaint-dialog/complaint-dialog';
 
 /**
  * Публічний профіль (`/users/:publicId`). Приховані власником поля бекенд не надсилає,
@@ -37,6 +43,7 @@ import { RatingSummary } from '../../ratings/rating-summary/rating-summary';
     UserName,
     GameCard,
     RatingSummary,
+    BlockedBadge,
   ],
   templateUrl: './profile-page.html',
   styleUrl: './profile-page.less',
@@ -48,6 +55,7 @@ export class ProfilePage {
   private readonly catalog = inject(CatalogStore);
   private readonly seo = inject(SeoService);
   private readonly translate = inject(TranslateService);
+  private readonly dialog = inject(MatDialog);
 
   /** `:publicId` з маршруту. */
   readonly publicId = input.required<string>();
@@ -62,6 +70,15 @@ export class ProfilePage {
     return !!p && this.auth.me()?.publicId === p.publicId;
   });
   protected readonly deleted = computed(() => this.profile()?.status === 'deleted');
+  /**
+   * «Поскаржитися» — активному користувачеві на чужий профіль; чи є право (спільна історія),
+   * вирішує бекенд (403 `COMPLAINT_NOT_ALLOWED` показується в діалозі).
+   */
+  protected readonly canComplain = computed(
+    () => this.auth.isActive() && !!this.profile() && !this.isMe() && !this.deleted(),
+  );
+  /** Повідомлення після надсилання скарги (ключ i18n). */
+  protected readonly notice = signal<string | null>(null);
   protected readonly systems = computed(() => {
     const ids = this.profile()?.favoriteSystemIds;
     if (!ids) return null;
@@ -78,6 +95,25 @@ export class ProfilePage {
     });
   }
 
+  protected async complain(): Promise<void> {
+    const p = this.profile();
+    if (!p || !this.canComplain()) return;
+    this.notice.set(null);
+    const data: ComplaintDialogData = {
+      kind: 'user',
+      publicId: p.publicId,
+      name: p.nickname || (this.translate.instant('user.noNickname') as string),
+    };
+    const ref = this.dialog.open<ComplaintDialog, ComplaintDialogData, boolean>(ComplaintDialog, {
+      data,
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+      width: '560px',
+      maxWidth: 'calc(100vw - 32px)',
+    });
+    if (await firstValueFrom(ref.afterClosed())) this.notice.set('moderation.complain.sent');
+  }
+
   protected retry(): void {
     void this.load(this.publicId());
   }
@@ -86,6 +122,7 @@ export class ProfilePage {
     const seq = ++this.seq;
     this.state.set('loading');
     this.profile.set(null);
+    this.notice.set(null);
     try {
       const p = await firstValueFrom(this.api.getPublic(publicId));
       if (seq !== this.seq) return;

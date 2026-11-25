@@ -1,0 +1,11 @@
+<p class="nri-alert sanction-active" role="alert">
+  {{ textKey() | translate }}
+  @if (until(); as date) {
+    {{ 'moderation.sanctionActive.until' | translate: { date: date } }}
+  } @else {
+    {{ 'moderation.sanctionActive.forever' | translate }}
+  }
+  @if (link()) {
+    <a routerLink="/my-sanctions">{{ 'moderation.sanctionActive.link' | translate }}</a>
+  }
+</p>

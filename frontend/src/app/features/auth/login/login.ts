@@ -27,7 +27,7 @@ import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { bannedDetails } from '../../../core/auth/banned';
+import { appealStatusOf, bannedDetails } from '../../../core/auth/banned';
 import { BannedNotice } from '../banned-notice/banned-notice';
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
@@ -65,6 +65,8 @@ export class Login implements OnInit {
   readonly appeal = input<string>();
   /** `?sent=1` — апеляцію в цьому періоді бану вже надіслано. */
   readonly sent = input<string>();
+  /** `?appealStatus=pending|accepted|rejected` — стан уже поданої апеляції. */
+  readonly appealStatus = input<string>();
 
   /** Акаунт заблоковано: показуємо екран апеляції замість способів входу. */
   protected readonly banned = signal<BannedLoginDetails | null>(null);
@@ -124,10 +126,16 @@ export class Login implements OnInit {
   ngOnInit(): void {
     const token = this.appeal();
     if (this.error() === 'ACCOUNT_BANNED' && token) {
-      this.banned.set({ appealToken: token, appealSent: this.sent() === '1' });
+      this.banned.set({
+        appealToken: token,
+        appealSent: this.sent() === '1',
+        appealStatus: appealStatusOf(this.appealStatus()),
+      });
     }
     // Токен не лишаємо ні в адресі, ні в історії (заміна поточного запису).
-    if (token !== undefined || this.sent() !== undefined) this.cleanQuery();
+    if (token !== undefined || this.sent() !== undefined || this.appealStatus() !== undefined) {
+      this.cleanQuery();
+    }
   }
 
   /** З екрана бану — назад до способів входу (отримати новий токен); фокус — на заголовок. */
@@ -140,7 +148,7 @@ export class Login implements OnInit {
   private cleanQuery(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { error: null, appeal: null, sent: null },
+      queryParams: { error: null, appeal: null, sent: null, appealStatus: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

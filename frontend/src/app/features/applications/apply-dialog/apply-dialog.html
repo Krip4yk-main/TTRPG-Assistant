@@ -128,7 +128,9 @@
     </fieldset>
 
     <div aria-live="assertive">
-      @if (error(); as key) {
+      @if (sanction(); as details) {
+        <nri-sanction-active-notice [details]="details" />
+      } @else if (error(); as key) {
         <p class="nri-alert" role="alert">{{ key | translate }}</p>
       }
     </div>

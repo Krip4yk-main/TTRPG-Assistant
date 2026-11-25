@@ -29,11 +29,14 @@ import {
   APPLICATION_MESSAGE_MAX,
   type ApplicationDto,
   type ErrorCode,
+  type SanctionActiveDetails,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
+import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
+import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
 
 /** Дані гри, потрібні для заявки. */
 export interface ApplyDialogData {
@@ -69,6 +72,7 @@ const FIELD_CODES = new Set<ErrorCode>(['WARNINGS_NOT_ACCEPTED', 'ANSWERS_REQUIR
     MatInputModule,
     TranslatePipe,
     WarningChip,
+    SanctionActiveNotice,
   ],
   templateUrl: './apply-dialog.html',
   styleUrl: './apply-dialog.less',
@@ -118,6 +122,8 @@ export class ApplyDialog {
   protected readonly submitting = signal(false);
   /** Загальна помилка API (ключ i18n). */
   protected readonly error = signal<string | null>(null);
+  /** Відмова через санкцію (409 `SANCTION_ACTIVE`): пояснення з датою замість загальної помилки. */
+  protected readonly sanction = signal<SanctionActiveDetails | null>(null);
   /** Помилка поля від сервера (на випадок розбіжності з клієнтською перевіркою). */
   protected readonly serverField = signal<ErrorCode | null>(null);
   protected readonly submitted = signal(false);
@@ -170,6 +176,7 @@ export class ApplyDialog {
     if (this.submitting()) return;
     this.submitted.set(true);
     this.error.set(null);
+    this.sanction.set(null);
     this.serverField.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -190,12 +197,16 @@ export class ApplyDialog {
       );
       this.ref.close({ status: 'applied', application });
     } catch (err) {
-      const { code } = toApiError(err);
+      const apiError = toApiError(err);
+      const { code } = apiError;
       if (code === 'APPLICATION_EXISTS') {
         this.ref.close({ status: 'exists' });
         return;
       }
-      if (FIELD_CODES.has(code)) {
+      const sanction = sanctionActiveDetails(apiError);
+      if (sanction) {
+        this.sanction.set(sanction);
+      } else if (FIELD_CODES.has(code)) {
         this.serverField.set(code);
         this.focus('.server-field-error');
       } else if (code !== 'UNAUTHENTICATED') {

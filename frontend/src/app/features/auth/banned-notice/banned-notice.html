@@ -52,7 +52,9 @@
           <h2 class="state-title" #stateTitle tabindex="-1">
             {{ 'banned.sent.title' | translate }}
           </h2>
-          <p>{{ 'banned.sent.text' | translate }}</p>
+          <p class="appeal-status" [attr.data-status]="status()">
+            {{ 'banned.status.' + status() | translate }}
+          </p>
         </div>
       }
       @case ('expired') {

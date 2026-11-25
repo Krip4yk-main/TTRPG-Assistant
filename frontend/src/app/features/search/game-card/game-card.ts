@@ -6,6 +6,7 @@ import { isRestrictedGame, type RestrictedGameDto, type SearchGameCardDto } from
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
+import { BlockedBadge } from '../../../shared/blocked-badge/blocked-badge';
 import { GmRating } from '../../ratings/gm-rating/gm-rating';
 
 /**
@@ -14,7 +15,7 @@ import { GmRating } from '../../ratings/gm-rating/gm-rating';
  */
 @Component({
   selector: 'nri-game-card',
-  imports: [RouterLink, MatIconModule, TranslatePipe, GmRating],
+  imports: [RouterLink, MatIconModule, TranslatePipe, GmRating, BlockedBadge],
   templateUrl: './game-card.html',
   styleUrl: './game-card.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

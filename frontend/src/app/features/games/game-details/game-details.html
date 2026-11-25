@@ -38,8 +38,22 @@
               } @else {
                 {{ 'user.deleted' | translate }}
               }
+              @if (g.gm.blocked) {
+                <nri-blocked-badge />
+              }
             </p>
             <p class="restricted-text">{{ 'games.restricted.' + g.ageRating | translate }}</p>
+            @if (canComplain()) {
+              <button mat-button type="button" class="complain" (click)="complain(g)">
+                <mat-icon aria-hidden="true">flag</mat-icon>
+                {{ 'moderation.complain.button' | translate }}
+              </button>
+            }
+            <div class="notice-area" aria-live="polite" tabindex="-1">
+              @if (notice(); as n) {
+                <p class="nri-notice">{{ n.key | translate }}</p>
+              }
+            </div>
             @if (!signedIn()) {
               <a mat-flat-button routerLink="/login" [queryParams]="{ returnTo: returnTo() }">{{
                 'games.restricted.login' | translate
@@ -88,6 +102,9 @@
                   {{ 'user.deleted' | translate }}
                 }
               </strong>
+              @if (g.gm.blocked) {
+                <nri-blocked-badge />
+              }
               <nri-gm-rating [value]="g.gmRating" [showEmpty]="true" />
             </p>
           </header>
@@ -198,6 +215,12 @@
               @if (applyBlock(); as hint) {
                 <p id="game-apply-hint" class="nri-muted apply-hint">{{ hint | translate }}</p>
               }
+            }
+            @if (canComplain()) {
+              <button mat-button type="button" class="complain" (click)="complain(g)">
+                <mat-icon aria-hidden="true">flag</mat-icon>
+                {{ 'moderation.complain.button' | translate }}
+              </button>
             }
           </div>
 

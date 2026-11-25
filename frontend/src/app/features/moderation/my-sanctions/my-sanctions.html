@@ -1,0 +1,113 @@
+<section class="nri-page my-sanctions">
+  <h1>{{ 'moderation.my.title' | translate }}</h1>
+  <p class="nri-muted intro">{{ 'moderation.my.intro' | translate }}</p>
+
+  <div class="notice-area" aria-live="polite" tabindex="-1">
+    @if (notice(); as key) {
+      <p class="nri-notice">{{ key | translate }}</p>
+    }
+  </div>
+
+  @if (items(); as list) {
+    @if (list.length) {
+      <ul class="list">
+        @for (s of list; track s.id) {
+          <li class="nri-card sanction" [attr.data-sanction]="s.id">
+            <h2>{{ 'moderation.sanctionTypes.' + s.type | translate }}</h2>
+            <p class="effect">{{ 'moderation.sanctionEffects.' + s.type | translate }}</p>
+            <dl class="facts">
+              <div>
+                <dt>{{ 'moderation.my.reason' | translate }}</dt>
+                <dd class="reason">{{ s.reason }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'moderation.my.ends' | translate }}</dt>
+                <dd class="ends">
+                  @if (until(s); as date) {
+                    {{ 'moderation.until' | translate: { date: date } }}
+                  } @else {
+                    {{ 'moderation.forever' | translate }}
+                  }
+                </dd>
+              </div>
+            </dl>
+
+            @if (s.appealStatus) {
+              <p class="appeal-status" [attr.data-status]="s.appealStatus">
+                {{ 'moderation.appealStatus.' + s.appealStatus | translate }}
+              </p>
+            } @else if (openId() === s.id) {
+              <form
+                class="appeal-form"
+                [formGroup]="form"
+                (ngSubmit)="submit(s)"
+                novalidate
+                [attr.aria-busy]="busy()"
+              >
+                <h3>{{ 'moderation.my.appealTitle' | translate }}</h3>
+                <p class="nri-muted">{{ 'moderation.my.appealHint' | translate }}</p>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>{{ 'moderation.my.appealMessage' | translate }}</mat-label>
+                  <textarea
+                    matInput
+                    class="message"
+                    rows="5"
+                    required
+                    [attr.data-sanction]="s.id"
+                    formControlName="message"
+                    [attr.maxlength]="max"
+                  ></textarea>
+                  <mat-hint align="end" class="counter">{{
+                    'moderation.counter' | translate: { count: length(), max: max }
+                  }}</mat-hint>
+                  @if (message.hasError('required')) {
+                    <mat-error>{{ 'moderation.my.appealRequired' | translate }}</mat-error>
+                  } @else if (message.hasError('maxlength')) {
+                    <mat-error>{{ 'moderation.tooLong' | translate: { max: max } }}</mat-error>
+                  }
+                </mat-form-field>
+                <div aria-live="assertive">
+                  @if (error(); as key) {
+                    <p class="nri-alert send-error" role="alert">{{ key | translate }}</p>
+                  }
+                </div>
+                <div class="actions">
+                  <button mat-button type="button" (click)="close(s)">
+                    {{ 'common.cancel' | translate }}
+                  </button>
+                  <button mat-flat-button type="submit" class="send" [disabled]="busy()">
+                    {{ (busy() ? 'moderation.my.sending' : 'moderation.my.send') | translate }}
+                  </button>
+                </div>
+              </form>
+            } @else {
+              <div class="actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="appeal"
+                  [attr.data-sanction]="s.id"
+                  (click)="open(s)"
+                >
+                  <mat-icon aria-hidden="true">gavel</mat-icon>
+                  {{ 'moderation.my.appeal' | translate }}
+                </button>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="nri-card empty">{{ 'moderation.my.empty' | translate }}</p>
+    }
+  } @else if (loadError()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'moderation.my.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retry()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>

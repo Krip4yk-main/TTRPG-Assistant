@@ -1,0 +1,7 @@
+@if (active()) {
+  <div class="sanctions-banner" role="status">
+    <mat-icon aria-hidden="true">gpp_maybe</mat-icon>
+    <span>{{ 'moderation.banner.text' | translate }}</span>
+    <a routerLink="/my-sanctions">{{ 'moderation.banner.link' | translate }}</a>
+  </div>
+}

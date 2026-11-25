@@ -25,7 +25,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import { APPEAL_MESSAGE_MAX } from '@nri/shared';
+import { APPEAL_MESSAGE_MAX, type SanctionAppealStatus } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AppealsApi } from '../../../core/appeals/appeals.api';
@@ -66,6 +66,11 @@ export class BannedNotice implements OnInit {
   readonly appealToken = input.required<string>();
   /** Повідомлення в цьому періоді бану вже надіслано (з `details` помилки входу). */
   readonly appealSent = input(false);
+  /**
+   * Стан уже поданої апеляції (з `details` помилки входу чи редиректу): на розгляді,
+   * задоволено чи відхилено. `null` — невідомо (щойно надіслано тут — «на розгляді»).
+   */
+  readonly appealStatus = input<SanctionAppealStatus | null>(null);
   /** «Увійти знову» — повернутися до способів входу. */
   readonly back = output<void>();
 
@@ -89,8 +94,15 @@ export class BannedNotice implements OnInit {
   private readonly title = viewChild<ElementRef<HTMLElement>>('title');
   private readonly stateTitle = viewChild<ElementRef<HTMLElement>>('stateTitle');
 
+  /** Щойно надіслане тут — на розгляді, незалежно від вхідного стану. */
+  private readonly sentStatus = signal<SanctionAppealStatus | null>(null);
+  /** Стан апеляції в стані «вже надіслано» (невідомий — «на розгляді»). */
+  protected readonly status = computed<SanctionAppealStatus>(
+    () => this.sentStatus() ?? this.appealStatus() ?? 'pending',
+  );
+
   ngOnInit(): void {
-    if (this.appealSent()) this.state.set('sent');
+    if (this.appealSent() || this.appealStatus() !== null) this.state.set('sent');
     afterNextRender(() => this.title()?.nativeElement.focus(), { injector: this.injector });
   }
 
@@ -106,6 +118,7 @@ export class BannedNotice implements OnInit {
       await firstValueFrom(
         this.api.create({ appealToken: this.appealToken(), message: this.message.value.trim() }),
       );
+      this.sentStatus.set('pending');
       this.setState('sent');
     } catch (err) {
       const { status, code } = toApiError(err);

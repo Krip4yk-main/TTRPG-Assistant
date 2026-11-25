@@ -11,6 +11,7 @@ import { type ViewMode, ViewModeStore } from '../../core/view-mode/view-mode.sto
 import { UserName } from '../../shared/user-name/user-name';
 import { NotificationBell } from '../../features/notifications/notification-bell/notification-bell';
 import { RateLink } from '../../features/ratings/rate-link/rate-link';
+import { SanctionsBanner } from '../../features/moderation/sanctions-banner/sanctions-banner';
 
 @Component({
   selector: 'nri-shell',
@@ -25,6 +26,7 @@ import { RateLink } from '../../features/ratings/rate-link/rate-link';
     MatToolbarModule,
     NotificationBell,
     RateLink,
+    SanctionsBanner,
     TranslatePipe,
     UserName,
   ],

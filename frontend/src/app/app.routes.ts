@@ -96,6 +96,13 @@ export const routes: Routes = [
       import('./features/members/blacklist-page/blacklist-page').then((m) => m.BlacklistPage),
   },
   {
+    path: 'my-sanctions',
+    canActivate: [activeGuard],
+    title: 'titles.mySanctions',
+    loadComponent: () =>
+      import('./features/moderation/my-sanctions/my-sanctions').then((m) => m.MySanctions),
+  },
+  {
     path: 'games/:id',
     title: 'titles.game',
     loadComponent: () =>

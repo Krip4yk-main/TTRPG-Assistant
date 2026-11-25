@@ -131,6 +131,15 @@ describe('GameCard', () => {
     expect(el.querySelector('.gm .none')!.textContent).toContain('ratings.gmRating.none');
   });
 
+  it('a blocked GM is labelled «Account blocked» on full and restricted cards', async () => {
+    await render(game);
+    expect(el.querySelector('nri-blocked-badge')).toBeNull();
+    await render({ ...game, gm: { ...game.gm, blocked: true } });
+    expect(el.querySelector('.gm nri-blocked-badge')!.textContent).toContain('moderation.blocked');
+    await render({ ...restricted, gm: { ...restricted.gm, blocked: true } });
+    expect(el.querySelector('.gm nri-blocked-badge')).not.toBeNull();
+  });
+
   it('restricted card has no rating even if it leaks', async () => {
     await render({ ...restricted, gmRating: 4.8 });
     expect(el.querySelector('nri-gm-rating')).toBeNull();

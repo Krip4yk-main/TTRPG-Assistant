@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { ApplicationDto } from '@nri/shared';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
@@ -46,6 +47,7 @@ describe('ApplyDialog', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService(),
+        provideRouter([]),
         { provide: MAT_DIALOG_DATA, useValue: d },
         { provide: MatDialogRef, useValue: { close } },
       ],
@@ -164,6 +166,49 @@ describe('ApplyDialog', () => {
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('errors.GM_BLACKLISTED');
     expect(close).not.toHaveBeenCalled();
     expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+  });
+
+  it('409 SANCTION_ACTIVE explains the restriction with its end date and links to the details', async () => {
+    await create();
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http.expectOne('/api/games/7/applications').flush(
+      {
+        error: {
+          code: 'SANCTION_ACTIVE',
+          details: { type: 'no_paid_apply', endsAt: '2026-12-02T10:00:00.000Z' },
+        },
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+    const notice = el.querySelector('.sanction-active')!;
+    expect(notice.getAttribute('role')).toBe('alert');
+    expect(notice.textContent).toContain('moderation.sanctionActive.no_paid_apply');
+    expect(notice.textContent).toContain('moderation.sanctionActive.until');
+    expect(notice.textContent).not.toContain('errors.SANCTION_ACTIVE');
+    expect(notice.querySelector('a')!.getAttribute('href')).toBe('/my-sanctions');
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('409 SANCTION_ACTIVE without an end date says the restriction is permanent', async () => {
+    await create();
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http
+      .expectOne('/api/games/7/applications')
+      .flush(
+        {
+          error: { code: 'SANCTION_ACTIVE', details: { type: 'application_limit', endsAt: null } },
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+    const text = el.querySelector('.sanction-active')!.textContent!;
+    expect(text).toContain('moderation.sanctionActive.application_limit');
+    expect(text).toContain('moderation.sanctionActive.forever');
   });
 
   it('constraints: at most 10', async () => {

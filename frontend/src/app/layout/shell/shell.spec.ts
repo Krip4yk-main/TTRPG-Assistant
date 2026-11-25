@@ -67,6 +67,8 @@ describe('Shell home by view mode', () => {
     http.match('/api/me/notifications/unread-count').forEach((r) => r.flush({ count: 0 }));
     // «Оцінити» (окремий відкладений блок) тягне список відкритих оцінок.
     http.match('/api/me/ratings/pending').forEach((r) => r.flush([]));
+    // Банер санкцій (відкладений блок) тягне мої чинні санкції.
+    http.match('/api/me/sanctions').forEach((r) => r.flush([]));
     http.verify();
     localStorage.clear();
   });

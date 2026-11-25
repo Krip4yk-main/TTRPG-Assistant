@@ -69,6 +69,11 @@ import { ChangeWatcher, type ChangeHandle } from '../../../core/realtime/change-
 import { HIGHLIGHT_MS } from '../../../core/realtime/highlight';
 import { UpdateBanner } from '../../../shared/update-banner/update-banner';
 import { GmRating } from '../../ratings/gm-rating/gm-rating';
+import { BlockedBadge } from '../../../shared/blocked-badge/blocked-badge';
+import {
+  ComplaintDialog,
+  type ComplaintDialogData,
+} from '../../moderation/complaint-dialog/complaint-dialog';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -103,6 +108,7 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
     SharedPlayerNotes,
     UpdateBanner,
     GmRating,
+    BlockedBadge,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
@@ -158,6 +164,10 @@ export class GameDetails {
     const me = this.auth.me();
     return !!g && !!me && g.gm.publicId === me.publicId;
   });
+  /** «Поскаржитися» на гру — будь-якому активному глядачеві, крім її майстра. */
+  protected readonly canComplain = computed(
+    () => this.auth.isActive() && !!this.view() && !this.isGm(),
+  );
   protected readonly canEdit = computed(() => {
     const g = this.game();
     return this.isGm() && !!g && EDITABLE.has(g.status);
@@ -425,6 +435,27 @@ export class GameDetails {
         kind: 'info',
         key: mode === 'convert' ? 'games.details.converted' : 'games.details.scheduleChanged',
       });
+      this.focusNotice();
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Діалог скарги на гру; після надсилання — повідомлення на сторінці. */
+  protected async complain(g: { id: number; title: string }): Promise<void> {
+    if (this.busy() || !this.canComplain()) return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const ref = this.dialog.open<ComplaintDialog, ComplaintDialogData, boolean>(ComplaintDialog, {
+        data: { kind: 'game', gameId: g.id, name: g.title },
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+        width: '560px',
+        maxWidth: 'calc(100vw - 32px)',
+      });
+      if (!(await firstValueFrom(ref.afterClosed()))) return;
+      this.notice.set({ kind: 'info', key: 'moderation.complain.sent' });
       this.focusNotice();
     } finally {
       this.busy.set(false);

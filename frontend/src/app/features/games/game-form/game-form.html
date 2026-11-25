@@ -581,6 +581,9 @@
       </fieldset>
 
       <div aria-live="polite">
+        @if (sanction(); as details) {
+          <nri-sanction-active-notice class="sanction-notice" tabindex="-1" [details]="details" />
+        }
         @if (formError(); as key) {
           <p class="nri-alert" role="alert">{{ key | translate }}</p>
         }

@@ -1,0 +1,58 @@
+<h2 mat-dialog-title>
+  {{
+    (data.kind === 'user' ? 'moderation.complain.userTitle' : 'moderation.complain.gameTitle')
+      | translate: { name: data.name }
+  }}
+</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p class="intro">{{ 'moderation.complain.intro' | translate }}</p>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'moderation.complain.reason' | translate }}</mat-label>
+      <mat-select class="reason" formControlName="reason" required>
+        @for (r of reasons; track r) {
+          <mat-option [value]="r">{{ 'moderation.reasons.' + r | translate }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.reason.hasError('required')) {
+        <mat-error class="reason-error">{{
+          'moderation.complain.reasonRequired' | translate
+        }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'moderation.complain.message' | translate }}</mat-label>
+      <textarea
+        matInput
+        class="message"
+        rows="5"
+        formControlName="message"
+        [attr.maxlength]="max"
+      ></textarea>
+      <mat-hint align="end" class="counter">{{
+        'moderation.counter' | translate: { count: length(), max: max }
+      }}</mat-hint>
+      @if (form.controls.message.hasError('maxlength')) {
+        <mat-error>{{ 'moderation.tooLong' | translate: { max: max } }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="send" [disabled]="submitting()">
+      {{
+        (submitting() ? 'moderation.complain.sending' : 'moderation.complain.submit') | translate
+      }}
+    </button>
+  </mat-dialog-actions>
+</form>

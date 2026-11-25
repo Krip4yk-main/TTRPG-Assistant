@@ -23,6 +23,9 @@
         } @else {
           {{ 'user.deleted' | translate }}
         }
+        @if (g.gm.blocked) {
+          <nri-blocked-badge />
+        }
       </p>
     </div>
   </article>
@@ -100,6 +103,9 @@
           <a class="gm-link" [routerLink]="['/users', g.gm.publicId]">{{ g.gm.nickname }}</a>
         } @else {
           {{ 'user.deleted' | translate }}
+        }
+        @if (g.gm.blocked) {
+          <nri-blocked-badge />
         }
         <nri-gm-rating [value]="g.gmRating" [showEmpty]="true" />
       </p>

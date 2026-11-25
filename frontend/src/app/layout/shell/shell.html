@@ -117,6 +117,13 @@
   </div>
 }
 
+@if (auth.isActive()) {
+  <!-- Окремий чанк: банер чинних санкцій (запит лише після завантаження сторінки). -->
+  @defer (on idle) {
+    <nri-sanctions-banner />
+  }
+}
+
 <main id="main-content" class="main" tabindex="-1">
   <router-outlet />
 </main>

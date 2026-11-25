@@ -188,6 +188,38 @@ describe('ProfilePage', () => {
     expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');
   });
 
+  const other: PublicProfileDto = {
+    publicId: 'zzzzzzzzzz',
+    status: 'active',
+    nickname: 'Gandalf',
+    avatarUrl: null,
+    gamesAsGm: [],
+    gamesAsPlayer: [],
+    ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
+  };
+
+  it("«Complain» is offered on someone else's profile", async () => {
+    await open(me, 'zzzzzzzzzz', other);
+    expect(el().querySelector('button.complain')!.textContent).toContain(
+      'moderation.complain.button',
+    );
+  });
+
+  it('no «Complain» on my own profile', async () => {
+    await open(me, me.publicId, { ...other, publicId: me.publicId, nickname: me.nickname });
+    expect(el().querySelector('button.complain')).toBeNull();
+  });
+
+  it('no «Complain» for guests', async () => {
+    await open(null, 'zzzzzzzzzz', other);
+    expect(el().querySelector('button.complain')).toBeNull();
+  });
+
+  it('a globally blocked account is labelled «Account blocked»', async () => {
+    await open(null, 'zzzzzzzzzz', { ...other, blocked: true });
+    expect(el().querySelector('h1 nri-blocked-badge')!.textContent).toContain('moderation.blocked');
+  });
+
   it('shows "not found" for an unknown user', async () => {
     await open(null, 'nnnnnnnnnn', 404);
     expect(el().textContent).toContain('profile.page.notFound');

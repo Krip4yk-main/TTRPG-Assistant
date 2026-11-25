@@ -3,6 +3,7 @@
     <nri-banned-notice
       [appealToken]="b.appealToken"
       [appealSent]="b.appealSent"
+      [appealStatus]="b.appealStatus ?? null"
       (back)="leaveBanned()"
     />
   }
