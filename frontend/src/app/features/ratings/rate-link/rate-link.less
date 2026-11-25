@@ -1,0 +1,33 @@
+:host {
+  display: contents;
+}
+
+.rate-link {
+  &.active {
+    color: var(--nri-accent-text);
+  }
+
+  mat-icon {
+    color: var(--nri-accent-text);
+  }
+}
+
+.count {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: var(--nri-space-xs);
+  padding: 0 6px;
+  border-radius: var(--nri-radius-lg);
+  background: var(--nri-accent);
+  color: var(--nri-on-accent);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+// Вузький тулбар: лише зірка й лічильник.
+@media (max-width: 639px) {
+  .label {
+    display: none;
+  }
+}

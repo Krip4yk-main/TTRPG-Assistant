@@ -121,6 +121,27 @@
             }
           </section>
 
+          <section class="nri-card ratings" aria-labelledby="profile-ratings">
+            <h2 id="profile-ratings">{{ 'ratings.profile.title' | translate }}</h2>
+            <div class="rating-blocks">
+              <section class="rating-block" data-rating="gm" aria-labelledby="rating-gm">
+                <h3 id="rating-gm">{{ 'ratings.profile.gm' | translate }}</h3>
+                <nri-rating-summary [rating]="p.ratings.gm" kind="gm" />
+              </section>
+              <section class="rating-block" aria-labelledby="rating-player">
+                <h3 id="rating-player">{{ 'ratings.profile.player' | translate }}</h3>
+                <div class="rating-source" data-rating="playerFromGm">
+                  <h4>{{ 'ratings.profile.fromGm' | translate }}</h4>
+                  <nri-rating-summary [rating]="p.ratings.playerFromGm" kind="player" />
+                </div>
+                <div class="rating-source" data-rating="playerFromPlayer">
+                  <h4>{{ 'ratings.profile.fromPlayer' | translate }}</h4>
+                  <nri-rating-summary [rating]="p.ratings.playerFromPlayer" kind="player" />
+                </div>
+              </section>
+            </div>
+          </section>
+
           <section class="games" aria-labelledby="profile-gm">
             <h2 id="profile-gm">{{ 'profile.page.gamesAsGm' | translate }}</h2>
             @if (gamesAsGm().length) {

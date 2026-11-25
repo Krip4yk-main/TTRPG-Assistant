@@ -532,6 +532,17 @@ describe('GameDetails', () => {
     expect(el().querySelector('a.gm-link')!.getAttribute('href')).toBe('/users/zzzzzzzzzz');
   });
 
+  it('GM rating next to the GM name; "no rating yet" when null', async () => {
+    await open(me, (r) => r.flush({ ...game, gmRating: 4.6 }));
+    const rating = el().querySelector('header .gm nri-gm-rating .gm-rating')!;
+    expect(rating.textContent).toContain('4,6');
+    expect(rating.getAttribute('aria-label')).toBe('ratings.gmRating.aria');
+    TestBed.resetTestingModule();
+    await open(me, (r) => r.flush(game));
+    expect(el().querySelector('header .gm .gm-rating')).toBeNull();
+    expect(el().querySelector('header .gm')!.textContent).toContain('ratings.gmRating.none');
+  });
+
   it('an 18+ game is not indexed', async () => {
     await open(me, (r) => r.flush({ ...game, ageRating: '18+' }));
     expect(TestBed.inject(Meta).getTag("name='robots'")?.content).toBe('noindex');

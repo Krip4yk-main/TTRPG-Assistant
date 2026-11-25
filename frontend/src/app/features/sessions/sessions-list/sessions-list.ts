@@ -14,11 +14,12 @@ import {
   untracked,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { RsvpStatus, SessionDto } from '@nri/shared';
+import { SESSION_RATING_WINDOW_DAYS, type RsvpStatus, type SessionDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -46,6 +47,8 @@ interface Message {
   key: string;
 }
 
+const SESSION_RATING_WINDOW_MS = SESSION_RATING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
 /** Як часто оновлюється «зараз» (межа майбутніх і минулих, «очікує завершення»), мс. */
 const CLOCK_MS = 60_000;
 
@@ -67,7 +70,14 @@ const DIALOG_OPTIONS = {
  */
 @Component({
   selector: 'nri-sessions-list',
-  imports: [NgTemplateOutlet, MatButtonModule, MatIconModule, TranslatePipe, NoteEditor],
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    TranslatePipe,
+    NoteEditor,
+  ],
   templateUrl: './sessions-list.html',
   styleUrl: './sessions-list.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -86,6 +96,8 @@ export class SessionsList {
   readonly isGm = input(false);
   /** Гра `recruiting`/`started`: сесіями можна керувати. */
   readonly manageable = input(false);
+  /** Кампанія: після проведеної сесії її учасників можна оцінити (ваншот — лише підсумково). */
+  readonly rateable = input(false);
   /** Сесії змінились — сторінці варто оновити «найближчу сесію». */
   readonly changed = output<void>();
   /** Глядач сам змінив дані (RSVP) — власний пінг не має піднімати банер. */
@@ -232,6 +244,16 @@ export class SessionsList {
 
   protected hours(s: SessionDto): number {
     return s.durationMinutes / 60;
+  }
+
+  /**
+   * «Оцінити» — на проведеній сесії кампанії, поки не минуло 14 днів від завершення. Кого
+   * саме (й чи був глядач присутній) вирішує сервер на сторінці оцінювання — без запиту
+   * на кожну сесію тут.
+   */
+  protected canRate(s: SessionDto): boolean {
+    if (!this.rateable() || s.status !== 'done' || !s.doneAt) return false;
+    return this.now() - Date.parse(s.doneAt) <= SESSION_RATING_WINDOW_MS;
   }
 
   /** Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. */

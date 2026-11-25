@@ -1,0 +1,67 @@
+<section class="nri-page pending-ratings">
+  <h1 tabindex="-1">{{ 'ratings.pending.title' | translate }}</h1>
+  <p class="nri-muted intro">{{ 'ratings.pending.intro' | translate }}</p>
+
+  @if (rows(); as list) {
+    @if (list.length === 0) {
+      <div class="nri-card empty">
+        <p>{{ 'ratings.pending.empty' | translate }}</p>
+      </div>
+    } @else {
+      <ul class="sets">
+        @for (r of list; track r.key) {
+          <li class="nri-card set" [attr.data-set]="r.key">
+            <div class="text">
+              <h2 class="game">
+                {{
+                  titles().get(r.gameId) ?? ('ratings.pending.game' | translate: { id: r.gameId })
+                }}
+              </h2>
+              <p class="nri-muted kind">
+                {{
+                  (r.sessionId === null ? 'ratings.pending.final' : 'ratings.pending.session')
+                    | translate
+                }}
+                ·
+                @if (r.closes; as day) {
+                  {{ 'ratings.closes.until' | translate: { date: day } }}
+                } @else {
+                  {{ 'ratings.closes.none' | translate }}
+                }
+              </p>
+              <p class="names">
+                {{ 'ratings.pending.who' | translate: { names: r.names.join(', ') } }}
+              </p>
+            </div>
+            <a
+              mat-flat-button
+              class="rate"
+              [routerLink]="['/games', r.gameId, 'rate']"
+              [queryParams]="r.queryParams"
+              [attr.aria-label]="
+                'ratings.pending.rateAria'
+                  | translate
+                    : {
+                        game:
+                          titles().get(r.gameId) ??
+                          ('ratings.pending.game' | translate: { id: r.gameId }),
+                      }
+              "
+            >
+              {{ 'ratings.pending.rate' | translate }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  } @else if (store.error()) {
+    <div class="nri-alert load-error" role="alert">
+      <span>{{ 'ratings.pending.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" (click)="retry()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+</section>

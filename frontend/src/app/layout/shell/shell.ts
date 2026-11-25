@@ -10,6 +10,7 @@ import { AuthStore } from '../../core/auth/auth.store';
 import { type ViewMode, ViewModeStore } from '../../core/view-mode/view-mode.store';
 import { UserName } from '../../shared/user-name/user-name';
 import { NotificationBell } from '../../features/notifications/notification-bell/notification-bell';
+import { RateLink } from '../../features/ratings/rate-link/rate-link';
 
 @Component({
   selector: 'nri-shell',
@@ -23,6 +24,7 @@ import { NotificationBell } from '../../features/notifications/notification-bell
     MatMenuModule,
     MatToolbarModule,
     NotificationBell,
+    RateLink,
     TranslatePipe,
     UserName,
   ],

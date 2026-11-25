@@ -1,0 +1,152 @@
+:host {
+  display: block;
+}
+
+.target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+}
+
+.avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+
+  &.placeholder {
+    display: grid;
+    place-items: center;
+    background: var(--nri-surface-sunken);
+    color: var(--nri-text-muted);
+  }
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+
+  a {
+    color: var(--nri-primary-text);
+  }
+}
+
+.role,
+.closes {
+  font-size: 0.875rem;
+}
+
+.result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  font-weight: 600;
+  outline: none;
+
+  &[data-result='rated'] {
+    color: var(--nri-success-text);
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.required {
+  color: var(--nri-danger-text);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--nri-danger-text);
+}
+
+.criteria {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  margin: 0;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-sm);
+
+  legend {
+    padding: 0 var(--nri-space-xs);
+    color: var(--nri-text-muted);
+  }
+}
+
+.criterion {
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-xs) var(--nri-space-md);
+}
+
+.criterion-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 200px;
+  min-width: 0;
+
+  .label {
+    font-weight: 500;
+  }
+}
+
+.hint {
+  font-size: 0.85rem;
+}
+
+.criterion-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-xs);
+}
+
+.comment {
+  width: 100%;
+}
+
+.warning {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}

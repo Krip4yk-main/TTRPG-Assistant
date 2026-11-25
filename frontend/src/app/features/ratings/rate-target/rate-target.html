@@ -1,0 +1,152 @@
+@let t = target();
+<article
+  class="target"
+  [class.done]="t.state !== 'open'"
+  [attr.data-target]="t.publicId"
+  [attr.data-state]="t.state"
+  [attr.aria-labelledby]="ids.name"
+>
+  <header class="head">
+    @if (t.avatarUrl) {
+      <img
+        class="avatar"
+        [src]="t.avatarUrl"
+        alt=""
+        width="40"
+        height="40"
+        referrerpolicy="no-referrer"
+      />
+    } @else {
+      <span class="avatar placeholder" aria-hidden="true"><mat-icon>person</mat-icon></span>
+    }
+    <div class="who">
+      <h2 class="name" [id]="ids.name">
+        <a [routerLink]="['/users', t.publicId]">{{ t.nickname }}</a>
+      </h2>
+      <span class="nri-muted role">{{ 'ratings.role.' + t.role | translate }}</span>
+    </div>
+    @if (t.state === 'open') {
+      <span class="nri-muted closes">
+        @if (closes(); as day) {
+          {{ 'ratings.closes.until' | translate: { date: day } }}
+        } @else {
+          {{ 'ratings.closes.none' | translate }}
+        }
+      </span>
+    } @else {
+      <span class="result" tabindex="-1" [attr.data-result]="t.state">
+        <mat-icon aria-hidden="true">{{ t.state === 'rated' ? 'check_circle' : 'block' }}</mat-icon>
+        {{ 'ratings.state.' + t.state | translate }}
+      </span>
+    }
+  </header>
+
+  @if (t.state === 'open') {
+    <form class="form" novalidate (submit)="$event.preventDefault(); send()">
+      <div class="field overall">
+        <span class="label" [id]="ids.overall">
+          {{ 'ratings.form.overall' | translate }}
+          <span class="required" aria-hidden="true">*</span>
+        </span>
+        <nri-star-rating
+          [labelledBy]="ids.overall"
+          [describedBy]="missingOverall() ? ids.overallError : null"
+          [required]="true"
+          [invalid]="missingOverall()"
+          [disabled]="busy()"
+          [(value)]="overall"
+        />
+        @if (missingOverall()) {
+          <p class="field-error" role="alert" [id]="ids.overallError">
+            {{ 'ratings.form.overallRequired' | translate }}
+          </p>
+        }
+      </div>
+
+      <fieldset class="criteria">
+        <legend>{{ 'ratings.form.criteria' | translate }}</legend>
+        @for (c of criteria(); track c) {
+          @let score = scores()[c] ?? null;
+          <div class="field criterion" [attr.data-criterion]="c">
+            <div class="criterion-text">
+              <span class="label" [id]="criterionId(c)">{{
+                'ratings.criteria.' + c + '.name' | translate
+              }}</span>
+              <span class="nri-muted hint" [id]="criterionId(c) + '-hint'">{{
+                'ratings.criteria.' + c + '.hint' | translate
+              }}</span>
+            </div>
+            <div class="criterion-input">
+              <nri-star-rating
+                [labelledBy]="criterionId(c)"
+                [describedBy]="criterionId(c) + '-hint'"
+                [disabled]="busy()"
+                [value]="score"
+                (valueChange)="setScore(c, $event)"
+              />
+              @if (score !== null) {
+                <button
+                  mat-button
+                  type="button"
+                  class="reset"
+                  [disabled]="busy()"
+                  [attr.aria-label]="
+                    'ratings.form.resetAria'
+                      | translate: { name: ('ratings.criteria.' + c + '.name' | translate) }
+                  "
+                  (click)="resetScore(c)"
+                >
+                  {{ 'ratings.form.reset' | translate }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </fieldset>
+
+      <mat-form-field class="comment" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'ratings.form.comment' | translate }}</mat-label>
+        <textarea
+          matInput
+          rows="3"
+          [maxLength]="commentMax"
+          [value]="comment()"
+          [disabled]="busy()"
+          (input)="onComment($event)"
+        ></textarea>
+        <mat-hint>{{ 'ratings.form.commentHint' | translate }}</mat-hint>
+        <mat-hint align="end">{{ comment().length }} / {{ commentMax }}</mat-hint>
+      </mat-form-field>
+
+      <p class="warning" [id]="ids.warning">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        {{ 'ratings.form.final' | translate }}
+      </p>
+
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+
+      <div class="actions">
+        <button
+          mat-flat-button
+          type="submit"
+          class="send"
+          [disabled]="busy()"
+          [attr.aria-describedby]="ids.warning"
+        >
+          {{ 'ratings.form.send' | translate }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          class="decline"
+          [disabled]="busy()"
+          (click)="decline()"
+        >
+          {{ 'ratings.form.decline' | translate }}
+        </button>
+      </div>
+    </form>
+  }
+</article>

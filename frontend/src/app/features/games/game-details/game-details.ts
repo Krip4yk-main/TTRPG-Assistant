@@ -67,6 +67,7 @@ import { NotesApi } from '../../../core/notes/notes.api';
 import { ChangeWatcher, type ChangeHandle } from '../../../core/realtime/change-watcher';
 import { HIGHLIGHT_MS } from '../../../core/realtime/highlight';
 import { UpdateBanner } from '../../../shared/update-banner/update-banner';
+import { GmRating } from '../../ratings/gm-rating/gm-rating';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -100,6 +101,7 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
     NoteEditor,
     SharedPlayerNotes,
     UpdateBanner,
+    GmRating,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',

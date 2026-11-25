@@ -151,6 +151,32 @@ describe('ProfilePage', () => {
     expect(el().querySelector('a[href="/profile/edit"]')).not.toBeNull();
   });
 
+  it('shows the GM rating and the player rating from GMs and from players', async () => {
+    await open(me, 'zzzzzzzzzz', {
+      publicId: 'zzzzzzzzzz',
+      status: 'active',
+      nickname: 'Gandalf',
+      avatarUrl: null,
+      gamesAsGm: [],
+      gamesAsPlayer: [],
+      ratings: {
+        gm: { overall: 4.6, units: 12, criteria: { preparation: 4.8, safety: 5 } },
+        playerFromGm: null,
+        playerFromPlayer: { overall: 3.9, units: 5, criteria: {} },
+      },
+    });
+    const block = (k: string) => el().querySelector<HTMLElement>(`[data-rating="${k}"]`)!;
+    expect(block('gm').textContent).toContain('4,6');
+    expect(block('gm').textContent).toContain('ratings.units.many');
+    expect(block('gm').querySelector('[data-criterion="preparation"]')!.textContent).toContain(
+      '4,8',
+    );
+    expect(block('playerFromGm').textContent).toContain('ratings.profile.fromGm');
+    expect(block('playerFromGm').textContent).toContain('ratings.summary.none');
+    expect(block('playerFromPlayer').textContent).toContain('ratings.profile.fromPlayer');
+    expect(block('playerFromPlayer').textContent).toContain('3,9');
+  });
+
   it('a deleted user shows only "deleted user" and is not indexed', async () => {
     await open(null, 'xxxxxxxxxx', {
       publicId: 'xxxxxxxxxx',

@@ -1,0 +1,13 @@
+@if (text(); as v) {
+  <span
+    class="gm-rating"
+    role="img"
+    [attr.aria-label]="'ratings.gmRating.aria' | translate: { value: v }"
+    [attr.title]="'ratings.gmRating.aria' | translate: { value: v }"
+  >
+    <mat-icon aria-hidden="true">star</mat-icon>
+    <span aria-hidden="true">{{ v }}</span>
+  </span>
+} @else if (showEmpty()) {
+  <span class="nri-muted none">{{ 'ratings.gmRating.none' | translate }}</span>
+}

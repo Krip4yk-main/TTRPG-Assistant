@@ -1,0 +1,19 @@
+@if (rating(); as r) {
+  <p class="overall">
+    <mat-icon class="star" aria-hidden="true">star</mat-icon>
+    <strong class="value">{{ overall() }}</strong>
+    <span class="nri-muted units">&nbsp;· {{ unitsKey() | translate: { n: r.units } }}</span>
+  </p>
+  @if (criteria().length) {
+    <dl class="criteria">
+      @for (c of criteria(); track c.key) {
+        <div class="criterion" [attr.data-criterion]="c.key">
+          <dt>{{ 'ratings.criteria.' + c.key + '.name' | translate }}</dt>
+          <dd>{{ c.value }}</dd>
+        </div>
+      }
+    </dl>
+  }
+} @else {
+  <p class="nri-muted none">{{ 'ratings.summary.none' | translate }}</p>
+}

@@ -76,6 +76,19 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'games/:id/rate',
+    canActivate: [activeGuard],
+    title: 'titles.rate',
+    loadComponent: () => import('./features/ratings/rate-page/rate-page').then((m) => m.RatePage),
+  },
+  {
+    path: 'ratings',
+    canActivate: [activeGuard],
+    title: 'titles.ratings',
+    loadComponent: () =>
+      import('./features/ratings/pending-ratings/pending-ratings').then((m) => m.PendingRatings),
+  },
+  {
     path: 'blacklist',
     canActivate: [activeGuard],
     title: 'titles.blacklist',

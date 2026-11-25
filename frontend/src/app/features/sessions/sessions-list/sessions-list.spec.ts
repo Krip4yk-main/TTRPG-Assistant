@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import type { MeDto, SessionDto } from '@nri/shared';
@@ -78,7 +79,12 @@ describe('SessionsList', () => {
     fixture.detectChanges();
   };
 
-  async function create(isGm: boolean, manageable = true, list: SessionDto[] = all) {
+  async function create(
+    isGm: boolean,
+    manageable = true,
+    list: SessionDto[] = all,
+    rateable = false,
+  ) {
     dialogOpen = vi.fn();
     changed = vi.fn<() => void>();
     await TestBed.configureTestingModule({
@@ -87,6 +93,7 @@ describe('SessionsList', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService(),
+        provideRouter([]),
         { provide: MatDialog, useValue: { open: dialogOpen } },
         {
           provide: SocketService,
@@ -106,6 +113,7 @@ describe('SessionsList', () => {
     fixture.componentRef.setInput('timezone', 'Europe/Kyiv');
     fixture.componentRef.setInput('isGm', isGm);
     fixture.componentRef.setInput('manageable', manageable);
+    fixture.componentRef.setInput('rateable', rateable);
     fixture.componentInstance.changed.subscribe(() => changed());
     el = fixture.nativeElement as HTMLElement;
     await settle();
@@ -114,6 +122,41 @@ describe('SessionsList', () => {
   }
 
   afterEach(() => http.verify());
+
+  describe('rate link', () => {
+    const day = 24 * 60 * 60 * 1000;
+    const recent: SessionDto = {
+      ...done,
+      id: 7,
+      startsAt: new Date(Date.now() - 2 * day).toISOString(),
+      doneAt: new Date(Date.now() - 2 * day + 3 * 60 * 60 * 1000).toISOString(),
+    };
+    const old: SessionDto = {
+      ...done,
+      id: 8,
+      startsAt: new Date(Date.now() - 20 * day).toISOString(),
+      doneAt: new Date(Date.now() - 15 * day).toISOString(),
+    };
+    const rateLink = (id: number) => row(id)!.querySelector<HTMLAnchorElement>('a.rate-link');
+
+    it('done campaign session within 14 days links to the session rating page', async () => {
+      await create(false, true, [recent, old, upcoming], true);
+      expect(rateLink(7)!.getAttribute('href')).toBe('/games/3/rate?session=7');
+      expect(rateLink(7)!.getAttribute('aria-label')).toBe('ratings.sessionLinkAria');
+      // Вікно минуло, і майбутня сесія — без посилання; запитів цілей на кожну сесію немає.
+      expect(rateLink(8)).toBeNull();
+      expect(rateLink(3)).toBeNull();
+      http.expectNone((r) => r.url.includes('/ratings'));
+    });
+
+    it('the GM gets the link too; a oneshot (not rateable) does not', async () => {
+      await create(true, true, [recent], true);
+      expect(rateLink(7)).not.toBeNull();
+      TestBed.resetTestingModule();
+      await create(false, true, [recent], false);
+      expect(rateLink(7)).toBeNull();
+    });
+  });
 
   const row = (id: number) => el.querySelector<HTMLElement>(`[data-session-id="${id}"]`);
   const buttons = (id: number) =>

@@ -168,6 +168,16 @@ describe('SearchPage', () => {
     });
   });
 
+  it('sort by GM rating is offered and sent as sort=gm_rating', async () => {
+    await setup(null, '/?sort=gm_rating');
+    expect(body(expectSearch()).sort).toBe('gm_rating');
+    const option = el().querySelector<HTMLOptionElement>(
+      'select[name="sort"] option[value="gm_rating"]',
+    )!;
+    expect(option.textContent).toContain('search.sort.gm_rating');
+    expect(option.selected).toBe(true);
+  });
+
   it('load more appends items without duplicates', async () => {
     await setup(null);
     await flush(expectSearch(), { items: [card(1), card(2)], nextCursor: 'c1' });

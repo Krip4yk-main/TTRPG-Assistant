@@ -102,6 +102,30 @@
   }
 }
 
+.rating-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--nri-space-lg);
+}
+
+.rating-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  min-width: 0;
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  h4 {
+    margin: 0 0 var(--nri-space-xs);
+    font-size: 0.95rem;
+    color: var(--nri-text-muted);
+  }
+}
+
 .games h2 {
   font-size: 1.4rem;
 }

@@ -21,6 +21,7 @@ import { ProfileApi } from '../../../core/profile/profile.api';
 import { SeoService } from '../../../core/seo/seo.service';
 import { UserName } from '../../../shared/user-name/user-name';
 import { GameCard } from '../../search/game-card/game-card';
+import { RatingSummary } from '../../ratings/rating-summary/rating-summary';
 
 /**
  * Публічний профіль (`/users/:publicId`). Приховані власником поля бекенд не надсилає,
@@ -28,7 +29,15 @@ import { GameCard } from '../../search/game-card/game-card';
  */
 @Component({
   selector: 'nri-profile-page',
-  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe, UserName, GameCard],
+  imports: [
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    TranslatePipe,
+    UserName,
+    GameCard,
+    RatingSummary,
+  ],
   templateUrl: './profile-page.html',
   styleUrl: './profile-page.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

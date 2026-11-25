@@ -1,0 +1,89 @@
+<section class="nri-page rate-page">
+  <a class="back" [routerLink]="['/games', gameId()]">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    {{ 'ratings.page.backToGame' | translate }}
+  </a>
+
+  <header class="page-head">
+    <h1 tabindex="-1">{{ 'ratings.page.title' | translate }}</h1>
+    @if (title(); as t) {
+      <p class="game-title">
+        <a [routerLink]="['/games', gameId()]">{{ t }}</a>
+      </p>
+    }
+    <p class="nri-muted kind">
+      @if (sessionId() !== null) {
+        @if (sessionWhen(); as when) {
+          {{ 'ratings.page.sessionOf' | translate: { when: when } }}
+        } @else {
+          {{ 'ratings.page.session' | translate }}
+        }
+      } @else {
+        {{ 'ratings.page.final' | translate }}
+      }
+    </p>
+    <p class="nri-muted intro">{{ 'ratings.page.intro' | translate }}</p>
+  </header>
+
+  <div aria-live="polite">
+    @if (message(); as msg) {
+      <p
+        class="message"
+        [class.nri-alert]="msg.kind === 'error'"
+        [class.nri-notice]="msg.kind === 'info'"
+        [attr.role]="msg.kind === 'error' ? 'alert' : null"
+      >
+        {{ msg.key | translate: { name: msg.name } }}
+      </p>
+    }
+  </div>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('notFound') {
+      <div class="nri-card not-found">
+        <p>{{ 'ratings.page.notFound' | translate }}</p>
+      </div>
+    }
+    @case ('forbidden') {
+      <div class="nri-card forbidden">
+        <p>{{ 'errors.RATING_NOT_ALLOWED' | translate }}</p>
+      </div>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'ratings.page.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (targets().length === 0) {
+        <div class="nri-card empty">
+          <p>{{ 'ratings.page.empty' | translate }}</p>
+          <a mat-stroked-button routerLink="/ratings">{{ 'ratings.page.toPending' | translate }}</a>
+        </div>
+      } @else {
+        @if (openCount() === 0) {
+          <p class="nri-notice all-done">{{ 'ratings.page.allDone' | translate }}</p>
+        }
+        <ul class="targets">
+          @for (t of targets(); track t.publicId) {
+            <li class="nri-card" [class.compact]="t.state !== 'open'">
+              <nri-rate-target
+                [target]="t"
+                [gameId]="gameId()"
+                [sessionId]="sessionId()"
+                (submitted)="onSubmitted($event)"
+                (stale)="onStale($event, t)"
+              />
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>

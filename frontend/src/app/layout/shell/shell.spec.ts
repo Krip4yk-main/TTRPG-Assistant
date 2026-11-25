@@ -65,6 +65,8 @@ describe('Shell home by view mode', () => {
   afterEach(() => {
     // Дзвіночок сповіщень тягне лічильник непрочитаних для активного користувача.
     http.match('/api/me/notifications/unread-count').forEach((r) => r.flush({ count: 0 }));
+    // «Оцінити» (той самий відкладений блок) тягне список відкритих оцінок.
+    http.match('/api/me/ratings/pending').forEach((r) => r.flush([]));
     http.verify();
     localStorage.clear();
   });

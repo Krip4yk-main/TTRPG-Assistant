@@ -154,6 +154,18 @@
         <mat-icon aria-hidden="true">{{ noteOpen ? 'expand_less' : 'edit_note' }}</mat-icon>
         {{ 'notes.session.toggle' | translate }}
       </button>
+      @if (canRate(s)) {
+        <a
+          mat-stroked-button
+          class="rate-link"
+          [routerLink]="['/games', gameId(), 'rate']"
+          [queryParams]="{ session: s.id }"
+          [attr.aria-label]="'ratings.sessionLinkAria' | translate: { when: when(s) }"
+        >
+          <mat-icon aria-hidden="true">star</mat-icon>
+          {{ 'ratings.sessionLink' | translate }}
+        </a>
+      }
       @for (a of actions(s); track a) {
         <button
           mat-stroked-button

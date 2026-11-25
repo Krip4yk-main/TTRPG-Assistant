@@ -1,0 +1,46 @@
+:host {
+  display: block;
+}
+
+p {
+  margin: 0;
+}
+
+.overall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-xs);
+}
+
+.star {
+  color: var(--nri-accent-text);
+}
+
+.value {
+  font-size: 1.25rem;
+}
+
+.criteria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--nri-space-xs) var(--nri-space-md);
+  margin: var(--nri-space-sm) 0 0;
+}
+
+.criterion {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+  min-width: 0;
+
+  dt {
+    color: var(--nri-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+  }
+}

@@ -1,0 +1,14 @@
+@if (count() > 0) {
+  <a
+    mat-button
+    class="rate-link"
+    routerLink="/ratings"
+    routerLinkActive="active"
+    ariaCurrentWhenActive="page"
+    [attr.aria-label]="'ratings.link.aria' | translate: { count: count() }"
+  >
+    <mat-icon aria-hidden="true">star</mat-icon>
+    <span class="label">{{ 'ratings.link.label' | translate }}</span>
+    <span class="count" aria-hidden="true">{{ count() }}</span>
+  </a>
+}

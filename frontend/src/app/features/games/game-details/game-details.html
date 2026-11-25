@@ -88,6 +88,7 @@
                   {{ 'user.deleted' | translate }}
                 }
               </strong>
+              <nri-gm-rating [value]="g.gmRating" [showEmpty]="true" />
             </p>
           </header>
 
@@ -298,6 +299,7 @@
               [timezone]="g.timezone"
               [isGm]="isGm()"
               [manageable]="manageable()"
+              [rateable]="g.kind === 'campaign'"
               (changed)="membersChanged()"
               (mutated)="quiet(['sessions'])"
             />

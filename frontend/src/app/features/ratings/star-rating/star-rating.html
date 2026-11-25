@@ -1,0 +1,35 @@
+<div
+  class="stars"
+  role="radiogroup"
+  [attr.aria-labelledby]="labelledBy()"
+  [attr.aria-describedby]="describedBy()"
+  [attr.aria-required]="required() || null"
+  [attr.aria-invalid]="invalid() || null"
+  [attr.aria-disabled]="disabled() || null"
+>
+  @for (n of scale; track n) {
+    <button
+      #star
+      type="button"
+      role="radio"
+      class="star"
+      [class.filled]="(value() ?? 0) >= n"
+      [attr.data-score]="n"
+      [attr.aria-checked]="value() === n"
+      [attr.aria-label]="'ratings.stars.of' | translate: { n: n, max: max }"
+      [tabIndex]="tabStop() === n ? 0 : -1"
+      [disabled]="disabled()"
+      (click)="select(n)"
+      (keydown)="onKeydown($event)"
+    >
+      <mat-icon aria-hidden="true">{{ (value() ?? 0) >= n ? 'star' : 'star_border' }}</mat-icon>
+    </button>
+  }
+</div>
+<span class="value" [class.nri-muted]="value() === null" aria-hidden="true">
+  @if (value(); as v) {
+    {{ 'ratings.stars.of' | translate: { n: v, max: max } }}
+  } @else {
+    {{ 'ratings.stars.none' | translate }}
+  }
+</span>

@@ -63,8 +63,10 @@
     </mat-button-toggle-group>
   }
   @if (auth.isActive()) {
-    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване. -->
+    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване.
+         «Оцінити» з’являється лише за наявності відкритих оцінок. -->
     @defer (on idle) {
+      <nri-rate-link />
       <nri-notification-bell />
     } @placeholder {
       <span class="bell-placeholder" aria-hidden="true"></span>
