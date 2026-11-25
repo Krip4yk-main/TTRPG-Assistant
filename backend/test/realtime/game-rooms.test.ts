@@ -16,8 +16,9 @@ import type { AppDeps } from '../../src/app.js';
 import { createApp } from '../../src/app.js';
 import { createSession } from '../../src/auth/session.service.js';
 import { gameSessions } from '../../src/db/schema/index.js';
+import { createServer } from 'node:http';
 import { createHttpServer } from '../../src/http-server.js';
-import type { RealtimeHub } from '../../src/realtime/socket.js';
+import { attachRealtime, type RealtimeHub } from '../../src/realtime/socket.js';
 import { deleteAccount } from '../../src/users/users.service.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
@@ -352,5 +353,97 @@ describe('applications and rsvp pings — personal rooms only', () => {
     expect(other.pings).toEqual([{ gameId, scope: 'sessions' }]);
     expect(a.pings).toEqual([]);
     expect(st.pings).toEqual([]);
+  });
+});
+
+describe('game.watch limits', () => {
+  /** Окремий сервер із малими межами (cap 3; відро 10 жетонів без поповнення в межах тесту). */
+  async function limitedServer() {
+    const srv = createServer();
+    const limited = attachRealtime(srv, deps, {
+      maxWatchedGames: 3,
+      watchBurst: 10,
+      watchRefillMs: 3_600_000,
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as AddressInfo).port;
+    return {
+      url: `http://127.0.0.1:${port}`,
+      close: async () => {
+        await limited.close();
+        await new Promise<void>((r) => srv.close(() => r()));
+      },
+    };
+  }
+
+  async function limitedSocket(base: string, userId: number): Promise<Socket> {
+    const { token } = await createSession(deps, userId, {});
+    const s = connect(base, {
+      transports: ['websocket'],
+      reconnection: false,
+      extraHeaders: { cookie: `nri_sid=${token}` },
+    });
+    clients.push(s);
+    await new Promise<void>((r) => s.once('connect', () => r()));
+    return s;
+  }
+
+  async function games(n: number): Promise<number[]> {
+    const gm = await h.userWithAge(30);
+    const ids: number[] = [];
+    for (let i = 0; i < n; i++) ids.push(await h.createGame(gm.cookie, {}, true));
+    return ids;
+  }
+
+  it('concurrent burst cannot exceed the cap; re-watch of a watched game and unwatch free a slot', async () => {
+    const ids = await games(5);
+    const u = await h.userWithAge(25);
+    const srv = await limitedServer();
+    try {
+      const s = await limitedSocket(srv.url, u.id);
+      // Усі 5 одночасно: броня синхронна, тож рівно 3 успішні.
+      const acks = await Promise.all(ids.map((id) => watch(s, id)));
+      const ok = ids.filter((_, i) => acks[i]!.ok);
+      expect(ok).toHaveLength(3);
+      // Уже переглядувана — дозволено; нова понад межу — ні.
+      expect(await watch(s, ok[0])).toEqual({ ok: true, members: false });
+      const rest = ids.filter((id) => !ok.includes(id));
+      expect(await watch(s, rest[0])).toEqual({ ok: false });
+      await s.timeout(5000).emitWithAck(GAME_UNWATCH_EVENT, { gameId: ok[1] });
+      expect(await watch(s, rest[0])).toEqual({ ok: true, members: false });
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('denied watch releases its reservation; duplicate in-flight watch is dropped', async () => {
+    const [a, b, c] = await games(3);
+    const u = await h.userWithAge(25);
+    const srv = await limitedServer();
+    try {
+      const s = await limitedSocket(srv.url, u.id);
+      // Неіснуючі ігри не займають місць після відмови.
+      expect(await watch(s, 999_998)).toEqual({ ok: false });
+      expect(await watch(s, 999_999)).toEqual({ ok: false });
+      const [first, dup] = await Promise.all([watch(s, a), watch(s, a)]);
+      expect([first, dup]).toEqual([{ ok: true, members: false }, { ok: false }]);
+      expect(await watch(s, b)).toEqual({ ok: true, members: false });
+      expect(await watch(s, c)).toEqual({ ok: true, members: false });
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('rate limit: watches beyond the token bucket are refused', async () => {
+    const [a] = await games(1);
+    const u = await h.userWithAge(25);
+    const srv = await limitedServer();
+    try {
+      const s = await limitedSocket(srv.url, u.id);
+      for (let i = 0; i < 10; i++) expect(await watch(s, a)).toEqual({ ok: true, members: false });
+      expect(await watch(s, a)).toEqual({ ok: false });
+    } finally {
+      await srv.close();
+    }
   });
 });

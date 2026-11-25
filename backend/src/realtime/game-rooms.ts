@@ -45,6 +45,10 @@ export async function watchAccess(
   if (!g) return none;
   if (g.gmUserId === userId) return { watch: true, members: g.status !== 'cancelled' };
   if (isHiddenFromNonGm(g)) return none;
+  // Вікова позначка перевіряється лише при підписці. Якщо майстер підніме позначку, уже
+  // підписаний молодший глядач лишиться в `game:<id>` до наступної підписки — свідомо
+  // прийнято: пінг містить лише `{gameId, scope}`, а дані після нього все одно віддає API
+  // з перевіркою віку (обмежений вид).
   if (g.ageRating !== 'none') {
     const viewer = await viewerById(deps, userId);
     if (!meetsAgeRating(viewerAge(viewer), g.ageRating)) return none;

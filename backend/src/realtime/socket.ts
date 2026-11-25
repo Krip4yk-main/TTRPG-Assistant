@@ -43,9 +43,29 @@ export interface RealtimeHub {
 export const REVALIDATE_EVERY_MS = 5 * 60_000;
 /** Скільки ігор один сокет може дивитися одночасно (захист від роздування кімнат). */
 export const MAX_WATCHED_GAMES = 50;
+/** Ліміт підписок `game.watch` на сокет: відро на 20 жетонів, повне поповнення за 10 с. */
+export const WATCH_BURST = 20;
+export const WATCH_REFILL_MS = 10_000;
 const REVALIDATE_CHUNK = 500;
 
-export type RealtimeOptions = { revalidateEveryMs?: number };
+export type RealtimeOptions = {
+  revalidateEveryMs?: number;
+  /** Для тестів: межа одночасно переглядуваних ігор на сокет. */
+  maxWatchedGames?: number;
+  /** Для тестів: місткість відра `game.watch` і час його повного поповнення. */
+  watchBurst?: number;
+  watchRefillMs?: number;
+};
+
+/** Стан підписок сокета — синхронний, щоб межу перевіряти й бронювати до будь-якого await. */
+interface WatchState {
+  /** Переглядувані ігри разом із тими, чия перевірка ще триває (броня місця). */
+  watched: Set<number>;
+  /** Ігри, для яких `game.watch` ще виконується (дубль відкидається). */
+  inFlight: Set<number>;
+  tokens: number;
+  refilledAt: number;
+}
 
 const logErr = (err: unknown): void => {
   console.error('[realtime] adapter error', err);
@@ -65,7 +85,12 @@ function originOf(url: string): string | null {
 export function attachRealtime(
   httpServer: HttpServer,
   deps: Pick<AppDeps, 'env' | 'db' | 'redis'>,
-  { revalidateEveryMs = REVALIDATE_EVERY_MS }: RealtimeOptions = {},
+  {
+    revalidateEveryMs = REVALIDATE_EVERY_MS,
+    maxWatchedGames = MAX_WATCHED_GAMES,
+    watchBurst = WATCH_BURST,
+    watchRefillMs = WATCH_REFILL_MS,
+  }: RealtimeOptions = {},
 ): RealtimeHub {
   const allowedOrigin = originOf(deps.env.PUBLIC_BASE_URL);
   const pub = deps.redis.duplicate();
@@ -104,47 +129,87 @@ export function attachRealtime(
 
   io.on('connection', (socket) => {
     const userId = socket.data.userId as number;
+    const state: WatchState = {
+      watched: new Set(),
+      inFlight: new Set(),
+      tokens: watchBurst,
+      refilledAt: Date.now(),
+    };
     const reply = (ack: unknown, value: GameWatchAck) => {
       if (typeof ack === 'function') (ack as (v: GameWatchAck) => void)(value);
     };
+    /** Відро жетонів: поповнюється пропорційно часу, `watchBurst` за `watchRefillMs`. */
+    const takeToken = (): boolean => {
+      const now = Date.now();
+      const refill = ((now - state.refilledAt) / watchRefillMs) * watchBurst;
+      state.tokens = Math.min(watchBurst, state.tokens + refill);
+      state.refilledAt = now;
+      if (state.tokens < 1) return false;
+      state.tokens -= 1;
+      return true;
+    };
+    const leaveGame = async (gameId: number) => {
+      state.watched.delete(gameId);
+      await Promise.all([socket.leave(gameRoom(gameId)), socket.leave(gameMembersRoom(gameId))]);
+    };
+
     // Підписка на пінги гри: право перевіряється щоразу заново (колишній учасник не
     // повернеться в `game-members:<id>`); без права — виходимо з обох кімнат гри.
+    // Ліміти (частота, дубль у польоті, межа ігор) перевіряються й бронюються синхронно,
+    // до першого await, — пачка одночасних підписок не обійде межу.
     socket.on(GAME_WATCH_EVENT, (input: unknown, ack?: unknown) => {
       const gameId = parseGameId(input);
       if (gameId === null) return reply(ack, { ok: false });
-      const watching = [...socket.rooms].filter((r) => r.startsWith('game:')).length;
-      if (watching >= MAX_WATCHED_GAMES && !socket.rooms.has(gameRoom(gameId))) {
+      if (state.inFlight.has(gameId)) return reply(ack, { ok: false });
+      if (!takeToken()) return reply(ack, { ok: false });
+      if (!state.watched.has(gameId) && state.watched.size >= maxWatchedGames) {
         return reply(ack, { ok: false });
       }
-      void watchAccess(deps, userId, gameId)
-        .then(async (access) => {
-          if (!access.members) await socket.leave(gameMembersRoom(gameId));
-          if (!access.watch) {
-            await socket.leave(gameRoom(gameId));
-            return reply(ack, { ok: false });
-          }
-          await socket.join(
-            access.members ? [gameRoom(gameId), gameMembersRoom(gameId)] : gameRoom(gameId),
-          );
-          // Повторна перевірка після входу закриває гонку з виключенням: якщо виселення
-          // (після коміту) пройшло між першою перевіркою й входом, тут членства вже немає.
-          if (access.members && !(await watchAccess(deps, userId, gameId)).members) {
-            await socket.leave(gameMembersRoom(gameId));
-            return reply(ack, { ok: true, members: false });
-          }
-          reply(ack, { ok: true, members: access.members });
-        })
-        .catch((err: unknown) => {
+      state.watched.add(gameId);
+      state.inFlight.add(gameId);
+      void (async (): Promise<GameWatchAck> => {
+        const access = await watchAccess(deps, userId, gameId);
+        if (!access.watch) {
+          await leaveGame(gameId);
+          return { ok: false };
+        }
+        if (!access.members) await socket.leave(gameMembersRoom(gameId));
+        await socket.join(
+          access.members ? [gameRoom(gameId), gameMembersRoom(gameId)] : gameRoom(gameId),
+        );
+        // `game.unwatch` під час перевірки скасовує підписку.
+        if (!state.watched.has(gameId)) {
+          await leaveGame(gameId);
+          return { ok: false };
+        }
+        // Повторна перевірка після входу закриває гонку з виключенням: якщо виселення
+        // (після коміту) пройшло між першою перевіркою й входом, тут членства вже немає.
+        if (access.members && !(await watchAccess(deps, userId, gameId)).members) {
+          await socket.leave(gameMembersRoom(gameId));
+          return { ok: true, members: false };
+        }
+        return { ok: true, members: access.members };
+      })()
+        .catch(async (err: unknown) => {
           console.error('[realtime] game.watch failed', err);
-          reply(ack, { ok: false });
+          await leaveGame(gameId).catch(() => {});
+          return { ok: false } as const;
+        })
+        .then((value) => {
+          state.inFlight.delete(gameId);
+          reply(ack, value);
         });
     });
     socket.on(GAME_UNWATCH_EVENT, (input: unknown, ack?: unknown) => {
       const gameId = parseGameId(input);
       if (gameId === null) return reply(ack, { ok: false });
-      void Promise.all([socket.leave(gameRoom(gameId)), socket.leave(gameMembersRoom(gameId))])
+      void leaveGame(gameId)
         .then(() => reply(ack, { ok: true, members: false }))
         .catch(() => reply(ack, { ok: false }));
+    });
+    socket.on('disconnect', () => {
+      state.watched.clear();
+      state.inFlight.clear();
     });
   });
 
