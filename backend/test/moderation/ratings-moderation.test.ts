@@ -9,7 +9,7 @@ import {
   ratings,
   users,
 } from '../../src/db/schema/index.js';
-import { maybePublish, userRatings } from '../../src/ratings/ratings.service.js';
+import { lockPublished, maybePublish, userRatings } from '../../src/ratings/ratings.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { bornYearsAgo, harness } from '../games/fixtures.js';
 import { ratingFixtures } from '../ratings/fixtures.js';
@@ -136,6 +136,19 @@ describe('hide text', () => {
     expect((await hide(mod.cookie, ids[1]!)).status).toBe(409);
     expect(await db.select().from(notifications)).toEqual([]);
   });
+
+  it('RF 2: the hidden text in the log is not shown to the rated staff member', async () => {
+    const mod = await user('Mod', 'moderator');
+    const owner = await user('Owner', 'owner');
+    const { gm, ids } = await gmWithRatings([5]);
+    await db.update(users).set({ role: 'admin' }).where(eq(users.id, gm.id));
+    expect((await hide(mod.cookie, ids[0]!)).status).toBe(200);
+    const asRatee = await call('get', '/api/admin/log', await login(gm.id));
+    expect(asRatee.status).toBe(200);
+    expect(asRatee.body.items[0].meta).toEqual({ role: 'gm', kind: 'final' });
+    const asOwner = await call('get', '/api/admin/log', owner.cookie);
+    expect(asOwner.body.items[0].meta.comment).toBe('Майстер запізнився');
+  });
 });
 
 describe('cancel rating', () => {
@@ -169,21 +182,27 @@ describe('cancel rating', () => {
     expect(left).not.toContain(ids[0]);
   });
 
-  it('fewer than 5 units after cancel → the rating is hidden; next batch publishes from 5', async () => {
+  it('fewer than 5 units after cancel → hidden; the baseline stays, next publish needs 5 new units', async () => {
     const mod = await user('Mod', 'moderator');
     const { gm, gameId, ids } = await gmWithRatings([5, 5, 5, 5, 1]);
     expect((await userRatings(deps, gm.id)).gm).toMatchObject({ overall: 4.2, units: 5 });
     expect((await cancel(mod.cookie, ids[4]!)).status).toBe(200);
     expect((await userRatings(deps, gm.id)).gm).toBeNull();
     const [snap] = await db.select().from(publishedRatings);
-    expect(snap).toMatchObject({ units: 0, overall: null, lastRatingId: null });
-    // Ще одна оцінка: 5 нескасованих одиниць — публікація (анульована не враховується).
-    const r = await createUser(db, { nickname: 'Late' });
-    await db
-      .insert(ratings)
-      .values({ raterId: r.id, rateeId: gm.id, gameId, kind: 'final', role: 'gm', overall: 3 });
-    expect(await db.transaction((tx) => maybePublish(tx, gm.id, 'gm'))).toBe(true);
-    expect((await userRatings(deps, gm.id)).gm).toMatchObject({ overall: 4.6, units: 5 });
+    expect(snap).toMatchObject({ units: 4, overall: null, lastRatingId: ids[4] });
+    const rate = async (overall: number) => {
+      const r = await createUser(db, { nickname: `Late${++seq}` });
+      await db
+        .insert(ratings)
+        .values({ raterId: r.id, rateeId: gm.id, gameId, kind: 'final', role: 'gm', overall });
+      return db.transaction((tx) => maybePublish(tx, gm.id, 'gm'));
+    };
+    // 4 нові — ще не пачка (анульована не рахується ні в базі, ні в нових).
+    for (let i = 0; i < 4; i++) expect(await rate(3)).toBe(false);
+    expect((await userRatings(deps, gm.id)).gm).toBeNull();
+    expect(await rate(3)).toBe(true);
+    // (5·4 + 3·5) / 9 = 3.89
+    expect((await userRatings(deps, gm.id)).gm).toMatchObject({ overall: 3.9, units: 9 });
   });
 
   it('RF 2: republish uses only the published batch — new unpublished ratings stay hidden', async () => {
@@ -217,7 +236,50 @@ describe('cancel rating', () => {
     expect(r.status).toBe(403);
     expect(r.body.error.code).toBe('MODERATION_FORBIDDEN');
     expect((await hide(admin.cookie, ids[0]!)).status).toBe(403);
+    // У черзі — лише оцінки від людей з нижчою роллю.
+    expect((await queue(mod.cookie)).body.items).toEqual([]);
+    expect((await queue(admin.cookie)).body.items).toEqual([]);
+    const owner = await user('Owner', 'owner');
+    expect((await queue(owner.cookie)).body.items.map((x: { id: number }) => x.id)).toEqual([
+      ids[0],
+    ]);
     expect((await cancel(mod.cookie, 999_999)).status).toBe(404);
     expect((await cancel(mod.cookie, ids[0]!, '')).status).toBe(400);
+  });
+
+  it('concurrent publish + cancel: the cancel sees the batch committed while it waited', async () => {
+    const mod = await user('Mod', 'moderator');
+    // 5 опубліковано (межа — 5-та), ще 4 чекають пачки.
+    const { gm, gameId, ids } = await gmWithRatings([3, 3, 3, 3, 3, 4, 4, 4, 4], {
+      publishAfter: 5,
+    });
+    let locked!: () => void;
+    const lockedP = new Promise<void>((r) => (locked = r));
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let lastId = 0;
+    // Інша транзакція тримає лок зрізу, додає 10-ту оцінку й публікує пачку.
+    const publish = db.transaction(async (tx) => {
+      await lockPublished(tx, gm.id, 'gm');
+      locked();
+      await gate;
+      const r = await createUser(db, { nickname: 'Tenth' });
+      const [res] = await tx
+        .insert(ratings)
+        .values({ raterId: r.id, rateeId: gm.id, gameId, kind: 'final', role: 'gm', overall: 4 })
+        .$returningId();
+      lastId = res!.id;
+      expect(await maybePublish(tx, gm.id, 'gm')).toBe(true);
+    });
+    await lockedP;
+    const cancelled = cancel(mod.cookie, ids[0]!);
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await publish;
+    expect((await cancelled).status).toBe(200);
+    const [snap] = await db.select().from(publishedRatings);
+    // Межа — 10-та оцінка; без анульованої — 9 одиниць: (3·4 + 4·5) / 9 = 3.56.
+    expect(snap).toMatchObject({ lastRatingId: lastId, units: 9 });
+    expect((await userRatings(deps, gm.id)).gm).toMatchObject({ overall: 3.6, units: 9 });
   });
 });

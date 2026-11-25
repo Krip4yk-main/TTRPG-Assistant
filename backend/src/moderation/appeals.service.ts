@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import {
   appealDecisionSchema,
@@ -98,25 +98,23 @@ export async function appealMySanction(
 /** Текст причини для бану, виставленого лише прапорцем (без санкції; `banUser`). */
 export const FLAG_BAN_REASON = 'Бан без зазначеної причини.';
 
-/**
- * Чинна санкція-бан користувача, на яку подається апеляція: найновіша чинна `global_ban`.
- * Немає (бан лише прапорцем — `banUser`, прямий SQL) і `create` — створює системну безстрокову
- * санкцію (журнал `sanction.impose` без актора), щоб апеляція мала до чого прив'язатись.
- */
+/** Найновіша чинна санкція-бан користувача (`null` — немає). */
 export async function activeBanSanction(
   tx: DbLike,
   userId: number,
-  opts: { create?: boolean; now?: Date } = {},
+  now: Date = new Date(),
 ): Promise<number | null> {
-  const now = opts.now ?? new Date();
   const [s] = await tx
     .select({ id: sanctions.id })
     .from(sanctions)
     .where(and(eq(sanctions.userId, userId), eq(sanctions.type, 'global_ban'), activeAt(now)))
     .orderBy(desc(sanctions.startsAt), desc(sanctions.id))
     .limit(1);
-  if (s) return s.id;
-  if (!opts.create) return null;
+  return s?.id ?? null;
+}
+
+/** Системна безстрокова санкція-бан для бану лише прапорцем (журнал без актора). */
+async function createFlagBanSanction(tx: Tx, userId: number, now: Date): Promise<number> {
   const [res] = await tx
     .insert(sanctions)
     .values({
@@ -155,19 +153,56 @@ export async function banAppealStatus(
 
 /**
  * Апеляція забаненого (`POST /api/appeals` за токеном) — на чинну санкцію-бан, у
- * `sanction_appeals`. Рядок користувача під X-локом: паралельні апеляції/бан серіалізуються.
+ * `sanction_appeals`. Рядок користувача під X-локом (паралельні апеляції/бан/зняття
+ * серіалізуються), `is_banned` — з нього: уже не забанений → 403 `FORBIDDEN`.
+ * - Є чинна санкція-бан → апеляція на найновішу.
+ * - Немає жодної незнятої санкції-бану → бан лише прапорцем (`banUser`, прямий SQL): системна
+ *   санкція, апеляція на неї.
+ * - Є лише прострочені незняті (задача строків ще не дійшла) → знімаються тут же (як задача:
+ *   розбан, сповіщення) і 409 `SANCTION_NOT_ACTIVE` — оскаржувати нічого.
  */
 export async function createBanAppeal(
-  deps: Pick<AppDeps, 'db'>,
+  deps: SanctionDeps,
   userId: number,
   message: string,
 ): Promise<{ id: number; sanctionId: number }> {
-  return deps.db.transaction(async (tx) => {
-    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
-    const sanctionId = (await activeBanSanction(tx, userId, { create: true }))!;
-    const id = await insertAppeal(tx, sanctionId, userId, message);
-    return { id, sanctionId };
+  const now = new Date();
+  const r = await deps.db.transaction(async (tx) => {
+    const [u] = await tx
+      .select({ isBanned: users.isBanned, status: users.status })
+      .from(users)
+      .where(eq(users.id, userId))
+      .for('update');
+    if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
+    if (!u.isBanned) throw new AppError(403, 'FORBIDDEN');
+    const open = await tx
+      .select()
+      .from(sanctions)
+      .where(
+        and(
+          eq(sanctions.userId, userId),
+          eq(sanctions.type, 'global_ban'),
+          isNull(sanctions.liftedAt),
+        ),
+      )
+      .orderBy(desc(sanctions.startsAt), desc(sanctions.id))
+      .for('update');
+    const active = open.find((s) => isActive(s, now));
+    if (active || open.length === 0) {
+      const sanctionId = active?.id ?? (await createFlagBanSanction(tx, userId, now));
+      const id = await insertAppeal(tx, sanctionId, userId, message);
+      return { created: { id, sanctionId } } as const;
+    }
+    const after: (() => Promise<void>)[] = [];
+    for (const s of open) {
+      const lifted = await liftSanctionTx(deps, tx, null, s.id, { now, expired: true });
+      if (lifted) after.push(lifted.afterCommit);
+    }
+    return { expired: after } as const;
   });
+  if ('created' in r && r.created) return r.created;
+  for (const fn of r.expired) await fn();
+  throw new AppError(409, 'SANCTION_NOT_ACTIVE');
 }
 
 // ---------- черга персоналу ----------
@@ -265,11 +300,18 @@ export async function decideAppeal(
       .where(eq(sanctionAppeals.id, appealId))
       .for('update');
     if (!a) throw new AppError(404, 'NOT_FOUND');
-    const [s] = await tx.select().from(sanctions).where(eq(sanctions.id, a.sanctionId));
+    // Порядок як у зняття: користувач → санкція (обидва X). Рішення — за заблокованим рядком
+    // санкції: паралельне зняття чи задача строків не змусять `liftSanctionTx` упасти з 409.
     const [target] = await tx
       .select({ role: users.role, status: users.status })
       .from(users)
-      .where(eq(users.id, a.userId));
+      .where(eq(users.id, a.userId))
+      .for('update');
+    const [s] = await tx
+      .select()
+      .from(sanctions)
+      .where(eq(sanctions.id, a.sanctionId))
+      .for('update');
     if (!s || !target) throw new AppError(404, 'NOT_FOUND');
     const role = await actorRole(tx, actorId);
     // Невидима для ролі апеляція — як відсутня (не розкриваємо існування).

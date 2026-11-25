@@ -8,7 +8,7 @@ import { requireStaff } from './permissions.js';
 export function adminLogRouter(deps: AppDeps): Router {
   const router = Router();
   router.get('/', requireAuth(deps), requireStaff('admin'), async (req, res) => {
-    res.json(await listLog(deps.db, req.user!.role, req.query));
+    res.json(await listLog(deps.db, { userId: req.user!.userId, role: req.user!.role }, req.query));
   });
   return router;
 }

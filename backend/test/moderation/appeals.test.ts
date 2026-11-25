@@ -8,6 +8,7 @@ import {
   sanctions,
   users,
 } from '../../src/db/schema/index.js';
+import { createBanAppeal } from '../../src/moderation/appeals.service.js';
 import { imposeSanction, liftSanction } from '../../src/moderation/sanctions.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { bornYearsAgo, harness } from '../games/fixtures.js';
@@ -214,5 +215,42 @@ describe('admin appeals', () => {
     expect(res.body.status).toBe('accepted');
     const actions = (await db.select().from(moderationLog)).map((l) => l.action);
     expect(actions).toEqual(['sanction.impose', 'appeal.accept']);
+  });
+
+  it('token appeal on an expired-but-not-yet-lifted ban: lifted inline, 409, no new sanction', async () => {
+    const admin = await user('Admin', 'admin');
+    const bad = await createUser(db, { nickname: 'Bad', birthDate: bornYearsAgo(30) });
+    const s = await imposeSanction(deps, admin.id, bad.id, ban);
+    await db
+      .update(sanctions)
+      .set({
+        startsAt: new Date(Date.now() - 40 * 86_400_000),
+        endsAt: new Date(Date.now() - 1000),
+      })
+      .where(eq(sanctions.id, s.id));
+    await expect(createBanAppeal(deps, bad.id, 'прошу')).rejects.toMatchObject({
+      status: 409,
+      code: 'SANCTION_NOT_ACTIVE',
+    });
+    expect(await db.select().from(sanctions)).toHaveLength(1);
+    expect(await db.select().from(sanctionAppeals)).toEqual([]);
+    const [row] = await db.select().from(sanctions);
+    expect(row!.liftedAt).not.toBeNull();
+    const [u] = await db.select().from(users).where(eq(users.id, bad.id));
+    expect(u!.isBanned).toBe(false);
+    const [log] = await db
+      .select()
+      .from(moderationLog)
+      .where(eq(moderationLog.action, 'sanction.expire'));
+    expect(log).toMatchObject({ actorId: null, targetId: bad.id });
+  });
+
+  it('token appeal re-checks is_banned under the lock', async () => {
+    const u = await createUser(db, { nickname: 'Free' });
+    await expect(createBanAppeal(deps, u.id, 'прошу')).rejects.toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+    });
+    expect(await db.select().from(sanctions)).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
 import { moderationLogQuerySchema, type AdminPageDto, type ModerationLogDto } from '@nri/shared';
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
-import { moderationLog } from '../db/schema/index.js';
+import { moderationLog, ratings } from '../db/schema/index.js';
 import { assertCan, type Role } from './permissions.js';
 import { refsOf } from './sanctions.service.js';
 
@@ -37,10 +37,10 @@ export async function writeLog(db: Db | Tx, e: LogEntry): Promise<void> {
  */
 export async function listLog(
   db: Db,
-  viewerRole: Role,
+  viewer: { userId: number; role: Role },
   query: unknown,
 ): Promise<AdminPageDto<ModerationLogDto>> {
-  assertCan(viewerRole, 'log.view');
+  assertCan(viewer.role, 'log.view');
   const { cursor, limit, targetType, targetId } = moderationLogQuerySchema.parse(query);
   const rows = await db
     .select()
@@ -59,6 +59,24 @@ export async function listLog(
     db,
     page.flatMap((r) => [r.actorId, r.targetType === 'user' ? r.targetId : null]),
   );
+  // Текст оцінки в журналі — не для самого оцінюваного (анонімність оцінювача).
+  const ratingIds = page.filter((r) => r.targetType === 'rating').map((r) => r.targetId);
+  const aboutViewer = new Set(
+    ratingIds.length
+      ? (
+          await db
+            .select({ id: ratings.id })
+            .from(ratings)
+            .where(and(inArray(ratings.id, ratingIds), eq(ratings.rateeId, viewer.userId)))
+        ).map((r) => r.id)
+      : [],
+  );
+  const metaFor = (r: (typeof page)[number]) => {
+    if (!r.meta || r.targetType !== 'rating' || !aboutViewer.has(r.targetId)) return r.meta ?? null;
+    const rest = { ...r.meta };
+    delete rest.comment;
+    return rest;
+  };
   return {
     items: page.map((r) => ({
       id: r.id,
@@ -68,7 +86,7 @@ export async function listLog(
       targetId: r.targetId,
       targetUser: r.targetType === 'user' ? (refs.get(r.targetId) ?? null) : null,
       reason: r.reason,
-      meta: r.meta ?? null,
+      meta: metaFor(r),
       createdAt: r.createdAt.toISOString(),
     })),
     nextCursor: rows.length > limit ? page[page.length - 1]!.id : null,

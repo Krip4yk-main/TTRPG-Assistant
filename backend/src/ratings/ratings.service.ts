@@ -32,16 +32,25 @@ import {
  * UPDATE»). Повертає поточну кількість опублікованих одиниць.
  */
 export async function lockPublished(tx: Tx, userId: number, role: RatingRole): Promise<number> {
+  return (await lockPublishedRow(tx, userId, role)).units;
+}
+
+/** `lockPublished` з межею зрізу (`last_rating_id`) — блокувальне читання, свіжий стан. */
+export async function lockPublishedRow(
+  tx: Tx,
+  userId: number,
+  role: RatingRole,
+): Promise<{ units: number; lastRatingId: number | null }> {
   await tx
     .insert(publishedRatings)
     .values({ userId, role })
     .onDuplicateKeyUpdate({ set: { units: sql`${publishedRatings.units}` } });
   const [row] = await tx
-    .select({ units: publishedRatings.units })
+    .select({ units: publishedRatings.units, lastRatingId: publishedRatings.lastRatingId })
     .from(publishedRatings)
     .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)))
     .for('update');
-  return row!.units;
+  return row!;
 }
 
 /**
@@ -98,17 +107,14 @@ function counted(userId: number, role: RatingRole) {
  * Негайна перепублікація зрізу (людина, роль) після анулювання оцінки модератором — у
  * транзакції дії. Перераховує лише оцінки в межах уже опублікованого зрізу (`id ≤
  * last_rating_id`), без анульованих: нові, ще не опубліковані оцінки чекають своєї пачки, тож
- * момент перепублікації (дія модератора) не розкриває нічого про нових оцінювачів. Якщо
- * одиниць стає менше 5 — зріз ховається (стає заготовкою: наступна публікація — як перша, від 5
- * одиниць). Зрізу ще не було — нічого не робить. Повертає `true`, якщо зріз змінено.
+ * момент перепублікації (дія модератора) не розкриває нічого про нових оцінювачів. Читання —
+ * блокувальні (лок зрізу, оцінки FOR SHARE): стан свіжий, навіть якщо знімок транзакції
+ * зафіксовано раніше. Менше 5 одиниць — зріз ховається (`overall` NULL), але межа й лічильник
+ * одиниць лишаються базою: наступна публікація, як і завжди, — лише після 5 нових одиниць.
+ * Зрізу ще не було — нічого не робить. Повертає `true`, якщо зріз змінено.
  */
 export async function republish(tx: Tx, userId: number, role: RatingRole): Promise<boolean> {
-  await lockPublished(tx, userId, role);
-  const [snap] = await tx
-    .select({ lastRatingId: publishedRatings.lastRatingId })
-    .from(publishedRatings)
-    .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)));
-  const boundary = snap?.lastRatingId ?? null;
+  const { lastRatingId: boundary } = await lockPublishedRow(tx, userId, role);
   if (boundary === null) return false;
   const rows = await tx
     .select({
@@ -118,34 +124,21 @@ export async function republish(tx: Tx, userId: number, role: RatingRole): Promi
       criteria: ratings.criteria,
     })
     .from(ratings)
-    .where(and(counted(userId, role), lte(ratings.id, boundary)));
+    .where(and(counted(userId, role), lte(ratings.id, boundary)))
+    .for('share');
   const scored = rows.filter((r) => r.overall !== null).map((r) => ({ ...r, overall: r.overall! }));
   const computed = computeRating(scored);
-  const where = and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role));
-  if (computed.units < RATING_MIN_UNITS) {
-    await tx
-      .update(publishedRatings)
-      .set({
-        overall: null,
-        overallUnits: 0,
-        criteria: null,
-        units: 0,
-        lastRatingId: null,
-        publishedAt: null,
-      })
-      .where(where);
-    return true;
-  }
+  const hidden = computed.units < RATING_MIN_UNITS;
   await tx
     .update(publishedRatings)
     .set({
-      overall: computed.overall,
-      overallUnits: computed.overallUnits,
-      criteria: computed.criteria,
+      overall: hidden ? null : computed.overall,
+      overallUnits: hidden ? 0 : computed.overallUnits,
+      criteria: hidden ? null : computed.criteria,
       units: computed.units,
       publishedAt: new Date(),
     })
-    .where(where);
+    .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)));
   return true;
 }
 

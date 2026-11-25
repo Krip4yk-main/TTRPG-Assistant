@@ -14,7 +14,7 @@ import { AppError } from '../http/errors.js';
 import { complaintsAboutUser, type StaffViewer } from './complaints.service.js';
 import { writeLog } from './log.js';
 import { assertCan, assertCanActOn, type Role } from './permissions.js';
-import { actorRole, runAfterCommit, sanctionDto } from './sanctions.service.js';
+import { runAfterCommit, sanctionDto } from './sanctions.service.js';
 
 type Deps = Pick<AppDeps, 'db' | 'redis' | 'env'> & Partial<Pick<AppDeps, 'realtime'>>;
 
@@ -117,15 +117,32 @@ export async function changeRole(
   body: unknown,
 ): Promise<AdminUserDto> {
   const { role: next } = roleChangeSchema.parse(body);
+  const [peek] = await deps.db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.publicId, publicId));
+  if (!peek) throw new AppError(404, 'NOT_FOUND');
   const { targetId, changed } = await deps.db.transaction(async (tx) => {
-    const role = await actorRole(tx, actorId);
-    // Право хоча б на модераторів — інакше 403 ще до пошуку цілі.
+    // Діяч (S) і ціль (X) — у порядку id: дві зустрічні зміни ролей не зациклюються, а роль
+    // діяча не зміниться до коміту.
+    const rows = new Map<number, { role: Role; status: string; isBanned: boolean }>();
+    for (const id of [...new Set([actorId, peek.id])].sort((a, b) => a - b)) {
+      const [row] = await tx
+        .select({ role: users.role, status: users.status, isBanned: users.isBanned })
+        .from(users)
+        .where(eq(users.id, id))
+        .for(id === peek.id ? 'update' : 'share');
+      if (row) rows.set(id, row);
+    }
+    const actor = rows.get(actorId);
+    if (!actor || actor.status !== 'active' || actor.isBanned) {
+      throw new AppError(403, 'MODERATION_FORBIDDEN');
+    }
+    const role = actor.role;
+    // Право хоча б на модераторів — інакше 403 ще до перевірки цілі.
     assertCan(role, 'roles.moderator');
-    const [t] = await tx
-      .select({ id: users.id, role: users.role, status: users.status })
-      .from(users)
-      .where(eq(users.publicId, publicId))
-      .for('update');
+    const found = rows.get(peek.id);
+    const t = found && { id: peek.id, ...found };
     if (!t || t.status !== 'active') throw new AppError(404, 'NOT_FOUND');
     assertCanActOn(role, t.role);
     if (next === 'admin' || t.role === 'admin') assertCan(role, 'roles.admin');

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, lt, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import {
   adminRatingsQuerySchema,
@@ -13,7 +13,7 @@ import { games, ratings, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { lockPublished, republish } from '../ratings/ratings.service.js';
 import { writeLog } from './log.js';
-import { assertCan, assertCanActOn, type Role } from './permissions.js';
+import { assertCan, assertCanActOn, ROLE_RANK, type Role } from './permissions.js';
 import { actorRole } from './sanctions.service.js';
 
 type DbLike = Db | Tx;
@@ -60,7 +60,8 @@ function toDto(row: Row): AdminRatingDto {
  * `GET /api/admin/ratings?filter=new|commented&cursor=&limit=` (модератор+): не модеровані
  * оцінки (без відмов), новіші першими; `commented` — лише з текстом. Персонал бачить ніки обох
  * сторін, але оцінки про самого переглядача в черзі не показуються — інакше оцінюваний
- * дізнався б, хто його оцінив.
+ * дізнався б, хто його оцінив; і лише оцінки від людей з нижчою роллю (інших модерувати не
+ * можна — `assertCanActOn`).
  */
 export async function listRatings(
   deps: Pick<AppDeps, 'db'>,
@@ -69,12 +70,17 @@ export async function listRatings(
 ): Promise<AdminPageDto<AdminRatingDto>> {
   assertCan(viewer.role, 'ratings.moderate');
   const { filter, cursor, limit } = adminRatingsQuerySchema.parse(query);
+  const lowerRoles = (Object.keys(ROLE_RANK) as Role[]).filter(
+    (r) => ROLE_RANK[r] < ROLE_RANK[viewer.role],
+  );
   const rows = await ratingsQuery(deps.db)
     .where(
       and(
         eq(ratings.declined, false),
         eq(ratings.moderated, 'none'),
         ne(ratings.rateeId, viewer.userId),
+        // Лише оцінки від людей з нижчою роллю — інших переглядач модерувати не може.
+        lowerRoles.length ? inArray(raterU.role, lowerRoles) : sql`FALSE`,
         filter === 'commented'
           ? and(isNotNull(ratings.comment), ne(ratings.comment, ''))
           : undefined,
@@ -110,16 +116,18 @@ async function moderateRating(
   action: Action,
 ): Promise<AdminRatingDto> {
   const { reason } = ratingModerationInputSchema.parse(body);
+  // (людина, роль) оцінки незмінні — читаємо до транзакції, щоб першою дією в ній був лок зрізу:
+  // звичайне читання до нього зафіксувало б знімок, старший за пачку, на яку чекали.
+  const [peek] = await deps.db
+    .select({ rateeId: ratings.rateeId, role: ratings.role })
+    .from(ratings)
+    .where(eq(ratings.id, ratingId));
+  if (!peek) throw new AppError(404, 'NOT_FOUND');
   return deps.db.transaction(async (tx) => {
+    // Порядок як у `submitRating`: зріз → оцінка.
+    if (action === 'cancel') await lockPublished(tx, peek.rateeId, peek.role);
     const role = await actorRole(tx, actorId);
     assertCan(role, 'ratings.moderate');
-    // Звичайне читання — щоб узяти лок зрізу до лока оцінки (порядок як у `submitRating`).
-    const [peek] = await tx
-      .select({ rateeId: ratings.rateeId, role: ratings.role })
-      .from(ratings)
-      .where(eq(ratings.id, ratingId));
-    if (!peek) throw new AppError(404, 'NOT_FOUND');
-    if (action === 'cancel') await lockPublished(tx, peek.rateeId, peek.role);
     const [r] = await tx.select().from(ratings).where(eq(ratings.id, ratingId)).for('update');
     if (!r || r.declined) throw new AppError(404, 'NOT_FOUND');
     if (r.raterId === actorId || r.rateeId === actorId) {

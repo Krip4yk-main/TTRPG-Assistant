@@ -60,7 +60,9 @@ export async function createAppeal(deps: AppDeps, rawBody: unknown): Promise<{ i
   try {
     created = await createBanAppeal(deps, userId, input.message);
   } catch (err) {
-    if (err instanceof AppError && err.code === 'APPEAL_EXISTS') await burn();
+    // Остаточні відповіді спалюють токен (як і перевірки вище).
+    const final = ['APPEAL_EXISTS', 'SANCTION_NOT_ACTIVE', 'FORBIDDEN', 'UNAUTHENTICATED'];
+    if (err instanceof AppError && final.includes(err.code)) await burn();
     throw err;
   }
   const { id, sanctionId } = created;
