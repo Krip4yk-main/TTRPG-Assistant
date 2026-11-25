@@ -42,6 +42,11 @@ export class SocketService {
     if (!socket.connected) socket.connect();
   }
 
+  /** Сокет зараз підключений. */
+  isConnected(): boolean {
+    return !!this.socket?.connected;
+  }
+
   disconnect(): void {
     this.socket?.disconnect();
   }

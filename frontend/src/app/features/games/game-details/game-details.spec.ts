@@ -137,6 +137,7 @@ describe('GameDetails', () => {
             on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
             sessionLost$: new Subject(),
             connected$: new Subject(),
+            isConnected: () => false,
             get request() {
               return socket.request;
             },

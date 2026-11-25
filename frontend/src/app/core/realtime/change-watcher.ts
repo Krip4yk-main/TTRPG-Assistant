@@ -16,8 +16,13 @@ export interface ChangeHandle {
   readonly pending: Signal<ReadonlySet<GameChangeScope>>;
   /** Забрати накопичені області (банер зникає) — сторінка перечитує саме їх. */
   take(): Set<GameChangeScope>;
-  /** Сторінка щойно сама змінила дані: ігнорувати пінги ще `ms`. */
-  quiet(ms?: number): void;
+  /** Перечитати не вдалося — повернути області (банер знову видно). */
+  restore(scopes: Iterable<GameChangeScope>): void;
+  /**
+   * Сторінка щойно сама змінила дані: ігнорувати пінги цих областей (без них — усіх) ще `ms`.
+   * Пінги інших областей і далі піднімають банер.
+   */
+  quiet(scopes?: readonly GameChangeScope[], ms?: number): void;
   /** Повторити `game.watch` (стосунок глядача змінився — сервер переоцінить кімнати). */
   rewatch(): void;
   stop(): void;
@@ -47,27 +52,43 @@ export class ChangeWatcher {
     const scopes = new Set(options.scopes);
     const { gameId } = options;
     const watch = !!options.watch && gameId !== undefined;
-    let quietUntil = 0;
+    const quietUntil = new Map<GameChangeScope, number>();
     let stopped = false;
     const subs: Subscription[] = [];
+    const add = (list: Iterable<GameChangeScope>) =>
+      pending.update((set) => {
+        const next = new Set(set);
+        for (const s of list) if (scopes.has(s)) next.add(s);
+        return next.size === set.size ? set : next;
+      });
 
     const sendWatch = () => {
       if (stopped || !watch) return;
-      void this.socket.request<GameWatchAck>(GAME_WATCH, { gameId });
+      void this.socket.request<GameWatchAck>(GAME_WATCH, { gameId }).then(() => {
+        // Підтвердження прийшло вже після відписки — сервер встиг додати нас у кімнати.
+        if (stopped) this.socket.send(GAME_UNWATCH, { gameId });
+      });
     };
 
     subs.push(
       this.socket.on<GameChangedPing>(GAME_CHANGED).subscribe((ping) => {
         if (!ping || !scopes.has(ping.scope)) return;
         if (gameId !== undefined && ping.gameId !== gameId) return;
-        if (Date.now() < quietUntil) return;
-        pending.update((set) => (set.has(ping.scope) ? set : new Set([...set, ping.scope])));
+        if (Date.now() < (quietUntil.get(ping.scope) ?? 0)) return;
+        add([ping.scope]);
       }),
     );
-    if (watch) {
-      subs.push(this.socket.connected$.subscribe(() => sendWatch()));
-      sendWatch();
-    }
+    // Перепідключення (не перше підключення): пінги за час розриву втрачено — вважаємо, що
+    // змінилось усе, що цікавить сторінку.
+    let hadConnection = this.socket.isConnected();
+    subs.push(
+      this.socket.connected$.subscribe(() => {
+        if (hadConnection) add(scopes);
+        hadConnection = true;
+        sendWatch();
+      }),
+    );
+    sendWatch();
 
     return {
       pending: pending.asReadonly(),
@@ -76,8 +97,10 @@ export class ChangeWatcher {
         pending.set(new Set());
         return taken;
       },
-      quiet: (ms = QUIET_MS) => {
-        quietUntil = Date.now() + ms;
+      restore: (list) => add(list),
+      quiet: (list = [...scopes], ms = QUIET_MS) => {
+        const until = Date.now() + ms;
+        for (const s of list) quietUntil.set(s, until);
       },
       rewatch: sendWatch,
       stop: () => {

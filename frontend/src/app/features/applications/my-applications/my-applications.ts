@@ -95,27 +95,34 @@ export class MyApplications {
     });
   }
 
-  protected async load(): Promise<void> {
-    this.loadFailed.set(false);
+  /** `silent` — помилка не замінює показаний список (оновлення за банером). */
+  protected async load(silent = false): Promise<boolean> {
+    if (!silent) this.loadFailed.set(false);
     try {
       const items = await firstValueFrom(this.api.mine());
       this.items.set(items);
       this.seen.track(items);
+      return true;
     } catch (err) {
-      if (toApiError(err).code !== 'UNAUTHENTICATED') this.loadFailed.set(true);
+      if (!silent && toApiError(err).code !== 'UNAUTHENTICATED') this.loadFailed.set(true);
+      return false;
     }
   }
 
   /** «Оновити» на банері: перечитати заявки й підсвітити нові та змінені. */
   protected async refreshUpdates(): Promise<void> {
     if (this.refreshing()) return;
-    this.watch.take();
+    const scopes = this.watch.take();
     this.refreshing.set(true);
     const before = this.items();
     try {
-      await this.load();
-      const after = this.items();
-      if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+      if (await this.load(true)) {
+        const after = this.items();
+        if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+      } else {
+        // Не вдалося перечитати — банер лишається.
+        this.watch.restore(scopes);
+      }
     } finally {
       this.refreshing.set(false);
     }
@@ -153,7 +160,7 @@ export class MyApplications {
     if (!(await firstValueFrom(ref.afterClosed()))) return;
     this.busyId.set(a.id);
     this.message.set(null);
-    this.watch.quiet();
+    this.watch.quiet(['applications']);
     try {
       const dto = await firstValueFrom(this.api.withdraw(a.id));
       this.items.update((list) =>

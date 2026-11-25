@@ -9,12 +9,14 @@ describe('ChangeWatcher', () => {
   let request: ReturnType<typeof vi.fn>;
   let send: ReturnType<typeof vi.fn>;
   let watcher: ChangeWatcher;
+  let isConnected: boolean;
 
   beforeEach(() => {
     pings = new Subject();
     connected = new Subject();
     request = vi.fn(() => Promise.resolve({ ok: true, members: false }));
     send = vi.fn();
+    isConnected = false;
     TestBed.configureTestingModule({
       providers: [
         {
@@ -22,6 +24,7 @@ describe('ChangeWatcher', () => {
           useValue: {
             on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
             connected$: connected,
+            isConnected: () => isConnected,
             request,
             send,
           },
@@ -69,7 +72,7 @@ describe('ChangeWatcher', () => {
     vi.useFakeTimers();
     try {
       const h = watcher.open({ gameId: 7, watch: true, scopes: ['sessions'] });
-      h.quiet(1000);
+      h.quiet(undefined, 1000);
       pings.next({ gameId: 7, scope: 'sessions' });
       expect(h.pending().size).toBe(0);
       vi.advanceTimersByTime(1001);
@@ -89,5 +92,50 @@ describe('ChangeWatcher', () => {
     connected.next();
     expect(h.pending().size).toBe(0);
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('quiet(scopes) silences only those scopes', () => {
+    const h = watcher.open({ gameId: 7, watch: true, scopes: ['sessions', 'members'] });
+    h.quiet(['sessions']);
+    pings.next({ gameId: 7, scope: 'sessions' });
+    pings.next({ gameId: 7, scope: 'members' });
+    expect([...h.pending()]).toEqual(['members']);
+  });
+
+  it('a reconnect (not the first connect) marks every scope pending', () => {
+    const h = watcher.open({ gameId: 7, watch: true, scopes: ['details', 'sessions'] });
+    connected.next();
+    expect(h.pending().size).toBe(0);
+    connected.next();
+    expect([...h.pending()].sort()).toEqual(['details', 'sessions']);
+  });
+
+  it('opened while connected: the next connect is a reconnect', () => {
+    isConnected = true;
+    const h = watcher.open({ scopes: ['applications'] });
+    connected.next();
+    expect([...h.pending()]).toEqual(['applications']);
+  });
+
+  it('restore() puts taken scopes back (failed reload)', () => {
+    const h = watcher.open({ gameId: 7, scopes: ['details', 'sessions'] });
+    pings.next({ gameId: 7, scope: 'details' });
+    const taken = h.take();
+    expect(h.pending().size).toBe(0);
+    h.restore(taken);
+    expect([...h.pending()]).toEqual(['details']);
+  });
+
+  it('a watch ack arriving after stop() sends unwatch again', async () => {
+    let ack!: (v: unknown) => void;
+    request.mockReturnValueOnce(new Promise((r) => (ack = r)));
+    const h = watcher.open({ gameId: 7, watch: true, scopes: ['details'] });
+    h.stop();
+    expect(send).toHaveBeenCalledTimes(1);
+    ack({ ok: true, members: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith('game.unwatch', { gameId: 7 });
   });
 });

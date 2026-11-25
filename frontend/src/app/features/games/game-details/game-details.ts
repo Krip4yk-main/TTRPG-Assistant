@@ -21,6 +21,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import {
   isRestrictedGame,
   type ApplicationConstraintDto,
+  type GameChangeScope,
   type ChannelLink,
   type GameDto,
   type GameStatus,
@@ -297,8 +298,8 @@ export class GameDetails {
   }
 
   /** Власна дія глядача: її ж пінги не мають піднімати банер. */
-  protected quiet(): void {
-    this.watch()?.quiet();
+  protected quiet(scopes?: GameChangeScope[]): void {
+    this.watch()?.quiet(scopes);
   }
 
   /**
@@ -312,17 +313,22 @@ export class GameDetails {
     this.refreshing.set(true);
     try {
       const before = this.game();
-      await this.load(Number(this.id()), true);
+      const ok = await this.load(Number(this.id()), true);
       const after = this.game();
+      const failed: GameChangeScope[] = ok ? [] : ['details'];
       if (scopes.has('details') && before && after) {
         // Стосунок глядача й позначка перегляду — не зміни гри.
         const print = (g: FullGame) => JSON.stringify({ ...g, viewer: null, seen: null });
         if (print(before) !== print(after)) this.flashHead();
       }
-      await Promise.all([
-        scopes.has('sessions') ? this.sessionsList()?.reload(true) : undefined,
-        scopes.has('members') ? this.membersPanel()?.reload(true) : undefined,
+      const [sessionsOk, membersOk] = await Promise.all([
+        scopes.has('sessions') ? this.sessionsList()?.reload(true) : true,
+        scopes.has('members') ? this.membersPanel()?.reload(true) : true,
       ]);
+      if (sessionsOk === false) failed.push('sessions');
+      if (membersOk === false) failed.push('members');
+      // Не вдалося перечитати — області повертаються, банер лишається.
+      handle.restore(failed.filter((s) => scopes.has(s)));
     } finally {
       this.refreshing.set(false);
     }
@@ -492,7 +498,7 @@ export class GameDetails {
   }
 
   /** `silent` — оновити дані без стану «завантаження» (після дії на сторінці). */
-  private async load(id: number, silent = false): Promise<void> {
+  private async load(id: number, silent = false): Promise<boolean> {
     const seq = ++this.seq;
     if (!silent) {
       this.state.set('loading');
@@ -501,19 +507,21 @@ export class GameDetails {
     }
     if (!Number.isInteger(id) || id <= 0) {
       this.state.set('notFound');
-      return;
+      return false;
     }
     try {
       const g = await firstValueFrom(this.api.get(id));
-      if (seq !== this.seq) return;
+      if (seq !== this.seq) return true;
       this.view.set(g);
       this.state.set('ready');
       this.updateSeo(g);
+      return true;
     } catch (err) {
-      if (seq !== this.seq) return;
+      if (seq !== this.seq) return true;
       const notFound = toApiError(err).status === 404;
       this.state.set(notFound ? 'notFound' : 'error');
       if (notFound) this.seo.set({ titleKey: 'games.details.notFound', noindex: true });
+      return false;
     }
   }
 

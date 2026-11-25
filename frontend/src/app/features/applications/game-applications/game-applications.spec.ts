@@ -116,6 +116,7 @@ describe('GameApplications', () => {
           useValue: {
             on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
             connected$: new Subject(),
+            isConnected: () => false,
             sessionLost$: new Subject(),
             connect: vi.fn(),
             disconnect: vi.fn(),

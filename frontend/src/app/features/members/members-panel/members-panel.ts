@@ -81,13 +81,14 @@ export class MembersPanel {
   }
 
   /** Перечитати склад (банер оновлень); `highlight` — підсвітити нових і змінених. */
-  async reload(highlight = false): Promise<void> {
+  async reload(highlight = false): Promise<boolean> {
     const before = this.members();
-    await this.load(this.gameId(), true);
+    const ok = await this.load(this.gameId(), true);
     const after = this.members();
-    if (highlight && after && after !== before) {
+    if (highlight && ok && after && after !== before) {
       this.flash.flash(changedKeys(before, after, (m) => m.publicId));
     }
+    return ok;
   }
 
   protected actions(): MemberAction[] {
@@ -161,12 +162,14 @@ export class MembersPanel {
     });
   }
 
-  private async load(gameId: number, silent = false): Promise<void> {
+  private async load(gameId: number, silent = false): Promise<boolean> {
     if (!silent) this.loadFailed.set(false);
     try {
       this.members.set(await firstValueFrom(this.api.list(gameId)));
+      return true;
     } catch (err) {
       if (!silent && toApiError(err).code !== 'UNAUTHENTICATED') this.loadFailed.set(true);
+      return false;
     }
   }
 }

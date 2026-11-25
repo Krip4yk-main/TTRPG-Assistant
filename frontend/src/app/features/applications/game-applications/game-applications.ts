@@ -160,13 +160,17 @@ export class GameApplications {
   protected async refreshUpdates(): Promise<void> {
     const handle = this.watch();
     if (!handle || this.refreshing()) return;
-    handle.take();
+    const scopes = handle.take();
     this.refreshing.set(true);
     const before = this.items();
     try {
-      await this.load(Number(this.id()), true);
-      const after = this.items();
-      if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+      if (await this.load(Number(this.id()), true)) {
+        const after = this.items();
+        if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+      } else {
+        // Не вдалося перечитати — банер лишається.
+        handle.restore(scopes);
+      }
     } finally {
       this.refreshing.set(false);
     }
@@ -237,7 +241,7 @@ export class GameApplications {
     }
     this.busyId.set(a.id);
     this.message.set(null);
-    this.watch()?.quiet();
+    this.watch()?.quiet(['applications']);
     try {
       const dto = await firstValueFrom(
         this.api.respond(a.id, c.id, { response: d.response, comment: comment || null }),
@@ -310,7 +314,7 @@ export class GameApplications {
     const rest = waiting.filter((x) => x.id !== a.id);
     const next = rest[Math.min(index, rest.length - 1)];
     // Власна дія: її пінг не має піднімати банер (до й після відповіді — пінг може обігнати її).
-    this.watch()?.quiet();
+    this.watch()?.quiet(['applications']);
     try {
       const dto = await firstValueFrom(
         action === 'approve' ? this.api.approve(a.id) : this.api.reject(a.id),
@@ -351,7 +355,7 @@ export class GameApplications {
   }
 
   private replace(dto: ApplicationDto): void {
-    this.watch()?.quiet();
+    this.watch()?.quiet(['applications']);
     this.items.update((list) => (list ?? []).map((x) => (x.id === dto.id ? { ...x, ...dto } : x)));
   }
 
@@ -376,7 +380,7 @@ export class GameApplications {
   }
 
   /** `silent` — оновити без стану «завантаження» (після помилки дії). */
-  private async load(id: number, silent = false): Promise<void> {
+  private async load(id: number, silent = false): Promise<boolean> {
     if (!silent) {
       this.state.set('loading');
       this.errorKey.set(null);
@@ -384,7 +388,7 @@ export class GameApplications {
     if (!Number.isInteger(id) || id <= 0) {
       this.state.set('error');
       this.errorKey.set('errors.NOT_FOUND');
-      return;
+      return false;
     }
     try {
       const [game, items, members] = await Promise.all([
@@ -397,11 +401,13 @@ export class GameApplications {
       this.seen.track(items);
       this.memberCount.set(members.length);
       this.state.set('ready');
+      return true;
     } catch (err) {
       const { code } = toApiError(err);
-      if (code === 'UNAUTHENTICATED' || silent) return;
+      if (code === 'UNAUTHENTICATED' || silent) return false;
       this.errorKey.set(`errors.${code}`);
       this.state.set('error');
+      return false;
     }
   }
 }

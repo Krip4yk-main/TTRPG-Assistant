@@ -101,6 +101,7 @@ describe('MyApplications', () => {
           useValue: {
             on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
             connected$: new Subject(),
+            isConnected: () => false,
             sessionLost$: new Subject(),
             connect: vi.fn(),
             disconnect: vi.fn(),
@@ -228,6 +229,33 @@ describe('MyApplications', () => {
       expect(card$(1).classList).toContain('nri-flash');
       expect(card$(3).classList).not.toContain('nri-flash');
       expect(banner()).toBeNull();
+    });
+
+    it('a failed refresh keeps the list and the banner', async () => {
+      await create();
+      pings.next({ gameId: 7, scope: 'applications' });
+      await settle();
+      banner()!.querySelector<HTMLButtonElement>('button.refresh')!.click();
+      await settle();
+      http
+        .expectOne('/api/me/applications')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      await settle();
+      await settle();
+      expect(card$(1)).not.toBeNull();
+      expect(banner()).not.toBeNull();
+    });
+
+    it('withdraw quiets only applications pings', async () => {
+      await create();
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(true) });
+      card$(1).querySelector<HTMLButtonElement>('button.withdraw')!.click();
+      await settle();
+      pings.next({ gameId: 7, scope: 'applications' });
+      await settle();
+      expect(banner()).toBeNull();
+      http.expectOne('/api/applications/1').flush({ ...list[0], status: 'withdrawn' });
+      await settle();
     });
 
     it('shows «updated» badges and marks them viewed', async () => {

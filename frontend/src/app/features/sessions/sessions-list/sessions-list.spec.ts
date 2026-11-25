@@ -294,8 +294,11 @@ describe('SessionsList', () => {
       expect(row(1)!.querySelector('.rsvp')).toBeNull();
       expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('false');
 
+      const mutated = vi.fn();
+      fixture.componentInstance.mutated.subscribe(mutated);
       option(3, 'going')!.click();
       await settle();
+      expect(mutated).toHaveBeenCalledTimes(1);
       // Вибір показано ще до відповіді сервера.
       expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('true');
       const req = http.expectOne('/api/sessions/3/rsvp');
@@ -303,6 +306,8 @@ describe('SessionsList', () => {
       expect(req.request.body).toEqual({ status: 'going' });
       req.flush({ ...upcoming, myRsvp: 'going' });
       await settle();
+      // Ще раз після успіху — щоб тиша накрила й пізній власний пінг.
+      expect(mutated).toHaveBeenCalledTimes(2);
       expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('true');
       expect(option(3, 'not_going')!.getAttribute('aria-pressed')).toBe('false');
       expect(el.querySelector('.message-area')!.textContent).toContain('sessions.rsvp.saved.going');

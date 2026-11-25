@@ -174,6 +174,8 @@ export class SessionsList {
     this.mutated.emit();
     try {
       const dto = await firstValueFrom(this.api.rsvp(s.id, status));
+      // Ще раз: пінг міг прийти вже після вікна тиші, відкритого до запиту.
+      this.mutated.emit();
       this.patch(s.id, dto);
       this.message.set({ kind: 'info', key: `sessions.rsvp.saved.${status}` });
     } catch (err) {
@@ -214,13 +216,14 @@ export class SessionsList {
    * Перезавантажити (після зміни правила розкладу чи за банером оновлень). `highlight` —
    * підсвітити сесії, що зʼявились або змінились.
    */
-  async reload(highlight = false): Promise<void> {
+  async reload(highlight = false): Promise<boolean> {
     const before = this.sessions();
-    await this.load(this.gameId(), true);
+    const ok = await this.load(this.gameId(), true);
     const after = this.sessions();
-    if (highlight && after && after !== before) {
+    if (highlight && ok && after && after !== before) {
       this.flash.flash(changedKeys(before, after, (x) => x.id));
     }
+    return ok;
   }
 
   protected when(s: SessionDto): string {
@@ -308,18 +311,20 @@ export class SessionsList {
     });
   }
 
-  private async load(gameId: number, silent = false): Promise<void> {
+  private async load(gameId: number, silent = false): Promise<boolean> {
     if (!silent) this.loadFailed.set(false);
     try {
       const list = await firstValueFrom(this.api.list(gameId));
       this.now.set(Date.now());
       this.sessions.set(list);
       if (!this.isGm()) this.seen.track(list);
+      return true;
     } catch (err) {
       const { code } = toApiError(err);
-      if (code === 'UNAUTHENTICATED') return;
+      if (code === 'UNAUTHENTICATED') return false;
       if (silent) this.message.set({ kind: 'error', key: `errors.${code}` });
       else this.loadFailed.set(true);
+      return false;
     }
   }
 }
