@@ -26,6 +26,8 @@ const me = (role: UserRole): MeDto => ({
   status: 'active',
   timezone: 'Europe/Kyiv',
   locale: 'uk',
+  uiTheme: 'quest-board',
+  availableThemes: ['quest-board'],
   identities: [],
 });
 

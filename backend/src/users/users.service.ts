@@ -1,10 +1,13 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
+  availableThemes,
   canRegister,
   localDate,
+  resolveTheme,
   type CompleteProfileInput,
   type MeDto,
+  type ThemeId,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
@@ -76,6 +79,8 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     timezone: u.timezone,
     locale: u.locale,
     identities,
+    uiTheme: resolveTheme(u.uiTheme, u.role),
+    availableThemes: availableThemes(u.role),
   };
 }
 
@@ -172,6 +177,20 @@ export async function changeTimezone(
   if (from !== timezone) {
     await logEvent(db, { type: 'user.timezone_changed', userId, payload: { from, to: timezone } });
   }
+  return getMe(deps, userId);
+}
+
+/**
+ * Зберігає обраний дизайн. Роль перечитується з БД під локом рядка (кеш сесії може відставати),
+ * недоступний ролі дизайн → 403 `THEME_NOT_AVAILABLE`.
+ */
+export async function changeTheme(deps: AppDeps, userId: number, theme: ThemeId): Promise<MeDto> {
+  await deps.db.transaction(async (tx) => {
+    const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+    if (!u || u.status !== 'active') throw new AppError(401, 'UNAUTHENTICATED');
+    if (!availableThemes(u.role).includes(theme)) throw new AppError(403, 'THEME_NOT_AVAILABLE');
+    await tx.update(users).set({ uiTheme: theme }).where(eq(users.id, userId));
+  });
   return getMe(deps, userId);
 }
 

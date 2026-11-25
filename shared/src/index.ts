@@ -3,6 +3,7 @@ export * from './errors.js';
 export * from './schemas/auth.js';
 export * from './realtime.js';
 export * from './contracts/me.js';
+export * from './contracts/theme.js';
 export * from './local-date.js';
 export * from './contracts/availability.js';
 export * from './schedule/tz.js';

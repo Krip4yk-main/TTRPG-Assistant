@@ -49,6 +49,8 @@ describe('authInterceptor', () => {
       status: 'active',
       timezone: 'Europe/Kyiv',
       locale: 'uk',
+      uiTheme: 'quest-board',
+      availableThemes: ['quest-board'],
       identities: [],
     });
   });

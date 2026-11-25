@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ianaTimezone } from '../schemas/common.js';
+import type { ThemeId } from './theme.js';
 
 export type UserStatus = 'pending' | 'active' | 'deleted';
 export type UserRole = 'owner' | 'admin' | 'moderator' | 'user';
@@ -23,6 +24,10 @@ export interface MeDto {
   timezone: string;
   locale: string;
   identities: IdentityDto[];
+  /** Ефективний дизайн сайту (збережений, якщо доступний ролі; інакше дефолтний). */
+  uiTheme: ThemeId;
+  /** Дизайни, доступні ролі користувача. */
+  availableThemes: ThemeId[];
 }
 
 /**

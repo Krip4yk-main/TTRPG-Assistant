@@ -97,6 +97,8 @@ describe('GET /api/me', () => {
       timezone: 'Europe/Kyiv',
       locale: 'uk',
       identities: [{ provider: 'google', displayName: 'G' }],
+      uiTheme: 'quest-board',
+      availableThemes: ['quest-board'],
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
   });
@@ -308,6 +310,81 @@ describe('PATCH /api/me/timezone', () => {
     const p = await createUser(db, { status: 'pending' });
     const res = await call('patch', '/api/me/timezone', await login(p.id), { timezone: 'UTC' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/me/theme', () => {
+  it('saves the theme and /api/me returns it; defaults to quest-board', async () => {
+    const owner = await createUser(db, { nickname: 'Boss', role: 'owner' });
+    const cookie = await login(owner.id);
+    const before = (await call('get', '/api/me', cookie)).body;
+    expect(before).toMatchObject({
+      uiTheme: 'quest-board',
+      availableThemes: ['quest-board', 'classic'],
+    });
+    const res = await call('patch', '/api/me/theme', cookie, { theme: 'classic' });
+    expect(res.status).toBe(200);
+    expect(res.body.uiTheme).toBe('classic');
+    expect((await call('get', '/api/me', cookie)).body.uiTheme).toBe('classic');
+    const [row] = await db.select().from(users).where(eq(users.id, owner.id));
+    expect(row!.uiTheme).toBe('classic');
+  });
+
+  it('non-owner picking classic: 403 THEME_NOT_AVAILABLE; unknown id or extra keys: 400', async () => {
+    const u = await createUser(db, { nickname: 'Usr' });
+    const cookie = await login(u.id);
+    const res = await call('patch', '/api/me/theme', cookie, { theme: 'classic' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('THEME_NOT_AVAILABLE');
+    for (const body of [{ theme: 'bogus' }, {}, { theme: 'quest-board', extra: 1 }]) {
+      const bad = await call('patch', '/api/me/theme', cookie, body);
+      expect(bad.status).toBe(400);
+      expect(bad.body.error.code).toBe('VALIDATION');
+    }
+    const ok = await call('patch', '/api/me/theme', cookie, { theme: 'quest-board' });
+    expect(ok.status).toBe(200);
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.uiTheme).toBe('quest-board');
+  });
+
+  it('guest: 401', async () => {
+    const guest = await request(app)
+      .patch('/api/me/theme')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ theme: 'quest-board' });
+    expect(guest.status).toBe(401);
+  });
+
+  it('RF1: after ownership transfer the old owner falls back to quest-board, DB value stays', async () => {
+    const owner = await createUser(db, { nickname: 'Boss', role: 'owner' });
+    const admin = await createUser(db, { nickname: 'NewBoss', role: 'admin' });
+    const ownerCookie = await login(owner.id);
+    const adminCookie = await login(admin.id);
+    expect((await call('patch', '/api/me/theme', ownerCookie, { theme: 'classic' })).status).toBe(
+      200,
+    );
+    const tr = await call('post', '/api/admin/owner/transfer', ownerCookie, {
+      toPublicId: admin.publicId,
+      confirmNickname: 'NewBoss',
+    });
+    expect(tr.status).toBe(200);
+
+    const old = (await call('get', '/api/me', ownerCookie)).body;
+    expect(old).toMatchObject({
+      role: 'admin',
+      uiTheme: 'quest-board',
+      availableThemes: ['quest-board'],
+    });
+    const [row] = await db.select().from(users).where(eq(users.id, owner.id));
+    expect(row!.uiTheme).toBe('classic');
+    expect((await call('patch', '/api/me/theme', ownerCookie, { theme: 'classic' })).status).toBe(
+      403,
+    );
+
+    const res = await call('patch', '/api/me/theme', adminCookie, { theme: 'classic' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ role: 'owner', uiTheme: 'classic' });
   });
 });
 

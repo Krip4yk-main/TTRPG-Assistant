@@ -27,6 +27,8 @@ export const users = mysqlTable('users', {
   banEpoch: int('ban_epoch').notNull().default(0),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Kyiv'),
   locale: varchar('locale', { length: 8 }).notNull().default('uk'),
+  /** Обраний дизайн сайту (`ThemeId`); NULL — дефолт. Ефективне значення — `resolveTheme`. */
+  uiTheme: varchar('ui_theme', { length: 32 }),
   privacy: json('privacy')
     .$type<Record<string, unknown>>()
     .notNull()

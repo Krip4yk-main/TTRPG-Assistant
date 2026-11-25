@@ -24,6 +24,8 @@ const me = {
   status: 'active',
   timezone: 'Europe/Warsaw',
   locale: 'uk',
+  uiTheme: 'quest-board',
+  availableThemes: ['quest-board'],
   identities: [],
 } satisfies MeDto;
 

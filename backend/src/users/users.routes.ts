@@ -1,7 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { changeNicknameSchema, changeTimezoneSchema, completeProfileSchema } from '@nri/shared';
+import {
+  changeNicknameSchema,
+  changeTimezoneSchema,
+  completeProfileSchema,
+  updateThemeSchema,
+} from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
 import { clearSessionCookie } from '../auth/session.service.js';
@@ -11,6 +16,7 @@ import { TG_LINK_PREFIX } from '../internal/internal.routes.js';
 import {
   changeBirthDate,
   changeNickname,
+  changeTheme,
   changeTimezone,
   completeProfile,
   deleteAccount,
@@ -57,6 +63,11 @@ export function usersRouter(deps: AppDeps): Router {
   router.patch('/timezone', auth, requireActive, async (req, res) => {
     const { timezone } = changeTimezoneSchema.parse(req.body);
     res.json(await changeTimezone(deps, req.user!.userId, timezone));
+  });
+
+  router.patch('/theme', auth, requireActive, async (req, res) => {
+    const { theme } = updateThemeSchema.parse(req.body);
+    res.json(await changeTheme(deps, req.user!.userId, theme));
   });
 
   router.post('/telegram-link-token', auth, requireActive, async (req, res) => {

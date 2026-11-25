@@ -95,6 +95,8 @@ describe('CompleteProfile', () => {
       status: 'pending',
       timezone: 'Europe/Kyiv',
       locale: 'uk',
+      uiTheme: 'quest-board',
+      availableThemes: ['quest-board'],
       identities: [{ provider: 'dev', displayName: 'kid' }],
     });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
