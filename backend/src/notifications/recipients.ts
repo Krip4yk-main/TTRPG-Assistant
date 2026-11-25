@@ -9,6 +9,7 @@ import type {
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
 import { events, gameMembers, games, gameSessions, genres, users } from '../db/schema/index.js';
+import { planRatingNotifications } from '../ratings/ratings.notify.js';
 
 export type EventRow = typeof events.$inferSelect;
 
@@ -45,7 +46,8 @@ interface Rule {
 
 /**
  * Які події сповіщають. Решта (акаунт, профіль, чорний список майстра, апеляції,
- * `game.created/updated/published`, `session.done`) — без отримувачів.
+ * `game.created/updated/published`, `session.done`) — без отримувачів (`session.done`,
+ * `game.finished` і виходи учасників додатково запрошують оцінити — `ratings.notify.ts`).
  */
 export const NOTIFY_RULES: Partial<Record<EventType, Rule>> = {
   'application.created': { category: 'applications', to: 'gm', actorIsEventUser: true },
@@ -112,11 +114,22 @@ function gameIdOf(ev: EventRow): number | undefined {
 type DbLike = Db | Tx;
 
 /**
- * Перетворює пачку подій на сповіщення. Читає поточний стан (майстер, склад, назва гри,
+ * Перетворює пачку подій на сповіщення: сповіщення самих подій (`NOTIFY_RULES`) і запрошення
+ * оцінити (`planRatingNotifications`, категорія `ratings`).
+ */
+export async function planNotifications(db: DbLike, batch: EventRow[]): Promise<NewNotification[]> {
+  return [
+    ...(await planEventNotifications(db, batch)),
+    ...(await planRatingNotifications(db, batch)),
+  ];
+}
+
+/**
+ * Сповіщення подій за `NOTIFY_RULES`. Читає поточний стан (майстер, склад, назва гри,
  * час сесії, нік автора) — знімок на момент обробки. Отримувачі — лише активні акаунти;
  * автор дії себе не сповіщає.
  */
-export async function planNotifications(db: DbLike, batch: EventRow[]): Promise<NewNotification[]> {
+async function planEventNotifications(db: DbLike, batch: EventRow[]): Promise<NewNotification[]> {
   const todo = batch.flatMap((ev) => {
     const rule = ruleFor(ev);
     const gameId = gameIdOf(ev);

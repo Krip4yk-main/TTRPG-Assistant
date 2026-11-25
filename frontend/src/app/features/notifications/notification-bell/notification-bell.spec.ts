@@ -167,6 +167,36 @@ describe('NotificationBell', () => {
     expect(panel()!.textContent).not.toMatch(/notifications\./); // без сирих ключів
   });
 
+  it('renders rating invitations: ratee, deadline line, no line without a deadline', async () => {
+    await start(2);
+    await open([
+      notification(2, {
+        type: 'rating.member_left',
+        category: 'ratings',
+        params: { gameId: 7, gameTitle: 'Морія', ratee: { publicId: 'p', nickname: 'Боромир' } },
+        link: '/games/7/rate',
+      }),
+      notification(1, {
+        type: 'rating.deadline',
+        category: 'ratings',
+        params: {
+          gameId: 7,
+          gameTitle: 'Морія',
+          sessionId: 3,
+          closesAt: '2026-12-09T17:00:00.000Z',
+        },
+        link: '/games/7/rate?session=3',
+      }),
+    ]);
+    const items = panel()!.querySelectorAll<HTMLAnchorElement>('a.item');
+    expect(items[0]!.textContent).toContain('Боромир більше не грає в «Морія»');
+    expect(items[0]!.textContent).not.toContain('Оцінити можна до');
+    expect(items[1]!.textContent).toContain('Оцінити можна до');
+    expect(items[1]!.textContent).toContain('19:00');
+    expect(items[0]!.querySelector('mat-icon')!.textContent).toContain('star');
+    expect(panel()!.textContent).not.toMatch(/notifications\.|\{\{/);
+  });
+
   it('clicking an item marks it read, navigates to its link and focuses the page heading', async () => {
     const main = document.createElement('main');
     main.id = 'main-content';

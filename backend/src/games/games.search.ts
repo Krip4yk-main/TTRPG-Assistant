@@ -26,6 +26,7 @@ import {
   FIT_HORIZON_DAYS,
   isRestrictedGame,
   meetsAgeRating,
+  RATING_MIN_UNITS,
   SEARCH_SORTS,
   searchFiltersSchema,
   type AgeRating,
@@ -159,7 +160,13 @@ function decodeCursor(deps: AppDeps, raw: string, sort: SearchSort): Cursor {
  */
 const rankSql = sql<number>`(case when ${games.status} = 'started' then 1 else 0 end)`;
 
-const gmOverallSql = publishedRatings.overall;
+/**
+ * Опублікований рейтинг майстра з тим самим порогом, що й ключ курсора (`publishedOverall`):
+ * зріз із менш ніж `RATING_MIN_UNITS` одиницями — як «без рейтингу».
+ */
+const gmOverallSql = sql<
+  number | null
+>`(case when ${publishedRatings.units} >= ${RATING_MIN_UNITS} then ${publishedRatings.overall} end)`;
 
 function ordering(sort: SearchSort) {
   const withRank = (within: (c: After) => SQL | undefined) => (c: After) =>

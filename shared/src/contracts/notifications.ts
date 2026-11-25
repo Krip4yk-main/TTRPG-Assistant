@@ -7,12 +7,15 @@ export const NOTIFICATION_CATEGORIES = [
   'sessions',
   'reminders',
   'games',
+  'ratings',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
 /**
- * Типи сповіщень (`notifications.type`): доменні події, що когось сповіщають, і
- * `session.reminder` (нагадування перед сесією, не з подій). Текст — `notifications.<type>`.
+ * Типи сповіщень (`notifications.type`): доменні події, що когось сповіщають,
+ * `session.reminder` (нагадування перед сесією, не з подій) і запрошення/нагадування оцінити
+ * (`rating.*`: з подій завершення сесії/гри та виходу; `rating.deadline` — за 2 дні до кінця
+ * вікна, не з подій). Текст — `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -32,6 +35,10 @@ export const NOTIFICATION_TYPES = [
   'game.cancelled',
   'game.converted_to_campaign',
   'game.rule_changed',
+  'rating.session_open',
+  'rating.final_open',
+  'rating.member_left',
+  'rating.deadline',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -69,6 +76,10 @@ export interface NotificationParams {
   genreSlug?: string | null;
   /** Офсет нагадування, хвилини. */
   offsetMin?: number;
+  /** Коли закривається вікно оцінювання (ISO UTC); немає — без дедлайну. */
+  closesAt?: string;
+  /** Кого запрошують оцінити (той, хто вийшов з гри). */
+  ratee?: NotificationActor;
   actor?: NotificationActor | null;
 }
 
@@ -149,6 +160,13 @@ export const NOTIFICATION_NEW_EVENT = 'notification.new';
 export function notificationLink(type: NotificationType, p: NotificationParams): string {
   if (p.gameId === undefined) return '/';
   switch (type) {
+    case 'rating.session_open':
+    case 'rating.final_open':
+    case 'rating.member_left':
+    case 'rating.deadline':
+      return p.sessionId !== undefined
+        ? `/games/${p.gameId}/rate?session=${p.sessionId}`
+        : `/games/${p.gameId}/rate`;
     case 'application.created':
     case 'application.withdrawn':
       return `/games/${p.gameId}/applications`;

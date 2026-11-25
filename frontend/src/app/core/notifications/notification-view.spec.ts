@@ -111,6 +111,34 @@ describe('notificationView', () => {
     expect(left.reason).toEqual({ code: 'account_deleted', text: null });
   });
 
+  it('rating.*: ratee name, deadline in the viewer zone only with closesAt', () => {
+    const left = notificationView(
+      dto('rating.member_left', { ratee: { publicId: 'r', nickname: 'Арвен' } }),
+      'Europe/Kyiv',
+    );
+    expect(left.key).toBe('notifications.rating.member_left');
+    expect(left.ratee).toBe('Арвен');
+    expect(left.closes).toBeNull();
+    expect(
+      notificationView(
+        dto('rating.member_left', { ratee: { publicId: 'r', nickname: null } }),
+        'UTC',
+      ).ratee,
+    ).toBeNull();
+    const deadline = notificationView(
+      dto('rating.deadline', { sessionId: 3, closesAt: '2026-12-09T17:00:00.000Z' }),
+      'Europe/Kyiv',
+    );
+    expect(deadline.closes).toContain('19:00');
+    expect(lookup('notifications.rating.until')).toContain('{{closes}}');
+    expect(lookup('notifications.categories.ratings.label')).toEqual(expect.any(String));
+    expect(lookup('notifications.categories.ratings.hint')).toEqual(expect.any(String));
+    // closesAt в інших типах ігнорується.
+    expect(
+      notificationView(dto('game.started', { closesAt: '2026-12-09T17:00:00.000Z' }), 'UTC').closes,
+    ).toBeNull();
+  });
+
   it('unknown type renders the generic text', () => {
     const v = notificationView(
       { ...dto('game.started'), type: 'future.thing' as NotificationType },

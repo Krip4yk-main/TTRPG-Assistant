@@ -124,6 +124,7 @@
                         : {
                             game: row.view.game ?? ('notifications.unknownGame' | translate),
                             actor: row.view.actor ?? ('notifications.someone' | translate),
+                            ratee: row.view.ratee ?? ('notifications.someone' | translate),
                             when: row.view.when ?? ('notifications.unknownTime' | translate),
                             from: row.view.from ?? ('notifications.unknownTime' | translate),
                             offset: row.view.offset
@@ -140,6 +141,11 @@
                                 ? ('notifications.reasons.' + r.code | translate)
                                 : r.text,
                             }
+                    }}</span>
+                  }
+                  @if (row.view.closes; as closes) {
+                    <span class="extra">{{
+                      'notifications.rating.until' | translate: { closes }
                     }}</span>
                   }
                   @if (row.view.thanksKey; as thanks) {

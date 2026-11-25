@@ -20,6 +20,7 @@ import { DISPATCH_JOB, dispatchEvents, dispatchHooks } from '../../src/notificat
 import type { RealtimeHub } from '../../src/realtime/socket.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
+import { ratingFixtures } from '../ratings/fixtures.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
@@ -338,6 +339,42 @@ describe('recipients: games', () => {
       .where(sql`${notifications.type} = 'game.cancelled' AND ${notifications.entityId} = ${g2}`);
     expect(rows.map((r) => r.userId)).toEqual([m.id]);
     expect(rows[0]!.payload).toMatchObject({ reason: 'account_deleted', actor: null });
+  });
+});
+
+describe('recipients: ratings', () => {
+  it('a real leave → members/GM notification plus rating invitations in the ratings category', async () => {
+    const { gm, gameId, p1, p2, former, stranger } = await party();
+    await ok(call('post', `/api/games/${gameId}/start`, gm.cookie));
+    // Проведена сесія (минула), на якій були обидва активні учасники.
+    await ratingFixtures(db).done(gameId, new Date(Date.now() - 2 * DAY), [p1.id, p2.id]);
+    await dispatchEvents(deps);
+    await ok(call('post', `/api/games/${gameId}/leave`, p1.cookie, LEAVE), 204);
+    await dispatchEvents(deps);
+    const [ev] = await db
+      .select()
+      .from(events)
+      .where(eq(events.type, 'member.left'))
+      .orderBy(sql`id desc`)
+      .limit(1);
+    const rows = await db.select().from(notifications).where(eq(notifications.eventId, ev!.id));
+    expect(
+      rows.map((r) => [r.userId, r.type, r.category]).sort((a, b) => `${a}`.localeCompare(`${b}`)),
+    ).toEqual(
+      [
+        [gm.id, 'member.left', 'members'],
+        [gm.id, 'rating.member_left', 'ratings'],
+        [p2.id, 'rating.member_left', 'ratings'],
+        [p1.id, 'rating.final_open', 'ratings'],
+      ].sort((a, b) => `${a}`.localeCompare(`${b}`)),
+    );
+    expect(rows.some((r) => r.userId === former.id || r.userId === stranger.id)).toBe(false);
+    // Повторна обробка — без дублів у жодній категорії.
+    await db.update(events).set({ dispatchedAt: null });
+    await dispatchEvents(deps);
+    expect(
+      await db.select().from(notifications).where(eq(notifications.eventId, ev!.id)),
+    ).toHaveLength(4);
   });
 });
 

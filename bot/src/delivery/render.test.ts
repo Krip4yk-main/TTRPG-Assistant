@@ -35,6 +35,59 @@ describe('renderNotification', () => {
     }
   });
 
+  it('rating.*: invitation texts, deadline line in the recipient zone, link to the rate page', () => {
+    const closesAt = '2026-12-09T17:00:00.000Z'; // 19:00 за Києвом
+    const session = render('rating.session_open', {
+      gameId: 12,
+      gameTitle: 'Гра',
+      sessionId: 56,
+      closesAt,
+    });
+    expect(session.text).toBe(
+      [
+        '⭐ Сесію гри «Гра» завершено — оціни тих, з ким грав(-ла).',
+        `Оцінити можна до ${formatWhen(closesAt)}.`,
+        '',
+        'Детальніше: https://nri.example/games/12/rate?session=56',
+      ].join('\n'),
+    );
+    expect(session.keyboard).toBeUndefined();
+    const final = render('rating.final_open', { gameId: 12, gameTitle: 'Гра', closesAt });
+    expect(final.text.split('\n')[0]).toBe('⭐ Час оцінити учасників гри «Гра».');
+    expect(final.text).toContain('https://nri.example/games/12/rate');
+    expect(final.text).not.toContain('?session=');
+    // «Вихідна» оцінка, поки гра йде: без дедлайну — без рядка строку.
+    const left = render('rating.member_left', {
+      gameId: 12,
+      gameTitle: 'Гра',
+      ratee: { publicId: 'p9', nickname: 'Арагорн' },
+    });
+    expect(left.text).toBe(
+      [
+        '⭐ Арагорн більше не грає в «Гра» — можеш оцінити вашу спільну гру.',
+        '',
+        'Детальніше: https://nri.example/games/12/rate',
+      ].join('\n'),
+    );
+    const anon = render('rating.member_left', {
+      gameId: 12,
+      gameTitle: 'Гра',
+      ratee: { publicId: 'p9', nickname: null },
+    });
+    expect(anon.text.split('\n')[0]).toContain(uk.notify.someone);
+    const deadline = render('rating.deadline', { gameId: 12, gameTitle: 'Гра', closesAt }, null);
+    expect(deadline.text.split('\n')[0]).toBe(
+      '⏳ Вікно оцінювання в грі «Гра» скоро закриється — ще встигнеш оцінити тих, з ким грав(-ла).',
+    );
+    expect(deadline.text).toContain(`Оцінити можна до ${formatWhen(closesAt)}.`);
+    expect(
+      renderNotification('rating.deadline', { gameId: 12, closesAt }, null, {
+        siteUrl: SITE,
+        timeZone: 'Asia/Tokyo',
+      }).text,
+    ).toContain(`до ${formatWhen(closesAt, 'Asia/Tokyo')}`);
+  });
+
   it('application.created: actor, link to applications, approve/reject buttons', () => {
     const r = render('application.created', base, [
       { action: 'approve', applicationId: 34 },

@@ -1,5 +1,10 @@
 import { DISPATCH_EVERY_MS, DISPATCH_JOB, runDispatch } from '../notifications/dispatcher.js';
 import { REMINDERS_EVERY_MS, REMINDERS_JOB, sendReminders } from '../notifications/reminders.js';
+import {
+  RATING_DEADLINE_EVERY_MS,
+  RATING_DEADLINE_JOB,
+  sendRatingDeadlines,
+} from '../ratings/ratings.reminders.js';
 import { DAILY_AT_UTC, DAILY_JOB, runDaily } from './daily.js';
 import { purgeFinishedJobs } from './queue.js';
 import { registerHandler, registerRecurring } from './registry.js';
@@ -21,6 +26,12 @@ export function registerJobs(): void {
     await sendReminders(deps, job.runAt);
   });
   registerRecurring(REMINDERS_JOB, { everyMs: REMINDERS_EVERY_MS });
+
+  // Нагадування «вікно оцінювання закривається»: вікно — від запланованого слоту (job.runAt).
+  registerHandler(RATING_DEADLINE_JOB, async (deps, _payload, job) => {
+    await sendRatingDeadlines(deps, job.runAt);
+  });
+  registerRecurring(RATING_DEADLINE_JOB, { everyMs: RATING_DEADLINE_EVERY_MS });
 
   registerHandler(DAILY_JOB, async (deps) => {
     await runDaily(deps);

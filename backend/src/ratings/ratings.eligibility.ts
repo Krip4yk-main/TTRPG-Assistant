@@ -53,6 +53,8 @@ interface GameFacts {
   present: Map<number, Set<number>>;
   /** Усі виходи (виключення, бани) кожного, хто колись виходив (з повернення — кілька). */
   leftAt: Map<number, Date[]>;
+  /** Усі, хто колись був учасником (зокрема ті, що вийшли). */
+  memberIds: Set<number>;
 }
 
 /**
@@ -89,7 +91,13 @@ async function loadFacts(q: Q, list: RatingGame[]): Promise<Map<number, GameFact
   const out = new Map<number, GameFacts>();
   if (list.length === 0) return out;
   for (const game of list) {
-    out.set(game.id, { game, doneAt: new Map(), present: new Map(), leftAt: new Map() });
+    out.set(game.id, {
+      game,
+      doneAt: new Map(),
+      present: new Map(),
+      leftAt: new Map(),
+      memberIds: new Set(),
+    });
   }
   const ids = list.map((g) => g.id);
   const [sessions, members] = await Promise.all([
@@ -129,6 +137,7 @@ async function loadFacts(q: Q, list: RatingGame[]): Promise<Map<number, GameFact
     : [];
 
   for (const m of members) {
+    out.get(m.gameId)!.memberIds.add(m.userId);
     if (!m.leftAt) continue;
     const f = out.get(m.gameId)!;
     const list = f.leftAt.get(m.userId);
@@ -449,4 +458,83 @@ export async function pendingRatings(
         a.gameId - b.gameId ||
         (a.sessionId ?? 0) - (b.sessionId ?? 0),
     );
+}
+
+/** Відкритий набір оцінювача: кого він ще не оцінив і не відмовився оцінювати. */
+export interface OpenRatingSet {
+  raterId: number;
+  gameId: number;
+  sessionId: number | null;
+  closesAt: Date | null;
+  /** Активні акаунти зі станом `open`, за id. */
+  openRateeIds: number[];
+}
+
+/**
+ * Відкриті набори всіх можливих оцінювачів (майстер і кожен, хто колись був учасником;
+ * лише активні акаунти) у вказаних іграх: вікно відкрите на `now` і є хоча б одна `open`
+ * ціль. Ігри, приховані від не-майстра, пропускаються. Для сповіщень (події, дедлайни):
+ * фіксована кількість запитів незалежно від кількості ігор і оцінювачів.
+ */
+export async function openRatingSets(
+  q: Q,
+  gameIds: number[],
+  now: Date = new Date(),
+): Promise<OpenRatingSet[]> {
+  if (gameIds.length === 0) return [];
+  const list = (
+    await q
+      .select(GAME_COLS)
+      .from(games)
+      .where(inArray(games.id, [...new Set(gameIds)]))
+  ).filter((g) => !isHiddenFromNonGm(g));
+  const facts = await loadFacts(q, list);
+  const sets: CandidateSet[] = [];
+  const raterOf: number[] = [];
+  for (const f of facts.values()) {
+    const raters = new Set([f.game.gmUserId, ...f.memberIds]);
+    for (const raterId of raters) {
+      for (const s of candidateSets(f, raterId, now)) {
+        if (s.rateeIds.length && isWindowOpen(s.closesAt, now)) {
+          sets.push(s);
+          raterOf.push(raterId);
+        }
+      }
+    }
+  }
+  if (sets.length === 0) return [];
+  const people = [...new Set([...raterOf, ...sets.flatMap((s) => s.rateeIds)])];
+  const [active, given] = await Promise.all([
+    q
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, people), eq(users.status, 'active'))),
+    q
+      .select({
+        raterId: ratings.raterId,
+        gameId: ratings.gameId,
+        rateeId: ratings.rateeId,
+        slotKey: ratings.slotKey,
+      })
+      .from(ratings)
+      .where(
+        and(
+          inArray(ratings.gameId, [...facts.keys()]),
+          inArray(ratings.raterId, [...new Set(raterOf)]),
+        ),
+      ),
+  ]);
+  const isActive = new Set(active.map((u) => u.id));
+  const done = new Set(given.map((r) => `${r.raterId}:${r.gameId}:${r.slotKey}:${r.rateeId}`));
+  return sets.flatMap((s, i) => {
+    const raterId = raterOf[i]!;
+    if (!isActive.has(raterId)) return [];
+    const slot = slotOf(s.sessionId);
+    const openRateeIds = s.rateeIds
+      .filter((u) => isActive.has(u) && !done.has(`${raterId}:${s.gameId}:${slot}:${u}`))
+      .sort((a, b) => a - b);
+    return openRateeIds.length
+      ? [{ raterId, gameId: s.gameId, sessionId: s.sessionId, closesAt: s.closesAt, openRateeIds }]
+      : [];
+  });
 }

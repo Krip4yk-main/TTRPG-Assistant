@@ -126,6 +126,7 @@ describe('/api/me/notification-prefs', () => {
     sessions: true,
     reminders: false,
     games: true,
+    ratings: false,
   };
 
   it('defaults without a row; PUT replaces; per-user', async () => {
@@ -134,7 +135,14 @@ describe('/api/me/notification-prefs', () => {
     const d = await call('get', '/api/me/notification-prefs', u.cookie);
     expect(d.status).toBe(200);
     expect(d.body).toEqual({
-      telegram: { applications: true, members: true, sessions: true, reminders: true, games: true },
+      telegram: {
+        applications: true,
+        members: true,
+        sessions: true,
+        reminders: true,
+        games: true,
+        ratings: true,
+      },
       reminderOffsets: [1440, 60],
     });
     const put = await call('put', '/api/me/notification-prefs', u.cookie, {
@@ -153,6 +161,17 @@ describe('/api/me/notification-prefs', () => {
     expect(
       (await call('get', '/api/me/notification-prefs', other.cookie)).body.reminderOffsets,
     ).toEqual([1440, 60]);
+  });
+
+  it('a row saved before the ratings category reads with it on by default', async () => {
+    const u = await userWithAge(25);
+    const { ratings: _r, ...legacy } = telegram;
+    void _r;
+    await db
+      .insert(notificationPrefs)
+      .values({ userId: u.id, telegram: legacy, reminderOffsets: [60] });
+    const res = await call('get', '/api/me/notification-prefs', u.cookie);
+    expect(res.body).toEqual({ telegram: { ...legacy, ratings: true }, reminderOffsets: [60] });
   });
 
   it('validation: allowed offsets only, ≤ 5, strict shape', async () => {

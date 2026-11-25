@@ -148,6 +148,13 @@
       "when": 1795602472910,
       "tag": "0020_plan5_ratings_check",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1795604376368,
+      "tag": "0021_plan5_rating_notifications",
+      "breakpoints": true
     }
   ]
 }

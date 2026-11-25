@@ -48,6 +48,7 @@ const CATEGORY_ICONS: Record<NotificationCategory, string> = {
   sessions: 'event',
   reminders: 'alarm',
   games: 'casino',
+  ratings: 'star',
 };
 
 const isType = (t: string): t is NotificationType =>
@@ -77,6 +78,10 @@ export interface NotificationView {
   reason: { code: string | null; text: string | null } | null;
   /** Подяка після завершення гри. */
   thanksKey: string | null;
+  /** Кого запрошують оцінити (`rating.member_left`); `null` — «Хтось». */
+  ratee: string | null;
+  /** Строк оцінювання (`rating.*` з `closesAt`) — рядок «Оцінити можна до …». */
+  closes: string | null;
   icon: string;
 }
 
@@ -93,6 +98,8 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     offset: null,
     reason: null,
     thanksKey: null,
+    ratee: p.ratee?.nickname || null,
+    closes: null,
     icon: CATEGORY_ICONS[n.category] ?? 'notifications',
   };
   if (!isType(n.type)) return view;
@@ -120,6 +127,10 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.offset = (REMINDER_OFFSETS as readonly number[]).includes(p.offsetMin)
       ? { key: `notifications.offset.${p.offsetMin}` }
       : { key: 'notifications.offset.other', params: { n: p.offsetMin } };
+  }
+
+  if (n.type.startsWith('rating.') && p.closesAt) {
+    view.closes = formatDateTime(p.closesAt, timeZone);
   }
 
   if (n.type === 'game.finished') {

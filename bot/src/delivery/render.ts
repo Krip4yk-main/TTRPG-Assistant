@@ -68,7 +68,8 @@ function formatIn(d: Date, timeZone: string): string {
 /**
  * Текст і кнопки Telegram-сповіщення з `kind` (тип) + `params` (знімок із бекенду):
  * шаблон `notify.<type>` (варіант `_account_deleted` для причини `account_deleted`), для
- * `game.finished` — подяка `thanks.<genreSlug>` (або `thanks.default`), у кінці — посилання
+ * `game.finished` — подяка `thanks.<genreSlug>` (або `thanks.default`), для `rating.*` — строк
+ * «Оцінити можна до …» (якщо є `closesAt`), у кінці — посилання
  * на сайт. Значення підставляються як є — без HTML-розмітки (повідомлення йде без `parse_mode`).
  */
 export function renderNotification(
@@ -86,6 +87,7 @@ export function renderNotification(
     when: formatWhen(params.startsAt, tz) ?? t('notify.unknownTime'),
     from: formatWhen(params.from, tz) ?? t('notify.unknownTime'),
     offset: offsetPhrase(params.offsetMin, t),
+    ratee: params.ratee?.nickname || t('notify.someone'),
   };
 
   const parts: string[] = [];
@@ -104,6 +106,9 @@ export function renderNotification(
       if (m && lookup(dict, `${key}_${m}`) !== undefined) key = `${key}_${m}`;
     }
     parts.push(t(key, vars));
+    // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
+    const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;
+    if (closes) parts.push(t('notify.rating.until', { closes }));
     if (kind === 'session.cancelled' && params.reason) {
       parts.push(t('notify.reason', { reason: params.reason }));
     }

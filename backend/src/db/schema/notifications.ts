@@ -22,13 +22,17 @@ const NOTIFICATION_CATEGORIES = [
   'sessions',
   'reminders',
   'games',
+  'ratings',
 ] as const satisfies NotificationCategory[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
 
 /**
  * Сповіщення користувача. `event_id` — подія-джерело (`NULL` для нагадувань);
- * UNIQUE(event_id, user_id) не дає повторній обробці події створити дубль (NULL-и не конфліктують).
+ * UNIQUE(event_id, user_id, category) не дає повторній обробці події створити дубль (NULL-и не
+ * конфліктують). Категорія в ключі: одна подія може сповістити того самого користувача в різних
+ * категоріях (вихід учасника — майстру `member.left` і запрошення оцінити `rating.member_left`;
+ * завершення гри — `game.finished` і `rating.final_open`), але не більше одного разу в кожній.
  * `payload` — знімок `NotificationParams` на момент створення (лише дані, видимі отримувачу).
  */
 export const notifications = mysqlTable(
@@ -51,7 +55,7 @@ export const notifications = mysqlTable(
     readAt: datetime('read_at', { fsp: 3 }),
   },
   (t) => [
-    uniqueIndex('notifications_event_id_user_id_uq').on(t.eventId, t.userId),
+    uniqueIndex('notifications_event_user_category_uq').on(t.eventId, t.userId, t.category),
     index('notifications_user_id_id_idx').on(t.userId, sql`${t.id} desc`),
     index('notifications_user_id_read_at_idx').on(t.userId, t.readAt),
     // Чистка прочитаних, старших 90 днів (Task 3).
@@ -67,7 +71,9 @@ export const notificationPrefs = mysqlTable('notification_prefs', {
   userId: id('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  telegram: json('telegram').$type<Record<NotificationCategory, boolean>>().notNull(),
+  // Partial: рядки, збережені до появи нової категорії, її не містять — читаються зі злиттям
+  // зі значеннями за замовчуванням (`getPrefs`, `enqueueTelegram`).
+  telegram: json('telegram').$type<Partial<Record<NotificationCategory, boolean>>>().notNull(),
   reminderOffsets: json('reminder_offsets').$type<number[]>().notNull(),
   updatedAt: datetime('updated_at')
     .notNull()

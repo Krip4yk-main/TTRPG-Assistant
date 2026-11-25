@@ -37,8 +37,9 @@ async function setup(patch: Parameters<typeof fx.game>[1] = { status: 'finished'
   const gameId = await fx.game(gm.id, { finishedAt: ago(0), ...patch });
   await fx.member(gameId, a.id, ago(10));
   await fx.member(gameId, b.id, ago(10));
-  const sessionId = await fx.done(gameId, ago(1), [a.id, b.id]);
-  return { gm, a, b, gameId, sessionId };
+  const doneAt = ago(1);
+  const sessionId = await fx.done(gameId, doneAt, [a.id, b.id]);
+  return { gm, a, b, gameId, sessionId, doneAt };
 }
 
 const post = (gameId: number, cookie: string, body: object) =>
@@ -52,7 +53,7 @@ const targets = (gameId: number, cookie: string, sessionId?: number) =>
 
 describe('POST /api/games/:id/ratings', () => {
   it('stores a rating with role derived from the game and kind from sessionId', async () => {
-    const { gm, a, b, gameId, sessionId } = await setup();
+    const { gm, a, b, gameId, sessionId, doneAt } = await setup();
     const r1 = await post(gameId, a.cookie, {
       rateeId: gm.publicId,
       sessionId,
@@ -67,7 +68,7 @@ describe('POST /api/games/:id/ratings', () => {
       avatarUrl: null,
       role: 'gm',
       state: 'rated',
-      closesAt: new Date(ago(1).getTime() + 14 * DAY).toISOString(),
+      closesAt: new Date(doneAt.getTime() + 14 * DAY).toISOString(),
     });
     expect((await post(gameId, gm.cookie, { rateeId: a.publicId, overall: 3 })).body.role).toBe(
       'player_from_gm',

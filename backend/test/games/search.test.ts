@@ -575,12 +575,15 @@ describe('POST /api/games/search — gm_rating', () => {
     const top = await gmWith(4.85);
     const mid = await gmWith(4.25);
     const placeholder = await gmWith(null, 0); // заготовка без зрізу — як без рейтингу
+    // Зріз нижче порогу (4 одиниці) — як без рейтингу і в порядку, і в ключі курсора.
+    const few = await gmWith(4.95, 4);
     const none = await createUser(db, { nickname: 'New Gm' });
     const a = await insertGame({ gmUserId: mid });
     const b = await insertGame({ gmUserId: top });
     const c = await insertGame({ gmUserId: mid }); // нічия з `a` → за id спадно
     const d = await insertGame({ gmUserId: none.id });
     const e = await insertGame({ gmUserId: placeholder });
+    const f = await insertGame({ gmUserId: few });
     const running = await insertGame({
       gmUserId: top,
       status: 'started',
@@ -597,13 +600,14 @@ describe('POST /api/games/search — gm_rating', () => {
       weekdays: [0],
       startsAt: new Date(Date.now() - 20 * DAY_MS),
     });
-    const expected = [b, c, a, e, d, running, runningUnrated];
+    const expected = [b, c, a, f, e, d, running, runningUnrated];
     const all = await search({ sort: 'gm_rating' });
     expect(ids(all)).toEqual(expected);
     expect(all.body.items.map((i: { gmRating: number | null }) => i.gmRating)).toEqual([
       4.9,
       4.3,
       4.3,
+      null,
       null,
       null,
       4.9,

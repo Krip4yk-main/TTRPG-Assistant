@@ -14,12 +14,13 @@ const telegram = {
   sessions: true,
   reminders: true,
   games: true,
+  ratings: false,
 };
 
 describe('notification contracts', () => {
-  it('every type except session.reminder is a domain event', () => {
+  it('every type except session.reminder and rating.* is a domain event', () => {
     for (const t of NOTIFICATION_TYPES) {
-      if (t !== 'session.reminder') expect(EVENT_TYPES).toContain(t);
+      if (t !== 'session.reminder' && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
     }
   });
 
@@ -58,6 +59,7 @@ describe('notification contracts', () => {
     const d = defaultNotificationPrefs();
     expect(Object.values(d.telegram).every(Boolean)).toBe(true);
     expect(d.reminderOffsets).toEqual([1440, 60]);
+    expect(d.telegram.ratings).toBe(true);
   });
 
   it('query: limit default 20, max 50', () => {
@@ -78,5 +80,17 @@ describe('notificationLink', () => {
     expect(notificationLink('application.rejected', { gameId: 5 })).toBe('/my-applications');
     expect(notificationLink('session.cancelled', { gameId: 5, sessionId: 2 })).toBe('/games/5');
     expect(notificationLink('game.finished', {})).toBe('/');
+  });
+
+  it('rating notifications lead to the rate page (session set via ?session=)', () => {
+    expect(notificationLink('rating.session_open', { gameId: 5, sessionId: 2 })).toBe(
+      '/games/5/rate?session=2',
+    );
+    expect(notificationLink('rating.deadline', { gameId: 5, sessionId: 2 })).toBe(
+      '/games/5/rate?session=2',
+    );
+    expect(notificationLink('rating.deadline', { gameId: 5 })).toBe('/games/5/rate');
+    expect(notificationLink('rating.final_open', { gameId: 5 })).toBe('/games/5/rate');
+    expect(notificationLink('rating.member_left', { gameId: 5 })).toBe('/games/5/rate');
   });
 });
