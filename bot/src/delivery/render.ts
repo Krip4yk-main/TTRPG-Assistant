@@ -88,6 +88,7 @@ export function renderNotification(
     from: formatWhen(params.from, tz) ?? t('notify.unknownTime'),
     offset: offsetPhrase(params.offsetMin, t),
     ratee: params.ratee?.nickname || t('notify.someone'),
+    count: String(params.count ?? 0),
   };
 
   const parts: string[] = [];

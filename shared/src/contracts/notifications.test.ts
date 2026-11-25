@@ -15,12 +15,14 @@ const telegram = {
   reminders: true,
   games: true,
   ratings: false,
+  moderation: true,
 };
 
 describe('notification contracts', () => {
-  it('every type except session.reminder and rating.* is a domain event', () => {
+  it('every type except session.reminder, rating.* and moderation is a domain event', () => {
+    const notFromEvents = ['session.reminder', 'complaint.resolved', 'moderation.digest'];
     for (const t of NOTIFICATION_TYPES) {
-      if (t !== 'session.reminder' && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
+      if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
     }
   });
 
@@ -60,6 +62,7 @@ describe('notification contracts', () => {
     expect(Object.values(d.telegram).every(Boolean)).toBe(true);
     expect(d.reminderOffsets).toEqual([1440, 60]);
     expect(d.telegram.ratings).toBe(true);
+    expect(d.telegram.moderation).toBe(true);
   });
 
   it('query: limit default 20, max 50', () => {
@@ -75,6 +78,12 @@ describe('notification contracts', () => {
 });
 
 describe('notificationLink', () => {
+  it('moderation: digest → complaint queue; resolved complaint → home, ignoring params', () => {
+    expect(notificationLink('moderation.digest', { count: 3 })).toBe('/admin/complaints');
+    expect(notificationLink('complaint.resolved', {})).toBe('/');
+    expect(notificationLink('complaint.resolved', { gameId: 5 })).toBe('/');
+  });
+
   it('routes by type', () => {
     expect(notificationLink('application.created', { gameId: 5 })).toBe('/games/5/applications');
     expect(notificationLink('application.rejected', { gameId: 5 })).toBe('/my-applications');

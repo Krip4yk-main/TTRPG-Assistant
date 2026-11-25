@@ -8,6 +8,7 @@ export const NOTIFICATION_CATEGORIES = [
   'reminders',
   'games',
   'ratings',
+  'moderation',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
@@ -15,7 +16,9 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * Типи сповіщень (`notifications.type`): доменні події, що когось сповіщають,
  * `session.reminder` (нагадування перед сесією, не з подій) і запрошення/нагадування оцінити
  * (`rating.*`: з подій завершення сесії/гри та виходу; `rating.deadline` — за 2 дні до кінця
- * вікна, не з подій). Текст — `notifications.<type>`.
+ * вікна, не з подій). Модерація (не з подій): `complaint.resolved` — скаржнику, без подробиць;
+ * `moderation.digest` — персоналу щоденне зведення нових скарг (`count`). Текст —
+ * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -39,6 +42,8 @@ export const NOTIFICATION_TYPES = [
   'rating.final_open',
   'rating.member_left',
   'rating.deadline',
+  'complaint.resolved',
+  'moderation.digest',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -80,6 +85,8 @@ export interface NotificationParams {
   closesAt?: string;
   /** Кого запрошують оцінити (той, хто вийшов з гри). */
   ratee?: NotificationActor;
+  /** Кількість нових скарг, видимих отримувачу (`moderation.digest`). */
+  count?: number;
   actor?: NotificationActor | null;
 }
 
@@ -158,6 +165,9 @@ export const NOTIFICATION_NEW_EVENT = 'notification.new';
 
 /** Маршрут фронтенду для сповіщення (без домену). */
 export function notificationLink(type: NotificationType, p: NotificationParams): string {
+  // Модерація — без гри: черга скарг персоналу; «скаргу розглянуто» — без подробиць.
+  if (type === 'moderation.digest') return '/admin/complaints';
+  if (type === 'complaint.resolved') return '/';
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'rating.session_open':

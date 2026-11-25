@@ -153,6 +153,25 @@ describe('notificationView', () => {
     ).toBeNull();
   });
 
+  it('moderation: resolved complaint has no details; digest carries the count; shield icon', () => {
+    const resolved = notificationView(
+      { ...dto('complaint.resolved'), category: 'moderation', params: {} },
+      'UTC',
+    );
+    expect(resolved.key).toBe('notifications.complaint.resolved');
+    expect(resolved.icon).toBe('shield');
+    expect(lookup(resolved.key)).not.toMatch(/\{\{/);
+    const digest = notificationView(
+      { ...dto('moderation.digest'), category: 'moderation', params: { count: 3 } },
+      'UTC',
+    );
+    expect(digest.key).toBe('notifications.moderation.digest');
+    expect(digest.count).toBe(3);
+    expect(lookup(digest.key)).toContain('{{count}}');
+    expect(lookup('notifications.categories.moderation.label')).toBe('Модерація');
+    expect(lookup('notifications.categories.moderation.hint')).toEqual(expect.any(String));
+  });
+
   it('unknown type renders the generic text', () => {
     const v = notificationView(
       { ...dto('game.started'), type: 'future.thing' as NotificationType },

@@ -23,6 +23,7 @@ const NOTIFICATION_CATEGORIES = [
   'reminders',
   'games',
   'ratings',
+  'moderation',
 ] as const satisfies NotificationCategory[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });

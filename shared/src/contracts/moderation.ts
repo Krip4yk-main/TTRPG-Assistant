@@ -89,6 +89,26 @@ export const complaintInputSchema = z
 export type ComplaintInput = z.input<typeof complaintInputSchema>;
 export type ComplaintInputParsed = z.output<typeof complaintInputSchema>;
 
+export const ADMIN_PAGE_MAX = 50;
+export const ADMIN_PAGE_DEFAULT = 20;
+
+/** Query `GET /api/admin/complaints`: без `status` — усі; новіші першими. */
+export const complaintsQuerySchema = z.object({
+  status: z.preprocess((v) => (v === '' ? undefined : v), z.enum(COMPLAINT_STATUSES).optional()),
+  // Порожній `cursor=` — як відсутній.
+  cursor: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
+  limit: z.coerce.number().int().min(1).max(ADMIN_PAGE_MAX).default(ADMIN_PAGE_DEFAULT),
+});
+export type ComplaintsQuery = z.input<typeof complaintsQuerySchema>;
+
+/** Відповідь `POST /api/complaints` (201): лише id — скаржник нічого не дізнається про ціль. */
+export interface ComplaintCreatedDto {
+  id: number;
+}
+
 /** Санкція: тип, строк і причина (покараний її бачить). */
 export const sanctionInputSchema = z
   .object({

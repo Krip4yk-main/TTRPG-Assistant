@@ -1,12 +1,14 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  char,
   check,
   datetime,
   index,
   json,
   mysqlEnum,
   mysqlTable,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
 import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core';
@@ -153,4 +155,21 @@ export const moderationLog = mysqlTable(
     index('moderation_log_target_idx').on(t.targetType, t.targetId),
     index('moderation_log_actor_id_idx').on(t.actorId),
   ],
+);
+
+/**
+ * Щоденне зведення скарг: хто й за яку київську дату (`YYYY-MM-DD`) уже отримав зведення.
+ * UNIQUE(user_id, digest_date) — повторний чи паралельний прогін не дублює.
+ */
+export const moderationDigestLog = mysqlTable(
+  'moderation_digest_log',
+  {
+    id: id('id').autoincrement().primaryKey(),
+    userId: id('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    digestDate: char('digest_date', { length: 10 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('moderation_digest_log_user_date_uq').on(t.userId, t.digestDate)],
 );

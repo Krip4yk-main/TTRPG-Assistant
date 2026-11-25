@@ -1,3 +1,4 @@
+import { DIGEST_EVERY_MS, DIGEST_JOB, sendModerationDigest } from '../moderation/digest.js';
 import { DISPATCH_EVERY_MS, DISPATCH_JOB, runDispatch } from '../notifications/dispatcher.js';
 import { REMINDERS_EVERY_MS, REMINDERS_JOB, sendReminders } from '../notifications/reminders.js';
 import {
@@ -32,6 +33,12 @@ export function registerJobs(): void {
     await sendRatingDeadlines(deps, job.runAt);
   });
   registerRecurring(RATING_DEADLINE_JOB, { everyMs: RATING_DEADLINE_EVERY_MS });
+
+  // Зведення скарг: щогодини, але надсилається лише в слоті 09:00 за Києвом (job.runAt).
+  registerHandler(DIGEST_JOB, async (deps, _payload, job) => {
+    await sendModerationDigest(deps, job.runAt);
+  });
+  registerRecurring(DIGEST_JOB, { everyMs: DIGEST_EVERY_MS });
 
   registerHandler(DAILY_JOB, async (deps) => {
     await runDaily(deps);

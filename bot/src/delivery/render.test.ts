@@ -19,12 +19,31 @@ const render = (kind: string, p: NotificationParams = base, b: TelegramButton[] 
   renderNotification(kind, p, b, { siteUrl: SITE });
 
 describe('renderNotification', () => {
-  it.each(NOTIFICATION_TYPES)('%s: has a real template, game title and site link', (kind) => {
+  const MODERATION = ['complaint.resolved', 'moderation.digest'];
+  const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
+
+  it.each(gameTypes)('%s: has a real template, game title and site link', (kind) => {
     const { text } = render(kind, { ...base, offsetMin: 60, reason: 'Хворію' });
     expect(text).not.toContain('notify.');
     expect(text).not.toMatch(/\{\w+\}/);
     expect(text).toContain('Прокляття Страда');
     expect(text).toMatch(/Детальніше: https:\/\/nri\.example\/(games\/12|my-applications)/);
+  });
+
+  it('moderation: resolved complaint without details; digest with the count and the queue link', () => {
+    const resolved = render('complaint.resolved', {});
+    expect(resolved.text.split('\n')).toEqual([
+      '🛡️ Твою скаргу розглянуто. Дякуємо, що допомагаєш зберігати спільноту безпечною!',
+      '',
+      'Детальніше: https://nri.example/',
+    ]);
+    expect(resolved.keyboard).toBeUndefined();
+    const digest = render('moderation.digest', { count: 4 });
+    expect(digest.text.split('\n')).toEqual([
+      '🛡️ Нових скарг на розгляд: 4.',
+      '',
+      'Детальніше: https://nri.example/admin/complaints',
+    ]);
   });
 
   it('every NotificationType has a uk.json template', () => {

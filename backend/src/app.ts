@@ -31,6 +31,7 @@ import { notificationPrefsRouter } from './notifications/prefs.routes.js';
 import { ogRouter, seoRootRouter } from './seo/seo.routes.js';
 import { viewsRouter } from './views/views.routes.js';
 import { gameRatingsRouter, myRatingsRouter } from './ratings/ratings.routes.js';
+import { adminComplaintsRouter, complaintsRouter } from './moderation/complaints.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
@@ -94,6 +95,8 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/games', gamesRouter(deps));
   app.use('/api/applications', applicationsRouter(deps));
   app.use('/api/sessions', sessionsRouter(deps));
+  app.use('/api/complaints', complaintsRouter(deps));
+  app.use('/api/admin/complaints', adminComplaintsRouter(deps));
   app.use('/api/og', ogRouter(deps));
   app.use('/api/internal', internalRouter(deps));
 

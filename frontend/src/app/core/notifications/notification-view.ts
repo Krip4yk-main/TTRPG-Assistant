@@ -49,6 +49,7 @@ const CATEGORY_ICONS: Record<NotificationCategory, string> = {
   reminders: 'alarm',
   games: 'casino',
   ratings: 'star',
+  moderation: 'shield',
 };
 
 const isType = (t: string): t is NotificationType =>
@@ -82,6 +83,8 @@ export interface NotificationView {
   ratee: string | null;
   /** Строк оцінювання (`rating.*` з `closesAt`) — рядок «Оцінити можна до …». */
   closes: string | null;
+  /** Кількість нових скарг (`moderation.digest`); інакше 0. */
+  count: number;
   icon: string;
 }
 
@@ -100,6 +103,7 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     thanksKey: null,
     ratee: p.ratee?.nickname || null,
     closes: null,
+    count: p.count ?? 0,
     icon: CATEGORY_ICONS[n.category] ?? 'notifications',
   };
   if (!isType(n.type)) return view;

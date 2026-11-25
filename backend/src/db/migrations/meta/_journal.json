@@ -169,6 +169,13 @@
       "when": 1795611387260,
       "tag": "0023_plan6_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1795612018031,
+      "tag": "0024_plan6_moderation_notifications",
+      "breakpoints": true
     }
   ]
 }

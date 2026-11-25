@@ -4,6 +4,7 @@ import {
   appealDecisionSchema,
   COMPLAINT_REASONS,
   complaintInputSchema,
+  complaintsQuerySchema,
   ownerTransferSchema,
   ratingModerationInputSchema,
   roleChangeSchema,
@@ -40,6 +41,7 @@ describe('moderation constants', () => {
     for (const code of [
       'MODERATION_FORBIDDEN',
       'COMPLAINT_NOT_ALLOWED',
+      'COMPLAINT_RESOLVED',
       'SANCTION_ACTIVE',
       'APPEAL_EXISTS',
       'OWNER_TRANSFER_INVALID',
@@ -126,5 +128,20 @@ describe('admin input schemas', () => {
     expect(
       ownerTransferSchema.safeParse({ toPublicId: 'abc', confirmNickname: 'Nick' }).success,
     ).toBe(true);
+  });
+});
+
+describe('complaintsQuerySchema', () => {
+  it('status optional (empty → all), cursor/limit coerced, limit ≤ 50', () => {
+    expect(complaintsQuerySchema.parse({})).toEqual({ limit: 20 });
+    expect(complaintsQuerySchema.parse({ status: '', cursor: '' })).toEqual({ limit: 20 });
+    expect(complaintsQuerySchema.parse({ status: 'new', cursor: '7', limit: '50' })).toEqual({
+      status: 'new',
+      cursor: 7,
+      limit: 50,
+    });
+    expect(complaintsQuerySchema.safeParse({ status: 'open' }).success).toBe(false);
+    expect(complaintsQuerySchema.safeParse({ limit: '51' }).success).toBe(false);
+    expect(complaintsQuerySchema.safeParse({ cursor: 'x' }).success).toBe(false);
   });
 });
