@@ -591,6 +591,30 @@ describe('detector: races and efficiency', () => {
     expect(await notesOf(gm.id, 'game.dead')).toHaveLength(0);
   });
 
+  it('session marked done between the first read and the reminder → no reminder', async () => {
+    const gm = await gmUser();
+    const id = await insertGame(gm.id, 40);
+    const sessionId = await insertSession(id, ago(40));
+    race.afterRead = async () => {
+      await db
+        .update(gameSessions)
+        .set({ status: 'done', doneAt: now() })
+        .where(eq(gameSessions.id, sessionId));
+    };
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.reminded).toEqual([]);
+    expect(await notesOf(gm.id, 'game.stale_reminder')).toHaveLength(0);
+  });
+
+  it('dead game falling back to «remind» is unmarked and reminded in one run', async () => {
+    const gm = await gmUser();
+    const id = await insertGame(gm.id, 40, { deadAt: ago(1) });
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.unmarkedDead).toEqual([id]);
+    expect(r.reminded).toEqual([id]);
+    expect((await row(id)).deadAt).toBeNull();
+  });
+
   it('«all ok» or admin exemption between read and update → not marked dead', async () => {
     const gm = await gmUser();
     const snoozed = await insertGame(gm.id, 100);

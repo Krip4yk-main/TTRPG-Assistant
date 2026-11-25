@@ -116,6 +116,32 @@ describe('profiles', () => {
     }
   });
 
+  it('a favourite system disabled later stays valid; adding a new inactive one → 400', async () => {
+    const u = await createUser(db, { nickname: 'Fan' });
+    const cookie = await login(u.id);
+    const [a, b, c] = await systemIds(3);
+    expect(
+      (await call('patch', '/api/me/profile', cookie, { favoriteSystemIds: [a!, b!] })).status,
+    ).toBe(200);
+    await db.update(gameSystems).set({ isActive: false }).where(eq(gameSystems.id, a!));
+    await db.update(gameSystems).set({ isActive: false }).where(eq(gameSystems.id, c!));
+    try {
+      const same = await call('patch', '/api/me/profile', cookie, {
+        favoriteSystemIds: [a!, b!],
+        bio: 'still here',
+      });
+      expect(same.status).toBe(200);
+      expect(same.body.favoriteSystemIds).toEqual([a!, b!]);
+      const dropB = await call('patch', '/api/me/profile', cookie, { favoriteSystemIds: [a!] });
+      expect(dropB.status).toBe(200);
+      const addC = await call('patch', '/api/me/profile', cookie, { favoriteSystemIds: [a!, c!] });
+      expect(addC.status).toBe(400);
+      expect(addC.body.error.details).toEqual({ reason: 'UNKNOWN_SYSTEM' });
+    } finally {
+      await db.update(gameSystems).set({ isActive: true });
+    }
+  });
+
   it('requires auth; pending users cannot PATCH', async () => {
     expect((await request(app).get('/api/me/profile')).status).toBe(401);
     const p = await createUser(db, { status: 'pending' });

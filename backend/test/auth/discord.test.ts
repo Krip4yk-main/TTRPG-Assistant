@@ -31,7 +31,7 @@ const json = (x: unknown, status = 200) =>
 const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input);
   const headers = new Headers(init?.headers);
-  if (url === 'https://discord.com/api/oauth2/token') {
+  if (url === 'https://discord.com/api/v10/oauth2/token') {
     expect(init?.method).toBe('POST');
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     tokenRequests.push({
@@ -41,7 +41,7 @@ const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit
     if (tokenStatus !== 200) return json({ error: 'invalid_grant' }, tokenStatus);
     return json({ access_token: 'at-1', token_type: 'Bearer', expires_in: 600, scope: 'identify' });
   }
-  if (url === 'https://discord.com/api/users/@me') {
+  if (url === 'https://discord.com/api/v10/users/@me') {
     meAuth = headers.get('authorization');
     if (meStatus !== 200) return json({ message: '401: Unauthorized' }, meStatus);
     return json(me);

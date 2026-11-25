@@ -58,16 +58,19 @@ export async function updateProfile(
   patch: ProfilePatch,
 ): Promise<ProfileDto> {
   const { db } = deps;
-  if (patch.favoriteSystemIds?.length) {
+  const current = await loadRow(deps, userId);
+  // Як і в іграх: вимкнену систему можна лишити в улюблених, але не додати заново.
+  const stored = new Set(current.favoriteSystemIds);
+  const added = [...new Set(patch.favoriteSystemIds ?? [])].filter((id) => !stored.has(id));
+  if (added.length) {
     const found = await db
       .select({ id: gameSystems.id })
       .from(gameSystems)
-      .where(and(inArray(gameSystems.id, patch.favoriteSystemIds), eq(gameSystems.isActive, true)));
-    if (found.length !== patch.favoriteSystemIds.length) {
+      .where(and(inArray(gameSystems.id, added), eq(gameSystems.isActive, true)));
+    if (found.length !== added.length) {
       throw new AppError(400, 'VALIDATION', { reason: 'UNKNOWN_SYSTEM' });
     }
   }
-  const current = await loadRow(deps, userId);
   const privacy: ProfileRow['privacy'] = { ...current.privacy };
   for (const k of PROFILE_PRIVACY_KEYS) {
     const v = patch.privacy?.[k];

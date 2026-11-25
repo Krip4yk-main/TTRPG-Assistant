@@ -46,13 +46,13 @@ describe('GET /api/catalog', () => {
     expect(dto.systems.find((s) => s.slug === 'dnd5e-2024')!.name).toBe('D&D 5e (2024)');
   });
 
-  it('caches the response in Redis for an hour', async () => {
+  it('caches the response in Redis for 5 minutes', async () => {
     await request(app).get('/api/catalog');
     expect(await redis.get(CATALOG_CACHE_KEY)).not.toBeNull();
     expect(CATALOG_CACHE_KEY).toBe('catalog:v1');
     const ttl = await redis.ttl(CATALOG_CACHE_KEY);
-    expect(ttl).toBeGreaterThan(3500);
-    expect(ttl).toBeLessThanOrEqual(3600);
+    expect(ttl).toBeGreaterThan(290);
+    expect(ttl).toBeLessThanOrEqual(300);
   });
 
   it('is public (no session needed)', async () => {

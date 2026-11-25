@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import type { OAuthProvider } from './oauth.js';
 
 const AUTHORIZE_URL = 'https://discord.com/oauth2/authorize';
-const TOKEN_URL = 'https://discord.com/api/oauth2/token';
-const ME_URL = 'https://discord.com/api/users/@me';
+const TOKEN_URL = 'https://discord.com/api/v10/oauth2/token';
+const ME_URL = 'https://discord.com/api/v10/users/@me';
 const PROVIDER_TIMEOUT_MS = 10_000;
 
 /** Snowflake-id користувача Discord. */
@@ -28,8 +28,8 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
 
 /**
  * Discord — звичайний OAuth 2.0 (не OIDC): authorization code + PKCE S256, scope `identify`.
- * Код обмінюємо на токен (`POST /api/oauth2/token`, client_secret_basic), потім читаємо
- * `GET /api/users/@me`; subject — Discord id. Токен ніде не зберігається. Запити — `fetch`
+ * Код обмінюємо на токен (`POST /api/v10/oauth2/token`, client_secret_basic), потім читаємо
+ * `GET /api/v10/users/@me`; subject — Discord id. Токен ніде не зберігається. Запити — `fetch`
  * з таймаутом, без редиректів. `state` додатково звіряє маршрут (Redis + кука).
  */
 export function createDiscordProvider(opts: {

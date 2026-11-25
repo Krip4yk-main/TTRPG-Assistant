@@ -163,47 +163,49 @@ export async function runDeadGamesDetector(deps: Deps, now: Date): Promise<Detec
         const push = (n: NotificationRow | null) => {
           if (n) out.push(n);
         };
-        if (markDead) {
+        if (markDead || remind) {
           // Сесію могли відмітити проведеною (чи майстер натиснув «все ок») після першого
-          // читання: блокуємо рядок гри й перераховуємо вердикт за свіжими даними. Відмітка
-          // сесії оновлює той самий рядок гри, тож вона або вже видна тут, або чекає на нашу
-          // транзакцію й одразу зніме позначку.
+          // читання: блокуємо рядок гри й перераховуємо вердикт за свіжими даними — і для
+          // позначки, і для нагадування. Відмітка сесії оновлює той самий рядок гри, тож вона
+          // або вже видна тут, або чекає на нашу транзакцію й одразу зніме позначку.
+          // `finishSession` тримає S-блокування гри (FOR SHARE) і потім бере X — зустрічний
+          // FOR UPDATE тут може дати дедлок; MySQL відкотить одну з транзакцій, а збій
+          // тимчасовий: задача детектора повториться, майстер повторить відмітку.
           const [fresh] = await tx.select().from(games).where(active).for('update');
-          if (fresh && fresh.deadAt === null) {
-            const freshInput = staleInputOf(
-              fresh,
-              (await sessionAnchors(tx, [row.id], now)).get(row.id),
-            );
-            if (staleRule(freshInput, now) === 'dead') {
-              const [res] = await tx
-                .update(games)
-                .set({ deadAt: now, ...keepUpdatedAt })
-                .where(
-                  and(
-                    active,
-                    isNull(games.deadAt),
-                    eq(games.deadExemptUntilSession, false),
-                    or(isNull(games.deadSnoozedUntil), lte(games.deadSnoozedUntil, now)),
-                  ),
-                );
-              if (res.affectedRows > 0) {
-                result.markedDead.push(row.id);
-                const deadPeriod = periodOf(freshInput, fresh.deadSnoozedUntil);
-                push(await notifyOnce(deps, tx, logged, g, 'dead', deadPeriod));
-              }
+          const freshInput = fresh
+            ? staleInputOf(fresh, (await sessionAnchors(tx, [row.id], now)).get(row.id))
+            : null;
+          const freshVerdict = freshInput ? staleRule(freshInput, now) : 'ok';
+          const freshPeriod = freshInput ? periodOf(freshInput, fresh!.deadSnoozedUntil) : '';
+          if (markDead && freshVerdict === 'dead' && fresh!.deadAt === null) {
+            const [res] = await tx
+              .update(games)
+              .set({ deadAt: now, ...keepUpdatedAt })
+              .where(
+                and(
+                  active,
+                  isNull(games.deadAt),
+                  eq(games.deadExemptUntilSession, false),
+                  or(isNull(games.deadSnoozedUntil), lte(games.deadSnoozedUntil, now)),
+                ),
+              );
+            if (res.affectedRows > 0) {
+              result.markedDead.push(row.id);
+              push(await notifyOnce(deps, tx, logged, g, 'dead', freshPeriod));
             }
           }
-        } else if (unmarkDead) {
+          if (remind && freshVerdict === 'remind') {
+            const n = await notifyOnce(deps, tx, logged, g, 'stale_reminder', freshPeriod);
+            if (n) result.reminded.push(row.id);
+            push(n);
+          }
+        }
+        if (unmarkDead) {
           const [res] = await tx
             .update(games)
             .set({ deadAt: null, ...keepUpdatedAt })
             .where(and(active, isNotNull(games.deadAt)));
           if (res.affectedRows > 0) result.unmarkedDead.push(row.id);
-        }
-        if (remind) {
-          const n = await notifyOnce(deps, tx, logged, g, 'stale_reminder', period);
-          if (n) result.reminded.push(row.id);
-          push(n);
         }
         if (markSuspicious) {
           const [res] = await tx

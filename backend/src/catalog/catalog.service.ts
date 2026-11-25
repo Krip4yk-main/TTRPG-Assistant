@@ -16,7 +16,12 @@ import { assertCan } from '../moderation/permissions.js';
 import { actorRole } from '../moderation/sanctions.service.js';
 
 export const CATALOG_CACHE_KEY = 'catalog:v1';
-const CATALOG_TTL_SECONDS = 60 * 60;
+/**
+ * 5 хвилин: адмінські зміни скидають кеш (`invalidateCatalog`), але паралельний читач, що
+ * прочитав БД до коміту зміни, може записати старий каталог уже після скидання — короткий TTL
+ * обмежує таку застарілість.
+ */
+const CATALOG_TTL_SECONDS = 5 * 60;
 
 async function loadCatalog(deps: AppDeps): Promise<CatalogDto> {
   const { db } = deps;
@@ -35,7 +40,7 @@ async function loadCatalog(deps: AppDeps): Promise<CatalogDto> {
   };
 }
 
-/** Кеш на годину; адмінські зміни каталогу скидають його (`invalidateCatalog`). */
+/** Кеш на 5 хвилин; адмінські зміни каталогу скидають його (`invalidateCatalog`). */
 export async function getCatalog(deps: AppDeps): Promise<CatalogDto> {
   try {
     const cached = await deps.redis.get(CATALOG_CACHE_KEY);
