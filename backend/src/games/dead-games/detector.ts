@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { NotificationType } from '@nri/shared';
 import type { AppDeps } from '../../app.js';
 import type { Tx } from '../../applications/applications.rules.js';
@@ -11,12 +11,14 @@ import {
 } from '../../notifications/notifications.service.js';
 import {
   CHECKED_STATUSES,
+  checkedSessionAnchors,
   keepUpdatedAt,
   overlapRule,
   sessionAnchors,
   staleAnchor,
   staleInputOf,
   staleRule,
+  type StaleInput,
 } from './rules.js';
 
 export const DEAD_GAMES_JOB = 'games.dead_detector';
@@ -31,17 +33,24 @@ const NOTIFY: Record<StalenessKind, NotificationType> = {
   suspicious: 'game.suspicious',
 };
 
+/** Ключ запису журналу `game_staleness_log` (гра+вид+період). */
+const logKey = (gameId: number, kind: StalenessKind, periodKey: string) =>
+  `${gameId}|${kind}|${periodKey}`;
+
 /**
  * Сповіщення майстру з дедупом журналом `game_staleness_log` (UNIQUE гра+вид+період) — у
- * транзакції викликача. Повторний чи паралельний прогін того самого періоду → `null`.
+ * транзакції викликача. Уже записане (попередній прогін, `logged`) не вставляємо зовсім;
+ * паралельний прогін того самого періоду ловить UNIQUE → `null`.
  */
 async function notifyOnce(
   deps: Deps,
   tx: Tx,
+  logged: Set<string>,
   g: { id: number; title: string; gmUserId: number; gmActive: boolean },
   kind: StalenessKind,
   periodKey: string,
 ): Promise<NotificationRow | null> {
+  if (logged.has(logKey(g.id, kind, periodKey))) return null;
   try {
     await tx.insert(gameStalenessLog).values({ gameId: g.id, kind, periodKey });
   } catch (err) {
@@ -58,6 +67,10 @@ async function notifyOnce(
     entityId: g.id,
   });
 }
+
+/** Період дедупу нагадування/позначки: відлік + кінець «все ок». */
+const periodOf = (input: StaleInput, snoozedUntil: Date | null): string =>
+  `${staleAnchor(input)?.toISOString() ?? '-'}|${snoozedUntil?.toISOString() ?? '-'}`;
 
 export interface DetectorResult {
   reminded: number[];
@@ -77,7 +90,9 @@ export interface DetectorResult {
  * - `overlapRule` (по майстру): `suspicious_at` і `game.suspicious` (період — дата позначки);
  *   менше 3 перетинів — позначка знімається; знята адміном — не повертається до
  *   `suspicious_dismissed_until`.
- * Кожна гра — окрема транзакція; збій однієї не зупиняє інші (тимчасова помилка БД
+ * Гра без змін і без належного нагадування транзакції не відкриває; інша — окрема транзакція
+ * (позначка «мертвої» — з блокуванням рядка й перерахунком за свіжими даними); збій однієї не
+ * зупиняє інші (тимчасова помилка БД
  * прокидається в кінці — задача повторить; усе ідемпотентно).
  */
 export async function runDeadGamesDetector(deps: Deps, now: Date): Promise<DetectorResult> {
@@ -94,9 +109,20 @@ export async function runDeadGamesDetector(deps: Deps, now: Date): Promise<Detec
     .from(games)
     .innerJoin(users, eq(users.id, games.gmUserId))
     .where(inArray(games.status, CHECKED_STATUSES));
-  const anchors = await sessionAnchors(
-    db,
-    rows.map((r) => r.row.id),
+  if (rows.length === 0) return result;
+  const anchors = await checkedSessionAnchors(db, now);
+  const logged = new Set(
+    (
+      await db
+        .select({
+          gameId: gameStalenessLog.gameId,
+          kind: gameStalenessLog.kind,
+          periodKey: gameStalenessLog.periodKey,
+        })
+        .from(gameStalenessLog)
+        .innerJoin(games, eq(games.id, gameStalenessLog.gameId))
+        .where(inArray(games.status, CHECKED_STATUSES))
+    ).map((l) => logKey(l.gameId, l.kind, l.periodKey)),
   );
 
   // Накладання — по майстрах із щонайменше двома активними іграми.
@@ -119,10 +145,16 @@ export async function runDeadGamesDetector(deps: Deps, now: Date): Promise<Detec
     };
     const input = staleInputOf(row, anchors.get(row.id));
     const verdict = staleRule(input, now);
-    const anchor = staleAnchor(input);
-    const period = `${anchor?.toISOString() ?? '-'}|${row.deadSnoozedUntil?.toISOString() ?? '-'}`;
+    const period = periodOf(input, row.deadSnoozedUntil);
     const dismissed = row.suspiciousDismissedUntil !== null && now < row.suspiciousDismissedUntil;
     const suspicious = overlapping.has(row.id) && !dismissed;
+    const markDead = verdict === 'dead' && row.deadAt === null;
+    const unmarkDead = verdict !== 'dead' && row.deadAt !== null;
+    const remind = verdict === 'remind' && !logged.has(logKey(row.id, 'stale_reminder', period));
+    const markSuspicious = suspicious && row.suspiciousAt === null;
+    const unmarkSuspicious = !suspicious && row.suspiciousAt !== null;
+    // Нічого не змінюється і нагадувати нема чого — без транзакції.
+    if (!markDead && !unmarkDead && !remind && !markSuspicious && !unmarkSuspicious) continue;
     // Умова за поточним станом (а не з першого читання) — паралельні дії майстра/адміна не губляться.
     const active = and(eq(games.id, row.id), inArray(games.status, CHECKED_STATUSES));
     try {
@@ -131,42 +163,64 @@ export async function runDeadGamesDetector(deps: Deps, now: Date): Promise<Detec
         const push = (n: NotificationRow | null) => {
           if (n) out.push(n);
         };
-        if (verdict === 'dead' && row.deadAt === null) {
-          const [res] = await tx
-            .update(games)
-            .set({ deadAt: now, ...keepUpdatedAt })
-            .where(and(active, isNull(games.deadAt)));
-          if (res.affectedRows > 0) {
-            result.markedDead.push(row.id);
-            push(await notifyOnce(deps, tx, g, 'dead', period));
+        if (markDead) {
+          // Сесію могли відмітити проведеною (чи майстер натиснув «все ок») після першого
+          // читання: блокуємо рядок гри й перераховуємо вердикт за свіжими даними. Відмітка
+          // сесії оновлює той самий рядок гри, тож вона або вже видна тут, або чекає на нашу
+          // транзакцію й одразу зніме позначку.
+          const [fresh] = await tx.select().from(games).where(active).for('update');
+          if (fresh && fresh.deadAt === null) {
+            const freshInput = staleInputOf(
+              fresh,
+              (await sessionAnchors(tx, [row.id], now)).get(row.id),
+            );
+            if (staleRule(freshInput, now) === 'dead') {
+              const [res] = await tx
+                .update(games)
+                .set({ deadAt: now, ...keepUpdatedAt })
+                .where(
+                  and(
+                    active,
+                    isNull(games.deadAt),
+                    eq(games.deadExemptUntilSession, false),
+                    or(isNull(games.deadSnoozedUntil), lte(games.deadSnoozedUntil, now)),
+                  ),
+                );
+              if (res.affectedRows > 0) {
+                result.markedDead.push(row.id);
+                const deadPeriod = periodOf(freshInput, fresh.deadSnoozedUntil);
+                push(await notifyOnce(deps, tx, logged, g, 'dead', deadPeriod));
+              }
+            }
           }
-        } else if (verdict !== 'dead' && row.deadAt !== null) {
-          await tx
+        } else if (unmarkDead) {
+          const [res] = await tx
             .update(games)
             .set({ deadAt: null, ...keepUpdatedAt })
             .where(and(active, isNotNull(games.deadAt)));
-          result.unmarkedDead.push(row.id);
+          if (res.affectedRows > 0) result.unmarkedDead.push(row.id);
         }
-        if (verdict === 'remind') {
-          const n = await notifyOnce(deps, tx, g, 'stale_reminder', period);
+        if (remind) {
+          const n = await notifyOnce(deps, tx, logged, g, 'stale_reminder', period);
           if (n) result.reminded.push(row.id);
           push(n);
         }
-        if (suspicious && row.suspiciousAt === null) {
+        if (markSuspicious) {
           const [res] = await tx
             .update(games)
             .set({ suspiciousAt: now, ...keepUpdatedAt })
             .where(and(active, isNull(games.suspiciousAt)));
           if (res.affectedRows > 0) {
             result.markedSuspicious.push(row.id);
-            push(await notifyOnce(deps, tx, g, 'suspicious', now.toISOString().slice(0, 10)));
+            const day = now.toISOString().slice(0, 10);
+            push(await notifyOnce(deps, tx, logged, g, 'suspicious', day));
           }
-        } else if (!suspicious && row.suspiciousAt !== null) {
-          await tx
+        } else if (unmarkSuspicious) {
+          const [res] = await tx
             .update(games)
             .set({ suspiciousAt: null, ...keepUpdatedAt })
             .where(and(active, isNotNull(games.suspiciousAt)));
-          result.unmarkedSuspicious.push(row.id);
+          if (res.affectedRows > 0) result.unmarkedSuspicious.push(row.id);
         }
         return out;
       });

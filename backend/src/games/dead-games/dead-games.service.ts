@@ -236,6 +236,12 @@ export async function adminCloseDeadGame(
           suspicious: row.suspiciousAt !== null,
         },
       });
+      // Видаленому чи забаненому майстру сповіщення не шлемо (як і решта сповіщень детектора).
+      const [gm] = await tx
+        .select({ status: users.status, isBanned: users.isBanned })
+        .from(users)
+        .where(eq(users.id, row.gmUserId));
+      if (gm?.status !== 'active' || gm.isBanned) return;
       notified = await createNotification(deps, tx, {
         userId: row.gmUserId,
         type: 'game.closed_by_admin',

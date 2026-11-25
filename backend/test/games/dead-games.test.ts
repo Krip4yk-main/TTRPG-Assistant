@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
@@ -24,6 +24,22 @@ import { runDispatch } from '../../src/notifications/dispatcher.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from './fixtures.js';
 
+/** Хук «між першим читанням і транзакцією» детектора — для тестів гонок. */
+const race = vi.hoisted(() => ({ afterRead: null as null | (() => Promise<void>) }));
+vi.mock('../../src/games/dead-games/rules.js', async (orig) => {
+  const mod = await orig<typeof import('../../src/games/dead-games/rules.js')>();
+  return {
+    ...mod,
+    checkedSessionAnchors: async (...args: Parameters<typeof mod.checkedSessionAnchors>) => {
+      const out = await mod.checkedSessionAnchors(...args);
+      const h = race.afterRead;
+      race.afterRead = null;
+      if (h) await h();
+      return out;
+    },
+  };
+});
+
 const deps = await testDeps();
 const { db, redis } = deps;
 const app = createApp(deps);
@@ -36,6 +52,7 @@ const ago = (days: number) => new Date(Date.now() - days * DAY);
 const ahead = (days: number) => new Date(Date.now() + days * DAY);
 
 beforeEach(async () => {
+  race.afterRead = null;
   await redis.flushdb();
   await resetDb(db);
 });
@@ -554,5 +571,107 @@ describe('job registration', () => {
       .from(gameStalenessLog)
       .where(and(eq(gameStalenessLog.gameId, id), eq(gameStalenessLog.kind, 'stale_reminder')));
     expect(log).toHaveLength(1);
+  });
+});
+
+describe('detector: races and efficiency', () => {
+  it('session marked done between the first read and the update → not marked dead', async () => {
+    const gm = await gmUser();
+    const id = await insertGame(gm.id, 100);
+    const sessionId = await insertSession(id, ago(100));
+    race.afterRead = async () => {
+      await db
+        .update(gameSessions)
+        .set({ status: 'done', doneAt: now() })
+        .where(eq(gameSessions.id, sessionId));
+    };
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.markedDead).toEqual([]);
+    expect((await row(id)).deadAt).toBeNull();
+    expect(await notesOf(gm.id, 'game.dead')).toHaveLength(0);
+  });
+
+  it('«all ok» or admin exemption between read and update → not marked dead', async () => {
+    const gm = await gmUser();
+    const snoozed = await insertGame(gm.id, 100);
+    const exempt = await insertGame(gm.id, 100);
+    race.afterRead = async () => {
+      await db
+        .update(games)
+        .set({ deadSnoozedUntil: ahead(14) })
+        .where(eq(games.id, snoozed));
+      await db.update(games).set({ deadExemptUntilSession: true }).where(eq(games.id, exempt));
+    };
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.markedDead).toEqual([]);
+    expect((await row(snoozed)).deadAt).toBeNull();
+    expect((await row(exempt)).deadAt).toBeNull();
+  });
+
+  it('unmark counters count only rows actually changed', async () => {
+    const gm = await gmUser();
+    const id = await insertGame(gm.id, 10, { deadAt: ago(1), suspiciousAt: ago(1) });
+    race.afterRead = async () => {
+      await db.update(games).set({ deadAt: null, suspiciousAt: null }).where(eq(games.id, id));
+    };
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.unmarkedDead).toEqual([]);
+    expect(r.unmarkedSuspicious).toEqual([]);
+  });
+
+  it('cancelling all past sessions does not dodge «dead» (past cancelled count as the first session)', async () => {
+    const gm = await gmUser();
+    const id = await insertGame(gm.id, 120);
+    await insertSession(id, ago(120), { status: 'cancelled' });
+    await insertSession(id, ago(113), { status: 'cancelled' });
+    await insertSession(id, ahead(5));
+    const r = await runDeadGamesDetector(deps, now());
+    expect(r.markedDead).toEqual([id]);
+    // А скасована майбутня сесія відлік не зсуває (гра, що стартує через 20 днів, — ок).
+    const future = await insertGame(gm.id, 0, {
+      status: 'recruiting',
+      publishedAt: ago(150),
+      startsAt: ahead(20),
+    });
+    await insertSession(future, ahead(13), { status: 'cancelled' });
+    await insertSession(future, ahead(20));
+    const r2 = await runDeadGamesDetector(deps, now());
+    expect(r2.markedDead).not.toContain(future);
+    expect(r2.reminded).not.toContain(future);
+  });
+
+  it('no transaction when nothing changes and no reminder is due', async () => {
+    const gm = await gmUser();
+    await insertGame(gm.id, 10);
+    const stale = await insertGame(gm.id, 40);
+    await insertGame(gm.id, 100);
+    await runDeadGamesDetector(deps, now());
+    expect(await notesOf(gm.id, 'game.stale_reminder')).toHaveLength(1);
+    const tx = vi.spyOn(db, 'transaction');
+    try {
+      const r = await runDeadGamesDetector(deps, now());
+      expect(r).toEqual({
+        reminded: [],
+        markedDead: [],
+        unmarkedDead: [],
+        markedSuspicious: [],
+        unmarkedSuspicious: [],
+      });
+      expect(tx).not.toHaveBeenCalled();
+    } finally {
+      tx.mockRestore();
+    }
+    expect(await notesOf(gm.id, 'game.stale_reminder')).toHaveLength(1);
+    expect((await row(stale)).deadAt).toBeNull();
+  });
+
+  it('admin close: no game.closed_by_admin for a banned GM', async () => {
+    const gm = await gmUser({ isBanned: true });
+    const mod = await gmUser({ role: 'moderator' });
+    const id = await insertGame(gm.id, 100, { status: 'recruiting', deadAt: ago(1) });
+    const res = await call('post', `/api/admin/dead-games/${id}/close`, mod.cookie, {});
+    expect(res.status).toBe(200);
+    expect((await row(id)).closedByAdmin).toBe(true);
+    expect(await notesOf(gm.id, 'game.closed_by_admin')).toHaveLength(0);
   });
 });

@@ -34,7 +34,7 @@ export interface StaleInput {
   publishedAt: Date | null;
   /** Остання проведена (`done`) сесія — її `done_at`. */
   lastDoneAt: Date | null;
-  /** Перша не скасована сесія гри (`starts_at`); без сесій — перший слот правила. */
+  /** Перша сесія гри (`starts_at`; без майбутніх скасованих); без сесій — перший слот правила. */
   firstSessionAt: Date | null;
   deadSnoozedUntil: Date | null;
   deadExemptUntilSession: boolean;
@@ -73,31 +73,58 @@ export function staleRule(g: StaleInput, now: Date): StaleVerdict {
 const asDate = (v: string | Date | null): Date | null =>
   v === null ? null : v instanceof Date ? v : new Date(`${v.replace(' ', 'T')}Z`);
 
-/** Дати проведених і перших сесій для набору ігор — одним запитом. */
-export async function sessionAnchors(
-  db: DbLike,
-  gameIds: number[],
-): Promise<Map<number, { lastDoneAt: Date | null; firstSessionAt: Date | null }>> {
-  if (gameIds.length === 0) return new Map();
-  const rows = await db
-    .select({
-      gameId: gameSessions.gameId,
-      lastDoneAt: sql<
-        string | null
-      >`max(case when ${gameSessions.status} = 'done' then ${gameSessions.doneAt} end)`,
-      firstSessionAt: sql<
-        string | null
-      >`min(case when ${gameSessions.status} <> 'cancelled' then ${gameSessions.startsAt} end)`,
-    })
-    .from(gameSessions)
-    .where(inArray(gameSessions.gameId, gameIds))
-    .groupBy(gameSessions.gameId);
-  return new Map(
+type Anchors = { lastDoneAt: Date | null; firstSessionAt: Date | null };
+
+/**
+ * Агрегати сесій гри: остання проведена (`done_at`) і перша сесія (`starts_at`). Скасовані
+ * сесії в майбутньому не рахуються (гра ще не почалась), а в минулому — рахуються: інакше
+ * скасування всіх минулих сесій зсунуло б відлік на наступну заплановану і гра ніколи не
+ * стала б «мертвою».
+ */
+const anchorColumns = (now: Date) => ({
+  gameId: gameSessions.gameId,
+  lastDoneAt: sql<
+    string | null
+  >`max(case when ${gameSessions.status} = 'done' then ${gameSessions.doneAt} end)`,
+  firstSessionAt: sql<
+    string | null
+  >`min(case when ${gameSessions.status} <> 'cancelled' or ${gameSessions.startsAt} < ${now} then ${gameSessions.startsAt} end)`,
+});
+
+const toAnchorMap = (
+  rows: { gameId: number; lastDoneAt: string | null; firstSessionAt: string | null }[],
+): Map<number, Anchors> =>
+  new Map(
     rows.map((r) => [
       r.gameId,
       { lastDoneAt: asDate(r.lastDoneAt), firstSessionAt: asDate(r.firstSessionAt) },
     ]),
   );
+
+/** Дати проведених і перших сесій для набору ігор — одним запитом. */
+export async function sessionAnchors(
+  db: DbLike,
+  gameIds: number[],
+  now: Date = new Date(),
+): Promise<Map<number, Anchors>> {
+  if (gameIds.length === 0) return new Map();
+  const rows = await db
+    .select(anchorColumns(now))
+    .from(gameSessions)
+    .where(inArray(gameSessions.gameId, gameIds))
+    .groupBy(gameSessions.gameId);
+  return toAnchorMap(rows);
+}
+
+/** Те саме для всіх ігор, які перевіряє детектор (`recruiting`/`started`) — без списку id. */
+export async function checkedSessionAnchors(db: DbLike, now: Date): Promise<Map<number, Anchors>> {
+  const rows = await db
+    .select(anchorColumns(now))
+    .from(gameSessions)
+    .innerJoin(games, eq(games.id, gameSessions.gameId))
+    .where(inArray(games.status, CHECKED_STATUSES))
+    .groupBy(gameSessions.gameId);
+  return toAnchorMap(rows);
 }
 
 type GameRow = typeof games.$inferSelect;
@@ -108,7 +135,7 @@ export function staleInputOf(
     GameRow,
     'status' | 'publishedAt' | 'startsAt' | 'deadSnoozedUntil' | 'deadExemptUntilSession'
   >,
-  anchors: { lastDoneAt: Date | null; firstSessionAt: Date | null } | undefined,
+  anchors: Anchors | undefined,
 ): StaleInput {
   return {
     status: row.status,
