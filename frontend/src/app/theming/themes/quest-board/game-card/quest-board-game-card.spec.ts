@@ -299,6 +299,24 @@ describe('QuestBoardGameCard — клік і відривання', () => {
       expect(navigate).not.toHaveBeenCalled();
     });
 
+    it('наперед, клік по місцю вкладки поза кнопкою (кнопка втрачає фокус) — закриває', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      button.focus();
+      click(button);
+      f.detectChanges();
+      expect(host.classList).toContain('front');
+      // Справжній порядок подій миші: pointerdown → blur кнопки → click по хосту.
+      host.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      button.blur();
+      click(host);
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
     it('Esc (фокус деінде) повертає вкладку й скасовує збільшення від наведення', async () => {
       await mount();
       const f = await create(8, { coverUrl: COVER });

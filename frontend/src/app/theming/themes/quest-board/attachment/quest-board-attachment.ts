@@ -35,6 +35,7 @@ import { TranslatePipe } from '@ngx-translate/core';
     '[class.dismissed]': 'dismissed()',
     '[class.failed]': 'failed()',
     '(click)': 'toggle()',
+    '(pointerdown)': 'pointerInside = true',
     '(mouseleave)': 'onLeave()',
     '(document:pointerdown)': 'onDocumentPointerDown($event)',
     '(document:keydown.escape)': 'dismiss()',
@@ -55,8 +56,14 @@ export class QuestBoardAttachment {
   protected readonly failed = computed(() => this.failedSrc() === this.src());
 
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
+  /**
+   * Натиснуто всередині вкладки (до кліку): фокус, що йде з кнопки на інше місце вкладки, — не
+   * «пішов геть», інакше blur закрив би вкладку, а клік одразу відкрив би знову.
+   */
+  protected pointerInside = false;
 
   protected toggle(): void {
+    this.pointerInside = false;
     this.dismissed.set(false);
     this.front.update((v) => !v);
   }
@@ -66,12 +73,14 @@ export class QuestBoardAttachment {
   }
 
   protected onLeave(): void {
+    this.pointerInside = false;
     this.front.set(false);
     this.dismissed.set(false);
   }
 
   /** Фокус пішов з кнопки — вкладка повертається під аркуш. */
   protected onBlur(): void {
+    if (this.pointerInside) return;
     this.front.set(false);
   }
 
@@ -81,6 +90,8 @@ export class QuestBoardAttachment {
   }
 
   protected onDocumentPointerDown(event: PointerEvent): void {
-    if (this.front() && !this.host.contains(event.target as Node)) this.front.set(false);
+    if (this.host.contains(event.target as Node)) return;
+    this.pointerInside = false;
+    if (this.front()) this.front.set(false);
   }
 }
