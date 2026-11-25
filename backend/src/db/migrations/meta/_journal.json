@@ -162,6 +162,13 @@
       "when": 1795605324928,
       "tag": "0022_plan5_precise_member_session_times",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1795611387260,
+      "tag": "0023_plan6_moderation",
+      "breakpoints": true
     }
   ]
 }

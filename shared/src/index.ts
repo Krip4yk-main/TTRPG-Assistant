@@ -21,3 +21,4 @@ export * from './contracts/notifications.js';
 export * from './contracts/telegram.js';
 export * from './contracts/views.js';
 export * from './contracts/ratings.js';
+export * from './contracts/moderation.js';

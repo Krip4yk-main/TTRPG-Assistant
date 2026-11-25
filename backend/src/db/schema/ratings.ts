@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
-import type { RatingCriterion, RatingKind, RatingRole } from '@nri/shared';
+import type { RatingCriterion, RatingKind, RatingModerationState, RatingRole } from '@nri/shared';
 import { games } from './games.js';
 import { gameSessions } from './sessions.js';
 import { users } from './users.js';
@@ -23,6 +23,11 @@ import { users } from './users.js';
 const RATING_ROLES = ['gm', 'player_from_gm', 'player_from_player'] as const satisfies RatingRole[];
 const RATING_KINDS = ['session', 'final'] as const satisfies RatingKind[];
 const RATING_REMINDER_KINDS = ['deadline'] as const;
+const RATING_MODERATION_STATES = [
+  'none',
+  'text_hidden',
+  'cancelled',
+] as const satisfies RatingModerationState[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
 
@@ -60,6 +65,10 @@ export const ratings = mysqlTable(
     /** `{ критерій: 1..5 }` — лише заповнені критерії. */
     criteria: json('criteria').$type<Partial<Record<RatingCriterion, number>>>(),
     comment: varchar('comment', { length: 2000 }),
+    /** Модерація: `text_hidden` — текст прихований; `cancelled` — оцінка не враховується. */
+    moderated: mysqlEnum('moderated', RATING_MODERATION_STATES).notNull().default('none'),
+    moderatedBy: id('moderated_by').references(() => users.id, { onDelete: 'set null' }),
+    moderatedAt: datetime('moderated_at', { fsp: 3 }),
     createdAt: datetime('created_at', { fsp: 3 })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP(3)`),

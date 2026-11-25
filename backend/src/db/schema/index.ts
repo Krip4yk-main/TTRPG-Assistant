@@ -7,6 +7,7 @@ import * as catalog from './catalog.js';
 import * as events from './events.js';
 import * as games from './games.js';
 import * as jobs from './jobs.js';
+import * as moderation from './moderation.js';
 import * as notes from './notes.js';
 import * as notifications from './notifications.js';
 import * as profiles from './profiles.js';
@@ -24,6 +25,7 @@ export * from './catalog.js';
 export * from './events.js';
 export * from './games.js';
 export * from './jobs.js';
+export * from './moderation.js';
 export * from './notes.js';
 export * from './notifications.js';
 export * from './profiles.js';
@@ -49,4 +51,5 @@ export const schema = {
   ...notifications,
   ...views,
   ...ratings,
+  ...moderation,
 };

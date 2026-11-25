@@ -61,10 +61,17 @@ export const identityTombstones = mysqlTable(
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
     provider: mysqlEnum('provider', providers).notNull(),
     subjectHash: char('subject_hash', { length: 64 }).notNull(),
+    /** Чий це був спосіб входу (бан позначає всі надгробки користувача); NULL — невідомо. */
+    userId: bigint('user_id', { mode: 'number', unsigned: true }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
     isBanned: boolean('is_banned').notNull().default(false),
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (t) => [uniqueIndex('identity_tombstones_provider_hash_uq').on(t.provider, t.subjectHash)],
+  (t) => [
+    uniqueIndex('identity_tombstones_provider_hash_uq').on(t.provider, t.subjectHash),
+    index('identity_tombstones_user_id_idx').on(t.userId),
+  ],
 );
