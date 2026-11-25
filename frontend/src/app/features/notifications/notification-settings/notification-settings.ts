@@ -56,6 +56,18 @@ export class NotificationSettings {
   protected readonly telegram = signal<TelegramPrefs | null>(null);
   protected readonly reminderOffsets = signal<ReminderOffset[]>([]);
   protected readonly remindersOff = computed(() => this.reminderOffsets().length === 0);
+  /** Останній збережений (завантажений) стан — для «є незбережені зміни». */
+  private readonly saved = signal<NotificationPrefsDto | null>(null);
+  protected readonly dirty = computed(() => {
+    const saved = this.saved();
+    const telegram = this.telegram();
+    if (!saved || !telegram) return false;
+    const offsets = (a: readonly number[]) => [...a].sort((x, y) => y - x).join(',');
+    return (
+      this.categories.some((c) => telegram[c] !== saved.telegram[c]) ||
+      offsets(this.reminderOffsets()) !== offsets(saved.reminderOffsets)
+    );
+  });
 
   constructor() {
     void this.load();
@@ -89,7 +101,7 @@ export class NotificationSettings {
 
   protected async save(): Promise<void> {
     const telegram = this.telegram();
-    if (!telegram || this.saving()) return;
+    if (!telegram || this.saving() || !this.dirty()) return;
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -113,6 +125,7 @@ export class NotificationSettings {
   }
 
   private apply(prefs: NotificationPrefsDto): void {
+    this.saved.set(prefs);
     this.telegram.set({ ...prefs.telegram });
     this.reminderOffsets.set([...prefs.reminderOffsets]);
   }

@@ -2,6 +2,7 @@ import { NOTIFICATION_TYPES, type NotificationDto, type NotificationType } from 
 import uk from '../../../assets/i18n/uk.json';
 import {
   ACCOUNT_DELETED_VARIANTS,
+  ANONYMOUS_VARIANTS,
   NOTIFICATION_REASON_CODES,
   THANKS_GENRES,
   notificationTime,
@@ -21,7 +22,7 @@ const dto = (type: NotificationType, params: NotificationDto['params'] = {}): No
   id: 1,
   type,
   category: 'games',
-  params: { gameId: 1, gameTitle: 'Гра', ...params },
+  params: { gameId: 1, gameTitle: 'Гра', actor: { publicId: 'p', nickname: 'Фродо' }, ...params },
   link: '/games/1',
   createdAt: '2026-11-25T10:00:00.000Z',
   readAt: null,
@@ -38,6 +39,17 @@ describe('notificationView', () => {
       if (typeof lookup(deleted.key) !== 'string') missing.push(deleted.key);
     }
     expect(missing).toEqual([]);
+    for (const type of ANONYMOUS_VARIANTS) {
+      const key = notificationView(dto(type, { actor: null }), 'UTC').key;
+      expect(key).toBe(`notifications.${type}_anonymous`);
+      expect(lookup(key)).toEqual(expect.any(String));
+      expect(lookup(key)).not.toContain('{{actor}}');
+    }
+    // Без автора в інших типах текст не містить {{actor}} — варіант не потрібен.
+    for (const type of NOTIFICATION_TYPES) {
+      if (ANONYMOUS_VARIANTS.includes(type)) continue;
+      expect(lookup(`notifications.${type}`)).not.toContain('{{actor}}');
+    }
     for (const type of ACCOUNT_DELETED_VARIANTS) {
       expect(notificationView(dto(type, { reason: 'account_deleted' }), 'UTC').key).toBe(
         `notifications.${type}_account_deleted`,

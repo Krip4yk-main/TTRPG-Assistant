@@ -49,6 +49,7 @@ describe('Shell home by view mode', () => {
             connect: vi.fn(),
             disconnect: vi.fn(),
             on: () => new Subject(),
+            connected$: new Subject(),
             sessionLost$: new Subject(),
           },
         },

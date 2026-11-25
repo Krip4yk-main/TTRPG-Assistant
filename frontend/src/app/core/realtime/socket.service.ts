@@ -23,12 +23,19 @@ export class SocketService {
   private readonly io = inject(SOCKET_IO);
   private socket: Socket | null = null;
   private readonly lost = new Subject<SessionLostReason>();
+  private readonly connected = new Subject<void>();
 
   /**
    * Сервер дав зрозуміти, що сесію втрачено (відкликано, бан, видалення акаунта).
    * Тимчасові мережеві розриви сюди не потрапляють: socket.io перепідключиться сам.
    */
   readonly sessionLost$: Observable<SessionLostReason> = this.lost.asObservable();
+
+  /**
+   * Кожне (пере)підключення сокета. Події, що прийшли, поки з'єднання не було, втрачено —
+   * підписники перечитують стан через API.
+   */
+  readonly connected$: Observable<void> = this.connected.asObservable();
 
   connect(): void {
     const socket = this.ensure();
@@ -53,6 +60,7 @@ export class SocketService {
       const socket = this.io({ path: '/socket.io', withCredentials: true, autoConnect: false });
       // Дзеркало SESSION_REVOKED_EVENT з @nri/shared (фронтенд не тягне shared заради рядка).
       socket.on('session.revoked', () => this.lost.next('revoked'));
+      socket.on('connect', () => this.connected.next());
       // Сервер сам розірвав з'єднання (disconnectSockets) — це не мережа.
       socket.on('disconnect', (reason: string) => {
         if (reason === 'io server disconnect') this.lost.next('server-disconnect');

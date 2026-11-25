@@ -84,7 +84,13 @@
       </section>
 
       <div class="actions">
-        <button mat-flat-button type="button" class="save" [disabled]="saving()" (click)="save()">
+        <button
+          mat-flat-button
+          type="button"
+          class="save"
+          [disabled]="saving() || !dirty()"
+          (click)="save()"
+        >
           {{ (saving() ? 'common.saving' : 'common.save') | translate }}
         </button>
       </div>

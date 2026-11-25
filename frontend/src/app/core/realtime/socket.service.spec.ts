@@ -56,3 +56,19 @@ describe('SocketService sessionLost$', () => {
     expect(lost).not.toHaveBeenCalled();
   });
 });
+
+describe('SocketService connected$', () => {
+  it("емітить на кожне 'connect' (включно з перепідключенням)", () => {
+    handlers.clear();
+    TestBed.configureTestingModule({
+      providers: [{ provide: SOCKET_IO, useValue: fakeIo as unknown as typeof io }],
+    });
+    const service = TestBed.inject(SocketService);
+    const connected = vi.fn();
+    service.connected$.subscribe(() => connected());
+    service.connect();
+    handlers.get('connect')?.();
+    handlers.get('connect')?.();
+    expect(connected).toHaveBeenCalledTimes(2);
+  });
+});

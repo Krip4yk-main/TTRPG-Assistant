@@ -1,5 +1,6 @@
 import {
   NOTIFICATION_TYPES,
+  REMINDER_OFFSETS,
   type NotificationCategory,
   type NotificationDto,
   type NotificationType,
@@ -14,6 +15,16 @@ export const ACCOUNT_DELETED_VARIANTS: readonly NotificationType[] = [
   'application.withdrawn',
   'member.left',
   'game.cancelled',
+];
+
+/**
+ * Типи, у тексті яких є `{{actor}}`: без автора (система чи видалений акаунт) — окремий текст
+ * без «від Хтось» (`notifications.<type>_anonymous`).
+ */
+export const ANONYMOUS_VARIANTS: readonly NotificationType[] = [
+  'application.created',
+  'application.withdrawn',
+  'member.left',
 ];
 
 /** Жанри з власною подякою після завершення гри (`notifications.thanks.<slug>`). */
@@ -97,9 +108,16 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     // Текст майстра (його й так бачать учасники в сесії) — показується як є.
     view.reason = { code: null, text: reason };
   }
+  if (
+    view.key === `notifications.${n.type}` &&
+    !view.actor &&
+    ANONYMOUS_VARIANTS.includes(n.type)
+  ) {
+    view.key = `notifications.${n.type}_anonymous`;
+  }
 
   if (n.type === 'session.reminder' && p.offsetMin !== undefined) {
-    view.offset = [15, 60, 180, 1440, 2880].includes(p.offsetMin)
+    view.offset = (REMINDER_OFFSETS as readonly number[]).includes(p.offsetMin)
       ? { key: `notifications.offset.${p.offsetMin}` }
       : { key: 'notifications.offset.other', params: { n: p.offsetMin } };
   }

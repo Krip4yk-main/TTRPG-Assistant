@@ -87,6 +87,7 @@ describe('NotificationBell', () => {
             connect: vi.fn(),
             disconnect: vi.fn(),
             sessionLost$: new Subject(),
+            connected$: new Subject(),
             on: (event: string) => {
               if (!events.has(event)) events.set(event, new Subject());
               return events.get(event)!.asObservable();
@@ -158,14 +159,20 @@ describe('NotificationBell', () => {
     expect(button().getAttribute('aria-expanded')).toBe('true');
     const items = panel()!.querySelectorAll<HTMLAnchorElement>('a.item');
     expect(items.length).toBe(2);
-    expect(items[0]!.textContent).toContain('Нова заявка на гру «Морія» від Хтось');
+    expect(items[0]!.textContent).toContain('Нова заявка на гру «Морія».');
+    expect(items[0]!.textContent).not.toContain(uk.notifications.someone);
     expect(items[0]!.classList).toContain('unread');
     expect(items[1]!.classList).not.toContain('unread');
     expect(items[1]!.textContent).toContain(uk.notifications.thanks.horror);
     expect(panel()!.textContent).not.toMatch(/notifications\./); // без сирих ключів
   });
 
-  it('clicking an item marks it read and navigates to its link', async () => {
+  it('clicking an item marks it read, navigates to its link and focuses the page heading', async () => {
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    main.tabIndex = -1;
+    main.innerHTML = '<h1>Гра</h1>';
+    document.body.appendChild(main);
     await start(1);
     await open([notification(5, { link: '/games/7' })]);
     panel()!.querySelector<HTMLAnchorElement>('a.item')!.click();
@@ -179,6 +186,22 @@ describe('NotificationBell', () => {
     expect(panel()).toBeNull();
     expect(badge()).not.toBeNull();
     expect(el.querySelector('.mat-badge-hidden')).not.toBeNull();
+    await flushAsync();
+    await settle();
+    expect(document.activeElement).toBe(main.querySelector('h1'));
+    main.remove();
+  });
+
+  it('clicking an item for the current page returns focus to the bell', async () => {
+    await TestBed.inject(Router).navigateByUrl('/games/7');
+    await start(1);
+    await open([notification(5, { link: '/games/7' })]);
+    panel()!.querySelector<HTMLAnchorElement>('a.item')!.click();
+    await settle();
+    http.expectOne('/api/me/notifications/5/read').flush(notification(5));
+    await flushAsync();
+    expect(panel()).toBeNull();
+    expect(document.activeElement).toBe(button());
   });
 
   it('«Прочитати все» and «Ще»', async () => {
@@ -198,6 +221,8 @@ describe('NotificationBell', () => {
     panel()!.querySelector<HTMLButtonElement>('button.mark-all')!.click();
     http.expectOne('/api/me/notifications/read-all').flush(null);
     await flushAsync();
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 0 });
+    await flushAsync();
     await settle();
     expect(panel()!.querySelectorAll('a.item.unread').length).toBe(0);
     expect(el.querySelector('.mat-badge-hidden')).not.toBeNull();
@@ -212,5 +237,6 @@ describe('NotificationBell', () => {
     await settle();
     expect(panel()).toBeNull();
     expect(button().getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(button());
   });
 });

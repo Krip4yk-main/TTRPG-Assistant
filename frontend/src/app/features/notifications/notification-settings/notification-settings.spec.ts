@@ -160,8 +160,23 @@ describe('NotificationSettings', () => {
     for (const c of NOTIFICATION_CATEGORIES) expect(toggleInput(c).disabled).toBe(true);
   });
 
+  it('Save is disabled while the form is pristine (and again after toggling back)', async () => {
+    await start(true);
+    const save = () => el.querySelector<HTMLButtonElement>('button.save')!;
+    expect(save().disabled).toBe(true);
+    toggleInput('games').click();
+    await settle();
+    expect(save().disabled).toBe(false);
+    toggleInput('games').click();
+    await settle();
+    expect(save().disabled).toBe(true);
+    await clickChip(15);
+    expect(save().disabled).toBe(false);
+  });
+
   it('save error shows the translated error code', async () => {
     await start(true);
+    await clickChip(15);
     el.querySelector<HTMLButtonElement>('button.save')!.click();
     http
       .expectOne('/api/me/notification-prefs')

@@ -1,6 +1,6 @@
-import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { DOCUMENT, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { firstValueFrom } from 'rxjs';
+import { filter, firstValueFrom, fromEvent, merge } from 'rxjs';
 import { NOTIFICATION_NEW_EVENT, type NotificationDto } from '@nri/shared';
 import { AuthStore } from '../auth/auth.store';
 import { SocketService } from '../realtime/socket.service';
@@ -9,8 +9,10 @@ import { NotificationsApi } from './notifications.api';
 /**
  * Центр сповіщень: лічильник непрочитаних (для дзвіночка) і список (для панелі).
  * Лічильник тягнеться, щойно користувач активний; список — коли відкривають панель.
- * Подія сокета `notification.new` оновлює лічильник, а при відкритій панелі — і першу
- * сторінку. Вихід або зміна користувача скидає все (відповіді старих запитів ігноруються).
+ * Подія сокета `notification.new` оновлює лічильник, а при відкритій панелі — підмішує нові
+ * сповіщення першої сторінки згори (довантажені сторінки й курсор лишаються). Те саме — при
+ * (пере)підключенні сокета й поверненні на вкладку: події, пропущені без з'єднання, не губляться.
+ * Вихід або зміна користувача скидає все (відповіді старих запитів ігноруються).
  */
 @Injectable({ providedIn: 'root' })
 export class NotificationsStore {
@@ -27,6 +29,8 @@ export class NotificationsStore {
   private readonly _panelOpen = signal(false);
   /** Покоління стану: зростає при скиданні, щоб запізнілі відповіді не повертали старе. */
   private generation = 0;
+  /** Номер останнього запиту/зміни лічильника: застаріла відповідь не перезаписує новішу. */
+  private unreadSeq = 0;
 
   readonly unreadCount = this._unread.asReadonly();
   /** Лічильник уже отримано з сервера (після входу). */
@@ -51,14 +55,22 @@ export class NotificationsStore {
       });
     });
 
-    inject(SocketService)
-      .on<{ id: number }>(NOTIFICATION_NEW_EVENT)
+    const socket = inject(SocketService);
+    const doc = inject(DOCUMENT);
+    merge(
+      socket.on<{ id: number }>(NOTIFICATION_NEW_EVENT),
+      socket.connected$,
+      fromEvent(doc, 'visibilitychange').pipe(filter(() => doc.visibilityState === 'visible')),
+    )
       .pipe(takeUntilDestroyed())
-      .subscribe(() => {
-        if (this.userId() === null) return;
-        void this.refreshUnread();
-        if (this._panelOpen()) void this.loadFirst();
-      });
+      .subscribe(() => this.sync());
+  }
+
+  /** Підтягнути зміни з сервера: лічильник, а при відкритій панелі — нові згори. */
+  private sync(): void {
+    if (this.userId() === null) return;
+    void this.refreshUnread();
+    if (this._panelOpen()) void (this._loaded() ? this.mergeFirst() : this.loadFirst());
   }
 
   setPanelOpen(open: boolean): void {
@@ -67,9 +79,10 @@ export class NotificationsStore {
 
   async refreshUnread(): Promise<void> {
     const gen = this.generation;
+    const seq = ++this.unreadSeq;
     try {
       const { count } = await firstValueFrom(this.api.unreadCount());
-      if (gen === this.generation) {
+      if (gen === this.generation && seq === this.unreadSeq) {
         this._unread.set(count);
         this._unreadKnown.set(true);
       }
@@ -93,6 +106,30 @@ export class NotificationsStore {
       if (gen === this.generation) this._error.set(true);
     } finally {
       if (gen === this.generation) this._loading.set(false);
+    }
+  }
+
+  /**
+   * Перша сторінка, підмішана згори без дублікатів; довантажене й курсор лишаються. Якщо
+   * жодне сповіщення сторінки ще не відоме, а далі є ще — між ними може бути розрив, тож
+   * список замінюється першою сторінкою.
+   */
+  private async mergeFirst(): Promise<void> {
+    const gen = this.generation;
+    try {
+      const page = await firstValueFrom(this.api.list());
+      if (gen !== this.generation) return;
+      const known = new Set(this._items().map((n) => n.id));
+      const fresh = page.items.filter((n) => !known.has(n.id));
+      if (fresh.length === page.items.length && page.nextCursor !== null) {
+        this._items.set(page.items);
+        this._nextCursor.set(page.nextCursor);
+        return;
+      }
+      const byId = new Map(page.items.map((n) => [n.id, n]));
+      this._items.update((items) => [...fresh, ...items.map((n) => byId.get(n.id) ?? n)]);
+    } catch {
+      // Тихе оновлення: список лишається як був.
     }
   }
 
@@ -121,6 +158,7 @@ export class NotificationsStore {
     if (n.readAt) return;
     const gen = this.generation;
     this.patch(n.id, { readAt: new Date().toISOString() });
+    this.unreadSeq++; // запит лічильника, що вже летить, не поверне старе значення
     this._unread.update((c) => Math.max(0, c - 1));
     try {
       const saved = await firstValueFrom(this.api.markRead(n.id));
@@ -143,7 +181,8 @@ export class NotificationsStore {
     if (gen !== this.generation) return;
     const now = new Date().toISOString();
     this._items.update((items) => items.map((n) => (n.readAt ? n : { ...n, readAt: now })));
-    this._unread.set(0);
+    // Поки летів запит, могли прийти нові — лічильник беремо з сервера.
+    await this.refreshUnread();
   }
 
   private patch(id: number, changes: Partial<NotificationDto>): void {

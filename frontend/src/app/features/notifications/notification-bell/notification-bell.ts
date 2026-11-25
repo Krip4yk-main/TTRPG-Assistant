@@ -1,7 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DOCUMENT,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -9,7 +12,14 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  NavigationCancel,
+  NavigationEnd,
+  NavigationError,
+  Router,
+  RouterLink,
+} from '@angular/router';
+import { filter, take } from 'rxjs';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
   CdkConnectedOverlay,
@@ -65,6 +75,9 @@ interface Row {
 export class NotificationBell {
   protected readonly store = inject(NotificationsStore);
   private readonly auth = inject(AuthStore);
+  private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly document = inject(DOCUMENT);
   private readonly trigger = viewChild.required('trigger', {
     read: ElementRef<HTMLButtonElement>,
   });
@@ -146,9 +159,43 @@ export class NotificationBell {
     }
   }
 
+  /**
+   * Перехід за сповіщенням. Панель (з елементом у фокусі) зникає, тож фокус переносимо:
+   * на новій сторінці — на її заголовок (або `main`), якщо сторінка та сама — на дзвіночок.
+   */
   protected openItem(n: NotificationDto): void {
     void this.store.markRead(n);
+    if (this.router.url === n.link) {
+      this.close(true);
+      return;
+    }
     this.close();
+    this.router.events
+      .pipe(
+        filter(
+          (e) =>
+            e instanceof NavigationEnd ||
+            e instanceof NavigationCancel ||
+            e instanceof NavigationError,
+        ),
+        take(1),
+      )
+      .subscribe((e) => {
+        if (e instanceof NavigationEnd) {
+          afterNextRender(() => this.focusMain(), { injector: this.injector });
+        } else {
+          this.trigger().nativeElement.focus();
+        }
+      });
+  }
+
+  private focusMain(): void {
+    const main = this.document.getElementById('main-content');
+    const heading = main?.querySelector<HTMLElement>('h1');
+    const target = heading ?? main;
+    if (!target) return;
+    if (target === heading && !heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+    target.focus();
   }
 
   protected markAll(): void {

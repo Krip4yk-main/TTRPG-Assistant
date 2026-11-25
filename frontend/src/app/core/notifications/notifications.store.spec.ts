@@ -40,9 +40,11 @@ describe('NotificationsStore', () => {
   let store: NotificationsStore;
   let auth: AuthStore;
   let events: Map<string, Subject<unknown>>;
+  let connected: Subject<void>;
 
   beforeEach(() => {
     events = new Map();
+    connected = new Subject();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -53,6 +55,7 @@ describe('NotificationsStore', () => {
             connect: vi.fn(),
             disconnect: vi.fn(),
             sessionLost$: new Subject(),
+            connected$: connected,
             on: (event: string) => {
               if (!events.has(event)) events.set(event, new Subject());
               return events.get(event)!.asObservable();
@@ -138,16 +141,92 @@ describe('NotificationsStore', () => {
     expect(store.unreadCount()).toBe(1);
   });
 
-  it('markAllRead marks every item and zeroes the count', async () => {
+  it('markAllRead marks every item and re-reads the count from the server', async () => {
     await login(2);
     await loadFirst([notification(1), notification(2)]);
     const p = store.markAllRead();
     const req = http.expectOne('/api/me/notifications/read-all');
     expect(req.request.method).toBe('POST');
     req.flush(null, { status: 204, statusText: 'No Content' });
+    await flushAsync();
+    // Поки летів read-all, прийшло ще одне.
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 1 });
     await p;
-    expect(store.unreadCount()).toBe(0);
+    expect(store.unreadCount()).toBe(1);
     expect(store.items().every((n) => n.readAt !== null)).toBe(true);
+  });
+
+  it('markAllRead failure keeps the count and items unread', async () => {
+    await login(2);
+    await loadFirst([notification(1), notification(2)]);
+    const p = store.markAllRead();
+    http
+      .expectOne('/api/me/notifications/read-all')
+      .flush(null, { status: 500, statusText: 'err' });
+    await p;
+    expect(store.unreadCount()).toBe(2);
+    expect(store.items().every((n) => n.readAt === null)).toBe(true);
+  });
+
+  it('a stale unread-count response does not overwrite a newer one', async () => {
+    await login(1);
+    const first = store.refreshUnread();
+    const second = store.refreshUnread();
+    const [older, newer] = http.match('/api/me/notifications/unread-count');
+    newer!.flush({ count: 5 });
+    older!.flush({ count: 2 });
+    await Promise.all([first, second]);
+    expect(store.unreadCount()).toBe(5);
+  });
+
+  it('socket reconnect and returning to the tab refresh the count', async () => {
+    await login(1);
+    connected.next();
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 4 });
+    await flushAsync();
+    expect(store.unreadCount()).toBe(4);
+
+    const state = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    http.expectNone('/api/me/notifications/unread-count');
+    state.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 6 });
+    await flushAsync();
+    expect(store.unreadCount()).toBe(6);
+    state.mockRestore();
+  });
+
+  it('new notification with the panel open merges the first page on top, keeping loaded pages', async () => {
+    await login(1);
+    store.setPanelOpen(true);
+    await loadFirst([notification(3), notification(2)], 2);
+    const more = store.loadMore();
+    http
+      .expectOne((r) => r.url === '/api/me/notifications')
+      .flush({ items: [notification(1)], nextCursor: null });
+    await more;
+
+    events.get(NOTIFICATION_NEW_EVENT)!.next({ id: 4 });
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 2 });
+    http
+      .expectOne((r) => r.url === '/api/me/notifications')
+      .flush({ items: [notification(4), notification(3)], nextCursor: 3 });
+    await flushAsync();
+    expect(store.items().map((n) => n.id)).toEqual([4, 3, 2, 1]);
+    expect(store.nextCursor()).toBeNull();
+  });
+
+  it('switching user A → B resets the list and loads the count of B', async () => {
+    await login(3);
+    await loadFirst([notification(1)]);
+    auth.setMe({ ...testMe, id: 2, publicId: 'bbbbbbbbbb' });
+    TestBed.tick();
+    expect(store.items()).toEqual([]);
+    expect(store.loaded()).toBe(false);
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 7 });
+    await flushAsync();
+    expect(store.unreadCount()).toBe(7);
   });
 
   it('socket notification.new refreshes the count; reloads the list only when the panel is open', async () => {
