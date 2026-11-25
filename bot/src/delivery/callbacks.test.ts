@@ -74,7 +74,7 @@ describe('handleCallback', () => {
     const { ctx, client } = setup(
       'r:5:n',
       { ok: true, result: 'not_going' },
-      { text: `${text}\n\n👍 Ви будете`, reply_markup: RSVP_KB },
+      { text: `${text}\n\n👍 Твоя відповідь: буду`, reply_markup: RSVP_KB },
     );
     await handleCallback(ctx, client, t);
     expect(client.telegramAction).toHaveBeenCalledWith({
@@ -83,22 +83,22 @@ describe('handleCallback', () => {
       id: 5,
       value: 'not_going',
     });
-    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: '🙅 Не зможете' });
-    expect(ctx.editMessageText).toHaveBeenCalledWith(`${text}\n\n🙅 Не зможете`, {
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: '🙅 Твоя відповідь: не зможу' });
+    expect(ctx.editMessageText).toHaveBeenCalledWith(`${text}\n\n🙅 Твоя відповідь: не зможу`, {
       reply_markup: RSVP_KB,
       link_preview_options: { is_disabled: true },
     });
   });
 
   it('the same rsvp again: answers, does not edit (message would not change)', async () => {
-    const text = '⏰ Нагадування\n\n👍 Ви будете';
+    const text = '⏰ Нагадування\n\n👍 Твоя відповідь: буду';
     const { ctx, client } = setup(
       'r:5:y',
       { ok: true, result: 'going' },
       { text, reply_markup: RSVP_KB },
     );
     await handleCallback(ctx, client, t);
-    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: '👍 Ви будете' });
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: '👍 Твоя відповідь: буду' });
     expect(ctx.editMessageText).not.toHaveBeenCalled();
   });
 
