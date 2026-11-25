@@ -99,6 +99,9 @@ export class ThemeService {
     const themeChanged = root.getAttribute('data-theme') !== id;
     root.setAttribute('data-theme', id);
     root.style.colorScheme = def.colorScheme;
+    // Ранній фон з інлайн-скрипту index.html — колір дизайну з кешу; інший дизайн — знімаємо,
+    // щоб поки вантажиться новий бандл не було видно кольору попереднього.
+    if (themeChanged) root.style.removeProperty('background-color');
     this.doc.querySelector('meta[name="color-scheme"]')?.setAttribute('content', def.colorScheme);
     this.setStyle(def.styleHref, themeChanged);
     this.current.set(id);

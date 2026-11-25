@@ -182,10 +182,10 @@
     linear-gradient(var(--qb-wood), var(--qb-wood-dark));
 }
 
-// Фон <html> — дерево. Ранній колір з інлайн-скрипту index.html діє лише до завантаження
-// бандла (і після перемикання дизайну без перезавантаження колір іншого дизайну не лишається).
+// Фон <html> — дерево (той самий колір, що ранній інлайн-фон з index.html; при перемиканні
+// дизайну без перезавантаження ThemeService знімає інлайн-фон попереднього дизайну).
 @{qb} {
-  background-color: var(--qb-wood) !important;
+  background-color: var(--qb-wood);
 }
 
 // До першого рендера body прозорий — видно дерево <html> (без «пергаментного» спалаху між
@@ -349,6 +349,13 @@
   .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel,
   .mat-datepicker-content.mat-datepicker-content {
     box-shadow: var(--nri-shadow-lg);
+  }
+
+  // Календар на пергаменті без межі зливається зі сторінкою — та сама межа, що в інших
+  // спливних поверхонь (styles.less).
+  .mat-datepicker-content.mat-datepicker-content {
+    outline: 1px solid var(--nri-overlay-border);
+    outline-offset: -1px;
   }
 }
 

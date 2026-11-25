@@ -32,21 +32,18 @@
 // рядок і на вузькому екрані налазять на наступне поле. Тут вони в потоці (як у режимі
 // dynamic), а порожнє місце під полем лишається тієї ж висоти — помилка в один рядок не зсуває
 // форму.
-html .mat-mdc-form-field-bottom-align {
+// Лише фіксований режим: у dynamic Material навмисно не резервує рядок під полем.
+html .mat-mdc-form-field-bottom-align:not(.mat-mdc-form-field-subscript-dynamic-size) {
   min-height: var(--mat-form-field-subscript-text-line-height, 16px);
 
   &::before {
     content: unset;
   }
+}
 
+html .mat-mdc-form-field-bottom-align {
   .mat-mdc-form-field-hint-wrapper,
   .mat-mdc-form-field-error-wrapper {
     position: static;
   }
-}
-
-// Календар Material — така сама межа, як в інших спливних поверхонь (styles.less).
-.mat-datepicker-content.mat-datepicker-content {
-  outline: 1px solid var(--nri-overlay-border);
-  outline-offset: -1px;
 }

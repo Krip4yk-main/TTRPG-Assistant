@@ -93,14 +93,17 @@ describe('ThemePicker («Вигляд»)', () => {
     fixture.detectChanges();
     // Поки зберігається — вибір позначено одразу, картки заблоковані.
     expect(byName(el, 'Класичний').getAttribute('aria-pressed')).toBe('true');
-    expect(byName(el, 'Дошка оголошень').disabled).toBe(true);
+    expect(byName(el, 'Дошка оголошень').getAttribute('aria-disabled')).toBe('true');
+    // Повторний клік під час збереження нічого не робить.
+    byName(el, 'Дошка оголошень').click();
+    expect(themes.select).toHaveBeenCalledTimes(1);
 
     fail(new HttpErrorResponse({ status: 403, error: { error: { code: 'FORBIDDEN' } } }));
     await fixture.whenStable();
     fixture.detectChanges();
     expect(byName(el, 'Дошка оголошень').getAttribute('aria-pressed')).toBe('true');
     expect(byName(el, 'Класичний').getAttribute('aria-pressed')).toBe('false');
-    expect(byName(el, 'Класичний').disabled).toBe(false);
+    expect(byName(el, 'Класичний').getAttribute('aria-disabled')).toBeNull();
     const alert = el.querySelector('[role="alert"]');
     expect(alert?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
   });

@@ -106,6 +106,7 @@ describe('ThemeService', () => {
   afterEach(() => {
     document.head.querySelectorAll(`link#${THEME_LINK_ID}`).forEach((l) => l.remove());
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.style.removeProperty('background-color');
     localStorage.clear();
   });
 
@@ -218,6 +219,21 @@ describe('ThemeService', () => {
     await done;
     expect(load).toHaveBeenCalledTimes(2);
     expect(service.slots()).toBe(QB_SLOTS);
+  });
+
+  it('keeps the early background hint for the same design and drops it when the design changes', async () => {
+    setup();
+    bootFromCache('quest-board', 'theme-quest-board.css?v=1');
+    document.documentElement.style.backgroundColor = 'rgb(58, 39, 24)';
+    auth.setMe({ ...owner, uiTheme: 'quest-board' });
+    await service.init();
+    // Кеш збігся з чинним — підказка лишається (бандл дає той самий колір).
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(58, 39, 24)');
+
+    auth.setMe(owner);
+    TestBed.tick();
+    await vi.waitFor(() => expect(service.theme()).toBe('classic'));
+    expect(document.documentElement.style.backgroundColor).toBe('');
   });
 
   it('sets color-scheme on <html> and in <meta name="color-scheme">', async () => {

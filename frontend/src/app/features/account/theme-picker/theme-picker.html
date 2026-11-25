@@ -10,7 +10,7 @@
             class="option"
             [class.selected]="option.id === selected()"
             [attr.aria-pressed]="option.id === selected()"
-            [disabled]="busy()"
+            [attr.aria-disabled]="busy() || null"
             (click)="choose(option.id)"
           >
             <img [src]="option.preview" alt="" width="240" height="150" loading="lazy" />

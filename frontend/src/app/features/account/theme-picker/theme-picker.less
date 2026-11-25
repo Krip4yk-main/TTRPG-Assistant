@@ -30,7 +30,7 @@
   text-align: left;
   transition: border-color var(--nri-transition);
 
-  &:hover:not(:disabled) {
+  &:hover:not([aria-disabled='true']) {
     border-color: var(--nri-accent);
   }
 
@@ -38,7 +38,8 @@
     border-color: var(--nri-primary);
   }
 
-  &:disabled {
+  // Поки зберігається — кнопки лишаються у фокусі (aria-disabled), кліки ігнорує choose().
+  &[aria-disabled='true'] {
     cursor: progress;
   }
 
