@@ -13,6 +13,14 @@ export const events = mysqlTable(
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
+    /**
+     * Коли диспетчер сповіщень обробив подію (`NULL` — ще ні). Outbox за прапорцем, а не за
+     * курсором id: id видаються до коміту, тож «пізній» коміт курсор пропустив би.
+     */
+    dispatchedAt: datetime('dispatched_at', { fsp: 3 }),
   },
-  (t) => [index('events_type_created_at_idx').on(t.type, t.createdAt)],
+  (t) => [
+    index('events_type_created_at_idx').on(t.type, t.createdAt),
+    index('events_dispatched_at_id_idx').on(t.dispatchedAt, t.id),
+  ],
 );

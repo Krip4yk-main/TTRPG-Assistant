@@ -155,7 +155,7 @@ export async function logCancelled(
       userId: r.userId,
       entityType: 'application',
       entityId: r.id,
-      payload: { gameId: r.gameId },
+      payload: { gameId: r.gameId, applicantId: r.userId },
     });
   }
 }

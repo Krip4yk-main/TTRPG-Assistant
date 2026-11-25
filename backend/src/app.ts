@@ -26,6 +26,8 @@ import { gameMembersRouter } from './members/members.routes.js';
 import { blacklistRouter } from './members/blacklist.routes.js';
 import { gameSessionsRouter, sessionsRouter } from './sessions/sessions.routes.js';
 import { gameNotesRouter, sessionNotesRouter } from './notes/notes.routes.js';
+import { notificationsRouter } from './notifications/notifications.routes.js';
+import { notificationPrefsRouter } from './notifications/prefs.routes.js';
 import { ogRouter, seoRootRouter } from './seo/seo.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
@@ -73,6 +75,8 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/availability', availabilityRouter(deps));
   app.use('/api/me/applications', myApplicationsRouter(deps));
   app.use('/api/me/blacklist', blacklistRouter(deps));
+  app.use('/api/me/notifications', notificationsRouter(deps));
+  app.use('/api/me/notification-prefs', notificationPrefsRouter(deps));
   app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));

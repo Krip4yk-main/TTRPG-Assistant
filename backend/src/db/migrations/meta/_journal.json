@@ -85,6 +85,13 @@
       "when": 1795573777752,
       "tag": "0011_plan4_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1795575840189,
+      "tag": "0012_plan4_notifications",
+      "breakpoints": true
     }
   ]
 }
