@@ -80,6 +80,15 @@ async function readOwn(
  * UPDATE `WHERE version = ?`; рівно один із двох паралельних записів з однаковою версією
  * проходить, інший отримує 409 з актуальним текстом.
  */
+/** MySQL ER_NO_REFERENCED_ROW_2 (1452): FK посилається на рядок, якого вже немає. */
+function isMissingReference(err: unknown): boolean {
+  for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
+    const o = e as { code?: string; errno?: number };
+    if (o.code === 'ER_NO_REFERENCED_ROW_2' || o.errno === 1452) return true;
+  }
+  return false;
+}
+
 async function writeOwn(
   deps: AppDeps,
   scope: NoteScope,
@@ -98,6 +107,8 @@ async function writeOwn(
         .values({ scope, gameId, sessionId, userId, body: input.body, version: 1 });
       ok = true;
     } catch (err) {
+      // Сесію видалили між перевіркою доступу й вставкою (перебудова розкладу) → як 404.
+      if (isMissingReference(err)) throw new AppError(404, 'NOT_FOUND');
       if (!isDuplicateKey(err)) throw err;
       ok = false;
     }
