@@ -10,6 +10,21 @@ export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
 /** Сесії матеріалізуються на 4 тижні вперед (рішення власника). */
 export const SESSION_WINDOW_DAYS = 28;
 
+/** RSVP на майбутню сесію: «буду» / «не зможу». */
+export const RSVP_STATUSES = ['going', 'not_going'] as const;
+export type RsvpStatus = (typeof RSVP_STATUSES)[number];
+
+/** Тіло `PUT /api/sessions/:id/rsvp`. */
+export const rsvpInputSchema = z.object({ status: z.enum(RSVP_STATUSES) }).strict();
+export type RsvpInput = z.input<typeof rsvpInputSchema>;
+
+/** Зведення RSVP — лише майстру. `members` — усі активні учасники (`status: null` — не відповів). */
+export interface SessionRsvpSummary {
+  going: number;
+  notGoing: number;
+  members: { publicId: string; nickname: string; status: RsvpStatus | null }[];
+}
+
 export const SESSION_CANCEL_REASON_MAX = 300;
 export const SESSION_SUMMARY_MAX = 10_000;
 
@@ -63,4 +78,8 @@ export interface SessionDto {
   /** Лише для майстра й активних учасників. */
   summary: string | null;
   doneAt: string | null;
+  /** Моя відповідь (активний учасник); для майстра й без відповіді — `null`. */
+  myRsvp: RsvpStatus | null;
+  /** Лише в DTO майстра (приватність учасників); іншим — `null`. */
+  rsvpSummary: SessionRsvpSummary | null;
 }

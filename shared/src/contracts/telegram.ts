@@ -17,8 +17,10 @@ export interface TelegramOutboxItem {
   kind: string;
   params: NotificationParams;
   buttons: TelegramButton[] | null;
-  /** Скільки невдалих спроб уже було. */
+  /** Скільки спроб уже було (видача рахується спробою). */
   attempts: number;
+  /** IANA-пояс одержувача для дат у тексті; `null` — типовий (Europe/Kyiv). */
+  timeZone: string | null;
 }
 
 export interface TelegramOutboxClaimResult {
@@ -46,6 +48,36 @@ export const telegramOutboxFailedSchema = z
      * повідомлення цього чату теж позначаються `failed`, щоб не стукати марно.
      */
     chatUnreachable: z.boolean().optional(),
+    /**
+     * Telegram 429 (або решта пачки після нього): спроба не рахується — видачу, що її
+     * зарахувала, відкочуємо (`attempts - 1`), повтор не раніше `retryAfterSec`.
+     */
+    rateLimited: z.boolean().optional(),
   })
   .strict();
 export type TelegramOutboxFailedInput = z.input<typeof telegramOutboxFailedSchema>;
+
+/** Дії з кнопок Telegram-сповіщень. */
+export const TELEGRAM_ACTIONS = ['approve', 'reject', 'rsvp'] as const;
+export type TelegramAction = (typeof TELEGRAM_ACTIONS)[number];
+
+/** Тіло `POST /api/internal/telegram/action` (бот → бекенд). */
+export const telegramActionSchema = z
+  .object({
+    telegramId: z.union([z.string().regex(/^\d{1,20}$/), z.number().int().positive()]),
+    action: z.enum(TELEGRAM_ACTIONS),
+    id: z.number().int().positive(),
+    value: z.enum(['going', 'not_going']).optional(),
+  })
+  .strict()
+  .refine((b) => (b.action === 'rsvp') === (b.value !== undefined), {
+    message: 'value is required for rsvp only',
+    path: ['value'],
+  });
+export type TelegramActionInput = z.input<typeof telegramActionSchema>;
+
+/** Успішна відповідь `POST /api/internal/telegram/action`. */
+export interface TelegramActionResult {
+  ok: true;
+  result: 'approved' | 'rejected' | 'going' | 'not_going';
+}

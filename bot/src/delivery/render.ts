@@ -34,11 +34,22 @@ export type Rendered = {
 const isType = (k: string): k is NotificationType =>
   (NOTIFICATION_TYPES as readonly string[]).includes(k);
 
-/** `пт, 28 листопада о 19:00` у вказаному поясі; зіпсована дата — `null`. */
+/**
+ * `пт, 28 листопада о 19:00` у вказаному поясі (невідомий пояс — Europe/Kyiv); зіпсована
+ * дата — `null`.
+ */
 export function formatWhen(iso: string | undefined, timeZone = DEFAULT_TIME_ZONE): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
+  try {
+    return formatIn(d, timeZone);
+  } catch {
+    return formatIn(d, DEFAULT_TIME_ZONE);
+  }
+}
+
+function formatIn(d: Date, timeZone: string): string {
   const date = new Intl.DateTimeFormat('uk-UA', {
     timeZone,
     weekday: 'short',
@@ -80,10 +91,18 @@ export function renderNotification(
   const parts: string[] = [];
   if (isType(kind)) {
     const variant = `notify.${kind}_${params.reason ?? ''}`;
-    const key =
+    let key =
       params.reason === 'account_deleted' && lookup(dict, variant) !== undefined
         ? variant
         : `notify.${kind}`;
+    // Варіанти без частини, якої немає в даних (без «від Хтось», без подвійного пробілу).
+    const missing = [
+      !params.actor?.nickname && 'noactor',
+      params.offsetMin === undefined && 'nooffset',
+    ];
+    for (const m of missing) {
+      if (m && lookup(dict, `${key}_${m}`) !== undefined) key = `${key}_${m}`;
+    }
     parts.push(t(key, vars));
     if (kind === 'session.cancelled' && params.reason) {
       parts.push(t('notify.reason', { reason: params.reason }));

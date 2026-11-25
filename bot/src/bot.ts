@@ -4,6 +4,7 @@ import { Bot } from 'grammy';
 import { createBackendClient } from './api/backend-client.js';
 import type { BackendClient } from './api/backend-client.js';
 import { loadEnv } from './config/env.js';
+import { handleCallback } from './delivery/callbacks.js';
 import { startPoller } from './delivery/poller.js';
 import { renderNotification } from './delivery/render.js';
 import { makeT, type Translate } from './i18n/t.js';
@@ -47,6 +48,8 @@ export async function main(): Promise<void> {
   const t = makeT();
   const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
   bot.command('start', (ctx) => handleStart(ctx, client, t));
+  // Кнопки сповіщень (затвердити/відхилити заявку, RSVP); права перевіряє бекенд.
+  bot.on('callback_query:data', (ctx) => handleCallback(ctx, client, t));
   bot.catch((err) => {
     // Лише тип помилки: у повідомленнях/URL може бути токен.
     console.error(
@@ -62,6 +65,7 @@ export async function main(): Promise<void> {
       renderNotification(item.kind, item.params, item.buttons, {
         siteUrl: env.PUBLIC_BASE_URL,
         t,
+        ...(item.timeZone ? { timeZone: item.timeZone } : {}),
       }),
   });
   const stop = (): void => {

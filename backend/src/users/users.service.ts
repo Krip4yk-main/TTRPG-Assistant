@@ -32,6 +32,7 @@ import { cancelPendingForGames, logCancelled } from '../applications/application
 import { logEvent } from '../events/events.service.js';
 import { cancelFutureSessions, logSessionsCancelled } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
+import { cancelPendingOutbox } from '../notifications/telegram-outbox.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
 
@@ -223,6 +224,8 @@ export async function unlinkIdentity(
     if (!target) throw new AppError(404, 'NOT_FOUND');
     if (rows.length <= 1) throw new AppError(409, 'LAST_IDENTITY');
     await tx.delete(authIdentities).where(eq(authIdentities.id, target.id));
+    // Ще не надіслане в цей чат більше не доставляємо.
+    if (provider === 'telegram') await cancelPendingOutbox(tx, userId, 'unlinked');
   });
   await logEvent(db, { type: 'identity.unlinked', userId, payload: { provider } });
 }
@@ -294,6 +297,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         });
     }
     await tx.delete(authIdentities).where(eq(authIdentities.userId, userId));
+    await cancelPendingOutbox(tx, userId, 'unlinked');
     const sess = await tx
       .select({ tokenHash: sessions.tokenHash })
       .from(sessions)

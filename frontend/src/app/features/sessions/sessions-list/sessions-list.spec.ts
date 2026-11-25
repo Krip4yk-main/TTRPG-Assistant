@@ -37,6 +37,8 @@ const base: SessionDto = {
   cancelReason: null,
   summary: null,
   doneAt: null,
+  myRsvp: null,
+  rsvpSummary: null,
 };
 const done: SessionDto = {
   ...base,

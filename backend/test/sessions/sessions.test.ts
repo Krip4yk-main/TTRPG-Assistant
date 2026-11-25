@@ -104,6 +104,8 @@ describe('materialization on publish', () => {
       cancelReason: null,
       summary: null,
       doneAt: null,
+      myRsvp: null,
+      rsvpSummary: { going: 0, notGoing: 0, members: [] },
     } satisfies SessionDto);
     await call('get', `/api/games/${gameId}/sessions`, gm.cookie);
     expect(await rows(gameId)).toHaveLength(4);

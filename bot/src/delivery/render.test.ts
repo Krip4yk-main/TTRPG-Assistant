@@ -89,9 +89,42 @@ describe('renderNotification', () => {
 
   it('missing actor/title/time fall back to neutral words', () => {
     const r = render('application.created', { gameId: 1 });
-    expect(r.text).toContain(uk.notify.someone);
     expect(r.text).toContain(uk.notify.unknownGame);
     expect(render('session.cancelled', { gameId: 1 }).text).toContain(uk.notify.unknownTime);
+    expect(render('member.left', { gameId: 1 }).text).toContain(uk.notify.someone);
+  });
+
+  it('application.created without an actor drops "від …"', () => {
+    const r = render('application.created', { gameId: 1, gameTitle: 'Гра' });
+    expect(r.text.split('\n')[0]).toBe('📜 Нова заявка на гру «Гра».');
+    expect(r.text).not.toContain(uk.notify.someone);
+  });
+
+  it('reminder without an offset has no double space', () => {
+    const r = render('session.reminder', {
+      gameId: 1,
+      gameTitle: 'Гра',
+      sessionId: 2,
+      startsAt: '2026-11-28T17:00:00.000Z',
+    });
+    expect(r.text).not.toMatch(/ {2}/);
+    expect(r.text.split('\n')[0]).toBe(
+      '⏰ Нагадування: сесія гри «Гра» — сб, 28 листопада о 19:00.',
+    );
+  });
+
+  it('uses the recipient time zone; an invalid zone falls back to Kyiv', () => {
+    const p = { gameId: 1, gameTitle: 'Гра', startsAt: '2026-11-28T17:00:00.000Z' };
+    const ny = renderNotification('session.cancelled', p, null, {
+      siteUrl: 'https://s',
+      timeZone: 'America/New_York',
+    });
+    expect(ny.text).toContain('о 12:00');
+    const bad = renderNotification('session.cancelled', p, null, {
+      siteUrl: 'https://s',
+      timeZone: 'Not/AZone',
+    });
+    expect(bad.text).toContain('о 19:00');
   });
 
   it('passes HTML-ish values through as plain text (sent without parse_mode)', () => {

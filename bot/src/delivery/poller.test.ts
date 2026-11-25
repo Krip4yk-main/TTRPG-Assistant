@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GrammyError, HttpError } from 'grammy';
 import type { TelegramOutboxItem } from '@nri/shared';
-import { classifySendError, deliverOnce, startPoller, type PollerDeps } from './poller.js';
+import {
+  classifySendError,
+  deliverOnce,
+  newDeliveryState,
+  startPoller,
+  type PollerDeps,
+} from './poller.js';
 import { renderNotification } from './render.js';
 
 const tgError = (code: number, description: string, parameters = {}) =>
@@ -22,6 +28,7 @@ const item = (id: number, extra: Partial<TelegramOutboxItem> = {}): TelegramOutb
     { action: 'reject', applicationId: 9 },
   ],
   attempts: 0,
+  timeZone: null,
   ...extra,
 });
 
@@ -85,29 +92,104 @@ describe('deliverOnce', () => {
     });
   });
 
-  it('429 → retryable with retry_after; network → retryable; one failure does not stop the batch', async () => {
-    const { client, deps } = setup([item(1), item(2), item(3)], async (chatId) => {
-      if (chatId === '1001') throw tgError(429, 'Too Many Requests', { retry_after: 7 });
-      if (chatId === '1002') throw new HttpError('Network request failed', new Error('ECONNRESET'));
+  it('network → retryable; one failure does not stop the batch', async () => {
+    const { client, deps } = setup([item(1), item(2)], async (chatId) => {
+      if (chatId === '1001') throw new HttpError('Network request failed', new Error('ECONNRESET'));
       return {};
     });
     await deliverOnce(deps);
-    expect(client.markFailed).toHaveBeenCalledWith(1, {
+    expect(client.markFailed).toHaveBeenCalledWith(1, { retryable: true, error: 'network error' });
+    expect(client.markSent).toHaveBeenCalledWith(2);
+  });
+
+  it('429 stops the batch: the rest is reported rateLimited with the same retry_after', async () => {
+    const { client, sendMessage, deps } = setup([item(1), item(2), item(3), item(4)], async (c) => {
+      if (c === '1002') throw tgError(429, 'Too Many Requests', { retry_after: 7 });
+      return {};
+    });
+    await deliverOnce(deps);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(client.markSent.mock.calls).toEqual([[1]]);
+    expect(client.markFailed).toHaveBeenCalledWith(2, {
       retryable: true,
+      rateLimited: true,
       retryAfterSec: 7,
       error: '429: Too Many Requests',
     });
-    expect(client.markFailed).toHaveBeenCalledWith(2, { retryable: true, error: 'network error' });
-    expect(client.markSent).toHaveBeenCalledWith(3);
+    for (const id of [3, 4]) {
+      expect(client.markFailed).toHaveBeenCalledWith(id, {
+        retryable: true,
+        rateLimited: true,
+        retryAfterSec: 7,
+        error: 'rate limited',
+      });
+    }
   });
 
-  it('a failing report is logged and the batch continues', async () => {
-    const { client, deps } = setup([item(1), item(2)], async () => ({}));
+  it('a failing sent report is logged, remembered and retried first; no second send', async () => {
+    const { client, sendMessage, deps } = setup([item(1), item(2)], async () => ({}));
     client.markSent.mockRejectedValueOnce(new Error('backend down'));
     const log = vi.fn();
-    await deliverOnce({ ...deps, log });
+    const state = newDeliveryState();
+    await deliverOnce({ ...deps, log }, 20, state);
     expect(client.markSent).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledOnce();
+    expect([...state.unreportedSent]).toEqual([1]);
+    // Наступний цикл: спершу повтор звіту (до видачі), нічого не надсилається вдруге.
+    client.markSent.mockClear();
+    sendMessage.mockClear();
+    client.claimOutbox.mockResolvedValueOnce([]);
+    await deliverOnce({ ...deps, log }, 20, state);
+    expect(client.markSent.mock.calls).toEqual([[1]]);
+    expect(client.markSent.mock.invocationCallOrder[0]!).toBeLessThan(
+      client.claimOutbox.mock.invocationCallOrder.at(-1)!,
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(state.unreportedSent.size).toBe(0);
+  });
+
+  it('a re-claimed id that is still unreported is only reported, not re-sent', async () => {
+    const { client, sendMessage, deps } = setup([item(5)], async () => ({}));
+    const state = newDeliveryState();
+    state.unreportedSent.add(5);
+    client.markSent.mockRejectedValueOnce(new Error('still down'));
+    await deliverOnce(deps, 20, state);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(client.markSent.mock.calls).toEqual([[5], [5]]);
+    expect(state.unreportedSent.size).toBe(0);
+  });
+
+  it('render error → non-retryable failure, nothing sent', async () => {
+    const { client, sendMessage, deps } = setup([item(1), item(2)], async () => ({}));
+    const render = vi.fn((i: TelegramOutboxItem) => {
+      if (i.id === 1) throw new TypeError('boom');
+      return deps.render(i);
+    });
+    await deliverOnce({ ...deps, render });
+    expect(client.markFailed).toHaveBeenCalledWith(1, {
+      retryable: false,
+      error: 'render error: TypeError',
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(client.markSent).toHaveBeenCalledWith(2);
+  });
+
+  it('a reminder for a session that already started → failed stale, not sent', async () => {
+    const now = new Date('2026-11-25T10:00:00Z');
+    const reminder = (id: number, startsAt: string) =>
+      item(id, {
+        kind: 'session.reminder',
+        params: { gameId: 1, gameTitle: 'Гра', sessionId: 3, startsAt, offsetMin: 60 },
+        buttons: null,
+      });
+    const { client, sendMessage, deps } = setup(
+      [reminder(1, '2026-11-25T09:59:00Z'), reminder(2, '2026-11-25T11:00:00Z')],
+      async () => ({}),
+    );
+    await deliverOnce({ ...deps, now: () => now });
+    expect(client.markFailed).toHaveBeenCalledWith(1, { retryable: false, error: 'stale' });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(client.markSent).toHaveBeenCalledWith(2);
   });
 });
 
@@ -116,7 +198,7 @@ describe('classifySendError', () => {
     [tgError(403, 'Forbidden: user is deactivated'), { retryable: false, chatUnreachable: true }],
     [tgError(400, 'Bad Request: chat not found'), { retryable: false, chatUnreachable: true }],
     [tgError(400, 'Bad Request: message is too long'), { retryable: false }],
-    [tgError(429, 'Too Many Requests'), { retryable: true }],
+    [tgError(429, 'Too Many Requests'), { retryable: true, rateLimited: true }],
     [tgError(502, 'Bad Gateway'), { retryable: true }],
     [new Error('boom'), { retryable: true, error: 'Error' }],
     ['weird', { retryable: true, error: 'unknown error' }],

@@ -118,7 +118,15 @@ describe('createBackendClient outbox', () => {
 
   it('claim POSTs the limit with the key and returns items', async () => {
     const items = [
-      { id: 1, chatId: '5', kind: 'game.started', params: {}, buttons: null, attempts: 0 },
+      {
+        id: 1,
+        chatId: '5',
+        kind: 'game.started',
+        params: {},
+        buttons: null,
+        attempts: 0,
+        timeZone: null,
+      },
     ];
     const { f, client } = make(new Response(JSON.stringify({ items }), { status: 200 }));
     expect(await client.claimOutbox(20)).toEqual(items);
@@ -143,5 +151,45 @@ describe('createBackendClient outbox', () => {
     });
     const bad = make(new Response('{}', { status: 401 }));
     await expect(bad.client.claimOutbox(1)).rejects.toThrow('backend responded 401');
+  });
+});
+
+describe('createBackendClient telegramAction', () => {
+  const make = (res: Response | Error) => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => {
+      if (res instanceof Error) throw res;
+      return res;
+    });
+    return {
+      f,
+      client: createBackendClient('http://x/api/internal', 'k', f as unknown as typeof fetch),
+    };
+  };
+  const body = { telegramId: 42, action: 'approve', id: 9 } as const;
+
+  it('POSTs the action with the key and returns the result', async () => {
+    const { f, client } = make(
+      new Response(JSON.stringify({ ok: true, result: 'approved' }), { status: 200 }),
+    );
+    expect(await client.telegramAction(body)).toEqual({ ok: true, result: 'approved' });
+    const [url, init] = f.mock.calls[0]!;
+    expect(url).toBe('http://x/api/internal/telegram/action');
+    expect((init.headers as Record<string, string>)['x-internal-key']).toBe('k');
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  it('maps error codes; NOT_LINKED from details; network → ERROR', async () => {
+    const err = (status: number, error: unknown) =>
+      make(new Response(JSON.stringify({ error }), { status })).client.telegramAction(body);
+    expect(await err(403, { code: 'FORBIDDEN' })).toEqual({ ok: false, code: 'FORBIDDEN' });
+    expect(await err(404, { code: 'NOT_FOUND', details: { reason: 'NOT_LINKED' } })).toEqual({
+      ok: false,
+      code: 'NOT_LINKED',
+    });
+    expect(await err(500, null)).toEqual({ ok: false, code: 'ERROR' });
+    expect(await make(new Error('down')).client.telegramAction(body)).toEqual({
+      ok: false,
+      code: 'ERROR',
+    });
   });
 });

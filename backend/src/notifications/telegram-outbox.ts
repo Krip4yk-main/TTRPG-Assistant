@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import {
   defaultNotificationPrefs,
   telegramOutboxClaimSchema,
@@ -9,7 +9,7 @@ import {
 } from '@nri/shared';
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
-import { authIdentities, notificationPrefs, telegramOutbox } from '../db/schema/index.js';
+import { authIdentities, notificationPrefs, telegramOutbox, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 
 type DbLike = Db | Tx;
@@ -29,6 +29,8 @@ const OUTBOX_BACKOFF_BASE_MS = 30_000;
 const LAST_ERROR_MAX = 255;
 const DAY_MS = 86_400_000;
 export const OUTBOX_TTL_DAYS = 30;
+/** Не надіслане за добу вже неактуальне (нагадування, кнопки заявки) → `failed 'stale'`. */
+export const OUTBOX_STALE_MS = DAY_MS;
 const PURGE_BATCH = 1000;
 
 /** Затримка після невдалої спроби №`attempts` (з 1): 30 с · 2^(attempts-1). */
@@ -55,19 +57,25 @@ export function buttonsFor(n: Pick<OutboxSource, 'type' | 'payload'>): TelegramB
 
 /**
  * Ставить Telegram-повідомлення для нових сповіщень: лише користувачам із Telegram-ідентичністю
- * та ввімкненою категорією (`prefs.telegram[category] !== false`). Два пакетні запити (ідентичності,
- * налаштування), одна вставка; повтор того самого сповіщення — no-op (UNIQUE notification_id).
- * Лише записи через `tx`, без мережі.
+ * та ввімкненою категорією (`prefs.telegram[category] !== false`). Два пакетні запити (ідентичності
+ * з поясом користувача, налаштування), одна вставка; повтор того самого сповіщення — no-op
+ * (UNIQUE notification_id). Лише записи через `tx`, без мережі.
  */
 export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise<number> {
   if (rows.length === 0) return 0;
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const idents = await tx
-    .select({ userId: authIdentities.userId, subject: authIdentities.subject })
+    .select({
+      userId: authIdentities.userId,
+      subject: authIdentities.subject,
+      timeZone: users.timezone,
+    })
     .from(authIdentities)
+    .innerJoin(users, eq(users.id, authIdentities.userId))
     .where(and(eq(authIdentities.provider, 'telegram'), inArray(authIdentities.userId, userIds)));
   if (idents.length === 0) return 0;
   const chatOf = new Map(idents.map((i) => [i.userId, i.subject]));
+  const zoneOf = new Map(idents.map((i) => [i.userId, i.timeZone]));
   const prefRows = await tx
     .select({ userId: notificationPrefs.userId, telegram: notificationPrefs.telegram })
     .from(notificationPrefs)
@@ -86,6 +94,7 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
         kind: r.type,
         params: r.payload,
         buttons: buttonsFor(r),
+        timeZone: zoneOf.get(r.userId) ?? null,
       },
     ];
   });
@@ -104,13 +113,16 @@ const toItem = (r: typeof telegramOutbox.$inferSelect): TelegramOutboxItem => ({
   params: r.params,
   buttons: r.buttons ?? null,
   attempts: r.attempts,
+  timeZone: r.timeZone ?? null,
 });
 
 /**
  * Видає боту пачку повідомлень, що настали (`pending`, `next_try_at <= now`, без живого локу —
  * зокрема й ті, чий лок прострочено, бо бот «упав»), і ставить `locked_until = now + 2 хв`.
- * Коротка транзакція READ COMMITTED з `FOR UPDATE SKIP LOCKED`: паралельні виклики не
- * отримують той самий рядок.
+ * Видача рахується спробою (`attempts + 1`): рядок, на якому бот щоразу падає без звіту, не
+ * крутиться вічно — після 5 видач він `failed 'lock expired'`. Не надіслане за добу —
+ * `failed 'stale'`. Коротка транзакція READ COMMITTED з `FOR UPDATE SKIP LOCKED`: паралельні
+ * виклики не отримують той самий рядок.
  */
 export async function claimOutbox(
   deps: { db: Db },
@@ -119,8 +131,31 @@ export async function claimOutbox(
 ): Promise<TelegramOutboxItem[]> {
   const { limit } = telegramOutboxClaimSchema.parse(body ?? {});
   const lockedUntil = new Date(now.getTime() + OUTBOX_LOCK_MS);
+  const staleBefore = new Date(now.getTime() - OUTBOX_STALE_MS);
+  const idle = () => or(isNull(telegramOutbox.lockedUntil), lt(telegramOutbox.lockedUntil, now));
   return deps.db.transaction(
     async (tx) => {
+      // Вичерпані видачі з простроченим локом (бот не звітував) і застарілі — остаточно.
+      await tx
+        .update(telegramOutbox)
+        .set({ status: 'failed', lockedUntil: null, lastError: 'lock expired' })
+        .where(
+          and(
+            eq(telegramOutbox.status, 'pending'),
+            gte(telegramOutbox.attempts, OUTBOX_MAX_ATTEMPTS),
+            idle(),
+          ),
+        );
+      await tx
+        .update(telegramOutbox)
+        .set({ status: 'failed', lockedUntil: null, lastError: 'stale' })
+        .where(
+          and(
+            eq(telegramOutbox.status, 'pending'),
+            lt(telegramOutbox.createdAt, staleBefore),
+            idle(),
+          ),
+        );
       const rows = await tx
         .select()
         .from(telegramOutbox)
@@ -128,24 +163,27 @@ export async function claimOutbox(
           and(
             eq(telegramOutbox.status, 'pending'),
             lte(telegramOutbox.nextTryAt, now),
-            or(isNull(telegramOutbox.lockedUntil), lt(telegramOutbox.lockedUntil, now)),
+            idle(),
+            lt(telegramOutbox.attempts, OUTBOX_MAX_ATTEMPTS),
+            gte(telegramOutbox.createdAt, staleBefore),
           ),
         )
-        // FIFO за id: без filesort InnoDB блокує лише видані рядки (LIMIT), а не всі, що настали.
+        // FIFO за id (індекс (status, id)): без filesort InnoDB блокує лише видані рядки
+        // (LIMIT), а не всі, що настали.
         .orderBy(asc(telegramOutbox.id))
         .limit(limit)
         .for('update', { skipLocked: true });
       if (rows.length === 0) return [];
       await tx
         .update(telegramOutbox)
-        .set({ lockedUntil })
+        .set({ lockedUntil, attempts: sql`${telegramOutbox.attempts} + 1` })
         .where(
           inArray(
             telegramOutbox.id,
             rows.map((r) => r.id),
           ),
         );
-      return rows.map(toItem);
+      return rows.map((r) => toItem({ ...r, attempts: r.attempts + 1 }));
     },
     { isolationLevel: 'read committed' },
   );
@@ -169,11 +207,13 @@ export async function markOutboxSent(deps: { db: Db }, id: number): Promise<void
 }
 
 /**
- * Невдала спроба. `retryable` — `attempts + 1` і повтор через 30 с · 2^(n-1) (не раніше за
- * `retryAfterSec`); на 5-й невдачі — `failed`. Не `retryable` — одразу `failed`. Змінює лише
- * `pending`-рядок (уже надісланий не «псується»). `chatUnreachable` — бот заблоковано / чат
- * не знайдено: інші очікувані й не видані зараз повідомлення цього чату теж `failed` (нові,
- * поставлені пізніше, знову спробуються — користувач міг розблокувати бота).
+ * Невдала спроба (саму спробу вже зараховано при видачі). `retryable` — повтор через
+ * 30 с · 2^(n-1) (не раніше за `retryAfterSec`); якщо видач уже 5 — `failed`. `rateLimited`
+ * (Telegram 429) — спроба не рахується (`attempts - 1`), повтор не раніше `retryAfterSec`.
+ * Не `retryable` — одразу `failed`. Змінює лише `pending`-рядок (уже надісланий не
+ * «псується»). `chatUnreachable` — бот заблоковано / чат не знайдено: інші очікувані й не
+ * видані зараз повідомлення цього чату теж `failed` (нові, поставлені пізніше, знову
+ * спробуються — користувач міг розблокувати бота).
  */
 export async function markOutboxFailed(
   deps: { db: Db },
@@ -194,18 +234,31 @@ export async function markOutboxFailed(
       .for('update');
     if (!row) throw new AppError(404, 'NOT_FOUND');
     if (row.status !== 'pending') return;
-    const attempts = row.attempts + 1;
+    if (input.retryable && input.rateLimited) {
+      const delay = Math.max(1000, (input.retryAfterSec ?? 0) * 1000);
+      await tx
+        .update(telegramOutbox)
+        .set({
+          attempts: Math.max(0, row.attempts - 1),
+          nextTryAt: new Date(now.getTime() + delay),
+          lockedUntil: null,
+          lastError,
+        })
+        .where(eq(telegramOutbox.id, id));
+      return;
+    }
+    const attempts = Math.max(1, row.attempts);
     if (input.retryable && attempts < OUTBOX_MAX_ATTEMPTS) {
       const delay = Math.max(outboxBackoffMs(attempts), (input.retryAfterSec ?? 0) * 1000);
       await tx
         .update(telegramOutbox)
-        .set({ attempts, nextTryAt: new Date(now.getTime() + delay), lockedUntil: null, lastError })
+        .set({ nextTryAt: new Date(now.getTime() + delay), lockedUntil: null, lastError })
         .where(eq(telegramOutbox.id, id));
       return;
     }
     await tx
       .update(telegramOutbox)
-      .set({ status: 'failed', attempts, lockedUntil: null, lastError })
+      .set({ status: 'failed', lockedUntil: null, lastError })
       .where(eq(telegramOutbox.id, id));
     if (!input.retryable && input.chatUnreachable) {
       await tx
@@ -221,6 +274,22 @@ export async function markOutboxFailed(
         );
     }
   });
+}
+
+/**
+ * Скасовує ще не надіслані Telegram-повідомлення користувача (`failed`, `last_error = reason`)
+ * — при відв'язуванні Telegram чи видаленні акаунта, у транзакції виклику. Уже видані боту
+ * рядки теж: пізній звіт `sent` лише зафіксує факт, `failed` нічого не змінить.
+ */
+export async function cancelPendingOutbox(
+  tx: DbLike,
+  userId: number,
+  reason: string,
+): Promise<void> {
+  await tx
+    .update(telegramOutbox)
+    .set({ status: 'failed', lockedUntil: null, lastError: reason })
+    .where(and(eq(telegramOutbox.userId, userId), eq(telegramOutbox.status, 'pending')));
 }
 
 /** Надіслані й невдалі повідомлення, старші 30 днів (за `updated_at`), пачками по 1000. */

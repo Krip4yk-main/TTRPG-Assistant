@@ -1,10 +1,24 @@
-import type { TelegramOutboxFailedInput, TelegramOutboxItem } from '@nri/shared';
+import type {
+  TelegramActionInput,
+  TelegramActionResult,
+  TelegramOutboxFailedInput,
+  TelegramOutboxItem,
+} from '@nri/shared';
 
 export type LinkResult =
   | { ok: true; nickname: string }
   | { ok: false; reason: 'taken' | 'expired' | 'banned' | 'already' | 'error' };
 
+/**
+ * Результат дії з кнопки: успіх або код помилки бекенда (`NOT_LINKED` — Telegram не
+ * прив'язано; `ERROR` — мережа/невідома відповідь).
+ */
+export type ActionOutcome =
+  { ok: true; result: TelegramActionResult['result'] } | { ok: false; code: string };
+
 export type BackendClient = {
+  /** Дія з кнопки сповіщення від імені власника Telegram-акаунта. Не кидає. */
+  telegramAction(input: TelegramActionInput): Promise<ActionOutcome>;
   linkTelegram(
     token: string,
     telegramId: number | string,
@@ -51,6 +65,28 @@ export function createBackendClient(
     return res;
   };
   return {
+    async telegramAction(input) {
+      try {
+        const res = await fetchImpl(`${base}/telegram/action`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-internal-key': apiKey },
+          body: JSON.stringify(input),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          result?: unknown;
+          error?: { code?: unknown; details?: { reason?: unknown } };
+        } | null;
+        if (res.ok && typeof data?.result === 'string') {
+          return { ok: true, result: data.result as TelegramActionResult['result'] };
+        }
+        if (data?.error?.details?.reason === 'NOT_LINKED') return { ok: false, code: 'NOT_LINKED' };
+        const code = data?.error?.code;
+        return { ok: false, code: typeof code === 'string' ? code : 'ERROR' };
+      } catch {
+        return { ok: false, code: 'ERROR' };
+      }
+    },
     async claimOutbox(limit) {
       const res = await post('/telegram/outbox/claim', { limit });
       const data = (await res.json()) as { items?: TelegramOutboxItem[] };

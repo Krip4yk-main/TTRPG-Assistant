@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
   authIdentities,
@@ -18,6 +18,7 @@ import {
   markOutboxSent,
   purgeTelegramOutbox,
 } from '../../src/notifications/telegram-outbox.js';
+import { deleteAccount, unlinkIdentity } from '../../src/users/users.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
 
@@ -238,9 +239,11 @@ describe('claim', () => {
       kind: 'game.started',
       params: { gameId: 1, gameTitle: 'Гра' },
       buttons: null,
-      attempts: 0,
+      attempts: 1,
+      timeZone: null,
     });
     expect((await row(id!)).lockedUntil!.getTime()).toBe(now.getTime() + 120 * SEC);
+    expect((await row(id!)).attempts).toBe(1);
     expect(await claimOutbox(deps, {}, new Date(now.getTime() + 119 * SEC))).toEqual([]);
     const again = await claimOutbox(deps, {}, new Date(now.getTime() + 121 * SEC));
     expect(again.map((i) => i.id)).toEqual([id]);
@@ -258,10 +261,11 @@ describe('claim', () => {
 });
 
 describe('failed', () => {
-  it('retryable: exponential backoff, then failed after 5 attempts', async () => {
+  it('retryable: claims count as attempts; exponential backoff, then failed on the 5th', async () => {
     const [id] = await seed(1);
     let now = new Date();
     for (let n = 1; n <= 4; n++) {
+      expect((await claimOutbox(deps, {}, now)).map((i) => i.attempts)).toEqual([n]);
       await markOutboxFailed(deps, id!, { retryable: true, error: `e${n}` }, now);
       const r = await row(id!);
       expect(r.status).toBe('pending');
@@ -271,12 +275,68 @@ describe('failed', () => {
       expect(r.nextTryAt.getTime()).toBe(now.getTime() + 30 * SEC * 2 ** (n - 1));
       expect(await claimOutbox(deps, {}, new Date(r.nextTryAt.getTime() - 1))).toEqual([]);
       now = new Date(r.nextTryAt.getTime());
-      expect((await claimOutbox(deps, {}, now)).map((i) => i.attempts)).toEqual([n]);
     }
+    expect((await claimOutbox(deps, {}, now)).map((i) => i.attempts)).toEqual([5]);
     await markOutboxFailed(deps, id!, { retryable: true }, now);
     const r = await row(id!);
     expect(r.status).toBe('failed');
     expect(r.attempts).toBe(5);
+  });
+
+  it('a row claimed 5 times without any report → failed "lock expired"', async () => {
+    const [id] = await seed(1);
+    let now = new Date();
+    for (let n = 1; n <= 5; n++) {
+      expect((await claimOutbox(deps, {}, now)).map((i) => i.id)).toEqual([id]);
+      now = new Date(now.getTime() + 121 * SEC); // лок сплив — бот «упав»
+    }
+    expect(await claimOutbox(deps, {}, now)).toEqual([]);
+    expect(await row(id!)).toMatchObject({
+      status: 'failed',
+      attempts: 5,
+      lastError: 'lock expired',
+      lockedUntil: null,
+    });
+  });
+
+  it('pending rows older than 24h are failed "stale" and not sent', async () => {
+    const [old, fresh] = await seed(2);
+    await db
+      .update(telegramOutbox)
+      .set({ createdAt: new Date(Date.now() - 25 * 3600 * SEC) })
+      .where(eq(telegramOutbox.id, old!));
+    const items = await claimOutbox(deps, {});
+    expect(items.map((i) => i.id)).toEqual([fresh]);
+    expect(await row(old!)).toMatchObject({ status: 'failed', lastError: 'stale' });
+  });
+
+  it('rateLimited: the attempt is not counted, retry not before retryAfterSec', async () => {
+    const [id] = await seed(1);
+    const now = new Date();
+    await claimOutbox(deps, {}, now);
+    expect((await row(id!)).attempts).toBe(1);
+    await markOutboxFailed(
+      deps,
+      id!,
+      { retryable: true, rateLimited: true, retryAfterSec: 7, error: '429' },
+      now,
+    );
+    const r = await row(id!);
+    expect(r).toMatchObject({ status: 'pending', attempts: 0, lockedUntil: null });
+    expect(r.nextTryAt.getTime()).toBe(now.getTime() + 7 * SEC);
+    // Багато 429 поспіль не вичерпують спроби.
+    let t = r.nextTryAt;
+    for (let n = 0; n < 6; n++) {
+      expect(await claimOutbox(deps, {}, t)).toHaveLength(1);
+      await markOutboxFailed(
+        deps,
+        id!,
+        { retryable: true, rateLimited: true, retryAfterSec: 1 },
+        t,
+      );
+      t = (await row(id!)).nextTryAt;
+    }
+    expect(await row(id!)).toMatchObject({ status: 'pending', attempts: 0 });
   });
 
   it('respects retryAfterSec when longer than the backoff', async () => {
@@ -288,6 +348,7 @@ describe('failed', () => {
 
   it('non-retryable → failed at once; a late sent/failed does not resurrect it', async () => {
     const [id] = await seed(1);
+    await claimOutbox(deps, {});
     await markOutboxFailed(deps, id!, { retryable: false, error: '400: bad' });
     expect(await row(id!)).toMatchObject({ status: 'failed', attempts: 1, lastError: '400: bad' });
     await markOutboxFailed(deps, id!, { retryable: true });
@@ -357,6 +418,76 @@ describe('internal API', () => {
     expect((await post('/abc/sent')).status).toBe(400);
     expect((await post('/999999/sent')).status).toBe(404);
     expect((await post('/999999/failed', { retryable: false })).status).toBe(404);
+  });
+});
+
+describe('recipient time zone', () => {
+  it('is copied from users.timezone and handed to the bot', async () => {
+    const u = await createUser(db, { timezone: 'America/New_York' });
+    await linkTelegram(u.id, '7101');
+    await reminder(u.id);
+    const [r] = await outbox();
+    expect(r!.timeZone).toBe('America/New_York');
+    const [item] = await claimOutbox(deps, {});
+    expect(item!.timeZone).toBe('America/New_York');
+  });
+});
+
+describe('cancel pending rows on unlink / account deletion', () => {
+  it('unlinking Telegram fails that user pending rows ("unlinked"), not others', async () => {
+    const u = await createUser(db);
+    await linkTelegram(u.id, '7201');
+    await db.insert(authIdentities).values({ userId: u.id, provider: 'google', subject: 'g-1' });
+    const other = await createUser(db);
+    await linkTelegram(other.id, '7202');
+    await reminder(u.id);
+    await reminder(other.id);
+    await unlinkIdentity(deps, u.id, 'telegram');
+    const rows = await outbox();
+    expect(rows.find((r) => r.userId === u.id)).toMatchObject({
+      status: 'failed',
+      lastError: 'unlinked',
+    });
+    expect(rows.find((r) => r.userId === other.id)!.status).toBe('pending');
+    expect((await claimOutbox(deps, {})).map((i) => i.chatId)).toEqual(['7202']);
+  });
+
+  it('unlinking another provider keeps Telegram rows', async () => {
+    const u = await createUser(db);
+    await linkTelegram(u.id, '7301');
+    await db.insert(authIdentities).values({ userId: u.id, provider: 'google', subject: 'g-2' });
+    await reminder(u.id);
+    await unlinkIdentity(deps, u.id, 'google');
+    expect((await outbox())[0]!.status).toBe('pending');
+  });
+
+  it('deleting the account fails its pending rows; sent rows stay sent', async () => {
+    const u = await createUser(db);
+    await linkTelegram(u.id, '7401');
+    await reminder(u.id, 5);
+    await reminder(u.id, 6);
+    const [first] = await outbox();
+    await markOutboxSent(deps, first!.id);
+    await deleteAccount(deps, u.id);
+    const rows = await outbox();
+    expect(rows.map((r) => [r.status, r.lastError])).toEqual([
+      ['sent', null],
+      ['failed', 'unlinked'],
+    ]);
+  });
+});
+
+describe('claim query plan', () => {
+  it('uses an index on status (no full scan); ordered by id without filesort', async () => {
+    await seed(3);
+    const now = new Date();
+    const [rows] = (await db.execute(
+      sql`EXPLAIN SELECT * FROM telegram_outbox WHERE status = 'pending' AND next_try_at <= ${now}
+        AND (locked_until IS NULL OR locked_until < ${now}) AND attempts < 5
+        AND created_at >= ${now} ORDER BY id LIMIT 20 FOR UPDATE SKIP LOCKED`,
+    )) as unknown as [{ key: string | null; Extra: string | null }[]];
+    expect(rows[0]!.key).not.toBeNull();
+    expect(rows[0]!.Extra ?? '').not.toContain('filesort');
   });
 });
 

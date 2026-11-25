@@ -8,6 +8,7 @@ import { users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { hasValidInternalKey } from '../http/security.js';
 import { getMe } from '../users/users.service.js';
+import { telegramActionsRouter } from './telegram-actions.routes.js';
 import { telegramOutboxRouter } from './telegram-outbox.routes.js';
 
 export const TG_LINK_PREFIX = 'tglink:';
@@ -59,6 +60,7 @@ export function internalRouter(deps: AppDeps): Router {
   });
 
   router.use('/telegram/outbox', telegramOutboxRouter(deps));
+  router.use('/telegram/action', telegramActionsRouter(deps));
 
   return router;
 }

@@ -44,6 +44,7 @@ const TABLES = [
   'calendar_pinned_games',
   'user_settings',
   'notes',
+  'session_rsvp',
   'session_attendance',
   'game_sessions',
   'application_constraint_responses',

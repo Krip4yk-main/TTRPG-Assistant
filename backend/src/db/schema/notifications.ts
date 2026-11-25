@@ -136,6 +136,8 @@ export const telegramOutbox = mysqlTable(
       .default(sql`CURRENT_TIMESTAMP(3)`),
     lockedUntil: datetime('locked_until', { fsp: 3 }),
     lastError: varchar('last_error', { length: 255 }),
+    /** IANA-пояс одержувача на момент постановки (`users.timezone`) — для дат у тексті. */
+    timeZone: varchar('time_zone', { length: 64 }),
     createdAt: datetime('created_at', { fsp: 3 })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP(3)`),
@@ -147,6 +149,8 @@ export const telegramOutbox = mysqlTable(
   (t) => [
     uniqueIndex('telegram_outbox_notification_id_uq').on(t.notificationId),
     index('telegram_outbox_status_next_try_at_idx').on(t.status, t.nextTryAt),
+    // Видача FIFO: `WHERE status='pending' … ORDER BY id LIMIT n` без filesort.
+    index('telegram_outbox_status_id_idx').on(t.status, t.id),
     index('telegram_outbox_chat_id_status_idx').on(t.chatId, t.status),
     index('telegram_outbox_updated_at_idx').on(t.updatedAt),
   ],

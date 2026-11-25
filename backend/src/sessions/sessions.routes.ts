@@ -6,8 +6,10 @@ import {
   cancelSession,
   finishSession,
   listGameSessions,
+  reload,
   rescheduleSession,
 } from './sessions.service.js';
+import { setRsvp } from './rsvp.js';
 
 /** Монтується на `/api/games/:id`: список сесій гри. */
 export function gameSessionsRouter(deps: AppDeps): Router {
@@ -20,7 +22,7 @@ export function gameSessionsRouter(deps: AppDeps): Router {
   return router;
 }
 
-/** Монтується на `/api/sessions`: дії майстра над окремою сесією. */
+/** Монтується на `/api/sessions`: дії майстра над окремою сесією та RSVP учасника. */
 export function sessionsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAuth(deps);
@@ -34,5 +36,10 @@ export function sessionsRouter(deps: AppDeps): Router {
       res.json(await run(deps, req.user!.userId, numericId(req.params.id), req.body));
     });
   }
+  router.put('/:id/rsvp', auth, requireActive, async (req, res) => {
+    const id = numericId(req.params.id);
+    await setRsvp(deps, req.user!.userId, id, req.body);
+    res.json(await reload(deps, req.user!.userId, id));
+  });
   return router;
 }

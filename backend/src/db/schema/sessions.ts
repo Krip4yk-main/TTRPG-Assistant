@@ -12,12 +12,13 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
-import type { SessionOrigin, SessionStatus } from '@nri/shared';
+import type { RsvpStatus, SessionOrigin, SessionStatus } from '@nri/shared';
 import { games } from './games.js';
 import { users } from './users.js';
 
 const SESSION_STATUSES = ['scheduled', 'done', 'cancelled'] as const satisfies SessionStatus[];
 const SESSION_ORIGINS = ['rule', 'manual'] as const satisfies SessionOrigin[];
+const RSVP_STATUSES = ['going', 'not_going'] as const satisfies RsvpStatus[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
 
@@ -66,5 +67,27 @@ export const sessionAttendance = mysqlTable(
   (t) => [
     primaryKey({ columns: [t.sessionId, t.userId] }),
     index('session_attendance_user_id_idx').on(t.userId),
+  ],
+);
+
+/** RSVP учасника на майбутню сесію («буду / не зможу»); один рядок на (сесія, користувач). */
+export const sessionRsvp = mysqlTable(
+  'session_rsvp',
+  {
+    sessionId: id('session_id')
+      .notNull()
+      .references(() => gameSessions.id, { onDelete: 'cascade' }),
+    userId: id('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: mysqlEnum('status', RSVP_STATUSES).notNull(),
+    updatedAt: datetime('updated_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`)
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.userId] }),
+    index('session_rsvp_user_id_idx').on(t.userId),
   ],
 );

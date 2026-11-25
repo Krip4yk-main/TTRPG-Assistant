@@ -1,6 +1,6 @@
 import { GrammyError, HttpError } from 'grammy';
 import type { TelegramOutboxFailedInput, TelegramOutboxItem } from '@nri/shared';
-import type { BackendClient } from '../api/backend-client.js';
+import { BackendError, type BackendClient } from '../api/backend-client.js';
 import type { Rendered } from './render.js';
 
 export const POLL_EVERY_MS = 3000;
@@ -23,7 +23,21 @@ export type PollerDeps = {
   api: SendApi;
   render: (item: TelegramOutboxItem) => Rendered;
   log?: (msg: string) => void;
+  /** Годинник (для тестів). */
+  now?: () => Date;
 };
+
+/**
+ * Стан між циклами: id, які вже надіслано в Telegram, але звіт `sent` не дійшов до бекенда.
+ * Кожен цикл спершу повторює ці звіти; якщо такий рядок видано знову (лок сплив) — не
+ * надсилаємо вдруге, лише звітуємо.
+ */
+export type DeliveryState = { unreportedSent: Set<number> };
+
+export const newDeliveryState = (): DeliveryState => ({ unreportedSent: new Set() });
+
+/** Межа пам'яті для незвітованих id (бекенд недоступний довго — далі можливий дубль). */
+const UNREPORTED_MAX = 10_000;
 
 export type PollerOptions = { intervalMs?: number; batch?: number };
 
@@ -45,8 +59,8 @@ export function classifySendError(err: unknown): TelegramOutboxFailedInput {
     if (err.error_code === 429) {
       const after = err.parameters?.retry_after;
       return typeof after === 'number'
-        ? { retryable: true, retryAfterSec: Math.ceil(after), error }
-        : { retryable: true, error };
+        ? { retryable: true, rateLimited: true, retryAfterSec: Math.ceil(after), error }
+        : { retryable: true, rateLimited: true, error };
     }
     return { retryable: true, error };
   }
@@ -55,32 +69,101 @@ export function classifySendError(err: unknown): TelegramOutboxFailedInput {
   return { retryable: true, error: err instanceof Error ? err.name : 'unknown error' };
 }
 
+const errName = (err: unknown): string => (err instanceof Error ? err.message : 'unknown');
+
+/** Нагадування про сесію, що вже почалась, — неактуальне. */
+function isStale(item: TelegramOutboxItem, now: Date): boolean {
+  if (item.kind !== 'session.reminder' || !item.params.startsAt) return false;
+  const t = Date.parse(item.params.startsAt);
+  return Number.isFinite(t) && t < now.getTime();
+}
+
 /**
- * Один цикл: забрати пачку, надіслати кожне повідомлення простим текстом (без `parse_mode`),
- * звітувати `sent` / `failed`. Збій звіту лише логується — лок спливе, і повідомлення
- * повториться (можливий рідкісний дубль, але не втрата).
+ * Один цикл: спершу повторити незвітовані `sent`, потім забрати пачку й надіслати кожне
+ * повідомлення простим текстом (без `parse_mode`), звітуючи `sent` / `failed`.
+ * - Помилка рендеру — остаточна (`retryable: false`), без спроби надіслати.
+ * - Нагадування про сесію, що вже почалась, — `failed 'stale'` без надсилання.
+ * - Telegram 429 — пачка зупиняється: це й решта повідомлень звітуються як `rateLimited`
+ *   (спроба не рахується) з тим самим `retryAfterSec`.
+ * - Збій звіту `sent` — id запам'ятовується (`state.unreportedSent`), щоб не надіслати
+ *   вдруге; збій звіту `failed` лише логується (лок спливе — повтор).
  */
-export async function deliverOnce(deps: PollerDeps, batch = CLAIM_BATCH): Promise<number> {
+export async function deliverOnce(
+  deps: PollerDeps,
+  batch = CLAIM_BATCH,
+  state: DeliveryState = newDeliveryState(),
+): Promise<number> {
   const log = deps.log ?? ((m: string) => console.error(m));
-  const items = await deps.client.claimOutbox(batch);
-  for (const item of items) {
-    let outcome: { sent: true } | { sent: false; failure: TelegramOutboxFailedInput };
+  const now = (deps.now ?? (() => new Date()))();
+
+  const reportSent = async (id: number): Promise<void> => {
     try {
-      const r = deps.render(item);
+      await deps.client.markSent(id);
+      state.unreportedSent.delete(id);
+    } catch (err) {
+      // Рядка вже немає (очищено) — звітувати нікуди.
+      if (err instanceof BackendError && err.status === 404) {
+        state.unreportedSent.delete(id);
+        return;
+      }
+      if (state.unreportedSent.size < UNREPORTED_MAX) state.unreportedSent.add(id);
+      log(`outbox ${id}: report failed (${errName(err)})`);
+    }
+  };
+  const reportFailed = async (id: number, failure: TelegramOutboxFailedInput): Promise<void> => {
+    try {
+      await deps.client.markFailed(id, failure);
+    } catch (err) {
+      log(`outbox ${id}: report failed (${errName(err)})`);
+    }
+  };
+
+  for (const id of [...state.unreportedSent]) await reportSent(id);
+
+  const items = await deps.client.claimOutbox(batch);
+  let rateLimit: TelegramOutboxFailedInput | null = null;
+  for (const item of items) {
+    if (rateLimit) {
+      await reportFailed(item.id, rateLimit);
+      continue;
+    }
+    if (state.unreportedSent.has(item.id)) {
+      await reportSent(item.id);
+      continue;
+    }
+    if (isStale(item, now)) {
+      await reportFailed(item.id, { retryable: false, error: 'stale' });
+      continue;
+    }
+    let r: Rendered;
+    try {
+      r = deps.render(item);
+    } catch (err) {
+      await reportFailed(item.id, {
+        retryable: false,
+        error: `render error: ${err instanceof Error ? err.name : 'unknown'}`,
+      });
+      continue;
+    }
+    try {
       await deps.api.sendMessage(item.chatId, r.text, {
         ...(r.keyboard ? { reply_markup: { inline_keyboard: r.keyboard } } : {}),
         link_preview_options: { is_disabled: true },
       });
-      outcome = { sent: true };
     } catch (err) {
-      outcome = { sent: false, failure: classifySendError(err) };
+      const failure = classifySendError(err);
+      if (failure.rateLimited) {
+        rateLimit = {
+          retryable: true,
+          rateLimited: true,
+          error: 'rate limited',
+          ...(failure.retryAfterSec !== undefined ? { retryAfterSec: failure.retryAfterSec } : {}),
+        };
+      }
+      await reportFailed(item.id, failure);
+      continue;
     }
-    try {
-      if (outcome.sent) await deps.client.markSent(item.id);
-      else await deps.client.markFailed(item.id, outcome.failure);
-    } catch (err) {
-      log(`outbox ${item.id}: report failed (${err instanceof Error ? err.message : 'unknown'})`);
-    }
+    await reportSent(item.id);
   }
   return items.length;
 }
@@ -99,10 +182,11 @@ export function startPoller(deps: PollerDeps, opts: PollerOptions = {}): Poller 
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
   let current: Promise<void> | null = null;
+  const state = newDeliveryState();
 
   const tick = (): Promise<void> => {
     if (current || stopped) return current ?? Promise.resolve();
-    current = deliverOnce(deps, opts.batch)
+    current = deliverOnce(deps, opts.batch, state)
       .then(
         () => undefined,
         (err: unknown) => {

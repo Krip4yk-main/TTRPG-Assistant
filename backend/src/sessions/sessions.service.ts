@@ -12,13 +12,16 @@ import { logEvent } from '../events/events.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { materializeSessions, sessionsWindow } from './materialize.js';
+import { rsvpOf, rsvpViews, type RsvpView } from './rsvp.js';
 
 type GameRow = typeof games.$inferSelect;
 type SessionRow = typeof gameSessions.$inferSelect;
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
-export function toSessionDto(s: SessionRow): SessionDto {
+const NO_RSVP: RsvpView = { myRsvp: null, rsvpSummary: null };
+
+export function toSessionDto(s: SessionRow, rsvp: RsvpView = NO_RSVP): SessionDto {
   return {
     id: s.id,
     gameId: s.gameId,
@@ -30,6 +33,8 @@ export function toSessionDto(s: SessionRow): SessionDto {
     cancelReason: s.cancelReason,
     summary: s.summary,
     doneAt: iso(s.doneAt),
+    myRsvp: rsvp.myRsvp,
+    rsvpSummary: rsvp.rsvpSummary,
   };
 }
 
@@ -72,7 +77,13 @@ export async function listGameSessions(
     .from(gameSessions)
     .where(sessionsWindow(gameId, now))
     .orderBy(asc(gameSessions.startsAt), asc(gameSessions.id));
-  return rows.map(toSessionDto);
+  const views = await rsvpViews(
+    deps,
+    userId,
+    g,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => toSessionDto(r, rsvpOf(views, r.id)));
 }
 
 // ---------- дії майстра над сесією ----------
@@ -114,10 +125,25 @@ async function lockScheduled(
   return { game, session };
 }
 
-async function reload(deps: AppDeps, sessionId: number): Promise<SessionDto> {
-  const [s] = await deps.db.select().from(gameSessions).where(eq(gameSessions.id, sessionId));
-  if (!s) throw new AppError(404, 'NOT_FOUND');
-  return toSessionDto(s);
+/**
+ * Сесія з RSVP-частиною для глядача (`userId`), без перевірки доступу — викликати лише після
+ * неї (дії майстра, RSVP учасника).
+ */
+export async function reload(
+  deps: AppDeps,
+  userId: number,
+  sessionId: number,
+): Promise<SessionDto> {
+  const [r] = await deps.db
+    .select({ s: gameSessions, gmUserId: games.gmUserId })
+    .from(gameSessions)
+    .innerJoin(games, eq(games.id, gameSessions.gameId))
+    .where(eq(gameSessions.id, sessionId));
+  if (!r) throw new AppError(404, 'NOT_FOUND');
+  const views = await rsvpViews(deps, userId, { id: r.s.gameId, gmUserId: r.gmUserId }, [
+    sessionId,
+  ]);
+  return toSessionDto(r.s, rsvpOf(views, sessionId));
 }
 
 /** Перенесення: новий час (ціла хвилина, у майбутньому), за бажанням — тривалість. */
@@ -156,7 +182,7 @@ export async function rescheduleSession(
       durationMinutes: input.durationMinutes ?? from.durationMinutes,
     },
   });
-  return reload(deps, sessionId);
+  return reload(deps, userId, sessionId);
 }
 
 /** Скасування окремої сесії з причиною. */
@@ -182,7 +208,7 @@ export async function cancelSession(
     entityId: sessionId,
     payload: { gameId: g.id, reason: input.reason },
   });
-  return reload(deps, sessionId);
+  return reload(deps, userId, sessionId);
 }
 
 /**
@@ -247,5 +273,5 @@ export async function finishSession(
     },
   });
   await materializeSessions(deps, g.id, now);
-  return reload(deps, sessionId);
+  return reload(deps, userId, sessionId);
 }

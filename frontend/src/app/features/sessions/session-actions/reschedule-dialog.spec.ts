@@ -17,6 +17,8 @@ const session: SessionDto = {
   cancelReason: null,
   summary: null,
   doneAt: null,
+  myRsvp: null,
+  rsvpSummary: null,
 };
 
 describe('RescheduleDialog', () => {
