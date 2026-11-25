@@ -48,6 +48,7 @@ import {
   logSessionsCancelled,
   materializeForRow,
   replaceRuleSessions,
+  RULE_CHANGED_REASON,
 } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
@@ -416,7 +417,7 @@ export async function updateGame(
   await patchHooks.beforeWrite?.(id);
   const gm = await loadGm(deps, userId);
   const now = new Date();
-  const { cancelled, current, next, ruleChanged } = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // Патч зливається зі свіжим рядком під X-блокуванням: паралельний PATCH чи нове правило
     // (`PUT /schedule`) не загубляться. Якщо статус змінився після першого читання
     // (опублікували/скасували) — 409, заблоковані поля не змінюються.
@@ -460,14 +461,17 @@ export async function updateGame(
           .values(next.contentWarningIds.map((warningId) => ({ gameId: id, warningId })));
       }
     }
-    if (ruleChanged) await replaceRuleSessions(tx, { ...row, ...columns(next) }, now);
+    const ruleCancelled = ruleChanged
+      ? await replaceRuleSessions(tx, { ...row, ...columns(next) }, now)
+      : [];
     // Рядок гри заблоковано (X), тож паралельні заявки/затвердження чекають.
     const cancelled =
       row.status !== 'draft' && isRatingRaised(current.ageRating, next.ageRating)
         ? await applyAgeRatingRaise(tx, id, next.ageRating, now)
         : [];
-    return { cancelled, current, next, ruleChanged };
+    return { cancelled, current, next, ruleChanged, ruleCancelled };
   });
+  const { cancelled, current, next, ruleChanged, ruleCancelled } = result;
   await logCancelled(db, cancelled, 'application.cancelled_age');
   await logEvent(db, {
     type: 'game.updated',
@@ -479,6 +483,7 @@ export async function updateGame(
     },
   });
   if (ruleChanged) await logRuleChanged(deps, userId, id, current, next);
+  await logSessionsCancelled(db, userId, ruleCancelled, RULE_CHANGED_REASON);
   return gmView(deps, id);
 }
 
@@ -547,7 +552,7 @@ export async function changeScheduleRule(
   }
   await ruleHooks.beforeWrite?.(id);
   const now = new Date();
-  const { current, next } = await db.transaction(async (tx) => {
+  const { current, next, ruleCancelled } = await db.transaction(async (tx) => {
     // Свіжий рядок під X-блокуванням: паралельний PATCH (тривалість, поля) чи перехід
     // статусу не загубляться й не будуть перезаписані значеннями з першого читання.
     const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
@@ -572,8 +577,8 @@ export async function changeScheduleRule(
     if (new Date(next.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
     const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(next.startsAt) };
     await tx.update(games).set(set).where(eq(games.id, id));
-    await replaceRuleSessions(tx, { ...row, ...set }, now);
-    return { current, next };
+    const ruleCancelled = await replaceRuleSessions(tx, { ...row, ...set }, now);
+    return { current, next, ruleCancelled };
   });
   await logRuleChanged(
     deps,
@@ -583,6 +588,7 @@ export async function changeScheduleRule(
     next,
     mode === 'convert' ? 'game.converted_to_campaign' : 'game.rule_changed',
   );
+  await logSessionsCancelled(db, userId, ruleCancelled, RULE_CHANGED_REASON);
   return gmView(deps, id);
 }
 

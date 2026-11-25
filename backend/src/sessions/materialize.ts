@@ -1,7 +1,7 @@
 import { and, eq, gt, gte, inArray } from 'drizzle-orm';
 import { expandOccurrences, SESSION_WINDOW_DAYS } from '@nri/shared';
 import type { Db } from '../db/client.js';
-import { games, gameSessions } from '../db/schema/index.js';
+import { games, gameSessions, notes } from '../db/schema/index.js';
 import type { Tx } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
@@ -111,16 +111,78 @@ export async function materializeSessions(
   }
 }
 
+/** Причина автоскасування сесії з нотатками, яку замінило нове правило розкладу. */
+export const RULE_CHANGED_REASON = 'rule_changed';
+
+/**
+ * Прибирає сесії, які замінює нове правило. Сесії з нотатками (`notes.session_id` — CASCADE)
+ * не видаляються, а скасовуються (`rule_changed`; уже скасовані зберігають свою причину) і
+ * звільняють слот: `rule_starts_at = NULL` (NULL у UNIQUE не конфліктує), тож нове правило
+ * може згенерувати той самий слот, а повторна матеріалізація їх не «впізнає». Решта —
+ * видаляються. Повертає щойно скасовані (для подій `session.cancelled`).
+ */
+async function dropReplacedSessions(
+  tx: Tx,
+  where: ReturnType<typeof and>,
+): Promise<CancelledSession[]> {
+  const victims = await tx
+    .select({ id: gameSessions.id, gameId: gameSessions.gameId, status: gameSessions.status })
+    .from(gameSessions)
+    .where(where)
+    .for('update');
+  if (victims.length === 0) return [];
+  // Блокуюче читання: бачимо нотатки, закомічені після початку транзакції.
+  const noted = await tx
+    .selectDistinct({ id: notes.sessionId })
+    .from(notes)
+    .where(
+      inArray(
+        notes.sessionId,
+        victims.map((v) => v.id),
+      ),
+    )
+    .for('share');
+  const keep = new Set(noted.map((n) => n.id));
+  const kept = victims.filter((v) => keep.has(v.id));
+  const gone = victims.filter((v) => !keep.has(v.id)).map((v) => v.id);
+  if (gone.length) await tx.delete(gameSessions).where(inArray(gameSessions.id, gone));
+  const toCancel = kept.filter((v) => v.status === 'scheduled');
+  const alreadyCancelled = kept.filter((v) => v.status !== 'scheduled').map((v) => v.id);
+  if (toCancel.length) {
+    await tx
+      .update(gameSessions)
+      .set({ status: 'cancelled', cancelReason: RULE_CHANGED_REASON, ruleStartsAt: null })
+      .where(
+        inArray(
+          gameSessions.id,
+          toCancel.map((v) => v.id),
+        ),
+      );
+  }
+  if (alreadyCancelled.length) {
+    await tx
+      .update(gameSessions)
+      .set({ ruleStartsAt: null })
+      .where(inArray(gameSessions.id, alreadyCancelled));
+  }
+  return toCancel.map((v) => ({ id: v.id, gameId: v.gameId }));
+}
+
 /**
  * Нове правило розкладу (викликати в транзакції, що вже змінила рядок гри, тобто тримає
- * його X-блокування): видаляє майбутні сесії правила, які ще не чіпали (`scheduled`,
+ * його X-блокування): прибирає майбутні сесії правила, які ще не чіпали (`scheduled`,
  * `origin='rule'`, не перенесені), і матеріалізує нові від `now`. Перенесені, скасовані,
- * завершені й ручні сесії лишаються.
+ * завершені й ручні сесії лишаються. Сесії з нотатками не видаляються, а скасовуються
+ * (`rule_changed`) — див. `dropReplacedSessions`.
  *
- * Ваншот має рівно одну сесію: новий час замінює її `scheduled`- чи `cancelled`-сесію
+ * Ваншот має одну дійсну сесію: новий час замінює її `scheduled`- чи `cancelled`-сесію
  * (навіть перенесену чи минулу), а якщо сесію вже завершено — 409 `SESSION_INVALID_STATE`.
  */
-export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Promise<void> {
+export async function replaceRuleSessions(
+  tx: Tx,
+  game: GameRow,
+  now: Date,
+): Promise<CancelledSession[]> {
   if (game.kind === 'oneshot') {
     const [done] = await tx
       .select({ id: gameSessions.id })
@@ -130,29 +192,28 @@ export async function replaceRuleSessions(tx: Tx, game: GameRow, now: Date): Pro
     if (done) throw new AppError(409, 'SESSION_INVALID_STATE');
     // Скасовані теж: інакше скасована сесія зі старим `rule_starts_at` блокувала б (UNIQUE)
     // нову, якщо час повернули рівно на той самий слот, — і гра лишилась би без сесії.
-    await tx
-      .delete(gameSessions)
-      .where(
-        and(
-          eq(gameSessions.gameId, game.id),
-          inArray(gameSessions.status, ['scheduled', 'cancelled']),
-        ),
-      );
-    await materializeForRow(tx, game, now, game.startsAt);
-    return;
-  }
-  await tx
-    .delete(gameSessions)
-    .where(
+    const cancelled = await dropReplacedSessions(
+      tx,
       and(
         eq(gameSessions.gameId, game.id),
-        eq(gameSessions.status, 'scheduled'),
-        eq(gameSessions.origin, 'rule'),
-        eq(gameSessions.rescheduled, false),
-        gt(gameSessions.startsAt, now),
+        inArray(gameSessions.status, ['scheduled', 'cancelled']),
       ),
     );
+    await materializeForRow(tx, game, now, game.startsAt);
+    return cancelled;
+  }
+  const cancelled = await dropReplacedSessions(
+    tx,
+    and(
+      eq(gameSessions.gameId, game.id),
+      eq(gameSessions.status, 'scheduled'),
+      eq(gameSessions.origin, 'rule'),
+      eq(gameSessions.rescheduled, false),
+      gt(gameSessions.startsAt, now),
+    ),
+  );
   await materializeForRow(tx, game, now, now);
+  return cancelled;
 }
 
 /** Скасована сесія — для подій `session.cancelled` після коміту. */
@@ -205,7 +266,7 @@ export async function logSessionsCancelled(
   db: Db,
   userId: number,
   rows: CancelledSession[],
-  reason: 'game_finished' | 'game_cancelled',
+  reason: 'game_finished' | 'game_cancelled' | typeof RULE_CHANGED_REASON,
 ): Promise<void> {
   for (const r of rows) {
     await logEvent(db, {

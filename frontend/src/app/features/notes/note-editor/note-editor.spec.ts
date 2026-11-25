@@ -61,6 +61,10 @@ function conflict(s: Subject<NoteDto>, body: string, version: number) {
   );
 }
 
+function notFound() {
+  return new HttpErrorResponse({ status: 404, error: { error: { code: 'NOT_FOUND' } } });
+}
+
 describe('NoteEditor', () => {
   let fixture: ComponentFixture<NoteEditor>;
   let source: FakeSource;
@@ -225,6 +229,35 @@ describe('NoteEditor', () => {
     source.saves[0]!.reply.error(new HttpErrorResponse({ status: 500 }));
     await tick();
     expect(status()).toBe('notes.status.error');
+  });
+
+  it('404 on save (session removed): draft dropped, text kept read-only with a message', async () => {
+    await create(note('', 0));
+    type('Важливий текст');
+    await tick(1000);
+    source.saves[0]!.reply.error(notFound());
+    await tick();
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(area().value).toBe('Важливий текст');
+    expect(area().readOnly).toBe(true);
+    expect(el().querySelector('.gone')!.textContent).toContain('notes.gone');
+    // Більше не зберігає й не пише копію — ні на введення, ні на знищення.
+    type('Ще');
+    await tick(1000);
+    fixture.destroy();
+    expect(source.saves).toHaveLength(1);
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it('a stored draft of a removed session is shown once and dropped', async () => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ body: 'Чернетка' }));
+    await create();
+    source.loads[0]!.error(notFound());
+    await tick();
+    expect(area().value).toBe('Чернетка');
+    expect(area().readOnly).toBe(true);
+    expect(el().querySelector('.gone')).not.toBeNull();
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 
   it('shows a character counter near the limit', async () => {

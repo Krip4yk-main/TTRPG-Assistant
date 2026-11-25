@@ -154,6 +154,34 @@ describe('SessionsList', () => {
   it('a finished or cancelled game offers no session actions', async () => {
     await create(true, false);
     expect(el.querySelector('button[data-action]')).toBeNull();
+    // Незавершена минула сесія вже не «очікує завершення».
+    expect(row(2)!.querySelector('.status')!.textContent).toContain('sessions.status.unfinished');
+  });
+
+  it('a started session of a running game awaits finishing', async () => {
+    await create(false);
+    expect(row(2)!.querySelector('.status')!.textContent).toContain('sessions.status.awaiting');
+  });
+
+  it('system cancel reasons are translated, GM reasons shown as typed', async () => {
+    await create(false);
+    const reload = fixture.componentInstance.reload();
+    http
+      .expectOne('/api/games/3/sessions')
+      .flush([
+        { ...cancelled, id: 5, cancelReason: 'rule_changed' },
+        { ...cancelled, id: 6, cancelReason: 'game_finished' },
+        cancelled,
+      ]);
+    await reload;
+    await settle();
+    expect(row(5)!.querySelector('.reason')!.textContent).toContain(
+      'sessions.systemReason.rule_changed',
+    );
+    expect(row(6)!.querySelector('.reason')!.textContent).toContain(
+      'sessions.systemReason.game_finished',
+    );
+    expect(row(4)!.querySelector('.reason')!.textContent).toContain('Майстер у відпустці');
   });
 
   it('finish opens the dialog; afterwards the list reloads and the row gets focus', async () => {

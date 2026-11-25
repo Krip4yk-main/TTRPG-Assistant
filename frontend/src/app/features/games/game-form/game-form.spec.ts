@@ -230,6 +230,34 @@ describe('GameForm', () => {
     expect(q<HTMLInputElement>('input[formcontrolname="title"]').disabled).toBe(false);
   });
 
+  it('recruiting game: the schedule rule stays editable', async () => {
+    await setup(5, game({ status: 'recruiting' }));
+    expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(false);
+    expect(selectOf('durationMinutes').disabled).toBe(false);
+    expect(el.querySelector('.schedule-locked')).toBeNull();
+  });
+
+  it('started game: the schedule rule is read-only with a hint; PATCH omits it', async () => {
+    await setup(5, game({ status: 'started' }));
+    expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(true);
+    expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').disabled).toBe(true);
+    expect(selectOf('durationMinutes').disabled).toBe(true);
+    expect(selectOf('recurrence').disabled).toBe(true);
+    const hint = q<HTMLElement>('.schedule-locked');
+    expect(hint.textContent).toContain('games.form.scheduleLocked.');
+    expect(hint.querySelector('a')!.getAttribute('href')).toBe('/games/5');
+    expect(q<HTMLInputElement>('input[formcontrolname="title"]').disabled).toBe(false);
+    await type('input[formcontrolname="title"]', 'Нова назва');
+    await submit();
+    const req = http.expectOne('/api/games/5');
+    expect(req.request.body).toMatchObject({ title: 'Нова назва' });
+    for (const field of ['startsAt', 'durationMinutes', 'recurrence', 'weekdays']) {
+      expect(req.request.body).not.toHaveProperty(field);
+    }
+    req.flush(game({ status: 'started', title: 'Нова назва' }));
+    await settle();
+  });
+
   it('409 GAME_FIELD_LOCKED shows the translation next to the field', async () => {
     await setup(5, game({ status: 'draft' }));
     await submit();

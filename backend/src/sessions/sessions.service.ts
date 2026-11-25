@@ -202,7 +202,9 @@ export async function finishSession(
   const attendance = await deps.db.transaction(async (tx) => {
     const { session } = await lockScheduled(tx, g.id, sessionId);
     if (session.startsAt > now) throw new AppError(409, 'SESSION_INVALID_STATE');
-    // Під FOR SHARE гри склад не змінюється (виключення/бан беруть X).
+    // FOR SHARE гри блокує лише виключення/бан (беруть X). Склад не заморожено: вихід із
+    // гри (теж FOR SHARE) чи видалення акаунта можуть пройти паралельно. Присутність щойно
+    // вибулого учасника нешкідлива — це лише історія сесії.
     const publicIds = input.attendance.map((a) => a.publicId);
     const members = publicIds.length
       ? await tx

@@ -91,6 +91,18 @@ const MAX_CUSTOM_WARNINGS = 10;
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const LOCKED_STATUSES = new Set<GameStatus>(['recruiting', 'started']);
 const CLOSED_STATUSES = new Set<GameStatus>(['finished', 'cancelled']);
+/**
+ * Поля правила розкладу. Для гри, що вже йде, вони лише для читання: розклад змінюється
+ * на сторінці гри («Змінити розклад» / «Перетворити на кампанію»), де сесії перебудовуються.
+ */
+const RULE_CONTROLS = [
+  'startDate',
+  'startTime',
+  'durationMinutes',
+  'recurrence',
+  'weekdays',
+] as const;
+const RULE_FIELDS = ['startsAt', 'durationMinutes', 'recurrence', 'weekdays'] as const;
 
 /** Поле схеми → контрол форми (решта збігаються за назвою). */
 const FIELD_TO_CONTROL: Partial<Record<string, string>> = {
@@ -265,6 +277,8 @@ export class GameForm {
   protected readonly isDraft = computed(() => this.status() === 'draft');
   protected readonly locked = computed(() => LOCKED_STATUSES.has(this.status()));
   protected readonly closed = computed(() => CLOSED_STATUSES.has(this.status()));
+  /** Гра йде: правило розкладу тут не редагується (див. `RULE_CONTROLS`). */
+  protected readonly scheduleLocked = computed(() => this.status() === 'started');
   protected readonly ready = computed(
     () => this.catalog() !== null && (this.id() === undefined || this.game() !== null),
   );
@@ -536,11 +550,12 @@ export class GameForm {
     }
   }
 
-  /** Після публікації заблоковані поля не надсилаються. */
+  /** Після публікації заблоковані поля не надсилаються; для гри, що йде, — і правило розкладу. */
   private patchFor(input: GameInput): GamePatch {
     if (!this.locked()) return input;
     const patch: Record<string, unknown> = { ...input };
     for (const field of GAME_LOCKED_AFTER_PUBLISH) delete patch[field];
+    if (this.scheduleLocked()) for (const field of RULE_FIELDS) delete patch[field];
     return patch as GamePatch;
   }
 
@@ -819,6 +834,7 @@ export class GameForm {
         this.c.systemOther.disable();
         this.c.kind.disable();
       }
+      if (g.status === 'started') for (const name of RULE_CONTROLS) this.c[name].disable();
       this.startDraft();
     }
     this.validate();

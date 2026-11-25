@@ -228,6 +228,20 @@
           }
         </div>
 
+        @if (scheduleLocked()) {
+          <p class="nri-notice schedule-locked">
+            {{
+              (game()?.kind === 'campaign'
+                ? 'games.form.scheduleLocked.campaign'
+                : 'games.form.scheduleLocked.oneshot'
+              ) | translate
+            }}
+            <a [routerLink]="['/games', gameId()]">{{
+              'games.form.scheduleLocked.link' | translate
+            }}</a>
+          </p>
+        }
+
         <div class="row">
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">

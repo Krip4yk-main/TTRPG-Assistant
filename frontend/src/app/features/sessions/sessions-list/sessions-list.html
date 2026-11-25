@@ -67,7 +67,12 @@
     </div>
     @if (s.status === 'cancelled' && s.cancelReason) {
       <p class="reason">
-        <span class="label">{{ 'sessions.cancelReason' | translate }}:</span> {{ s.cancelReason }}
+        <span class="label">{{ 'sessions.cancelReason' | translate }}:</span>
+        @if (systemReasonKey(s.cancelReason); as key) {
+          {{ key | translate }}
+        } @else {
+          {{ s.cancelReason }}
+        }
       </p>
     }
     @if (s.summary) {

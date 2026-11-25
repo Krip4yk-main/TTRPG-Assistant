@@ -47,6 +47,9 @@ interface Message {
 /** Як часто оновлюється «зараз» (межа майбутніх і минулих, «очікує завершення»), мс. */
 const CLOCK_MS = 60_000;
 
+/** Причини автоскасування сесій бекендом (`cancel_reason` — код, а не текст майстра). */
+const SYSTEM_CANCEL_REASONS = ['game_finished', 'game_cancelled', 'rule_changed'] as const;
+
 const DIALOG_OPTIONS = {
   autoFocus: 'first-tabbable',
   restoreFocus: true,
@@ -157,12 +160,22 @@ export class SessionsList {
     return list;
   }
 
-  /** Стан для підпису: заплановану, що вже почалась, показуємо як «очікує завершення». */
+  /**
+   * Стан для підпису: заплановану, що вже почалась, показуємо як «очікує завершення», а якщо
+   * гра вже не йде (завершити сесію не можна) — нейтрально «не завершена».
+   */
   protected statusKey(s: SessionDto): string {
     if (s.status === 'scheduled' && Date.parse(s.startsAt) <= this.now()) {
-      return 'sessions.status.awaiting';
+      return this.manageable() ? 'sessions.status.awaiting' : 'sessions.status.unfinished';
     }
     return `sessions.status.${s.status}`;
+  }
+
+  /** Системна причина скасування (код) — ключ перекладу; причина майстра — як є. */
+  protected systemReasonKey(reason: string): string | null {
+    return (SYSTEM_CANCEL_REASONS as readonly string[]).includes(reason)
+      ? `sessions.systemReason.${reason}`
+      : null;
   }
 
   protected async run(s: SessionDto, action: SessionAction): Promise<void> {

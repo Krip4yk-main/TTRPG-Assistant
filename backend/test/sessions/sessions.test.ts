@@ -4,6 +4,7 @@ import { toZoned, zonedToUtc, type SessionDto } from '@nri/shared';
 import { createApp } from '../../src/app.js';
 import { patchHooks, ruleHooks } from '../../src/games/games.service.js';
 import { deleteAccount } from '../../src/users/users.service.js';
+import { gameBusyIntervals } from '../../src/calendar/game-busy.service.js';
 import { events, games, gameSessions, sessionAttendance } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
@@ -667,5 +668,146 @@ describe('PATCH of the schedule on a published game (R4)', () => {
     expect(back.status).toBe(200);
     const r = await rows(gameId);
     expect(r.map((x) => [x.startsAt.toISOString(), x.status])).toEqual([[original, 'scheduled']]);
+  });
+});
+
+describe('rule change keeps sessions with notes', () => {
+  const notePath = (sessionId: number) => `/api/sessions/${sessionId}/notes/private`;
+  async function writeNote(cookie: string, sessionId: number, body: string) {
+    const res = await call('put', notePath(sessionId), cookie, { body, version: 0 });
+    expect(res.status).toBe(200);
+  }
+
+  it('PUT /schedule: a noted session is cancelled (rule_changed), its slot regenerated', async () => {
+    const { gm, gameId, first } = await weekly();
+    const p = await userWithAge(25);
+    await join(gm, gameId, p);
+    const [s1, s2] = await rows(gameId);
+    await writeNote(p.cookie, s2!.id, 'Не забути кубики');
+
+    // Той самий слот (лише тривалість) — новий s2-слот не має впертись в UNIQUE.
+    const res = await call('put', `/api/games/${gameId}/schedule`, gm.cookie, {
+      recurrence: 'weekly',
+      weekdays: [first.weekday],
+      startsAt: first.startsAt,
+      durationMinutes: 180,
+    });
+    expect(res.status).toBe(200);
+    const after = await rows(gameId);
+    const old = after.find((r) => r.id === s2!.id);
+    expect(old).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'rule_changed',
+      ruleStartsAt: null,
+    });
+    // Сесія без нотаток видалена.
+    expect(after.some((r) => r.id === s1!.id)).toBe(false);
+    const scheduled = after.filter((r) => r.status === 'scheduled');
+    expect(scheduled).toHaveLength(4);
+    for (const r of scheduled) expect(r.durationMinutes).toBe(180);
+    expect(scheduled.some((r) => r.startsAt.getTime() === s2!.startsAt.getTime())).toBe(true);
+
+    const note = await call('get', notePath(s2!.id), p.cookie);
+    expect(note.status).toBe(200);
+    expect(note.body.body).toBe('Не забути кубики');
+    const list = await call('get', `/api/games/${gameId}/sessions`, p.cookie);
+    expect(list.body.find((x: SessionDto) => x.id === s2!.id)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'rule_changed',
+    });
+    // Повторна матеріалізація не дублює й не «впізнає» скасовану.
+    expect(await rows(gameId)).toHaveLength(after.length);
+    const ev = await eventsOf('session.cancelled');
+    expect(ev.map((e) => e.entityId)).toEqual([s2!.id]);
+    expect(ev[0]!.payload).toMatchObject({ gameId, reason: 'rule_changed' });
+
+    // Зайнятість: скасована не рахується, слот не подвоєний.
+    const busy = await gameBusyIntervals(
+      deps,
+      p.id,
+      new Date(Date.now()),
+      new Date(Date.now() + 60 * DAY),
+    );
+    expect(busy.some((b) => b.sessionId === s2!.id)).toBe(false);
+    const atS2 = busy.filter((b) => b.start.getTime() === s2!.startsAt.getTime());
+    expect(atS2).toHaveLength(1);
+    const starts = busy.map((b) => b.start.getTime());
+    expect(new Set(starts).size).toBe(starts.length);
+
+    // Ще одна зміна правила не чіпає скасовану сесію з нотаткою.
+    const again = await call('put', `/api/games/${gameId}/schedule`, gm.cookie, {
+      recurrence: 'weekly',
+      weekdays: [first.weekday],
+      startsAt: first.startsAt,
+      durationMinutes: 240,
+    });
+    expect(again.status).toBe(200);
+    const third = await rows(gameId);
+    expect(third.find((r) => r.id === s2!.id)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'rule_changed',
+    });
+    expect(third.filter((r) => r.status === 'scheduled')).toHaveLength(4);
+  });
+
+  it('oneshot PATCH: noted session kept as cancelled; moving back to its time still works', async () => {
+    const { gm, gameId } = await oneshot();
+    const p = await userWithAge(25);
+    await join(gm, gameId, p);
+    const [s] = await rows(gameId);
+    const original = s!.startsAt.toISOString();
+    await writeNote(p.cookie, s!.id, 'План на ваншот');
+    const away = await call('patch', `/api/games/${gameId}`, gm.cookie, {
+      startsAt: kyivAt(6).startsAt,
+    });
+    expect(away.status).toBe(200);
+    let r = await rows(gameId);
+    expect(r.find((x) => x.id === s!.id)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'rule_changed',
+      ruleStartsAt: null,
+    });
+    expect(r.filter((x) => x.status === 'scheduled')).toHaveLength(1);
+    const back = await call('patch', `/api/games/${gameId}`, gm.cookie, { startsAt: original });
+    expect(back.status).toBe(200);
+    r = await rows(gameId);
+    // Порядок — за часом, далі за id: стара (скасована) раніше.
+    expect(r.map((x) => [x.startsAt.toISOString(), x.status])).toEqual([
+      [original, 'cancelled'],
+      [original, 'scheduled'],
+    ]);
+    expect((await call('get', `/api/sessions/${s!.id}/notes/private`, p.cookie)).body.body).toBe(
+      'План на ваншот',
+    );
+    // Завершення гри закриває лише дійсну сесію.
+    await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    expect((await call('post', `/api/games/${gameId}/finish`, gm.cookie)).status).toBe(200);
+    const done = await rows(gameId);
+    expect(done.find((x) => x.id === s!.id)!.status).toBe('cancelled');
+    expect(done.filter((x) => x.status === 'done')).toHaveLength(1);
+  });
+
+  it('convert to campaign keeps the noted oneshot session as cancelled', async () => {
+    const { gm, gameId } = await oneshot();
+    const p = await userWithAge(25);
+    await join(gm, gameId, p);
+    const [s] = await rows(gameId);
+    await writeNote(p.cookie, s!.id, 'Нотатка ваншота');
+    const next = kyivAt(4);
+    const res = await call('post', `/api/games/${gameId}/convert-to-campaign`, gm.cookie, {
+      recurrence: 'weekly',
+      weekdays: [next.weekday],
+      startsAt: next.startsAt,
+    });
+    expect(res.status).toBe(200);
+    const r = await rows(gameId);
+    expect(r.find((x) => x.id === s!.id)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'rule_changed',
+    });
+    expect(r.filter((x) => x.status === 'scheduled')).toHaveLength(4);
+    expect((await call('get', `/api/sessions/${s!.id}/notes/private`, p.cookie)).body.body).toBe(
+      'Нотатка ваншота',
+    );
   });
 });

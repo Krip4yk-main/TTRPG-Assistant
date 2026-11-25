@@ -27,12 +27,16 @@
     [rows]="rows()"
     [maxLength]="max"
     [value]="body()"
+    [readOnly]="st === 'gone'"
     [attr.aria-describedby]="hint() ? uid + '-hint' : null"
     [attr.aria-invalid]="st === 'conflict' || st === 'error' ? true : null"
     spellcheck="true"
     (input)="onInput($any($event.target).value)"
     (blur)="onBlur()"
   ></textarea>
+  @if (st === 'gone') {
+    <p class="nri-alert gone" role="alert">{{ 'notes.gone' | translate }}</p>
+  }
   <div class="foot">
     @if (st === 'error') {
       <button mat-button type="button" class="retry" (click)="retry()">

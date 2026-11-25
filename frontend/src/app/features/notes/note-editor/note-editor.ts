@@ -30,7 +30,8 @@ export const NOTE_DRAFT_WRITE_MS = 500;
 /** Лічильник символів з'являється, коли до межі лишається менше 10 %. */
 const COUNTER_FROM = Math.floor(NOTE_BODY_MAX * 0.9);
 
-type Status = 'loading' | 'loadError' | 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
+/** `gone` — нотатки більше немає куди зберегти (404: сесію видалено); текст лише для копіювання. */
+type Status = 'loading' | 'loadError' | 'idle' | 'saving' | 'saved' | 'conflict' | 'error' | 'gone';
 
 let nextId = 0;
 
@@ -45,6 +46,8 @@ let nextId = 0;
  * - Текст, який не вдалося зберегти (конфлікт чи помилка), копіюється в `localStorage`;
  *   при наступному відкритті редактор перечитує актуальну версію й знову показує вибір.
  * - При закритті сторінки (`pagehide`) відкладене збереження йде `fetch` з `keepalive`.
+ * - 404 (сесію видалено) — локальна копія видаляється (її вже нікуди відновити), а текст
+ *   лишається на екрані лише для читання, щоб його можна було скопіювати.
  * - `source` читається один раз (при створенні); `initial` — уже завантажена нотатка.
  */
 @Component({
@@ -120,6 +123,7 @@ export class NoteEditor implements OnInit {
   }
 
   protected onInput(value: string): void {
+    if (this.status() === 'gone') return;
     this.body.set(value);
     if (this.conflict()) {
       this.scheduleDraft();
@@ -212,9 +216,20 @@ export class NoteEditor implements OnInit {
       this.body.set(draft);
       this.conflict.set({ body: server.body, version: server.version });
       this.status.set('conflict');
-    } catch {
-      if (!this.destroyed) this.status.set('loadError');
+    } catch (err) {
+      if (isGone(err)) {
+        this.body.set(draft);
+        this.markGone();
+      } else if (!this.destroyed) this.status.set('loadError');
     }
+  }
+
+  /** Нотатки більше немає (404): копія недосяжна — видаляємо, текст лишається на екрані. */
+  private markGone(): void {
+    this.clearTimer();
+    this.clearDraftTimer();
+    this.dropDraft();
+    this.status.set('gone');
   }
 
   private apply(note: NoteDto): void {
@@ -239,7 +254,7 @@ export class NoteEditor implements OnInit {
     this.clearTimer();
     if (this.inFlight || this.conflict()) return;
     const st = this.status();
-    if (st === 'loading' || st === 'loadError') return;
+    if (st === 'loading' || st === 'loadError' || st === 'gone') return;
     const body = this.body();
     if (body === this.savedBody) {
       if (st === 'error') this.status.set('saved');
@@ -255,6 +270,10 @@ export class NoteEditor implements OnInit {
       this.dropDraft();
     } catch (err) {
       const { code, details } = toApiError(err);
+      if (isGone(err)) {
+        this.markGone();
+        return;
+      }
       if (code === 'NOTE_CONFLICT' && isConflict(details)) {
         this.conflict.set({ body: details.body, version: details.version });
         this.status.set('conflict');
@@ -305,6 +324,11 @@ export class NoteEditor implements OnInit {
 function csrfToken(): string {
   const match = /(?:^|;\s*)nri_csrf=([^;]*)/.exec(document.cookie);
   return match ? decodeURIComponent(match[1]!) : '';
+}
+
+/** 404: сесію (чи гру) нотатки видалено. */
+function isGone(err: unknown): boolean {
+  return toApiError(err).code === 'NOT_FOUND';
 }
 
 function isConflict(d: unknown): d is NoteConflictDetails {
