@@ -14,6 +14,8 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   DATABASE_URL_TEST: optional,
   REDIS_URL: z.string().min(1),
+  /** Префікс каналів Redis-адаптера Socket.IO (усі екземпляри одного розгортання — однаковий). */
+  REALTIME_ADAPTER_KEY: z.string().min(1).default('socket.io'),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
   IDENTITY_PEPPER: z.string().min(32),
   INTERNAL_API_KEY: z.string().min(32),

@@ -26,6 +26,8 @@ npm run dev -w bot
 
 Корисні команди: `npm run lint`, `npm run typecheck`, `npm test`.
 
+Тести бекенду йдуть паралельно (4 воркери): кожен воркер створює й мігрує власну БД `nri_test_<N>`, тож тестовому користувачу MySQL потрібні права на `nri\_test\_%` (див. `docker/mysql-init.sql`). Якщо том MySQL створено раніше, виконайте один раз від root: ``GRANT ALL PRIVILEGES ON `nri\_test\_%`.* TO 'nri'@'%';``
+
 Нотатки для розробки:
 
 - Після змін у `@nri/shared` перезберіть його (`npm run build -w shared`) і перезапустіть `ng serve`, видаливши `frontend/.angular/cache` (Vite попередньо збирає лінкований пакет).

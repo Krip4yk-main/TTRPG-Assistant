@@ -20,11 +20,12 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
   const dbUrl = process.env.DATABASE_URL_TEST;
   if (!dbUrl) throw new Error('DATABASE_URL_TEST is required for tests');
   const base = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  const redisUrl = `${base.replace(/\/\d+$/, '')}/15`;
+  const redisUrl = `${base.replace(/\/\d+$/, '')}/${process.env.TEST_REDIS_DB ?? '15'}`;
   const env = loadEnv({
     NODE_ENV: 'test',
     DATABASE_URL: dbUrl,
     REDIS_URL: redisUrl,
+    REALTIME_ADAPTER_KEY: process.env.REALTIME_ADAPTER_KEY,
     IDENTITY_PEPPER: TEST_PEPPER,
     INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extraEnv,
@@ -66,12 +67,29 @@ const TABLES = [
   'users',
 ];
 
+/** Один запит: які з таблиць `TABLES` зараз не порожні. */
+const NON_EMPTY = sql.raw(
+  TABLES.map((t) => `SELECT '${t}' AS t FROM DUAL WHERE EXISTS (SELECT 1 FROM \`${t}\`)`).join(
+    ' UNION ALL ',
+  ),
+);
+
+/**
+ * Очищує тестову БД між тестами. `TRUNCATE` усіх таблиць коштував ~1.2 с на тест (InnoDB
+ * перестворює кожну таблицю), тож чистимо лише непорожні таблиці через `DELETE` і скидаємо
+ * їм `AUTO_INCREMENT` (тести можуть розраховувати на id з 1) — ~30 мс.
+ */
 export async function resetDb(db: Db): Promise<void> {
-  // Одна транзакція = одне з'єднання, тож SET FOREIGN_KEY_CHECKS діє на всі TRUNCATE.
+  // Одна транзакція = одне з'єднання, тож SET FOREIGN_KEY_CHECKS діє на всі запити.
   await db.transaction(async (tx) => {
+    const [rows] = (await tx.execute(NON_EMPTY)) as unknown as [{ t: string }[]];
+    if (rows.length === 0) return;
     await tx.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
     try {
-      for (const t of TABLES) await tx.execute(sql.raw(`TRUNCATE TABLE \`${t}\``));
+      for (const { t } of rows) {
+        await tx.execute(sql.raw(`DELETE FROM \`${t}\``));
+        await tx.execute(sql.raw(`ALTER TABLE \`${t}\` AUTO_INCREMENT = 1`));
+      }
     } finally {
       await tx.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
     }

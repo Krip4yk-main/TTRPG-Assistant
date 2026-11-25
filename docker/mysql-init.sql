@@ -5,4 +5,6 @@ CREATE DATABASE IF NOT EXISTS `nri` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicod
 CREATE DATABASE IF NOT EXISTS `nri_test` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 GRANT ALL PRIVILEGES ON `nri`.* TO 'nri'@'%';
 GRANT ALL PRIVILEGES ON `nri_test`.* TO 'nri'@'%';
+-- Паралельні тести бекенду: окрема БД на воркер (`nri_test_1`, `nri_test_2`, …).
+GRANT ALL PRIVILEGES ON `nri\_test\_%`.* TO 'nri'@'%';
 FLUSH PRIVILEGES;

@@ -11,7 +11,7 @@ function makeApp(extra: Record<string, string> = {}) {
   const env = loadEnv({
     NODE_ENV: 'test',
     DATABASE_URL: process.env.DATABASE_URL_TEST ?? 'mysql://x:x@localhost:3306/nri_test',
-    REDIS_URL: 'redis://localhost:6379/15',
+    REDIS_URL: `redis://localhost:6379/${process.env.TEST_REDIS_DB ?? '15'}`,
     IDENTITY_PEPPER: TEST_PEPPER,
     INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
     ...extra,

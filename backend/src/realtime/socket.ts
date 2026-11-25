@@ -104,7 +104,7 @@ export function attachRealtime(
       const origin = req.headers.origin;
       cb(null, !origin || origin === allowedOrigin);
     },
-    adapter: createAdapter(pub, sub),
+    adapter: createAdapter(pub, sub, { key: deps.env.REALTIME_ADAPTER_KEY }),
   });
 
   // Сесія перевіряється при підключенні; далі — періодично (`revalidateSockets`).
