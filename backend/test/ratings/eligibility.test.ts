@@ -72,7 +72,8 @@ describe('played together (Review Focus 2)', () => {
     expect((await ratingTargets(deps, b.id, g, null, now)).targets).toEqual([]);
     expect(await code(rate(b, g, gm, now))).toBe('403 RATING_NOT_ALLOWED');
     expect(await code(rate(gm, g, b, now))).toBe('403 RATING_NOT_ALLOWED');
-    expect(await pendingRatings(deps, b.id, now)).toEqual([]);
+    const pb = await pendingRatings(deps, b.id, now);
+    expect(pb.map((x) => x.sessionId)).not.toContain(null);
   });
 
   it('GM rates present session members, not absent ones; absent members rate nobody', async () => {
@@ -246,5 +247,107 @@ describe('submission and pending', () => {
     expect((await pendingRatings(deps, a.id, now)).map((x) => [x.gameId, x.sessionId])).toEqual([
       [g1, null],
     ]);
+  });
+});
+
+describe('edge cases (Task 2 review fold-ins)', () => {
+  it('rejoined member and a later co-player: no leave pair without a shared session before the leave', async () => {
+    const { gm, a, b } = await people();
+    const g = await fx.game(gm.id);
+    // A вийшов на 2-й день, повернувся на 4-й; B приєднався на 5-й; спільна сесія — 6-го.
+    await fx.member(g, a.id, days(0), days(2));
+    await fx.done(g, days(1), [a.id]);
+    await fx.member(g, a.id, days(4));
+    await fx.member(g, b.id, days(5));
+    await fx.done(g, days(6), [a.id, b.id]);
+    const now = days(7);
+    expect(ids(await ratingTargets(deps, b.id, g, null, now))).toEqual([]);
+    expect(ids(await ratingTargets(deps, a.id, g, null, now))).toEqual([gm.publicId]);
+    expect(await code(rate(b, g, a, now))).toBe('403 RATING_NOT_ALLOWED');
+    expect(await code(rate(a, g, b, now))).toBe('403 RATING_NOT_ALLOWED');
+    // Pending у B не показує A як «вихідну» ціль без дедлайну.
+    const pb = await pendingRatings(deps, b.id, now);
+    expect(pb.map((x) => x.sessionId)).not.toContain(null);
+    const pa = await pendingRatings(deps, a.id, now);
+    expect(pa.filter((x) => x.sessionId === null).map(ids)).toEqual([[gm.publicId]]);
+  });
+
+  it('a second leave after a shared session opens the pair (all left_at values count)', async () => {
+    const { gm, a, b } = await people();
+    const g = await fx.game(gm.id);
+    await fx.member(g, a.id, days(0), days(2));
+    await fx.member(g, a.id, days(4), days(8));
+    await fx.member(g, b.id, days(5));
+    await fx.done(g, days(6), [a.id, b.id]);
+    const now = days(9);
+    // Майстер не виходив — з ним «вихідної» пари в B немає.
+    expect(ids(await ratingTargets(deps, b.id, g, null, now))).toEqual([a.publicId]);
+    expect(await code(rate(b, g, a, now))).toBe('ok');
+  });
+
+  it('kicked and banned members open leave pairs like a voluntary leave', async () => {
+    const { gm, a, b } = await people();
+    const c = await createUser(db, { nickname: 'Gamma' });
+    const g = await fx.game(gm.id);
+    await fx.member(g, a.id, days(0));
+    await fx.member(g, b.id, days(0), days(4), 'kicked');
+    await fx.member(g, c.id, days(0), days(4), 'banned');
+    await fx.done(g, days(2), [a.id, b.id, c.id]);
+    const now = days(5);
+    expect(ids(await ratingTargets(deps, a.id, g, null, now))).toEqual([b.publicId, c.publicId]);
+    expect(ids(await ratingTargets(deps, b.id, g, null, now))).toEqual([
+      gm.publicId,
+      a.publicId,
+      c.publicId,
+    ]);
+    expect(await code(rate(c, g, gm, now))).toBe('ok');
+  });
+
+  it('GM pending: session set and leave set for the GM', async () => {
+    const { gm, a, b } = await people();
+    const g = await fx.game(gm.id);
+    await fx.member(g, a.id, days(0));
+    await fx.member(g, b.id, days(0), days(3));
+    await fx.done(g, days(1), [b.id]);
+    const s = await fx.done(g, days(4), [a.id]);
+    const now = days(5);
+    const p = await pendingRatings(deps, gm.id, now);
+    expect(p.map((x) => [x.sessionId, ids(x), x.targets.map((t) => t.role)])).toEqual([
+      [expect.any(Number), [b.publicId], ['player_from_gm']],
+      [s, [a.publicId], ['player_from_gm']],
+      [null, [b.publicId], ['player_from_gm']],
+    ]);
+  });
+
+  it('campaign done session without attendance rows: nobody but the GM is present', async () => {
+    const { gm, a } = await people();
+    const g = await fx.game(gm.id, { status: 'finished', finishedAt: days(3) });
+    await fx.member(g, a.id, days(0));
+    await fx.done(g, days(2));
+    expect(await playedTogether(db, g, gm.id, a.id)).toBe(false);
+    expect((await ratingTargets(deps, a.id, g, null, days(4))).targets).toEqual([]);
+  });
+
+  it('finished/cancelled without a timestamp: the final set is closed', async () => {
+    const { gm, a, b } = await people();
+    const g = await fx.game(gm.id, { status: 'finished', finishedAt: null });
+    await fx.member(g, a.id, days(0));
+    await fx.done(g, days(2), [a.id]);
+    expect((await ratingTargets(deps, a.id, g, null, days(4))).targets).toEqual([]);
+    expect(await code(rate(a, g, gm, days(4)))).toBe('409 RATING_WINDOW_CLOSED');
+    const c = await fx.game(gm.id, { status: 'cancelled', cancelledAt: null });
+    await fx.member(c, a.id, days(0));
+    await fx.member(c, b.id, days(0), days(3));
+    await fx.done(c, days(2), [a.id, b.id]);
+    expect(await code(rate(a, c, b, days(4)))).toBe('409 RATING_WINDOW_CLOSED');
+  });
+
+  it('playedTogether is false for the same person', async () => {
+    const { gm, a } = await people();
+    const g = await fx.game(gm.id);
+    await fx.member(g, a.id, days(0));
+    await fx.done(g, days(2), [a.id]);
+    expect(await playedTogether(db, g, a.id, a.id)).toBe(false);
+    expect(await playedTogether(db, g, gm.id, gm.id)).toBe(false);
   });
 });

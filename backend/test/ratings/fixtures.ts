@@ -50,13 +50,14 @@ export function ratingFixtures(db: Db) {
     userId: number,
     joinedAt: Date,
     leftAt: Date | null = null,
+    reason: 'left' | 'kicked' | 'banned' = 'left',
   ): Promise<void> {
     await db.insert(gameMembers).values({
       gameId,
       userId,
       joinedAt,
       leftAt,
-      leftReason: leftAt ? 'left' : null,
+      leftReason: leftAt ? reason : null,
     });
   }
 

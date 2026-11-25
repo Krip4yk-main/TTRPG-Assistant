@@ -26,6 +26,8 @@ export type Q = Db | Tx;
 
 const DAY_MS = 86_400_000;
 const addDays = (d: Date, days: number) => new Date(d.getTime() + days * DAY_MS);
+/** Вікно, що вже закрите (`finished`/`cancelled` без мітки часу — узгоджено з `pendingRatings`). */
+const CLOSED = new Date(0);
 
 export type RatingGame = Pick<
   typeof games.$inferSelect,
@@ -49,8 +51,8 @@ interface GameFacts {
   doneAt: Map<number, Date>;
   /** Присутні на кожній `done` сесії; майстер гри — на всіх. */
   present: Map<number, Set<number>>;
-  /** Найраніший вихід (виключення, бан) кожного, хто колись виходив. */
-  leftAt: Map<number, Date>;
+  /** Усі виходи (виключення, бани) кожного, хто колись виходив (з повернення — кілька). */
+  leftAt: Map<number, Date[]>;
 }
 
 /**
@@ -129,8 +131,9 @@ async function loadFacts(q: Q, list: RatingGame[]): Promise<Map<number, GameFact
   for (const m of members) {
     if (!m.leftAt) continue;
     const f = out.get(m.gameId)!;
-    const prev = f.leftAt.get(m.userId);
-    if (!prev || m.leftAt < prev) f.leftAt.set(m.userId, m.leftAt);
+    const list = f.leftAt.get(m.userId);
+    if (list) list.push(m.leftAt);
+    else f.leftAt.set(m.userId, [m.leftAt]);
   }
   const recorded = new Set<number>();
   const sessionGame = new Map<number, number>();
@@ -160,7 +163,24 @@ async function loadFacts(q: Q, list: RatingGame[]): Promise<Map<number, GameFact
 }
 
 const together = (f: GameFacts, a: number, b: number): boolean => {
+  if (a === b) return false;
   for (const set of f.present.values()) if (set.has(a) && set.has(b)) return true;
+  return false;
+};
+
+/**
+ * «Вихідна» пара: хтось із двох вийшов (`L <= now`) ПІСЛЯ спільної `done` сесії
+ * (`doneAt <= L`). Так той, хто повернувся, і гравець, що приєднався після його виходу, не
+ * стають «вихідною» парою лише через старий вихід.
+ */
+const leavePair = (f: GameFacts, a: number, b: number, now: Date): boolean => {
+  const leaves = [...(f.leftAt.get(a) ?? []), ...(f.leftAt.get(b) ?? [])].filter((l) => l <= now);
+  if (leaves.length === 0) return false;
+  for (const [sessionId, set] of f.present) {
+    if (!set.has(a) || !set.has(b)) continue;
+    const doneAt = f.doneAt.get(sessionId)!;
+    if (leaves.some((l) => doneAt <= l)) return true;
+  }
   return false;
 };
 
@@ -191,23 +211,19 @@ function candidateSets(f: GameFacts, raterId: number, now: Date): CandidateSet[]
   for (const set of f.present.values()) {
     if (set.has(raterId)) for (const u of set) if (u !== raterId) others.add(u);
   }
-  const hasLeft = (u: number) => {
-    const at = f.leftAt.get(u);
-    return at !== undefined && at <= now;
-  };
   let closesAt: Date | null;
   let needsLeave = true;
   if (game.status === 'finished') {
-    closesAt = addDays(game.finishedAt ?? now, FINAL_RATING_WINDOW_DAYS);
+    closesAt = game.finishedAt ? addDays(game.finishedAt, FINAL_RATING_WINDOW_DAYS) : CLOSED;
     needsLeave = false;
   } else if (game.status === 'cancelled') {
-    closesAt = addDays(game.cancelledAt ?? now, FINAL_RATING_WINDOW_DAYS);
+    closesAt = game.cancelledAt ? addDays(game.cancelledAt, FINAL_RATING_WINDOW_DAYS) : CLOSED;
   } else if (game.status === 'draft') {
     return sets;
   } else {
     closesAt = null;
   }
-  const rateeIds = [...others].filter((u) => !needsLeave || hasLeft(raterId) || hasLeft(u));
+  const rateeIds = [...others].filter((u) => !needsLeave || leavePair(f, raterId, u, now));
   sets.push({ gameId: game.id, sessionId: null, closesAt, rateeIds });
   return sets;
 }
