@@ -49,6 +49,7 @@ import {
 import { UserName } from '../../../shared/user-name/user-name';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
+import { ThemePicker } from '../theme-picker/theme-picker';
 
 /** Коди, для яких є специфічні для профілю тексти (`profile.errors.*`). */
 const PROFILE_ERROR_CODES = new Set<ErrorCode>([
@@ -89,6 +90,7 @@ interface Message {
     MatSlideToggleModule,
     MatTooltipModule,
     TranslatePipe,
+    ThemePicker,
     UserName,
   ],
   providers: [provideUkDates()],

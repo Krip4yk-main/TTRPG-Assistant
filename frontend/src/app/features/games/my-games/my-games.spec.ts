@@ -136,6 +136,12 @@ describe('MyGames', () => {
     req.flush(null);
   });
 
+  it('marks its layout with the theme-agnostic hooks (board page, card grid)', () => {
+    // Дизайни стилізують гачки, а не класи сторінки (див. styles.less).
+    expect(el.querySelector('.nri-page.nri-board')).not.toBeNull();
+    expect(el.querySelectorAll('.nri-card-grid > li')).toHaveLength(8);
+  });
+
   it('renders cards with a status badge and status-specific actions', () => {
     expect(article(1).querySelector('.status')!.textContent).toContain('games.status.draft');
     expect(actions(1)).toEqual(['edit', 'publish', 'cancel']);

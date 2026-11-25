@@ -11,16 +11,17 @@
     <meta name="description" content="НРІ Асистент — пошук ігор у настільні рольові ігри" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <!--
-      Дизайн до старту застосунку (без мигання): data-theme, color-scheme (style і meta) і <link> бандла стилів
-      з останнього чинного дизайну в localStorage. Кеш — лише підказка: права й версію
-      перевіряє ThemeService після /api/me. Мапа «дизайн → [бандл, схема]» — як THEMES у
-      src/app/theming/theme.registry.ts. Якщо з'явиться CSP зі script-src — потрібен хеш скрипту.
+      Дизайн до старту застосунку (без мигання): data-theme, color-scheme (style і meta), ранній колір
+      фону <html> (поки бандл стилів не завантажився й застосунок не відмалювався — колір, який
+      дизайн показує найбільше) і <link> бандла стилів з останнього чинного дизайну в localStorage. Кеш — лише підказка: права й версію
+      перевіряє ThemeService після /api/me. Мапа «дизайн → [бандл, схема, фон]» — як THEMES у
+      src/app/theming/theme.registry.ts (фон — як у бандлі дизайну: дерево «Дошки», --nri-bg «Класичного»). Якщо з'явиться CSP зі script-src — потрібен хеш скрипту.
     -->
     <script>
       (function () {
         var themes = {
-          'quest-board': ['quest-board', 'light'],
-          classic: ['classic', 'dark'],
+          'quest-board': ['quest-board', 'light', '#3a2718'],
+          classic: ['classic', 'dark', '#0f172a'],
         };
         var id = 'quest-board';
         var v = '';
@@ -35,6 +36,7 @@
         var root = document.documentElement;
         root.setAttribute('data-theme', id);
         root.style.colorScheme = theme[1];
+        root.style.backgroundColor = theme[2];
         var meta = document.querySelector('meta[name="color-scheme"]');
         if (meta) meta.setAttribute('content', theme[1]);
         var link = document.createElement('link');

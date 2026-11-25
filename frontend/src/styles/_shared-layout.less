@@ -1,0 +1,52 @@
+// Спільна для всіх дизайнів частина бандла дизайну (імпортують <id>.less кожного дизайну):
+// гачки розкладки сторінок і виправлення Material, які не залежать від кольорів. Не в
+// початковому бандлі styles.css — бандл дизайну підключається завжди (до першого рендера).
+
+// ---- Гачки розкладки сторінок (не залежать від дизайну) ----
+// Сторінки позначають свою роль цими класами, а дизайни стилізують гачки, а не класи
+// конкретних сторінок (перейменування класу сторінки не «скидає» вигляд дизайну):
+//   .nri-board      — на .nri-page: сторінка-дошка, оголошення (картки ігор) на ній головні;
+//   .nri-panel      — допоміжна панель сторінки (напр. фільтри пошуку);
+//   .nri-card-grid  — сітка карток; ширину колонки й проміжки задають токени дизайну
+//                     --nri-card-grid-min / --nri-card-grid-gap, а сторінка може підняти
+//                     мінімум через --nri-card-grid-page-min.
+.nri-card-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, max(var(--nri-card-grid-min), var(--nri-card-grid-page-min, 0px))), 1fr)
+  );
+  gap: var(--nri-card-grid-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Типові значення токенів сітки; дизайн перевизначає їх під :root[data-theme='<id>'].
+:root {
+  --nri-card-grid-min: 260px;
+  --nri-card-grid-gap: var(--nri-space-md);
+}
+
+// Підказки й помилки полів Material: у фіксованому режимі вони position: absolute на один
+// рядок і на вузькому екрані налазять на наступне поле. Тут вони в потоці (як у режимі
+// dynamic), а порожнє місце під полем лишається тієї ж висоти — помилка в один рядок не зсуває
+// форму.
+html .mat-mdc-form-field-bottom-align {
+  min-height: var(--mat-form-field-subscript-text-line-height, 16px);
+
+  &::before {
+    content: unset;
+  }
+
+  .mat-mdc-form-field-hint-wrapper,
+  .mat-mdc-form-field-error-wrapper {
+    position: static;
+  }
+}
+
+// Календар Material — така сама межа, як в інших спливних поверхонь (styles.less).
+.mat-datepicker-content.mat-datepicker-content {
+  outline: 1px solid var(--nri-overlay-border);
+  outline-offset: -1px;
+}

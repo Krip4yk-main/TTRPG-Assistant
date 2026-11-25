@@ -4,9 +4,10 @@
 } @else {
   {{ 'user.deleted' | translate }}
 }
+<!-- Пробіли між тегами шаблон не зберігає: явний пробіл — відступ і місце переносу. -->
 @if (g.blocked) {
-  <nri-blocked-badge />
+  {{ ' ' }}<nri-blocked-badge />
 }
 @if (g.showRating) {
-  <nri-gm-rating [value]="g.rating" [showEmpty]="true" />
+  {{ ' ' }}<nri-gm-rating [value]="g.rating" [showEmpty]="true" />
 }

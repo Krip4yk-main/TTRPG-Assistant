@@ -338,6 +338,15 @@ describe('SearchPage', () => {
     expect(el().textContent).not.toContain('search.empty.title');
   });
 
+  it('marks its layout with the theme-agnostic hooks (board page, panel, card grid)', async () => {
+    // Дизайни стилізують гачки, а не класи сторінки (див. styles.less).
+    await setup(null);
+    await flush(expectSearch(), { items: [card(1)], nextCursor: null });
+    expect(el().querySelector('.nri-page.nri-board')).not.toBeNull();
+    expect(el().querySelector('.nri-board .nri-panel')).not.toBeNull();
+    expect(el().querySelectorAll('.nri-card-grid > li')).toHaveLength(1);
+  });
+
   it('shows the empty state when nothing is found', async () => {
     await setup(null);
     await flush(expectSearch(), { items: [], nextCursor: null });

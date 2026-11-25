@@ -187,6 +187,11 @@
   border-left: 4px solid var(--nri-danger);
 }
 
+// Без чинних санкцій банер порожній — без смуги й тіні пергаменту.
+nri-sanctions-banner:empty {
+  display: none;
+}
+
 // Середня ширина: навігація — у меню.
 @media (max-width: 959.98px) {
   .nav {
@@ -229,8 +234,33 @@
   }
 }
 
-// Дуже вузький екран із перемикачем виду: лише герб (назва лишається для читачів екрана).
+// Дуже вузький екран із перемикачем виду: лише герб (назва лишається для читачів екрана);
+// щільніші кнопки, щоб «Оцінити», перемикач, дзвоник, меню й аватар уміщались у 360px, а на
+// ще вужчому — переносились, а не вилазили за край.
 @media (max-width: 479.98px) {
+  .plank {
+    flex-wrap: wrap;
+    gap: 2px;
+    padding-inline: var(--nri-space-xs);
+    --mat-button-text-horizontal-padding: 4px;
+    --mat-button-text-with-icon-horizontal-padding: 4px;
+    --mat-icon-button-state-layer-size: 36px;
+  }
+
+  // Відступи підпису перемикача Material (12px) токеном не задаються — звужуємо сам підпис.
+  .view-mode {
+    --mat-button-toggle-label-text-size: 0.75rem;
+
+    .short {
+      margin-inline: -6px;
+    }
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+  }
+
   .plank:has(.view-mode) .brand-name {
     position: absolute;
     width: 1px;

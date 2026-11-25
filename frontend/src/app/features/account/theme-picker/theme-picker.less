@@ -1,0 +1,72 @@
+:host {
+  display: block;
+}
+
+.hint {
+  margin: 0 0 var(--nri-space-md);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--nri-space-md);
+  margin: 0 0 var(--nri-space-md);
+  padding: 0;
+  list-style: none;
+}
+
+// Картка дизайну: мініатюра й назва; вибрана — рамка кольору primary і позначка.
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  width: 100%;
+  padding: var(--nri-space-sm);
+  border: 2px solid var(--nri-border);
+  border-radius: var(--nri-radius-md);
+  background: var(--nri-surface-sunken);
+  color: var(--nri-text);
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--nri-transition);
+
+  &:hover:not(:disabled) {
+    border-color: var(--nri-accent);
+  }
+
+  &.selected {
+    border-color: var(--nri-primary);
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 8 / 5;
+    object-fit: cover;
+    border-radius: var(--nri-radius-sm);
+    background: var(--nri-surface);
+  }
+}
+
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-xs);
+  font-weight: 600;
+}
+
+.current {
+  padding: 0 var(--nri-space-sm);
+  border-radius: 999px;
+  background: var(--nri-primary);
+  color: var(--nri-on-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}

@@ -107,10 +107,11 @@
                   {{ 'user.deleted' | translate }}
                 }
               </strong>
+              <!-- Пробіли між тегами шаблон не зберігає: явний пробіл — відступ і місце переносу. -->
               @if (g.gm.blocked) {
-                <nri-blocked-badge />
+                {{ ' ' }}<nri-blocked-badge />
               }
-              <nri-gm-rating [value]="g.gmRating" [showEmpty]="true" />
+              {{ ' ' }}<nri-gm-rating [value]="g.gmRating" [showEmpty]="true" />
             </p>
           </header>
 

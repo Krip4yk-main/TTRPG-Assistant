@@ -21,6 +21,7 @@
 @import (css) '@fontsource/literata/latin-600.css';
 @import (css) '@fontsource/literata/cyrillic-700.css';
 @import (css) '@fontsource/literata/latin-700.css';
+@import '../../../../styles/_shared-layout.less';
 
 @qb: ~":root[data-theme='quest-board']";
 
@@ -74,6 +75,10 @@
   --nri-radius-lg: 8px;
   --nri-shadow-md: 0 6px 14px rgba(0, 0, 0, 0.35);
   --nri-shadow-lg: 0 18px 28px rgba(0, 0, 0, 0.45);
+
+  // Оголошенням у сітці (.nri-card-grid) потрібне місце для шпильки, печатки й нахилу.
+  --nri-card-grid-min: 290px;
+  --nri-card-grid-gap: var(--nri-space-2xl) var(--nri-space-xl);
 
   // Фон body — пергамент: на :root діє контекст «пергамент» (чорнило), тож усе, що лежить
   // прямо на body (резервний каркас при збої чанку, банери), читабельне. Дерев'яна стіна —
@@ -175,6 +180,24 @@
     repeating-linear-gradient(90deg, transparent 0 179px, rgba(0, 0, 0, 0.35) 179px 183px),
     repeating-linear-gradient(3deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 9px),
     linear-gradient(var(--qb-wood), var(--qb-wood-dark));
+}
+
+// Фон <html> — дерево. Ранній колір з інлайн-скрипту index.html діє лише до завантаження
+// бандла (і після перемикання дизайну без перезавантаження колір іншого дизайну не лишається).
+@{qb} {
+  background-color: var(--qb-wood) !important;
+}
+
+// До першого рендера body прозорий — видно дерево <html> (без «пергаментного» спалаху між
+// завантаженням стилів і стіною каркаса). Після рендера body — пергамент на всю висоту вмісту
+// (не лише екрана), тож резервний каркас (RF 3) ніде не лежить на дереві.
+@{qb} body {
+  height: auto;
+  min-height: 100%;
+
+  &:has(> nri-root:empty) {
+    background: transparent;
+  }
 }
 
 @{qb} {
@@ -292,9 +315,9 @@
       inset 0 0 80px rgba(120, 80, 30, 0.18);
   }
 
-  // Сторінки-дошки (оголошення приколоті прямо до стіни). Перелік — тимчасово тут; задача 4
-  // плану 8 переносить розкладку сторінок у самі сторінки.
-  .nri-page:is(.search, .my-games) {
+  // Сторінки-дошки (гачок .nri-board, див. styles.less): оголошення приколоті прямо до
+  // стіни, без аркуша; панелі, картки й повідомлення на ній — окремі папірці.
+  .nri-page.nri-board {
     .qb-wood-tokens();
 
     margin-top: 0;
@@ -302,24 +325,15 @@
     background: none;
     box-shadow: none;
 
-    .filters,
-    .nri-card,
-    .nri-alert,
-    .nri-notice {
+    :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
       .qb-paper-tokens();
 
       background-color: var(--qb-parchment);
       box-shadow: var(--nri-shadow-md);
     }
 
-    .filters {
+    .nri-panel {
       padding: var(--nri-space-md);
-    }
-
-    // Оголошенням потрібне місце для шпильки, печатки й нахилу.
-    .cards {
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-      gap: var(--nri-space-2xl) var(--nri-space-xl);
     }
   }
 
@@ -332,13 +346,14 @@
   .mat-mdc-dialog-surface.mdc-dialog__surface,
   .mat-mdc-menu-panel.mat-mdc-menu-panel,
   .mat-mdc-select-panel.mat-mdc-select-panel,
-  .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel {
+  .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel,
+  .mat-datepicker-content.mat-datepicker-content {
     box-shadow: var(--nri-shadow-lg);
   }
 }
 
 @media (max-width: 599.98px) {
-  @{qb} .nri-page:not(.search, .my-games) {
+  @{qb} .nri-page:not(.nri-board) {
     margin-top: var(--nri-space-md);
     margin-bottom: var(--nri-space-lg);
   }

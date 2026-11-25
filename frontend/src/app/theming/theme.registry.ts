@@ -46,7 +46,7 @@ function theme(
 }
 
 /**
- * Усі дизайни. Мапа «дизайн → [бандл, color-scheme]» продубльована в інлайн-скрипті
+ * Усі дизайни. Мапа «дизайн → [бандл, color-scheme, ранній фон]» продубльована в інлайн-скрипті
  * `src/index.html` — змінюйте обидва місця разом.
  */
 export const THEMES: Record<ThemeId, ThemeDefinition> = {

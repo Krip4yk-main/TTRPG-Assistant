@@ -161,7 +161,7 @@
           <section class="games" aria-labelledby="profile-gm">
             <h2 id="profile-gm">{{ 'profile.page.gamesAsGm' | translate }}</h2>
             @if (gamesAsGm().length) {
-              <ul class="cards">
+              <ul class="cards nri-card-grid">
                 @for (g of gamesAsGm(); track g.id) {
                   <li><nri-game-card [game]="g" [guest]="!signedIn()" /></li>
                 }
@@ -174,7 +174,7 @@
           <section class="games" aria-labelledby="profile-player">
             <h2 id="profile-player">{{ 'profile.page.gamesAsPlayer' | translate }}</h2>
             @if (gamesAsPlayer().length) {
-              <ul class="cards">
+              <ul class="cards nri-card-grid">
                 @for (g of gamesAsPlayer(); track g.id) {
                   <li><nri-game-card [game]="g" [guest]="!signedIn()" /></li>
                 }

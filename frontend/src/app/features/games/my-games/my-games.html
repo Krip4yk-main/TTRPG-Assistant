@@ -1,4 +1,4 @@
-<section class="nri-page my-games">
+<section class="nri-page nri-board my-games">
   <nri-slot name="page-header" [inputs]="{ titleKey: 'games.my.title', actions: headerActions }" />
 
   <div aria-live="polite">
@@ -31,7 +31,7 @@
         }"
       />
     } @else {
-      <ul class="cards">
+      <ul class="cards nri-card-grid">
         @for (row of list; track row.game.id) {
           <li>
             <nri-slot

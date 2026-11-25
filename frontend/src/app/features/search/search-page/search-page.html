@@ -1,8 +1,8 @@
-<section class="nri-page search">
+<section class="nri-page nri-board search">
   <nri-slot name="page-header" [inputs]="{ titleKey: 'search.title', leadKey: 'search.lead' }" />
 
   <div class="layout">
-    <aside class="filters" [attr.aria-label]="'search.filters.title' | translate">
+    <aside class="filters nri-panel" [attr.aria-label]="'search.filters.title' | translate">
       <nri-search-filters
         [filters]="filters()"
         [signedIn]="signedIn()"
@@ -70,7 +70,7 @@
       }
 
       @if (items().length > 0) {
-        <ul class="cards">
+        <ul class="cards nri-card-grid">
           @for (game of items(); track game.id) {
             <li>
               <nri-game-card [game]="game" [guest]="!signedIn()" />

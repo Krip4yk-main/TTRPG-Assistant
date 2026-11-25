@@ -17,6 +17,7 @@
 @import (css) '@fontsource/lora/latin-500.css';
 @import (css) '@fontsource/lora/cyrillic-600.css';
 @import (css) '@fontsource/lora/latin-600.css';
+@import '../../../../styles/_shared-layout.less';
 
 // Палітра. Палітра — design-system/nri-assistant/MASTER.md:
 // фон #0F172A, картки #192134, primary #15803D (felt green), accent #D97706 (gold).
@@ -25,6 +26,9 @@
 // Заливки: білий на #15803D ≈ 5:1, чорний на #D97706 ≈ 6.6:1, білий на #DC2626 ≈ 4.8:1.
 
 :root[data-theme='classic'] {
+  // Фон <html> — свій, а не ранній колір іншого дизайну з інлайн-скрипту index.html.
+  background-color: var(--nri-bg) !important;
+
   --nri-bg: #0f172a;
   --nri-surface: #0f172a;
   --nri-surface-raised: #192134;
