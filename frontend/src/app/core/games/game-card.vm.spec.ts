@@ -58,6 +58,21 @@ describe('toGameCardVm', () => {
     expect(full({ ...game, system: null, systemOther: 'Своя' }).systemName).toBe('Своя');
   });
 
+  it('one-line summaries: system · kind · genre and format · city · language', () => {
+    const vm = full(game);
+    expect(vm.systemLine).toEqual([
+      { text: 'D&D 5e' },
+      { key: 'games.kind.campaign' },
+      { key: 'genres.g1' },
+    ]);
+    expect(vm.whereLine).toEqual([
+      { key: 'games.format.offline' },
+      { text: 'Київ' },
+      { key: 'games.language.uk' },
+    ]);
+    expect(full({ ...game, city: null }).whereLine).toHaveLength(2);
+  });
+
   it('badges: fit, age (not «none»), status (not while recruiting)', () => {
     expect(full(game).badges.map((b) => [b.kind, b.value, b.labelKey, b.icon])).toEqual([
       ['fit', 'partial', 'search.fit.partial', 'event_note'],

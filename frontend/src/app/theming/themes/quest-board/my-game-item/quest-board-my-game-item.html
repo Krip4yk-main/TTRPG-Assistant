@@ -7,13 +7,7 @@
       <span class="nri-seen-badge" [attr.data-seen]="b">{{ 'live.badge.' + b | translate }}</span>
     }
   </header>
-  @let sys =
-    game.systemName +
-    ' · ' +
-    (game.formatKey | translate) +
-    (game.city ? ' · ' + game.city : '') +
-    ' · ' +
-    (game.kindKey | translate);
+  @let sys = game.systemLine | nriLine;
   <p class="sys" [nriTruncateTooltip]="sys">{{ sys }}</p>
   <h2 class="title" [nriTruncateTooltip]="game.title">{{ game.title }}</h2>
   @for (f of game.flags; track f.flag) {
@@ -24,7 +18,8 @@
   }
   <dl class="facts">
     <dt>{{ 'questBoard.card.when' | translate }}</dt>
-    <dd>{{ game.nextSession ?? ('games.my.noNextSession' | translate) }}</dd>
+    @let next = game.nextSession ?? ('games.my.noNextSession' | translate);
+    <dd [nriTruncateTooltip]="next">{{ next }}</dd>
     <dt>{{ 'search.card.slots' | translate }}</dt>
     <dd>
       {{ 'search.card.slotsValue' | translate: { free: game.freeSlots, max: game.maxPlayers } }}

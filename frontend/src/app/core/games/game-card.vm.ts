@@ -18,6 +18,12 @@ export interface BadgeVm {
   icon: string | null;
 }
 
+/**
+ * Частина однорядкового підсумку картки («D&D 5e · Кампанія · Фентезі»): готовий текст або
+ * ключ i18n. Слот збирає рядок пайпом `nriLine` (частини через « · »).
+ */
+export type LinePart = { text: string } | { key: string };
+
 /** Майстер гри для слоту «підпис майстра». */
 export interface GmSignatureVm {
   publicId: string;
@@ -63,6 +69,10 @@ export interface FullGameCardVm extends GameCardVmBase {
   maxPlayers: number;
   /** Ціна за сесію; `null` — безкоштовно. */
   priceUah: number | null;
+  /** Рядок «система · тип · жанр». */
+  systemLine: LinePart[];
+  /** Рядок «формат · місто · мова». */
+  whereLine: LinePart[];
 }
 
 export type GameCardVm = RestrictedGameCardVm | FullGameCardVm;
@@ -135,6 +145,12 @@ export function toGameCardVm(
     });
   }
 
+  const systemName = game.system?.name ?? game.systemOther ?? '';
+  const genre = genreKey(game.genreId);
+  const kindKey = `games.kind.${game.kind}`;
+  const formatKey = `games.format.${game.format}`;
+  const languageKey = `games.language.${game.language}`;
+
   return {
     restricted: false,
     id: game.id,
@@ -142,16 +158,22 @@ export function toGameCardVm(
     badges,
     gm: gm(game.gmRating, true),
     coverUrl: game.coverUrl,
-    systemName: game.system?.name ?? game.systemOther ?? '',
-    genreKey: genreKey(game.genreId),
-    formatKey: `games.format.${game.format}`,
+    systemName,
+    genreKey: genre,
+    formatKey,
     city: game.city,
-    kindKey: `games.kind.${game.kind}`,
-    languageKey: `games.language.${game.language}`,
+    kindKey,
+    languageKey,
     showSchedule: game.status === 'recruiting' || game.status === 'started',
     nextSession,
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
     priceUah: game.priceUah,
+    systemLine: [{ text: systemName }, { key: kindKey }, ...(genre ? [{ key: genre }] : [])],
+    whereLine: [
+      { key: formatKey },
+      ...(game.city ? [{ text: game.city }] : []),
+      { key: languageKey },
+    ],
   };
 }

@@ -1,6 +1,7 @@
 import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
 import { differentZones, formatDateTime, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
+import type { LinePart } from './game-card.vm';
 
 /** Дії-переходи, доступні в кожному статусі (редагування — окремо). */
 const ACTIONS: Record<GameStatus, GameAction[]> = {
@@ -50,6 +51,8 @@ export interface MyGameItemVm {
   formatKey: string;
   city: string | null;
   kindKey: string;
+  /** Рядок «система · формат · місто · тип». */
+  systemLine: LinePart[];
   /** Найближча сесія в поясі глядача, або `null`. */
   nextSession: string | null;
   freeSlots: number;
@@ -132,6 +135,10 @@ export function toMyGameItemVm(
     });
   }
 
+  const systemName = game.system?.name ?? game.systemOther ?? '';
+  const formatKey = `games.format.${game.format}`;
+  const kindKey = `games.kind.${game.kind}`;
+
   return {
     id: game.id,
     title: game.title,
@@ -143,10 +150,16 @@ export function toMyGameItemVm(
       badgeKey: `games.dead.badge.${flag}`,
       explainKey: `games.dead.explain.${flag}`,
     })),
-    systemName: game.system?.name ?? game.systemOther ?? '',
-    formatKey: `games.format.${game.format}`,
+    systemName,
+    formatKey,
     city: game.city,
-    kindKey: `games.kind.${game.kind}`,
+    kindKey,
+    systemLine: [
+      { text: systemName },
+      { key: formatKey },
+      ...(game.city ? [{ text: game.city }] : []),
+      { key: kindKey },
+    ],
     nextSession,
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,

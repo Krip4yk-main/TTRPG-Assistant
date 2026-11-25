@@ -42,11 +42,7 @@
     @if (g.coverUrl) {
       <img class="cover" [src]="g.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" />
     }
-    @let sys =
-      g.systemName +
-      ' · ' +
-      (g.kindKey | translate) +
-      (g.genreKey ? ' · ' + (g.genreKey | translate) : '');
+    @let sys = g.systemLine | nriLine;
     <p class="sys" [nriTruncateTooltip]="sys">{{ sys }}</p>
     @if (stamps().length > 0) {
       <!-- Бейджі — один рядок: зайві ховаються за «+N» (для читачів екрана — усі). -->
@@ -70,13 +66,10 @@
     <dl class="facts">
       @if (g.showSchedule) {
         <dt>{{ 'questBoard.card.when' | translate }}</dt>
-        <dd class="next">{{ g.nextSession ?? ('search.card.noNext' | translate) }}</dd>
+        @let next = g.nextSession ?? ('search.card.noNext' | translate);
+        <dd class="next" [nriTruncateTooltip]="next">{{ next }}</dd>
       }
-      @let where =
-        (g.formatKey | translate) +
-        (g.city ? ' · ' + g.city : '') +
-        ' · ' +
-        (g.languageKey | translate);
+      @let where = g.whereLine | nriLine;
       <dt>{{ 'questBoard.card.where' | translate }}</dt>
       <dd [nriTruncateTooltip]="where">{{ where }}</dd>
       @if (g.showSchedule) {

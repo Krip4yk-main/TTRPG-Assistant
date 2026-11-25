@@ -71,6 +71,7 @@
 }
 
 .sys {
+  flex: none;
   margin: 0;
   color: var(--nri-primary-text);
   font-size: 0.875rem;
@@ -80,7 +81,6 @@
 
 // Однорядкові поля: «…» замість переносу.
 .sys,
-.title a,
 .facts dd {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -96,11 +96,15 @@
   padding-right: 0;
 }
 
+// Бейджі: до трьох (решта — «+N»), не більше двох рядків — широкі переносяться, а не
+// виходять за край.
 .stamps {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
+  max-height: 3.25rem;
   margin-top: 6px;
   overflow: hidden;
 }
@@ -112,13 +116,19 @@
 }
 
 .title {
+  flex: none;
   margin: 6px 0 var(--nri-space-sm);
   font-size: 1.6rem;
   line-height: 1.2;
 
+  // Назва — до двох рядків з «…».
   a {
-    display: block;
+    display: -webkit-box;
+    overflow: hidden;
     color: inherit;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     text-decoration: none;
 
     &:hover,
@@ -129,7 +139,12 @@
   }
 }
 
+// Факти — єдиний блок, що стискається: якщо згори забагато (стрічка, обкладинка, бейджі),
+// обрізаються вони, а не підвал із майстром і печаткою.
 .facts {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 14px;
@@ -148,6 +163,7 @@
 }
 
 .foot {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;

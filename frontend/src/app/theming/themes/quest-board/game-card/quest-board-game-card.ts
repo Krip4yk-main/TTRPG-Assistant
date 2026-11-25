@@ -7,6 +7,7 @@ import type { GameCardSlot } from '../../../slots';
 import { QuestBoardBadge } from '../badge/quest-board-badge';
 import { QuestBoardGmSignature } from '../gm-signature/quest-board-gm-signature';
 import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
+import { LinePipe } from '../../../../core/i18n/line.pipe';
 
 /** Скільки різних нахилів має дошка (набір кутів — у стилях, `data-tilt`). */
 const TILTS = 6;
@@ -28,6 +29,7 @@ const MAX_STAMPS = 3;
     QuestBoardBadge,
     QuestBoardGmSignature,
     TruncateTooltip,
+    LinePipe,
   ],
   templateUrl: './quest-board-game-card.html',
   styleUrl: './quest-board-game-card.less',

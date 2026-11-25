@@ -9,6 +9,7 @@ import type {
 } from '../../../../core/games/my-game-item.vm';
 import type { MyGameItemSlot } from '../../../slots';
 import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
+import { LinePipe } from '../../../../core/i18n/line.pipe';
 
 /**
  * Слот `my-game-item` дизайну «Дошка оголошень»: оголошення майстра без повороту — статус
@@ -16,7 +17,7 @@ import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-to
  */
 @Component({
   selector: 'nri-qb-my-game-item',
-  imports: [RouterLink, MatButtonModule, TranslatePipe, TruncateTooltip],
+  imports: [RouterLink, MatButtonModule, TranslatePipe, TruncateTooltip, LinePipe],
   templateUrl: './quest-board-my-game-item.html',
   styleUrl: './quest-board-my-game-item.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
