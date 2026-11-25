@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, lte, ne, sql } from 'drizzle-orm';
 import {
   criteriaForRole,
   RATING_BATCH_UNITS,
@@ -47,7 +47,7 @@ export async function lockPublished(tx: Tx, userId: number, role: RatingRole): P
 /**
  * Перевірка пачки й публікація зрізу рейтингу. Викликається в транзакції збереження оцінки
  * (після INSERT); `true` — зріз опубліковано (після коміту — подія `rating.published`).
- * Поточні одиниці — за всіма не-відмовами (людина, роль); публікація, якщо одиниць ≥ 5 і
+ * Поточні одиниці — за всіма не-відмовами (людина, роль), крім анульованих модерацією; публікація, якщо одиниць ≥ 5 і
  * з'явилось ≥ 5 нових від останнього зрізу (без зрізу — 0, тож перша — рівно від 5).
  * Серіалізація паралельних оцінок — лок рядка зрізу (`lockPublished`); `submitRating` бере
  * його ДО першого неблокуючого читання, щоб знімок транзакції бачив усі оцінки, закомічені
@@ -64,7 +64,7 @@ export async function maybePublish(tx: Tx, userId: number, role: RatingRole): Pr
       criteria: ratings.criteria,
     })
     .from(ratings)
-    .where(and(eq(ratings.rateeId, userId), eq(ratings.role, role), eq(ratings.declined, false)));
+    .where(counted(userId, role));
   const scored = rows.filter((r) => r.overall !== null).map((r) => ({ ...r, overall: r.overall! }));
   const computed = computeRating(scored);
   if (computed.units < RATING_MIN_UNITS) return false;
@@ -81,6 +81,71 @@ export async function maybePublish(tx: Tx, userId: number, role: RatingRole): Pr
       publishedAt: new Date(),
     })
     .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)));
+  return true;
+}
+
+/** Оцінки, що входять у рейтинг (людина, роль): не відмови й не анульовані модерацією. */
+function counted(userId: number, role: RatingRole) {
+  return and(
+    eq(ratings.rateeId, userId),
+    eq(ratings.role, role),
+    eq(ratings.declined, false),
+    ne(ratings.moderated, 'cancelled'),
+  );
+}
+
+/**
+ * Негайна перепублікація зрізу (людина, роль) після анулювання оцінки модератором — у
+ * транзакції дії. Перераховує лише оцінки в межах уже опублікованого зрізу (`id ≤
+ * last_rating_id`), без анульованих: нові, ще не опубліковані оцінки чекають своєї пачки, тож
+ * момент перепублікації (дія модератора) не розкриває нічого про нових оцінювачів. Якщо
+ * одиниць стає менше 5 — зріз ховається (стає заготовкою: наступна публікація — як перша, від 5
+ * одиниць). Зрізу ще не було — нічого не робить. Повертає `true`, якщо зріз змінено.
+ */
+export async function republish(tx: Tx, userId: number, role: RatingRole): Promise<boolean> {
+  await lockPublished(tx, userId, role);
+  const [snap] = await tx
+    .select({ lastRatingId: publishedRatings.lastRatingId })
+    .from(publishedRatings)
+    .where(and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role)));
+  const boundary = snap?.lastRatingId ?? null;
+  if (boundary === null) return false;
+  const rows = await tx
+    .select({
+      raterId: ratings.raterId,
+      gameId: ratings.gameId,
+      overall: ratings.overall,
+      criteria: ratings.criteria,
+    })
+    .from(ratings)
+    .where(and(counted(userId, role), lte(ratings.id, boundary)));
+  const scored = rows.filter((r) => r.overall !== null).map((r) => ({ ...r, overall: r.overall! }));
+  const computed = computeRating(scored);
+  const where = and(eq(publishedRatings.userId, userId), eq(publishedRatings.role, role));
+  if (computed.units < RATING_MIN_UNITS) {
+    await tx
+      .update(publishedRatings)
+      .set({
+        overall: null,
+        overallUnits: 0,
+        criteria: null,
+        units: 0,
+        lastRatingId: null,
+        publishedAt: null,
+      })
+      .where(where);
+    return true;
+  }
+  await tx
+    .update(publishedRatings)
+    .set({
+      overall: computed.overall,
+      overallUnits: computed.overallUnits,
+      criteria: computed.criteria,
+      units: computed.units,
+      publishedAt: new Date(),
+    })
+    .where(where);
   return true;
 }
 

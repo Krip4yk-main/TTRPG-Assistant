@@ -26,6 +26,7 @@ describe('notification contracts', () => {
       'moderation.digest',
       'sanction.imposed',
       'sanction.lifted',
+      'appeal.decided',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -92,6 +93,7 @@ describe('notificationLink', () => {
     expect(notificationLink('sanction.lifted', { sanctionType: 'global_ban' })).toBe(
       '/my-sanctions',
     );
+    expect(notificationLink('appeal.decided', { accepted: true })).toBe('/my-sanctions');
   });
 
   it('routes by type', () => {

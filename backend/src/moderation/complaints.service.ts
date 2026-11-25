@@ -389,3 +389,29 @@ export async function actionComplaint(
   if (row) emitNotificationsNew(deps, [row]);
   return dto;
 }
+
+/**
+ * Скарги на людину (на неї саму й на її ігри як майстра) для картки користувача, новіші першими;
+ * лише видимі ролі переглядача. Скаржник — лише для адміна/власника (і не тоді, коли переглядач
+ * сам суб'єкт скарги); модератор бачить скарги без скаржників.
+ */
+export async function complaintsAboutUser(
+  db: DbLike,
+  viewer: StaffViewer,
+  userId: number,
+  limit = 100,
+): Promise<ComplaintDto[]> {
+  const rows = await baseQuery(db)
+    .where(
+      and(
+        visibleWhere(viewer.role),
+        sql`(${complaints.targetUserId} = ${userId} OR ${games.gmUserId} = ${userId})`,
+      ),
+    )
+    .orderBy(desc(complaints.id))
+    .limit(limit);
+  const seeReporters = ROLE_RANK[viewer.role] >= ROLE_RANK.admin;
+  return rows.map((r) =>
+    toComplaintDto(r, { showReporter: seeReporters && !isSubject(r, viewer.userId) }),
+  );
+}

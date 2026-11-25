@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { UserRole } from './me.js';
+import type { RatingCriterion, RatingKind, RatingRole } from './ratings.js';
 
 /** Причини скарг (порядок — як у формі). */
 export const COMPLAINT_REASONS = [
@@ -242,6 +243,8 @@ export interface ModerationLogDto {
   action: string;
   targetType: string;
   targetId: number;
+  /** Для `targetType = 'user'` — сама людина (посилання на картку); інакше null. */
+  targetUser: ModerationUserRefDto | null;
   reason: string | null;
   meta: Record<string, unknown> | null;
   createdAt: string;
@@ -267,4 +270,84 @@ export interface SanctionActiveDetails {
 export interface AdminPageDto<T> {
   items: T[];
   nextCursor: number | null;
+}
+
+/** Порожній рядок у query — як відсутній. */
+const emptyAsUndefined = (v: unknown) => (v === '' ? undefined : v);
+const cursorParam = z.preprocess(emptyAsUndefined, z.coerce.number().int().positive().optional());
+const limitParam = z.coerce.number().int().min(1).max(ADMIN_PAGE_MAX).default(ADMIN_PAGE_DEFAULT);
+
+/** Query `GET /api/admin/appeals`: без `status` — усі; новіші першими. */
+export const appealsQuerySchema = z.object({
+  status: z.preprocess(emptyAsUndefined, z.enum(SANCTION_APPEAL_STATUSES).optional()),
+  cursor: cursorParam,
+  limit: limitParam,
+});
+export type AppealsQuery = z.input<typeof appealsQuerySchema>;
+
+/**
+ * Фільтр черги «Відгуки»: `new` — ще не модеровані оцінки; `commented` — не модеровані з
+ * текстом. Приховані й анульовані в черзі не показуються.
+ */
+export const ADMIN_RATING_FILTERS = ['new', 'commented'] as const;
+export type AdminRatingFilter = (typeof ADMIN_RATING_FILTERS)[number];
+
+/** Query `GET /api/admin/ratings`: новіші першими. */
+export const adminRatingsQuerySchema = z.object({
+  filter: z.preprocess(emptyAsUndefined, z.enum(ADMIN_RATING_FILTERS).default('new')),
+  cursor: cursorParam,
+  limit: limitParam,
+});
+export type AdminRatingsQuery = z.input<typeof adminRatingsQuerySchema>;
+
+/** Query `GET /api/admin/users`: нік (початок, без регістру) або точний `publicId`. */
+export const adminUsersQuerySchema = z.object({
+  q: z.preprocess(emptyAsUndefined, z.string().trim().min(1).max(32).optional()),
+  cursor: cursorParam,
+  limit: limitParam,
+});
+export type AdminUsersQuery = z.input<typeof adminUsersQuerySchema>;
+
+/** Query `GET /api/admin/log`: новіші першими; необов'язково — лише записи однієї цілі. */
+export const moderationLogQuerySchema = z
+  .object({
+    targetType: z.preprocess(emptyAsUndefined, z.string().min(1).max(32).optional()),
+    targetId: cursorParam,
+    cursor: cursorParam,
+    limit: limitParam,
+  })
+  .refine((v) => (v.targetType === undefined) === (v.targetId === undefined), {
+    message: 'targetType and targetId go together',
+    path: ['targetId'],
+  });
+export type ModerationLogQuery = z.input<typeof moderationLogQuerySchema>;
+
+/** Рядок пошуку користувачів в адмінці. */
+export interface AdminUserListItemDto {
+  publicId: string;
+  nickname: string | null;
+  avatarUrl: string | null;
+  role: UserRole;
+  status: 'active' | 'deleted';
+  isBanned: boolean;
+}
+
+/**
+ * Оцінка в черзі «Відгуки» (лише персоналу; персонал бачить ніки обох сторін). Оцінки, де
+ * переглядач — оцінюваний, у черзі не показуються (анонімність оцінювача діє й для персоналу).
+ * `comment` = null — тексту немає або його приховано.
+ */
+export interface AdminRatingDto {
+  id: number;
+  rater: ModerationUserRefDto;
+  ratee: ModerationUserRefDto;
+  game: { id: number; title: string };
+  sessionId: number | null;
+  kind: RatingKind;
+  role: RatingRole;
+  overall: number;
+  criteria: Partial<Record<RatingCriterion, number>>;
+  comment: string | null;
+  moderated: RatingModerationState;
+  createdAt: string;
 }

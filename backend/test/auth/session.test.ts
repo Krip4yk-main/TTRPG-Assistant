@@ -51,7 +51,11 @@ describe('sessions', () => {
     await banUser(deps, u.id);
     const r1 = await get(token).expect(403);
     expect(r1.body.error.code).toBe('ACCOUNT_BANNED');
-    expect(r1.body.error.details).toEqual({ appealToken: expect.any(String), appealSent: false });
+    expect(r1.body.error.details).toEqual({
+      appealToken: expect.any(String),
+      appealSent: false,
+      appealStatus: null,
+    });
     const r2 = await get(token).expect(401);
     expect(r2.body.error.code).toBe('UNAUTHENTICATED');
   });

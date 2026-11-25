@@ -112,6 +112,10 @@ export function renderNotification(
     }
     // Безстрокова санкція — без «до …».
     if (kind === 'sanction.imposed' && !params.endsAt) key = 'notify.sanction.imposed_permanent';
+    // Рішення по апеляції — окремий текст для прийнятої й відхиленої.
+    if (kind === 'appeal.decided' && params.accepted !== undefined) {
+      key = params.accepted ? 'notify.appeal.decided_accepted' : 'notify.appeal.decided_rejected';
+    }
     // Нагадування про дедлайн сесійного набору — з датою сесії.
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
@@ -120,7 +124,8 @@ export function renderNotification(
     // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
     const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;
     if (closes) parts.push(t('notify.rating.until', { closes }));
-    if ((kind === 'session.cancelled' || kind === 'sanction.imposed') && params.reason) {
+    const withReason = ['session.cancelled', 'sanction.imposed', 'appeal.decided'];
+    if (withReason.includes(kind) && params.reason) {
       parts.push(t('notify.reason', { reason: params.reason }));
     }
     if (kind === 'game.finished') {

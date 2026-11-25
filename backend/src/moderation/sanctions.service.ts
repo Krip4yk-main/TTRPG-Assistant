@@ -48,7 +48,7 @@ export interface SanctionTxResult {
 
 export type UserRef = { publicId: string; nickname: string | null; role: Role };
 
-async function refsOf(db: DbLike, ids: (number | null)[]): Promise<Map<number, UserRef>> {
+export async function refsOf(db: DbLike, ids: (number | null)[]): Promise<Map<number, UserRef>> {
   const list = [...new Set(ids.filter((x): x is number => x !== null))];
   if (list.length === 0) return new Map();
   const rows = await db
@@ -96,7 +96,7 @@ export async function sanctionDto(
   };
 }
 
-function isActive(
+export function isActive(
   s: { liftedAt: Date | null; startsAt: Date; endsAt: Date | null },
   now: Date,
 ): boolean {
@@ -113,7 +113,7 @@ export function actionFor(type: SanctionType) {
 }
 
 /** Роль діяча (звичайне читання — лише для перевірки прав). Неактивний → 403. */
-async function actorRole(tx: DbLike, actorId: number): Promise<Role> {
+export async function actorRole(tx: DbLike, actorId: number): Promise<Role> {
   const [actor] = await tx
     .select({ role: users.role, status: users.status, isBanned: users.isBanned })
     .from(users)
@@ -125,7 +125,7 @@ async function actorRole(tx: DbLike, actorId: number): Promise<Role> {
 }
 
 /** Запускає побічні ефекти після коміту; помилка не скасовує вже зафіксовану дію. */
-async function runAfterCommit(label: string, fn: () => Promise<void>): Promise<void> {
+export async function runAfterCommit(label: string, fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
   } catch (err) {
@@ -274,6 +274,8 @@ export interface LiftOptions {
   now?: Date;
   /** Строк минув (задача `moderation.expire`): `lifted_at` = `ends_at`, актор — система. */
   expired?: boolean;
+  /** `false` — без `sanction.lifted` (прийнята апеляція сповіщає власним `appeal.decided`). */
+  notify?: boolean;
 }
 
 /**
@@ -358,7 +360,7 @@ export async function liftSanctionTx(
   }
 
   let row: NotificationRow | null = null;
-  if (target.status === 'active' && !stillBanned) {
+  if (target.status === 'active' && !stillBanned && opts.notify !== false) {
     row = await createNotification(deps, tx, {
       userId: s.userId,
       type: 'sanction.lifted',

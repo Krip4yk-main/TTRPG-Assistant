@@ -149,12 +149,24 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
   }
 
   // Санкції: тип, кінець і причина (її бачить лише сам покараний).
-  if (n.type === 'sanction.imposed' || n.type === 'sanction.lifted') {
+  if (
+    n.type === 'sanction.imposed' ||
+    n.type === 'sanction.lifted' ||
+    n.type === 'appeal.decided'
+  ) {
     view.sanction = `notifications.sanction.types.${p.sanctionType ?? 'unknown'}`;
   }
   if (n.type === 'sanction.imposed') {
     if (p.endsAt) view.until = formatDateTime(p.endsAt, timeZone);
     else view.key = 'notifications.sanction.imposed_permanent';
+    if (reason) view.reason = { code: null, text: reason };
+  }
+
+  // Рішення по апеляції: прийнято/відхилено й примітка персоналу (адресована автору апеляції).
+  if (n.type === 'appeal.decided') {
+    if (p.accepted !== undefined) {
+      view.key = `notifications.appeal.${p.accepted ? 'decided_accepted' : 'decided_rejected'}`;
+    }
     if (reason) view.reason = { code: null, text: reason };
   }
 

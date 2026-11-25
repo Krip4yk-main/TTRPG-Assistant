@@ -24,6 +24,7 @@ describe('renderNotification', () => {
     'moderation.digest',
     'sanction.imposed',
     'sanction.lifted',
+    'appeal.decided',
   ];
   const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
 
@@ -72,6 +73,27 @@ describe('renderNotification', () => {
     expect(permanent.text).not.toContain('{');
     const lifted = render('sanction.lifted', { sanctionType: 'warning' });
     expect(lifted.text.split('\n')[0]).toBe('✅ Обмеження «попередження» з твого акаунта знято.');
+  });
+
+  it('appeal.decided: accepted / rejected with the note; link to my sanctions', () => {
+    const accepted = render('appeal.decided', { sanctionType: 'global_ban', accepted: true });
+    expect(accepted.text.split('\n')).toEqual([
+      '✅ Твою апеляцію прийнято: обмеження «блокування акаунта» знято.',
+      '',
+      'Детальніше: https://nri.example/my-sanctions',
+    ]);
+    const rejected = render('appeal.decided', {
+      sanctionType: 'warning',
+      accepted: false,
+      reason: 'Порушення підтверджено',
+    });
+    expect(rejected.text.split('\n').slice(0, 2)).toEqual([
+      '❌ Твою апеляцію на обмеження «попередження» відхилено.',
+      'Причина: Порушення підтверджено',
+    ]);
+    expect(render('appeal.decided', {}).text).toContain(
+      'Твою апеляцію на обмеження «обмеження» розглянуто.',
+    );
   });
 
   it('every NotificationType has a uk.json template', () => {

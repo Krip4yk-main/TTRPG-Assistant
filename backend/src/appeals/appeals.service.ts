@@ -1,19 +1,20 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { appealInputSchema } from '@nri/shared';
 import type { BannedLoginDetails } from '@nri/shared';
 import type { AppDeps } from '../app.js';
-import { banAppeals, users } from '../db/schema/index.js';
+import { users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { isDuplicateKey } from '../db/errors.js';
 import { logEvent } from '../events/events.service.js';
+import { banAppealStatus, createBanAppeal } from '../moderation/appeals.service.js';
 
 const APPEAL_TTL_SEC = 30 * 60;
 const key = (token: string) => `appeal:${token}`;
 
 /**
  * Обмежений токен апеляції для забаненого користувача: Redis `appeal:<token>` → userId.
- * Дає право лише на один `POST /api/appeals`; сесії не створює.
+ * Дає право лише на один `POST /api/appeals`; сесії не створює. `appealStatus` — статус
+ * апеляції на чинну санкцію-бан (екран бану).
  */
 export async function issueAppealToken(
   deps: Pick<AppDeps, 'db' | 'redis'>,
@@ -21,17 +22,8 @@ export async function issueAppealToken(
 ): Promise<BannedLoginDetails> {
   const appealToken = randomBytes(24).toString('base64url');
   await deps.redis.set(key(appealToken), String(userId), 'EX', APPEAL_TTL_SEC);
-  const [u] = await deps.db
-    .select({ banEpoch: users.banEpoch })
-    .from(users)
-    .where(eq(users.id, userId));
-  const sent = u
-    ? await deps.db
-        .select({ id: banAppeals.id })
-        .from(banAppeals)
-        .where(and(eq(banAppeals.userId, userId), eq(banAppeals.banEpoch, u.banEpoch)))
-    : [];
-  return { appealToken, appealSent: sent.length > 0 };
+  const appealStatus = await banAppealStatus(deps.db, userId);
+  return { appealToken, appealSent: appealStatus !== null, appealStatus };
 }
 
 /** 403 ACCOUNT_BANNED із токеном апеляції в `details`. */
@@ -43,7 +35,8 @@ export async function bannedError(
 }
 
 /**
- * Апеляція: одна на період бану (`users.ban_epoch`). Токен спалюється лише остаточною
+ * Апеляція: одна на чинну санкцію-бан (`sanction_appeals`; бан лише прапорцем отримує системну
+ * санкцію — `activeBanSanction`). Токен спалюється лише остаточною
  * відповіддю (201, 409, 403, 401 для видаленого акаунта); невалідне тіло чи неочікувана
  * помилка (5xx) лишають його дійсним до кінця TTL — можна повторити.
  */
@@ -63,26 +56,21 @@ export async function createAppeal(deps: AppDeps, rawBody: unknown): Promise<{ i
     await burn();
     throw new AppError(403, 'FORBIDDEN');
   }
-  let id: number;
+  let created: { id: number; sanctionId: number };
   try {
-    const [res] = await deps.db
-      .insert(banAppeals)
-      .values({ userId, banEpoch: u.banEpoch, message: input.message });
-    id = res.insertId;
+    created = await createBanAppeal(deps, userId, input.message);
   } catch (err) {
-    if (isDuplicateKey(err)) {
-      await burn();
-      throw new AppError(409, 'APPEAL_EXISTS');
-    }
+    if (err instanceof AppError && err.code === 'APPEAL_EXISTS') await burn();
     throw err;
   }
+  const { id, sanctionId } = created;
   await burn();
   await logEvent(deps.db, {
     type: 'appeal.created',
     userId,
-    entityType: 'ban_appeal',
+    entityType: 'sanction_appeal',
     entityId: id,
-    payload: { banEpoch: u.banEpoch },
+    payload: { sanctionId, banEpoch: u.banEpoch },
   });
   return { id };
 }

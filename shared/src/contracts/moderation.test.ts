@@ -45,6 +45,8 @@ describe('moderation constants', () => {
       'SANCTION_ACTIVE',
       'APPEAL_EXISTS',
       'OWNER_TRANSFER_INVALID',
+      'APPEAL_DECIDED',
+      'RATING_ALREADY_MODERATED',
     ]) {
       expect(ERROR_CODES).toContain(code);
     }

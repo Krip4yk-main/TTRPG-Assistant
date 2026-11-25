@@ -20,7 +20,8 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * вікна, не з подій). Модерація (не з подій): `complaint.resolved` — скаржнику, без подробиць;
  * `moderation.digest` — персоналу щоденне зведення нових скарг (`count`); `sanction.imposed` /
  * `sanction.lifted` — покараному: тип (`sanctionType`), кінець (`endsAt`), причина (`reason`,
- * лише для накладення — її бачить сам покараний). Текст —
+ * лише для накладення — її бачить сам покараний); `appeal.decided` — автору апеляції: тип
+ * санкції, `accepted` і примітка (`reason`, необов'язкова). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -49,6 +50,7 @@ export const NOTIFICATION_TYPES = [
   'moderation.digest',
   'sanction.imposed',
   'sanction.lifted',
+  'appeal.decided',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -94,6 +96,8 @@ export interface NotificationParams {
   count?: number;
   /** Тип санкції (`sanction.imposed` / `sanction.lifted`). */
   sanctionType?: SanctionType;
+  /** Рішення по апеляції (`appeal.decided`): прийнято — санкцію знято. */
+  accepted?: boolean;
   /** Кінець санкції (ISO UTC); `null` — назавжди (`sanction.imposed`). */
   endsAt?: string | null;
   actor?: NotificationActor | null;
@@ -178,7 +182,9 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   if (type === 'moderation.digest') return '/admin/complaints';
   if (type === 'complaint.resolved') return '/';
   // Санкції — сторінка «Обмеження акаунта» (фронтенд, Task 5).
-  if (type === 'sanction.imposed' || type === 'sanction.lifted') return '/my-sanctions';
+  if (type === 'sanction.imposed' || type === 'sanction.lifted' || type === 'appeal.decided') {
+    return '/my-sanctions';
+  }
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'rating.session_open':

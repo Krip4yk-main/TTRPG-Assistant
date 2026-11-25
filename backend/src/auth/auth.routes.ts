@@ -290,8 +290,8 @@ export function authRouter(deps: AppDeps): Router {
       const [u] = await db.select().from(users).where(eq(users.id, userId));
       if (!u || u.status === 'deleted') return res.redirect('/login?error=UNAUTHENTICATED');
       if (u.isBanned) {
-        const { appealToken, appealSent } = await issueAppealToken(deps, userId);
-        const sent = appealSent ? '&sent=1' : '';
+        const { appealToken, appealSent, appealStatus } = await issueAppealToken(deps, userId);
+        const sent = appealSent ? `&sent=1&appealStatus=${appealStatus}` : '';
         return res.redirect(`/login?error=ACCOUNT_BANNED&appeal=${appealToken}${sent}`);
       }
       await startSession(req, res, userId);

@@ -57,6 +57,11 @@
     "moderation": {
       "digest": "🛡️ Нових скарг на розгляд: {count}."
     },
+    "appeal": {
+      "decided": "🛡️ Твою апеляцію на обмеження «{sanction}» розглянуто.",
+      "decided_accepted": "✅ Твою апеляцію прийнято: обмеження «{sanction}» знято.",
+      "decided_rejected": "❌ Твою апеляцію на обмеження «{sanction}» відхилено."
+    },
     "sanction": {
       "imposed": "⚠️ На твій акаунт накладено обмеження «{sanction}» до {until}.",
       "imposed_permanent": "⚠️ На твій акаунт накладено безстрокове обмеження «{sanction}».",

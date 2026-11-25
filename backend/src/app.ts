@@ -33,6 +33,8 @@ import { viewsRouter } from './views/views.routes.js';
 import { gameRatingsRouter, myRatingsRouter } from './ratings/ratings.routes.js';
 import { adminComplaintsRouter, complaintsRouter } from './moderation/complaints.routes.js';
 import { adminSanctionsRouter, mySanctionsRouter } from './moderation/sanctions.routes.js';
+import { adminRouter, mySanctionAppealsRouter } from './moderation/admin.routes.js';
+import { adminLogRouter } from './moderation/log.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
@@ -84,6 +86,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/views', viewsRouter(deps));
   app.use('/api/me/ratings', myRatingsRouter(deps));
   app.use('/api/me/sanctions', mySanctionsRouter(deps));
+  app.use('/api/me/sanctions', mySanctionAppealsRouter(deps));
   app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));
@@ -99,7 +102,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/sessions', sessionsRouter(deps));
   app.use('/api/complaints', complaintsRouter(deps));
   app.use('/api/admin/complaints', adminComplaintsRouter(deps));
+  app.use('/api/admin/log', adminLogRouter(deps));
   app.use('/api/admin', adminSanctionsRouter(deps));
+  app.use('/api/admin', adminRouter(deps));
   app.use('/api/og', ogRouter(deps));
   app.use('/api/internal', internalRouter(deps));
 

@@ -137,7 +137,7 @@ describe('POST /api/auth/dev-login', () => {
     expect(res.body).toEqual({
       error: {
         code: 'ACCOUNT_BANNED',
-        details: { appealToken: expect.any(String), appealSent: false },
+        details: { appealToken: expect.any(String), appealSent: false, appealStatus: null },
       },
     });
     expect((await post(app, {})).status).toBe(400);

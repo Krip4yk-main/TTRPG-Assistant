@@ -164,7 +164,11 @@ describe('telegram routes', () => {
       .send(widget('888'));
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ACCOUNT_BANNED');
-    expect(res.body.error.details).toEqual({ appealToken: expect.any(String), appealSent: false });
+    expect(res.body.error.details).toEqual({
+      appealToken: expect.any(String),
+      appealSent: false,
+      appealStatus: null,
+    });
     expect(cookies(res)).not.toMatch(/nri_sid/);
     expect(await db.select().from(sessions)).toHaveLength(0);
   });

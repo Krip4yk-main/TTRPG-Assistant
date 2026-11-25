@@ -176,6 +176,32 @@ describe('notificationView', () => {
     expect(lookup('notifications.categories.moderation.hint')).toEqual(expect.any(String));
   });
 
+  it('appeal.decided: accepted/rejected texts with the sanction type and the note', () => {
+    const accepted = notificationView(
+      {
+        ...dto('appeal.decided'),
+        category: 'moderation',
+        params: { sanctionType: 'global_ban', accepted: true },
+      },
+      'UTC',
+    );
+    expect(accepted.key).toBe('notifications.appeal.decided_accepted');
+    expect(accepted.sanction).toBe('notifications.sanction.types.global_ban');
+    expect(accepted.reason).toBeNull();
+    expect(lookup(accepted.key)).toContain('{{sanction}}');
+    const rejected = notificationView(
+      {
+        ...dto('appeal.decided'),
+        category: 'moderation',
+        params: { sanctionType: 'warning', accepted: false, reason: 'Підтверджено' },
+      },
+      'UTC',
+    );
+    expect(rejected.key).toBe('notifications.appeal.decided_rejected');
+    expect(rejected.reason).toEqual({ code: null, text: 'Підтверджено' });
+    expect(lookup(rejected.key)).toEqual(expect.any(String));
+  });
+
   it('sanctions: type name, end date, reason; permanent variant; lifted without reason', () => {
     const imposed = notificationView(
       {
