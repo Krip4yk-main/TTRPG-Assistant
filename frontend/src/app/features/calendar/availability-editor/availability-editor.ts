@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
   effect,
@@ -36,6 +37,8 @@ import {
   slotsToCells,
 } from './availability-grid';
 
+/** Як часто оновлювати зайнятість від ігор, мс. */
+const GAME_BUSY_REFRESH_MS = 5 * 60_000;
 /** Найбільше зайнятих дат (обмеження бекенду). */
 const MAX_BUSY_DATES = 366;
 /** Крок PageUp/PageDown, клітинок (4 год). */
@@ -133,7 +136,8 @@ export class AvailabilityEditor {
   /** Значення, яке Shift+стрілка «протягує» далі. */
   private paintValue = true;
   /**
-   * `save`: назви ігор, сесії яких припадають на клітинку в найближчі 7 днів. Лише показ —
+   * `save`: сесії ігор («Назва, 27.11, 19:00–23:00»), що припадають на клітинку в найближчі
+   * 7 днів. Лише показ —
    * вільний час вони не змінюють і не редагуються.
    */
   protected readonly gameBusy = signal<string[][]>(gameBusyCells([], 'UTC'));
@@ -156,6 +160,10 @@ export class AvailabilityEditor {
       inRect(d, Math.floor(i / CELLS_PER_DAY), i % CELLS_PER_DAY) ? d.value : on,
     );
   });
+  /** Підказка клітинки із сесіями (по сесії на рядок) або `null`. */
+  protected readonly busyTitles = computed(() =>
+    this.gameBusy().map((games) => (games.length ? games.join('\n') : null)),
+  );
   private readonly busyPrefix = toSignal(
     this.translate.stream('calendar.gameBusy.cell').pipe(map(String)),
     { initialValue: '' },
@@ -169,7 +177,7 @@ export class AvailabilityEditor {
       this.rows.map((c) => {
         const base = `${names[d]}, ${this.times[c]}–${this.times[c + 1]}`;
         const games = busy[cellIndex(d, c)]!;
-        return games.length ? `${base}. ${prefix}: ${games.join(', ')}` : base;
+        return games.length ? `${base}. ${prefix}: ${games.join('; ')}` : base;
       }),
     );
   });
@@ -184,6 +192,13 @@ export class AvailabilityEditor {
         else void this.load();
       });
     });
+    // Сесії переносять/скасовують, а вікно «найближчих 7 днів» зсувається з новою добою.
+    const refresh = setInterval(() => {
+      if (this.mode() === 'save' && this.state() === 'ready') {
+        void this.loadGameBusy(this.timezone());
+      }
+    }, GAME_BUSY_REFRESH_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(refresh));
   }
 
   protected async load(): Promise<void> {

@@ -68,7 +68,7 @@
                   class="cell"
                   [class.on]="display()[i]"
                   [class.game-busy]="gameBusy()[i].length > 0"
-                  [attr.title]="gameBusy()[i].length ? gameBusy()[i].join(', ') : null"
+                  [attr.title]="busyTitles()[i]"
                   [attr.data-day]="d"
                   [attr.data-cell]="c"
                   [attr.aria-selected]="display()[i]"
@@ -98,6 +98,7 @@
             {{ 'calendar.gameBusy.legend' | translate }}
           </li>
         </ul>
+        <p class="nri-muted hint busy-note">{{ 'calendar.gameBusy.note' | translate }}</p>
       }
     </section>
 

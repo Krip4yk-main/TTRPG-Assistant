@@ -8,6 +8,7 @@ import type { MeDto } from '@nri/shared';
 import { SocketService, type SessionLostReason } from '../realtime/socket.service';
 import { safeReturnTo } from './return-to';
 import { clearAllGameDrafts } from '../games/game-draft-storage';
+import { clearAllNoteDrafts } from '../notes/note-draft-storage';
 
 const CHANNEL_NAME = 'nri-auth';
 
@@ -136,10 +137,14 @@ export class AuthStore {
 
   /**
    * `null` (гість: вихід, втрата сесії, видалення акаунта, вихід в іншій вкладці) також
-   * видаляє локальні копії форм ігор — на спільному пристрої вони не мають лишатися.
+   * видаляє локальні копії форм ігор і незбережених нотаток — на спільному пристрої вони
+   * не мають лишатися.
    */
   setMe(me: MeDto | null): void {
-    if (me === null) clearAllGameDrafts();
+    if (me === null) {
+      clearAllGameDrafts();
+      clearAllNoteDrafts();
+    }
     this.state.set(me);
     this.known.set(true);
     this.failed.set(false);

@@ -5,6 +5,10 @@ import type { NoteDto, NoteUpdateInput, SharedNotesDto } from '@nri/shared';
 
 /** Джерело однієї нотатки для `NoteEditor`: прочитати й зберегти з оптимістичним блокуванням. */
 export interface NoteSource {
+  /** Стабільний ключ нотатки (`game_private.7`) — для локальної копії незбереженого тексту. */
+  key: string;
+  /** URL `PUT` — для збереження з `keepalive` при закритті сторінки. */
+  url: string;
   load(): Observable<NoteDto>;
   save(input: NoteUpdateInput): Observable<NoteDto>;
 }
@@ -22,15 +26,23 @@ export class NotesApi {
     return this.http.get<SharedNotesDto>(`/api/games/${gameId}/notes/shared`);
   }
 
-  /** Зберегти власну сторінку спільної нотатки. */
-  saveShared(gameId: number, input: NoteUpdateInput): Observable<NoteDto> {
-    return this.http.put<NoteDto>(`/api/games/${gameId}/notes/shared`, input);
+  /** Власна сторінка спільної нотатки (лише гравцям). */
+  sharedPage(gameId: number, load: () => Observable<NoteDto>): NoteSource {
+    const url = `/api/games/${gameId}/notes/shared`;
+    return {
+      key: `game_shared.${gameId}`,
+      url,
+      load,
+      save: (input) => this.http.put<NoteDto>(url, input),
+    };
   }
 
   /** Приватна нотатка на гру (майстер і активні учасники). */
   gamePrivate(gameId: number): NoteSource {
     const url = `/api/games/${gameId}/notes/private`;
     return {
+      key: `game_private.${gameId}`,
+      url,
       load: () => this.http.get<NoteDto>(url),
       save: (input) => this.http.put<NoteDto>(url, input),
     };
@@ -40,6 +52,8 @@ export class NotesApi {
   sessionPrivate(sessionId: number): NoteSource {
     const url = `/api/sessions/${sessionId}/notes/private`;
     return {
+      key: `session_private.${sessionId}`,
+      url,
       load: () => this.http.get<NoteDto>(url),
       save: (input) => this.http.put<NoteDto>(url, input),
     };

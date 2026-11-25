@@ -6,7 +6,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import type { AvailabilityDto, GameBusyDto, MeDto } from '@nri/shared';
 import { AvailabilityEditor } from './availability-editor';
-import { cellsToSlots, slotsToCells } from './availability-grid';
+import { cellsToSlots, gameBusyCells, slotsToCells } from './availability-grid';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { browserZone } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
@@ -35,6 +35,35 @@ describe('availability-grid', () => {
     const cells = slotsToCells(slots);
     expect(cells.filter(Boolean)).toHaveLength(8 + 48);
     expect(cellsToSlots(cells)).toEqual(slots);
+  });
+});
+
+describe('gameBusyCells', () => {
+  const busy = (start: string, end: string) => ({
+    gameId: 1,
+    gameTitle: 'Гра',
+    sessionId: 1,
+    start,
+    end,
+  });
+  const busyIndexes = (cells: unknown[][]) => cells.flatMap((c, i) => (c.length ? [i] : []));
+
+  it('uses the zoned minute of day (Asia/Kathmandu, UTC+5:45)', () => {
+    // Пт 27.11 19:00–20:00 за Катманду = 13:15–14:15 UTC.
+    const cells = gameBusyCells(
+      [busy('2026-11-27T13:15:00.000Z', '2026-11-27T14:15:00.000Z')],
+      'Asia/Kathmandu',
+    );
+    expect(busyIndexes(cells)).toEqual([4 * 48 + 38, 4 * 48 + 39]);
+  });
+
+  it('marks a partially covered cell and stops at the end', () => {
+    // 19:10–19:40 за Києвом → клітинки 19:00 і 19:30.
+    const cells = gameBusyCells(
+      [busy('2026-11-27T17:10:00.000Z', '2026-11-27T17:40:00.000Z')],
+      'Europe/Kyiv',
+    );
+    expect(busyIndexes(cells)).toEqual([4 * 48 + 38, 4 * 48 + 39]);
   });
 });
 
@@ -273,7 +302,8 @@ describe('AvailabilityEditor', () => {
       const busy = cell(3, 38);
       expect(busy.classList).toContain('game-busy');
       expect(busy.getAttribute('aria-label')).toContain('Туман над Дніпром');
-      expect(busy.getAttribute('title')).toContain('Туман над Дніпром');
+      expect(busy.getAttribute('title')).toBe('Туман над Дніпром, 26.11, 19:00–22:00');
+      expect(busy.getAttribute('aria-label')).toContain('26.11, 19:00–22:00');
       expect(cell(3, 43).classList).toContain('game-busy');
       expect(cell(3, 44).classList).not.toContain('game-busy');
       expect(cell(3, 37).classList).not.toContain('game-busy');
@@ -281,6 +311,28 @@ describe('AvailabilityEditor', () => {
       // Сесія — не вільний час: позначка не змінює слотів.
       expect(busy.getAttribute('aria-selected')).toBe('false');
       expect(el().querySelector('.legend .swatch.game-busy')).not.toBeNull();
+      expect(el().querySelector('.busy-note')!.textContent).toContain('calendar.gameBusy.note');
+    });
+
+    it('skips ended sessions and refreshes every 5 minutes with a moving window', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(new Date('2026-11-25T21:58:00.000Z')); // 23:58 за Києвом
+      const ended = {
+        ...session,
+        start: '2026-11-25T18:00:00.000Z',
+        end: '2026-11-25T21:00:00.000Z',
+      };
+      await setup('save', null, [ended, session]);
+      expect(cell(2, 40).classList).not.toContain('game-busy'); // ср 20:00 — уже минула
+      expect(cell(3, 38).classList).toContain('game-busy');
+
+      vi.advanceTimersByTime(5 * 60_000); // 00:03 четверга — нова доба
+      await settle();
+      flushGameBusy([]);
+      await settle();
+      expect(busyParams!.from).toBe('2026-11-25T22:00:00.000Z');
+      expect(busyParams!.to).toBe('2026-12-02T22:00:00.000Z');
+      expect(cell(3, 38).classList).not.toContain('game-busy');
     });
   });
 });

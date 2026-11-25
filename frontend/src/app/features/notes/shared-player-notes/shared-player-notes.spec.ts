@@ -133,4 +133,20 @@ describe('SharedPlayerNotes', () => {
     expect(el().querySelectorAll('.other-page')).toHaveLength(0);
     expect(el().textContent).toContain('notes.shared.noOthers');
   });
+
+  it('a former member gets no editable page', async () => {
+    const other = TestBed.createComponent(SharedPlayerNotes);
+    other.componentRef.setInput('gameId', 8);
+    other.detectChanges();
+    await other.whenStable();
+    http.expectOne('/api/games/8/notes/shared').flush({
+      pages: [{ ...notes.pages[1]!, formerMember: true }],
+    });
+    other.detectChanges();
+    await other.whenStable();
+    other.detectChanges();
+    const host = other.nativeElement as HTMLElement;
+    expect(host.querySelector('textarea')).toBeNull();
+    expect(host.querySelector('.other-page .former')).not.toBeNull();
+  });
 });

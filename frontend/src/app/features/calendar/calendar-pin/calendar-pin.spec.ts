@@ -79,4 +79,29 @@ describe('CalendarPin', () => {
     expect(toggle()!.getAttribute('aria-checked')).toBe('true');
     expect(el().querySelector('[role=alert]')!.textContent).toContain('errors.NOT_A_MEMBER');
   });
+
+  it('ignores a stale response after the game changes', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(CalendarPin);
+    fixture.componentRef.setInput('gameId', 7);
+    await settle();
+    fixture.componentRef.setInput('gameId', 8);
+    await settle();
+    const [stale, fresh] = http.match('/api/me/settings');
+    fresh!.flush({ calendarAutoBusy: true });
+    await settle();
+    stale!.flush({ calendarAutoBusy: false });
+    await settle();
+    http.expectNone('/api/me/calendar/pinned-games');
+    expect(toggle()).toBeNull();
+    expect(el().textContent).toContain('calendarPin.auto');
+  });
 });

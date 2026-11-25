@@ -72,17 +72,35 @@ export function gameBusyWindow(now: Date, tz: string): { from: Date; to: Date } 
   return { from: midnight(start), to: midnight(start + GAME_BUSY_DAYS) };
 }
 
-/** Інтервали сесій → назви ігор у кожній клітинці сітки (у поясі `tz`). */
-export function gameBusyCells(busy: readonly GameBusyDto[], tz: string): string[][] {
+/**
+ * Сесії → підписи в кожній клітинці сітки в поясі `tz`: «Назва, 27.11, 19:00–23:00».
+ * Клітинка — за локальною хвилиною доби (пояси зі зсувом :45 теж). Сесії, що вже
+ * закінчились до `now`, пропускаються.
+ */
+export function gameBusyCells(
+  busy: readonly GameBusyDto[],
+  tz: string,
+  now = Date.now(),
+): string[][] {
   const out = Array.from({ length: DAYS * CELLS_PER_DAY }, () => [] as string[]);
-  const step = CELL_MINUTES * 60_000;
   for (const b of busy) {
     const end = Date.parse(b.end);
-    for (let t = Math.floor(Date.parse(b.start) / step) * step; t < end; t += step) {
+    let t = Date.parse(b.start);
+    if (!(end > t) || end <= now) continue;
+    const from = toZoned(new Date(t), tz);
+    const to = toZoned(new Date(end), tz);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const label =
+      `${b.gameTitle}, ${pad(from.day)}.${pad(from.month)}, ` +
+      `${formatMinutes(from.hour * 60 + from.minute)}–${formatMinutes(to.hour * 60 + to.minute)}`;
+    while (t < end) {
       const z = toZoned(new Date(t), tz);
-      const cell = Math.floor((z.hour * 60 + z.minute) / CELL_MINUTES);
-      const titles = out[cellIndex(z.weekday, cell)]!;
-      if (!titles.includes(b.gameTitle)) titles.push(b.gameTitle);
+      const minute = z.hour * 60 + z.minute;
+      const cell = Math.floor(minute / CELL_MINUTES);
+      const labels = out[cellIndex(z.weekday, cell)]!;
+      if (!labels.includes(label)) labels.push(label);
+      // До наступної межі півгодини за місцевим часом.
+      t += ((cell + 1) * CELL_MINUTES - minute) * 60_000 - (t % 60_000);
     }
   }
   return out;

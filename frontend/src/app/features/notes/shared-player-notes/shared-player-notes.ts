@@ -41,16 +41,21 @@ export class SharedPlayerNotes {
   protected readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   protected readonly refreshing = signal(false);
   protected readonly refreshFailed = signal(false);
-  /** Моя сторінка — береться з першого завантаження. */
+  /**
+   * Моя сторінка — з першого завантаження; лише активному учасникові (колишній не редагує).
+   */
   protected readonly mine = signal<NoteDto | null>(null);
   /** Непорожні сторінки інших гравців. */
   protected readonly others = signal<SharedNotePageDto[]>([]);
+  /**
+   * Моя сторінка. `load` редактор викликає лише для відновлення незбереженого тексту
+   * (перечитати актуальну версію), звичайно ж бере вже завантажену сторінку (`initial`).
+   */
   protected readonly source = computed<NoteSource>(() => {
     const id = this.gameId();
-    return {
-      load: () => this.api.shared(id).pipe(map(({ pages }) => this.ownPage(pages) ?? EMPTY_NOTE)),
-      save: (input) => this.api.saveShared(id, input),
-    };
+    return this.api.sharedPage(id, () =>
+      this.api.shared(id).pipe(map(({ pages }) => this.ownPage(pages) ?? EMPTY_NOTE)),
+    );
   });
 
   private readonly zone = computed(() => viewerTimeZone(this.auth.me()));
@@ -91,7 +96,7 @@ export class SharedPlayerNotes {
     try {
       const { pages } = await firstValueFrom(this.api.shared(gameId));
       const own = this.ownPage(pages);
-      if (!this.mine()) this.mine.set(own ?? EMPTY_NOTE);
+      if (!this.mine() && own) this.mine.set(own);
       this.others.set(pages.filter((p) => p !== own && p.body.trim() !== ''));
       this.state.set('ready');
     } catch {

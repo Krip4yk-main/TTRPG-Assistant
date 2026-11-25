@@ -36,6 +36,8 @@ export class CalendarPin {
   protected readonly pinned = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Номер останнього завантаження: відповіді для попередньої гри ігноруються. */
+  private seq = 0;
 
   constructor() {
     effect(() => {
@@ -50,9 +52,11 @@ export class CalendarPin {
     this.busy.set(true);
     this.error.set(null);
     this.pinned.set(on);
+    const seq = this.seq;
     try {
       await firstValueFrom(on ? this.api.pin(id) : this.api.unpin(id), { defaultValue: null });
     } catch (err) {
+      if (seq !== this.seq) return;
       this.pinned.set(!on);
       const { code } = toApiError(err);
       if (code !== 'UNAUTHENTICATED') this.error.set(`errors.${code}`);
@@ -62,18 +66,22 @@ export class CalendarPin {
   }
 
   private async load(gameId: number): Promise<void> {
+    const seq = ++this.seq;
     this.mode.set(null);
+    this.error.set(null);
     try {
       const { calendarAutoBusy } = await firstValueFrom(this.api.settings());
+      if (seq !== this.seq) return;
       if (calendarAutoBusy) {
         this.mode.set('auto');
         return;
       }
       const { gameIds } = await firstValueFrom(this.api.pinnedGames());
+      if (seq !== this.seq) return;
       this.pinned.set(gameIds.includes(gameId));
       this.mode.set('manual');
     } catch {
-      this.mode.set(null);
+      if (seq === this.seq) this.mode.set(null);
     }
   }
 }

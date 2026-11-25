@@ -14,6 +14,13 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { NOTE_BODY_MAX, type NoteConflictDetails, type NoteDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
+import { AuthStore } from '../../../core/auth/auth.store';
+import {
+  noteDraftKey,
+  readNoteDraft,
+  removeNoteDraft,
+  writeNoteDraft,
+} from '../../../core/notes/note-draft-storage';
 import type { NoteSource } from '../../../core/notes/notes.api';
 
 /** Пауза після введення до автозбереження, мс. */
@@ -33,6 +40,9 @@ let nextId = 0;
  * - Оптимістичне блокування: `PUT { body, version }`; на 409 `NOTE_CONFLICT` показує обидві
  *   версії — «Залишити мою» (повторний `PUT` з актуальною `version`) чи «Взяти актуальну».
  *   Поки конфлікт не вирішено, автозбереження зупинене.
+ * - Текст, який не вдалося зберегти (конфлікт чи помилка), копіюється в `localStorage`;
+ *   при наступному відкритті редактор перечитує актуальну версію й знову показує вибір.
+ * - При закритті сторінки (`pagehide`) відкладене збереження йде `fetch` з `keepalive`.
  * - `source` читається один раз (при створенні); `initial` — уже завантажена нотатка.
  */
 @Component({
@@ -43,6 +53,8 @@ let nextId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NoteEditor implements OnInit {
+  private readonly auth = inject(AuthStore);
+
   readonly source = input.required<NoteSource>();
   /** Ключ i18n підпису поля. */
   readonly label = input.required<string>();
@@ -67,17 +79,22 @@ export class NoteEditor implements OnInit {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private inFlight = false;
   private destroyed = false;
+  private readonly onPageHide = () => this.flushOnPageHide();
 
   constructor() {
+    window.addEventListener('pagehide', this.onPageHide);
     inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('pagehide', this.onPageHide);
       this.destroyed = true;
-      void this.flush();
+      if (this.conflict()) this.keepDraft();
+      else void this.flush();
     });
   }
 
   ngOnInit(): void {
-    const initial = this.initial();
-    if (initial) this.apply(initial);
+    const draft = this.draftKey ? readNoteDraft(this.draftKey) : null;
+    if (draft !== null) void this.restore(draft);
+    else if (this.initial()) this.apply(this.initial()!);
     else void this.load();
   }
 
@@ -92,7 +109,10 @@ export class NoteEditor implements OnInit {
 
   protected onInput(value: string): void {
     this.body.set(value);
-    if (this.conflict()) return;
+    if (this.conflict()) {
+      this.keepDraft();
+      return;
+    }
     this.schedule();
   }
 
@@ -114,7 +134,10 @@ export class NoteEditor implements OnInit {
     this.conflict.set(null);
     await this.flush();
     // Текст збігся з актуальним — зберігати нічого, але стан узгоджено.
-    if (this.status() === 'conflict') this.status.set('saved');
+    if (this.status() === 'conflict') {
+      this.status.set('saved');
+      this.dropDraft();
+    }
   }
 
   /** «Взяти актуальну»: замінити свій текст версією з сервера. */
@@ -122,8 +145,43 @@ export class NoteEditor implements OnInit {
     const server = this.conflict();
     if (!server) return;
     this.conflict.set(null);
+    this.dropDraft();
     this.apply({ ...server, updatedAt: null });
     this.status.set('saved');
+  }
+
+  /** Ключ локальної копії незбереженого тексту (`null` — гість, копій не робимо). */
+  private get draftKey(): string | null {
+    const userId = this.auth.me()?.id;
+    return userId ? noteDraftKey(userId, this.source().key) : null;
+  }
+
+  private keepDraft(): void {
+    const key = this.draftKey;
+    if (key) writeNoteDraft(key, this.body());
+  }
+
+  private dropDraft(): void {
+    const key = this.draftKey;
+    if (key) removeNoteDraft(key);
+  }
+
+  /** Є незбережений текст із минулого разу: показати його поруч з актуальною версією. */
+  private async restore(draft: string): Promise<void> {
+    this.status.set('loading');
+    try {
+      const server = await firstValueFrom(this.source().load());
+      this.apply(server);
+      if (draft === server.body) {
+        this.dropDraft();
+        return;
+      }
+      this.body.set(draft);
+      this.conflict.set({ body: server.body, version: server.version });
+      this.status.set('conflict');
+    } catch {
+      if (!this.destroyed) this.status.set('loadError');
+    }
   }
 
   private apply(note: NoteDto): void {
@@ -161,6 +219,7 @@ export class NoteEditor implements OnInit {
       this.savedBody = saved.body;
       this.version = saved.version;
       this.status.set('saved');
+      this.dropDraft();
     } catch (err) {
       const { code, details } = toApiError(err);
       if (code === 'NOTE_CONFLICT' && isConflict(details)) {
@@ -169,14 +228,46 @@ export class NoteEditor implements OnInit {
       } else {
         this.status.set('error');
       }
+      // Мій текст не збережено — копія, щоб не загубити його, якщо редактор закриють.
+      this.keepDraft();
     } finally {
       this.inFlight = false;
     }
-    // Поки йшов запит, текст змінився — зберегти й це.
-    if (!this.destroyed && this.status() === 'saved' && this.body() !== this.savedBody) {
-      this.schedule();
+    // Поки йшов запит, текст змінився — зберегти й це (після знищення — одразу, один раз).
+    if (this.status() === 'saved' && this.body() !== this.savedBody) {
+      if (this.destroyed) void this.flush();
+      else this.schedule();
     }
   }
+
+  /**
+   * Сторінку закривають/ховають: незбережене відкладене введення відправляємо `fetch` з
+   * `keepalive` (звичайний запит браузер може обірвати).
+   */
+  private flushOnPageHide(): void {
+    if (this.inFlight || this.conflict() || this.timer === null) return;
+    const body = this.body();
+    this.clearTimer();
+    if (body === this.savedBody) return;
+    this.keepDraft();
+    try {
+      void fetch(this.source().url, {
+        method: 'PUT',
+        keepalive: true,
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+        body: JSON.stringify({ body, version: this.version }),
+      }).catch(() => undefined);
+    } catch {
+      // keepalive недоступний — копія в localStorage лишається.
+    }
+  }
+}
+
+/** Токен CSRF із куки (як `withXsrfConfiguration` для HttpClient). */
+function csrfToken(): string {
+  const match = /(?:^|;\s*)nri_csrf=([^;]*)/.exec(document.cookie);
+  return match ? decodeURIComponent(match[1]!) : '';
 }
 
 function isConflict(d: unknown): d is NoteConflictDetails {
