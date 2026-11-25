@@ -138,5 +138,10 @@ export const routes: Routes = [
     title: 'titles.about',
     loadComponent: () => import('./features/about/about').then((m) => m.About),
   },
-  { path: '**', redirectTo: '' },
+  {
+    // Неіснуюча адреса — сторінка 404 (адреса в рядку браузера лишається).
+    path: '**',
+    title: 'titles.notFound',
+    loadComponent: () => import('./features/not-found/not-found').then((m) => m.NotFound),
+  },
 ];

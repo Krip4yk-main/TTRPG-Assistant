@@ -1,0 +1,52 @@
+:host {
+  display: block;
+}
+
+.not-found {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+}
+
+.notice {
+  position: relative;
+  max-width: 440px;
+  padding: var(--nri-space-2xl) var(--nri-space-xl) var(--nri-space-xl);
+  text-align: center;
+
+  h1 {
+    margin: 0 0 var(--nri-space-sm);
+  }
+}
+
+.code {
+  margin: 0;
+  color: var(--nri-text-muted);
+  font-family: var(--nri-font-heading, inherit);
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--nri-space-sm);
+  margin-top: var(--nri-space-lg);
+}
+
+// «Дошка оголошень»: оголошення приколоте трохи криво (рваний край і шпилька — з .qb-paper,
+// .qb-torn, .qb-pin дизайну; в інших дизайнах ці класи нічого не роблять, шпилька прихована).
+.qb-pin {
+  display: none;
+}
+
+:host-context([data-theme='quest-board']) {
+  .notice {
+    transform: rotate(-1.5deg);
+  }
+
+  .qb-pin {
+    display: block;
+  }
+}
