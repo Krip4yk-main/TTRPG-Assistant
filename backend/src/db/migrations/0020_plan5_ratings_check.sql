@@ -1,0 +1,1 @@
+ALTER TABLE `ratings` ADD CONSTRAINT `ratings_declined_ck` CHECK ((`ratings`.`declined` = 1 AND `ratings`.`overall` IS NULL AND `ratings`.`criteria` IS NULL AND `ratings`.`comment` IS NULL) OR (`ratings`.`declined` = 0 AND `ratings`.`overall` IS NOT NULL AND `ratings`.`overall` BETWEEN 1 AND 5));

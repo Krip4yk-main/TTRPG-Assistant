@@ -83,8 +83,11 @@ export interface RatingTargetDto {
   /** Роль/джерело, під якою піде оцінка цієї цілі. */
   role: RatingRole;
   state: RatingTargetState;
-  /** ISO; коли закривається вікно (для «вихідної» оцінки під час кампанії — орієнтир). */
-  closesAt: string;
+  /**
+   * ISO; коли закривається вікно. `null` — «вихідна» оцінка, поки гра ще йде: дедлайну немає
+   * (вікно закриється через 30 днів після завершення чи скасування гри).
+   */
+  closesAt: string | null;
 }
 
 export interface RatingTargetsDto {

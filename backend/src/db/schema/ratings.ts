@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  check,
   datetime,
   decimal,
   index,
@@ -67,6 +68,11 @@ export const ratings = mysqlTable(
     uniqueIndex('ratings_rater_ratee_game_slot_uq').on(t.raterId, t.rateeId, t.gameId, t.slotKey),
     index('ratings_ratee_role_id_idx').on(t.rateeId, t.role, t.id),
     index('ratings_game_id_idx').on(t.gameId),
+    // Відмова — без оцінок і тексту; оцінка — з обов'язковою загальною 1..5 (`IS NOT NULL`: CHECK з NULL-результатом проходить).
+    check(
+      'ratings_declined_ck',
+      sql`(${t.declined} = 1 AND ${t.overall} IS NULL AND ${t.criteria} IS NULL AND ${t.comment} IS NULL) OR (${t.declined} = 0 AND ${t.overall} IS NOT NULL AND ${t.overall} BETWEEN 1 AND 5)`,
+    ),
   ],
 );
 

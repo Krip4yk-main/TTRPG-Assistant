@@ -19,7 +19,13 @@ afterAll(async () => {
   await closeDeps(deps);
 });
 
-const DUP = /Duplicate|Failed query/i;
+/** drizzle загортає помилку mysql2 («Failed query …»): текст MySQL — у `cause`. */
+const mysqlError = (re: RegExp) =>
+  expect.objectContaining({
+    cause: expect.objectContaining({ message: expect.stringMatching(re) }),
+  });
+const DUP = mysqlError(/Duplicate entry/);
+const CHECK_FAILED = mysqlError(/ratings_declined_ck/);
 
 async function setup() {
   const gm = await createUser(db, { nickname: 'Gm' });
@@ -85,6 +91,26 @@ describe('plan 5 schema', () => {
     expect(final.criteria).toEqual({ safety: 5 });
     expect(final.declined).toBe(false);
     expect(rows.find((r) => r.kind === 'session')!.slotKey).toBe(sessionId);
+  });
+
+  it('declined rows carry no scores; scored rows need overall 1..5', async () => {
+    const { gm, player, gameId } = await setup();
+    const base = { raterId: player.id, rateeId: gm.id, gameId, role: 'gm' as const };
+    const bad = [
+      { declined: true, overall: 3 },
+      { declined: true, criteria: { safety: 5 } },
+      { declined: true, comment: 'x' },
+      { declined: false },
+      { declined: false, overall: 0 },
+      { declined: false, overall: 6 },
+    ];
+    for (const v of bad) {
+      await expect(db.insert(ratings).values({ ...base, kind: 'final', ...v })).rejects.toThrow(
+        CHECK_FAILED,
+      );
+    }
+    await db.insert(ratings).values({ ...base, kind: 'final', declined: true });
+    expect(await db.select().from(ratings)).toHaveLength(1);
   });
 
   it('deleting a session cascades its ratings and reminder log rows', async () => {

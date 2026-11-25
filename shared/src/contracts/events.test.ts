@@ -21,6 +21,8 @@ describe('EVENT_TYPES', () => {
       'game.converted_to_campaign',
       'game.rule_changed',
       'appeal.created',
+      'rating.created',
+      'rating.published',
     ])
       expect(EVENT_TYPES).toContain(t);
   });

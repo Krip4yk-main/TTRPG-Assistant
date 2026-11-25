@@ -42,5 +42,8 @@ export const EVENT_TYPES = [
   'session.done',
   // апеляції
   'appeal.created',
+  // рейтинги (без оцінювача й оцінок у payload)
+  'rating.created',
+  'rating.published',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
