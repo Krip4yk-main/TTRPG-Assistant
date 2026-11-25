@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
 import { safeReturnTo } from '../auth/return-to';
+import { bannedDetailsOf, isAccountBanned } from '../auth/banned';
 
 export { safeReturnTo };
 
@@ -21,7 +22,8 @@ function isExempt(method: string, url: string): boolean {
 /**
  * Сесія завершилася (401 на будь-якому API-запиті, крім винятків) → очищаємо стан
  * і ведемо на /login, зберігши поточну сторінку в `returnTo`. Помилка йде далі —
- * компоненти просто не показують її повторно.
+ * компоненти просто не показують її повторно. 403 `ACCOUNT_BANNED` (бан посеред сесії) —
+ * так само на /login, але з формою апеляції (`AuthStore.accountBanned`).
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // Не-API запити (зокрема завантаження перекладів під час конструювання
@@ -32,7 +34,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const injector = inject(Injector);
   return next(req).pipe(
     catchError((err: unknown) => {
-      if (err instanceof HttpErrorResponse && err.status === 401) {
+      if (isAccountBanned(err)) {
+        // Бан посеред сесії: показати форму апеляції, а не просто «сесія завершилася».
+        injector.get(AuthStore).accountBanned(bannedDetailsOf(err));
+      } else if (err instanceof HttpErrorResponse && err.status === 401) {
         const auth = injector.get(AuthStore);
         const router = injector.get(Router);
         auth.setMe(null);

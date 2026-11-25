@@ -35,6 +35,7 @@ describe('authInterceptor', () => {
     auth = TestBed.inject(AuthStore);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/account');
+    router.navigated = true;
     navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true) as unknown as ReturnType<
       typeof vi.fn
     >;
@@ -85,6 +86,22 @@ describe('authInterceptor', () => {
     await fail('POST', '/api/appeals', 401);
     expect(navigate).not.toHaveBeenCalled();
     expect(auth.me()).not.toBeNull();
+  });
+
+  it('403 ACCOUNT_BANNED (бан посеред сесії) → гість, pendingBan і /login без токена в адресі', async () => {
+    const done = firstValueFrom(http.post('/api/games', {})).catch(() => undefined);
+    ctrl
+      .expectOne('/api/games')
+      .flush(
+        { error: { code: 'ACCOUNT_BANNED', details: { appealToken: 'tok', appealSent: false } } },
+        { status: 403, statusText: 'Forbidden' },
+      );
+    await done;
+    expect(auth.me()).toBeNull();
+    expect(auth.pendingBan()).toEqual({ appealToken: 'tok', appealSent: false });
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { error: 'ACCOUNT_BANNED', returnTo: '/account' },
+    });
   });
 
   it('5xx не розлогінює', async () => {

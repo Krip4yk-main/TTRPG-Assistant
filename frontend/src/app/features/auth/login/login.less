@@ -6,6 +6,16 @@
   max-width: 520px;
 }
 
+// Фокус на заголовок ставимо програмно (повернення з екрана бану).
+h1:focus {
+  outline: none;
+}
+
+h1:focus-visible {
+  outline: 2px solid var(--nri-focus-ring);
+  outline-offset: 2px;
+}
+
 .providers {
   display: flex;
   flex-direction: column;

@@ -1,12 +1,13 @@
 import { DestroyRef, Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { NavigationCancel, NavigationEnd, NavigationError, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { filter, firstValueFrom, take } from 'rxjs';
 import { AuthApi } from './auth.api';
-import type { MeDto } from '@nri/shared';
+import type { BannedLoginDetails, MeDto } from '@nri/shared';
 import { SocketService, type SessionLostReason } from '../realtime/socket.service';
 import { safeReturnTo } from './return-to';
+import { bannedDetailsOf, isAccountBanned } from './banned';
 import { clearAllGameDrafts } from '../games/game-draft-storage';
 import { clearAllNoteDrafts } from '../notes/note-draft-storage';
 
@@ -37,6 +38,7 @@ export class AuthStore {
   private readonly failed = signal(false);
   private loading: Promise<void> | null = null;
   private blockedUrl: string | null = null;
+  private readonly ban = signal<BannedLoginDetails | null>(null);
 
   readonly me = this.state.asReadonly();
   readonly isAuthenticated = computed(() => this.state() !== null);
@@ -46,6 +48,11 @@ export class AuthStore {
   readonly loadFailed = this.failed.asReadonly();
   /** Стан ще жодного разу не вдалося визначити. */
   readonly isUnknown = computed(() => !this.known() && this.failed());
+  /**
+   * Бан посеред сесії: токен апеляції тримаємо лише в пам'яті (не в адресі) — сторінка
+   * входу забирає його (`clearPendingBan`) і показує форму апеляції.
+   */
+  readonly pendingBan = this.ban.asReadonly();
 
   constructor() {
     // Сервер відкликав сесію або інша вкладка вийшла: перевіряємо, чи сесія ще жива.
@@ -64,7 +71,8 @@ export class AuthStore {
     this.loading = firstValueFrom(this.api.me()).then(
       (me) => this.setMe(me),
       (err: unknown) => {
-        if (err instanceof HttpErrorResponse && err.status === 401) this.setMe(null);
+        if (isAccountBanned(err)) this.accountBanned(bannedDetailsOf(err));
+        else if (err instanceof HttpErrorResponse && err.status === 401) this.setMe(null);
         else this.failed.set(true);
       },
     );
@@ -94,13 +102,11 @@ export class AuthStore {
         },
         (err: unknown) => {
           if (this.loggingOut > 0 || !this.isAuthenticated()) return;
-          const banned =
-            err instanceof HttpErrorResponse &&
-            err.status === 403 &&
-            (err.error as { error?: { code?: unknown } } | null)?.error?.code === 'ACCOUNT_BANNED';
-          if (banned || (err instanceof HttpErrorResponse && err.status === 401)) {
+          if (isAccountBanned(err)) {
+            this.accountBanned(bannedDetailsOf(err));
+          } else if (err instanceof HttpErrorResponse && err.status === 401) {
             this.setMe(null);
-            this.goToLogin(banned ? 'ACCOUNT_BANNED' : 'UNAUTHENTICATED');
+            this.goToLogin('UNAUTHENTICATED');
           } else {
             this.failed.set(true);
             // Сервер розірвав сокет, але перевірити сесію не вдалося: пробуємо перепідключитися.
@@ -112,8 +118,37 @@ export class AuthStore {
     return this.revalidating;
   }
 
+  /**
+   * Акаунт заблоковано (сесію бекенд уже відкликав): стан — гість, деталі апеляції — в
+   * пам'ять, перехід на /login?error=ACCOUNT_BANNED (без токена в адресі).
+   */
+  accountBanned(details: BannedLoginDetails | null): void {
+    this.ban.set(details);
+    this.setMe(null);
+    this.goToLogin('ACCOUNT_BANNED');
+  }
+
+  clearPendingBan(): void {
+    this.ban.set(null);
+  }
+
   private goToLogin(error: string): void {
     const router = this.injector.get(Router);
+    if (!router.navigated) {
+      // Початкова навігація ще не відбулася (перевірка сесії при старті) — після неї.
+      router.events
+        .pipe(
+          filter(
+            (e) =>
+              e instanceof NavigationEnd ||
+              e instanceof NavigationCancel ||
+              e instanceof NavigationError,
+          ),
+          take(1),
+        )
+        .subscribe(() => this.goToLogin(error));
+      return;
+    }
     if (router.url.startsWith('/login')) return;
     const returnTo = safeReturnTo(router.url);
     void router.navigate(['/login'], {

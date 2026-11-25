@@ -3,7 +3,7 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import type { OAuthProvider } from '../../src/auth/providers/oauth.js';
-import { authIdentities, sessions, users } from '../../src/db/schema/index.js';
+import { authIdentities, banAppeals, sessions, users } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { sign, TEST_BOT_TOKEN } from './telegram-sign.js';
 import { AppError } from '../../src/http/errors.js';
@@ -316,7 +316,18 @@ describe('google oauth', () => {
     const appeal = loc.searchParams.get('appeal');
     expect(appeal).toMatch(/^[A-Za-z0-9_-]{22,}$/);
     expect(await redis.get(`appeal:${appeal}`)).not.toBeNull();
+    expect(loc.searchParams.has('sent')).toBe(false);
     expect(cookies(res)).not.toMatch(/nri_sid/);
+
+    // Апеляцію вже надіслано — редирект каже про це (`sent=1`).
+    const [u] = await db.select().from(users);
+    await db.insert(banAppeals).values({ userId: u!.id, banEpoch: u!.banEpoch, message: 'm' });
+    const a3 = request.agent(createApp(deps));
+    const s3 = await startFlow(a3);
+    const res3 = await a3.get(`/api/auth/google/callback?code=c&state=${s3.state}`);
+    const loc3 = new URL(res3.headers.location as string, 'http://x.invalid');
+    expect(loc3.searchParams.get('error')).toBe('ACCOUNT_BANNED');
+    expect(loc3.searchParams.get('sent')).toBe('1');
   });
 
   it('login via oauth revokes an existing session', async () => {

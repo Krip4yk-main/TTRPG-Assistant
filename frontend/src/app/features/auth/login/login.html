@@ -8,7 +8,7 @@
   }
   <!-- Приховуємо, а не прибираємо: віджет Telegram вставляється один раз. -->
   <div class="nri-card" [hidden]="!!banned()">
-    <h1>{{ 'login.title' | translate }}</h1>
+    <h1 #loginTitle tabindex="-1">{{ 'login.title' | translate }}</h1>
     <p class="nri-muted">{{ 'login.intro' | translate }}</p>
 
     @if (errorKey(); as key) {

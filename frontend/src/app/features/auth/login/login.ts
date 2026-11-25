@@ -3,12 +3,15 @@ import {
   Component,
   DestroyRef,
   type ElementRef,
+  Injector,
   type OnInit,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -24,6 +27,7 @@ import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { bannedDetails } from '../../../core/auth/banned';
 import { BannedNotice } from '../banned-notice/banned-notice';
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
@@ -51,6 +55,7 @@ export class Login implements OnInit {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly injector = inject(Injector);
 
   /** `?error=CODE` після OAuth-редиректу або відхиленої реєстрації. */
   readonly error = input<string>();
@@ -58,6 +63,8 @@ export class Login implements OnInit {
   readonly returnTo = input<string>();
   /** `?appeal=TOKEN` разом з `error=ACCOUNT_BANNED` після OAuth-входу заблокованого. */
   readonly appeal = input<string>();
+  /** `?sent=1` — апеляцію в цьому періоді бану вже надіслано. */
+  readonly sent = input<string>();
 
   /** Акаунт заблоковано: показуємо екран апеляції замість способів входу. */
   protected readonly banned = signal<BannedLoginDetails | null>(null);
@@ -82,8 +89,19 @@ export class Login implements OnInit {
   });
 
   private readonly telegramContainer = viewChild<ElementRef<HTMLElement>>('telegramWidget');
+  private readonly loginTitle = viewChild<ElementRef<HTMLElement>>('loginTitle');
 
   constructor() {
+    // Бан посеред сесії: деталі апеляції в пам'яті AuthStore (не в адресі).
+    effect(() => {
+      const pending = this.auth.pendingBan();
+      if (!pending) return;
+      untracked(() => {
+        this.auth.clearPendingBan();
+        this.banned.set(pending);
+        if (this.error() === 'ACCOUNT_BANNED') this.cleanQuery();
+      });
+    });
     const win = window as TelegramWindow;
     inject(DestroyRef).onDestroy(() => delete win[TELEGRAM_CALLBACK]);
     afterNextRender(() => {
@@ -106,23 +124,26 @@ export class Login implements OnInit {
   ngOnInit(): void {
     const token = this.appeal();
     if (this.error() === 'ACCOUNT_BANNED' && token) {
-      this.banned.set({ appealToken: token, appealSent: false });
+      this.banned.set({ appealToken: token, appealSent: this.sent() === '1' });
     }
     // Токен не лишаємо ні в адресі, ні в історії (заміна поточного запису).
-    if (token !== undefined) {
-      void this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { error: null, appeal: null },
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
-    }
+    if (token !== undefined || this.sent() !== undefined) this.cleanQuery();
   }
 
-  /** З екрана бану — назад до способів входу (отримати новий токен). */
+  /** З екрана бану — назад до способів входу (отримати новий токен); фокус — на заголовок. */
   protected leaveBanned(): void {
     this.banned.set(null);
     this.actionError.set(null);
+    afterNextRender(() => this.loginTitle()?.nativeElement.focus(), { injector: this.injector });
+  }
+
+  private cleanQuery(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { error: null, appeal: null, sent: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected async devLogin(): Promise<void> {
@@ -152,8 +173,9 @@ export class Login implements OnInit {
       );
     } catch (err) {
       const { code, details } = toApiError(err);
-      if (code === 'ACCOUNT_BANNED' && isBannedDetails(details)) {
-        this.banned.set({ appealToken: details.appealToken, appealSent: details.appealSent });
+      const ban = code === 'ACCOUNT_BANNED' ? bannedDetails(details) : null;
+      if (ban) {
+        this.banned.set(ban);
       } else {
         this.actionError.set(code);
       }
@@ -161,11 +183,4 @@ export class Login implements OnInit {
       this.busy.set(false);
     }
   }
-}
-
-function isBannedDetails(d: unknown): d is BannedLoginDetails {
-  const v = d as Partial<BannedLoginDetails> | null | undefined;
-  return (
-    typeof v?.appealToken === 'string' && v.appealToken !== '' && typeof v.appealSent === 'boolean'
-  );
 }

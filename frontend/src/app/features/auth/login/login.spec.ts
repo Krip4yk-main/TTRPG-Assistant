@@ -9,6 +9,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { Login } from './login';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { AuthStore } from '../../../core/auth/auth.store';
 
 describe('Login — banned account', () => {
   let harness: RouterTestingHarness;
@@ -22,7 +23,7 @@ describe('Login — banned account', () => {
   };
   const el = () => harness.routeNativeElement!;
 
-  async function open(url: string): Promise<Login> {
+  async function open(url: string, before?: () => void): Promise<Login> {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -49,13 +50,18 @@ describe('Login — banned account', () => {
     });
     http = TestBed.inject(HttpTestingController);
     location = TestBed.inject(Location) as SpyLocation;
+    before?.();
     harness = await RouterTestingHarness.create();
+    document.body.appendChild(harness.fixture.nativeElement as HTMLElement);
     const login = await harness.navigateByUrl(url, Login);
     await settle();
     return login;
   }
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    (harness.fixture.nativeElement as HTMLElement).remove();
+  });
 
   it('takes the OAuth appeal token from the query and replaces the URL without a history entry', async () => {
     await open('/login?error=ACCOUNT_BANNED&appeal=tok-xyz&returnTo=%2Fcalendar');
@@ -124,5 +130,32 @@ describe('Login — banned account', () => {
     await settle();
     expect(el().querySelector('nri-banned-notice')).toBeNull();
     expect(el().querySelector('.nri-card[hidden]')).toBeNull();
+    expect(document.activeElement).toBe(el().querySelector('.nri-card h1'));
+  });
+
+  it('OAuth `sent=1` shows the sent state; sent is removed from the URL too', async () => {
+    await open('/login?error=ACCOUNT_BANNED&appeal=tok-s&sent=1');
+    expect(TestBed.inject(Router).url).toBe('/login');
+    expect(location.urlChanges.at(-1)).toBe('replace: /login');
+    expect(el().querySelector('.state-title')!.textContent).toContain('banned.sent.title');
+    expect(el().querySelector('nri-banned-notice form')).toBeNull();
+  });
+
+  it('mid-session ban: takes the in-memory appeal details and clears the error from the URL', async () => {
+    await open('/login?error=ACCOUNT_BANNED&returnTo=%2Fcalendar', () =>
+      TestBed.inject(AuthStore).accountBanned({ appealToken: 'tok-m', appealSent: false }),
+    );
+    const auth = TestBed.inject(AuthStore);
+    expect(auth.pendingBan()).toBeNull();
+    expect(TestBed.inject(Router).url).toBe('/login?returnTo=%2Fcalendar');
+    expect(el().querySelector('nri-banned-notice h1')).not.toBeNull();
+    el().querySelector<HTMLTextAreaElement>('textarea.message')!.value = 'Чому?';
+    el().querySelector('textarea.message')!.dispatchEvent(new Event('input'));
+    await settle();
+    el().querySelector<HTMLButtonElement>('button.send')!.click();
+    await settle();
+    const req = http.expectOne('/api/appeals');
+    expect(req.request.body).toEqual({ appealToken: 'tok-m', message: 'Чому?' });
+    req.flush({ id: 1 }, { status: 201, statusText: 'Created' });
   });
 });

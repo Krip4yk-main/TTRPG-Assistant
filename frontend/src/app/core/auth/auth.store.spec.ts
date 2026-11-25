@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Router, provideRouter } from '@angular/router';
+import { NavigationEnd, Router, provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 import type { SessionLostReason } from '../realtime/socket.service';
 import { AuthStore } from './auth.store';
@@ -43,6 +43,7 @@ describe('AuthStore', () => {
     http = TestBed.inject(HttpTestingController);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/account');
+    router.navigated = true;
     navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true) as unknown as ReturnType<
       typeof vi.fn
     >;
@@ -51,6 +52,31 @@ describe('AuthStore', () => {
   afterEach(() => {
     http.verify();
     localStorage.clear();
+  });
+
+  it('load() з 403 ACCOUNT_BANNED → гість, pendingBan, /login після початкової навігації', async () => {
+    const router = TestBed.inject(Router);
+    router.navigated = false;
+    const done = store.load();
+    http
+      .expectOne('/api/me')
+      .flush(
+        { error: { code: 'ACCOUNT_BANNED', details: { appealToken: 'tok', appealSent: false } } },
+        { status: 403, statusText: 'Forbidden' },
+      );
+    await done;
+    expect(store.me()).toBeNull();
+    expect(store.isUnknown()).toBe(false);
+    expect(store.pendingBan()).toEqual({ appealToken: 'tok', appealSent: false });
+    // Початкова навігація ще не завершилася — чекаємо на неї.
+    expect(navigate).not.toHaveBeenCalled();
+    router.navigated = true;
+    (router.events as unknown as Subject<unknown>).next(
+      new NavigationEnd(1, '/account', '/account'),
+    );
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { error: 'ACCOUNT_BANNED', returnTo: '/account' },
+    });
   });
 
   it('load() з відповіддю 401 → гість', async () => {
@@ -185,6 +211,24 @@ describe('AuthStore', () => {
       expect(navigate).toHaveBeenCalledWith(['/login'], {
         queryParams: { error: 'ACCOUNT_BANNED', returnTo: '/account' },
       });
+    });
+
+    it('403 ACCOUNT_BANNED з деталями → токен апеляції лише в пам’яті (pendingBan)', async () => {
+      await login();
+      lost$.next('revoked');
+      http
+        .expectOne('/api/me')
+        .flush(
+          { error: { code: 'ACCOUNT_BANNED', details: { appealToken: 'tok', appealSent: true } } },
+          { status: 403, statusText: 'Forbidden' },
+        );
+      await vi.waitFor(() => expect(store.me()).toBeNull());
+      expect(store.pendingBan()).toEqual({ appealToken: 'tok', appealSent: true });
+      expect(navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { error: 'ACCOUNT_BANNED', returnTo: '/account' },
+      });
+      store.clearPendingBan();
+      expect(store.pendingBan()).toBeNull();
     });
 
     it('sessionLost$ під час власного виходу → без /api/me і без навігації з error', async () => {

@@ -53,7 +53,8 @@ describe('BannedNotice', () => {
     expect(h1.textContent).toContain('banned.title');
     expect(document.activeElement).toBe(h1);
     expect(el.querySelector('mat-label')!.textContent).toContain('banned.form.message');
-    expect(el.querySelector('.state')!.getAttribute('aria-live')).toBe('polite');
+    // Зміну стану оголошує перенесення фокуса, а не live-регіон (без подвійного читання).
+    expect(el.querySelector('.state')!.hasAttribute('aria-live')).toBe(false);
     expect(el.querySelector('textarea')!.getAttribute('maxlength')).toBe(
       String(APPEAL_MESSAGE_MAX),
     );
@@ -136,6 +137,27 @@ describe('BannedNotice', () => {
       .flush({ error: { code: 'FORBIDDEN' } }, { status: 403, statusText: 'x' });
     await settle();
     expect(stateTitle()).toBe('banned.expired.title');
+  });
+
+  it('429 RATE_LIMITED and 403 CSRF are retryable: form and text stay, inline error', async () => {
+    await create();
+    await type('Текст');
+    await submit();
+    http
+      .expectOne('/api/appeals')
+      .flush({ error: { code: 'RATE_LIMITED' } }, { status: 429, statusText: 'x' });
+    await settle();
+    expect(el.querySelector('.send-error')!.textContent).toContain('errors.RATE_LIMITED');
+    expect(el.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Текст');
+    expect(stateTitle()).toBe('banned.form.title');
+
+    await submit();
+    http
+      .expectOne('/api/appeals')
+      .flush({ error: { code: 'CSRF' } }, { status: 403, statusText: 'x' });
+    await settle();
+    expect(el.querySelector('.send-error')!.textContent).toContain('errors.CSRF');
+    expect(el.querySelector('form')).not.toBeNull();
   });
 
   it('a server error keeps the form with the text and allows retrying', async () => {

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
@@ -122,6 +122,29 @@ describe('POST /api/appeals', () => {
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe('APPEAL_EXISTS');
     expect(await db.select().from(banAppeals)).toHaveLength(1);
+  });
+
+  it('token is burned by final answers (201/409/403) but survives an unexpected error', async () => {
+    const u = await bannedUser();
+    const token = await bannedLoginToken();
+    const insert = vi.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error('db down');
+    });
+    const failed = await appeal(token, 'перша спроба');
+    insert.mockRestore();
+    expect(failed.status).toBe(500);
+    expect(await redis.get(`appeal:${token}`)).toBe(String(u.id));
+    expect((await appeal(token, 'повтор')).status).toBe(201);
+    expect(await redis.get(`appeal:${token}`)).toBeNull();
+
+    const dupToken = await bannedLoginToken();
+    expect((await appeal(dupToken, 'друга')).status).toBe(409);
+    expect(await redis.get(`appeal:${dupToken}`)).toBeNull();
+
+    const unbanToken = await bannedLoginToken();
+    await db.update(users).set({ isBanned: false }).where(eq(users.id, u.id));
+    expect((await appeal(unbanToken, 'ще')).status).toBe(403);
+    expect(await redis.get(`appeal:${unbanToken}`)).toBeNull();
   });
 
   it('after unban and a new ban the user can appeal again', async () => {

@@ -42,7 +42,8 @@ function trimmedRequired(control: AbstractControl<string>): ValidationErrors | n
  * Екран заблокованого акаунта з формою єдиного повідомлення адміністрації (апеляції).
  * Токен одноразовий, із помилки входу `ACCOUNT_BANNED`. Після відправки (чи 409
  * `APPEAL_EXISTS`) — стан «вже надіслано»; токен недійсний/прострочений (401) чи акаунт
- * уже розблоковано (403) — пропозиція увійти знову. Збій мережі/сервера — повтор.
+ * уже розблоковано (403) — пропозиція увійти знову. Збій мережі/сервера, 429 чи CSRF —
+ * повтор.
  * На зміну стану фокус переходить на заголовок нового стану.
  */
 @Component({
@@ -71,8 +72,11 @@ export class BannedNotice implements OnInit {
   protected readonly max = APPEAL_MESSAGE_MAX;
   protected readonly state = signal<BannedNoticeState>('form');
   protected readonly busy = signal(false);
-  /** Збій мережі/сервера — можна спробувати ще раз. */
-  protected readonly failed = signal(false);
+  /**
+   * Ключ i18n тимчасової помилки (мережа, 5xx, 429, CSRF) — текст лишається, можна
+   * спробувати ще раз.
+   */
+  protected readonly failed = signal<string | null>(null);
 
   protected readonly message = new FormControl('', {
     nonNullable: true,
@@ -97,7 +101,7 @@ export class BannedNotice implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.failed.set(false);
+    this.failed.set(null);
     try {
       await firstValueFrom(
         this.api.create({ appealToken: this.appealToken(), message: this.message.value.trim() }),
@@ -106,7 +110,8 @@ export class BannedNotice implements OnInit {
     } catch (err) {
       const { status, code } = toApiError(err);
       if (code === 'APPEAL_EXISTS') this.setState('sent');
-      else if (status === 0 || status >= 500) this.failed.set(true);
+      else if (code === 'RATE_LIMITED' || code === 'CSRF') this.failed.set(`errors.${code}`);
+      else if (status === 0 || status >= 500) this.failed.set('banned.form.sendError');
       else this.setState('expired');
     } finally {
       this.busy.set(false);

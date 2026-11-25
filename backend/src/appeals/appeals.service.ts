@@ -42,15 +42,27 @@ export async function bannedError(
   return new AppError(403, 'ACCOUNT_BANNED', await issueAppealToken(deps, userId));
 }
 
-/** Апеляція: одна на період бану (`users.ban_epoch`); токен спалюється лише валідним тілом. */
+/**
+ * Апеляція: одна на період бану (`users.ban_epoch`). Токен спалюється лише остаточною
+ * відповіддю (201, 409, 403, 401 для видаленого акаунта); невалідне тіло чи неочікувана
+ * помилка (5xx) лишають його дійсним до кінця TTL — можна повторити.
+ */
 export async function createAppeal(deps: AppDeps, rawBody: unknown): Promise<{ id: number }> {
   const input = appealInputSchema.parse(rawBody);
-  const raw = await deps.redis.getdel(key(input.appealToken));
+  const tokenKey = key(input.appealToken);
+  const raw = await deps.redis.get(tokenKey);
   const userId = raw === null ? NaN : Number(raw);
   if (!Number.isSafeInteger(userId)) throw new AppError(401, 'UNAUTHENTICATED');
+  const burn = () => deps.redis.del(tokenKey);
   const [u] = await deps.db.select().from(users).where(eq(users.id, userId));
-  if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
-  if (!u.isBanned) throw new AppError(403, 'FORBIDDEN');
+  if (!u || u.status === 'deleted') {
+    await burn();
+    throw new AppError(401, 'UNAUTHENTICATED');
+  }
+  if (!u.isBanned) {
+    await burn();
+    throw new AppError(403, 'FORBIDDEN');
+  }
   let id: number;
   try {
     const [res] = await deps.db
@@ -58,9 +70,13 @@ export async function createAppeal(deps: AppDeps, rawBody: unknown): Promise<{ i
       .values({ userId, banEpoch: u.banEpoch, message: input.message });
     id = res.insertId;
   } catch (err) {
-    if (isDuplicateKey(err)) throw new AppError(409, 'APPEAL_EXISTS');
+    if (isDuplicateKey(err)) {
+      await burn();
+      throw new AppError(409, 'APPEAL_EXISTS');
+    }
     throw err;
   }
+  await burn();
   await logEvent(deps.db, {
     type: 'appeal.created',
     userId,
