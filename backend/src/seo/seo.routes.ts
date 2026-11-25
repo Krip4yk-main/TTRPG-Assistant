@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { games, users } from '../db/schema/index.js';
-import { openGamePredicate } from '../games/games.search.js';
+import { listedGamePredicate } from '../games/games.search.js';
 import { getPublicProfileHead } from '../profiles/profiles.service.js';
 
 const SITE_NAME = 'НРІ Асистент';
@@ -110,7 +110,7 @@ export function seoRootRouter(deps: AppDeps): Router {
         and(
           inArray(games.status, ['recruiting', 'started']),
           eq(games.ageRating, 'none'),
-          openGamePredicate(new Date()),
+          listedGamePredicate(new Date()),
         ),
       )
       .orderBy(asc(games.id))
@@ -170,6 +170,8 @@ export function ogRouter(deps: AppDeps): Router {
         type: 'website',
         description: truncateDescription(g.description) || undefined,
         image: g.coverUrl,
+        // «Мертва» гра: прев'ю посилання лишається, але без індексації.
+        noindex: g.deadAt !== null,
       }),
     );
   });

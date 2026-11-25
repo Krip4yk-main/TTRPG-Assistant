@@ -22,6 +22,7 @@ const MATRIX: Record<StaffAction, [boolean, boolean, boolean, boolean]> = {
   'ratings.moderate': [false, true, true, true],
   'sanctions.impose': [false, true, true, true],
   'appeals.decide': [false, true, true, true],
+  'games.moderate': [false, true, true, true],
   'sanctions.ban': [false, false, true, true],
   'appeals.decide_ban': [false, false, true, true],
   'roles.moderator': [false, false, true, true],

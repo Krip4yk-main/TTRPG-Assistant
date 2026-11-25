@@ -27,6 +27,10 @@ describe('notification contracts', () => {
       'sanction.imposed',
       'sanction.lifted',
       'appeal.decided',
+      'game.stale_reminder',
+      'game.dead',
+      'game.suspicious',
+      'game.closed_by_admin',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -101,6 +105,13 @@ describe('notificationLink', () => {
     expect(notificationLink('application.rejected', { gameId: 5 })).toBe('/my-applications');
     expect(notificationLink('session.cancelled', { gameId: 5, sessionId: 2 })).toBe('/games/5');
     expect(notificationLink('game.finished', {})).toBe('/');
+    const deadGameTypes = [
+      'game.stale_reminder',
+      'game.dead',
+      'game.suspicious',
+      'game.closed_by_admin',
+    ] as const;
+    for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/games/5');
   });
 
   it('rating notifications lead to the rate page (session set via ?session=)', () => {

@@ -35,6 +35,11 @@ import { adminComplaintsRouter, complaintsRouter } from './moderation/complaints
 import { adminSanctionsRouter, mySanctionsRouter } from './moderation/sanctions.routes.js';
 import { adminRouter, mySanctionAppealsRouter } from './moderation/admin.routes.js';
 import { adminLogRouter } from './moderation/log.routes.js';
+import {
+  adminDeadGamesRouter,
+  deadGamesRouter,
+  myDeadGamesRouter,
+} from './games/dead-games/dead-games.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
@@ -87,6 +92,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/ratings', myRatingsRouter(deps));
   app.use('/api/me/sanctions', mySanctionsRouter(deps));
   app.use('/api/me/sanctions', mySanctionAppealsRouter(deps));
+  app.use('/api/me/dead-games', myDeadGamesRouter(deps));
   app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));
@@ -97,12 +103,14 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/games/:id/ratings', gameRatingsRouter(deps));
   app.use('/api/games/:id', gameMembersRouter(deps));
   app.use('/api/games/:id', gameSessionsRouter(deps));
+  app.use('/api/games', deadGamesRouter(deps));
   app.use('/api/games', gamesRouter(deps));
   app.use('/api/applications', applicationsRouter(deps));
   app.use('/api/sessions', sessionsRouter(deps));
   app.use('/api/complaints', complaintsRouter(deps));
   app.use('/api/admin/complaints', adminComplaintsRouter(deps));
   app.use('/api/admin/log', adminLogRouter(deps));
+  app.use('/api/admin/dead-games', adminDeadGamesRouter(deps));
   app.use('/api/admin', adminSanctionsRouter(deps));
   app.use('/api/admin', adminRouter(deps));
   app.use('/api/og', ogRouter(deps));

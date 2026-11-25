@@ -21,7 +21,9 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * `moderation.digest` — персоналу щоденне зведення нових скарг (`count`); `sanction.imposed` /
  * `sanction.lifted` — покараному: тип (`sanctionType`), кінець (`endsAt`), причина (`reason`,
  * лише для накладення — її бачить сам покараний); `appeal.decided` — автору апеляції: тип
- * санкції, `accepted` і примітка (`reason`, необов'язкова). Текст —
+ * санкції, `accepted` і примітка (`reason`, необов'язкова). Детектор «мертвих» ігор (не з
+ * подій, майстру): `game.stale_reminder` (давно не проводилась), `game.dead` (позначено
+ * «мертвою»), `game.suspicious` (накладання сесій), `game.closed_by_admin`. Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -42,6 +44,10 @@ export const NOTIFICATION_TYPES = [
   'game.cancelled',
   'game.converted_to_campaign',
   'game.rule_changed',
+  'game.stale_reminder',
+  'game.dead',
+  'game.suspicious',
+  'game.closed_by_admin',
   'rating.session_open',
   'rating.final_open',
   'rating.member_left',

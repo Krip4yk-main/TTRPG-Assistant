@@ -264,7 +264,8 @@ export async function cancelFutureSessions(
 /** Події `session.cancelled` для автоскасованих сесій (після коміту). */
 export async function logSessionsCancelled(
   db: Db,
-  userId: number,
+  /** `null` — без автора (гру закрила адміністрація). */
+  userId: number | null,
   rows: CancelledSession[],
   reason: 'game_finished' | 'game_cancelled' | typeof RULE_CHANGED_REASON,
 ): Promise<void> {

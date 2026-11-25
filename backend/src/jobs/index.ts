@@ -1,3 +1,8 @@
+import {
+  DEAD_GAMES_AT_UTC,
+  DEAD_GAMES_JOB,
+  runDeadGamesDetector,
+} from '../games/dead-games/detector.js';
 import { DIGEST_EVERY_MS, DIGEST_JOB, sendModerationDigest } from '../moderation/digest.js';
 import {
   EXPIRE_EVERY_MS,
@@ -56,4 +61,10 @@ export function registerJobs(): void {
     await runDaily(deps);
   });
   registerRecurring(DAILY_JOB, { dailyAtUtc: DAILY_AT_UTC });
+
+  // Детектор «мертвих» ігор: щодня, «зараз» — запланований слот (job.runAt); ідемпотентно.
+  registerHandler(DEAD_GAMES_JOB, async (deps, _payload, job) => {
+    await runDeadGamesDetector(deps, job.runAt);
+  });
+  registerRecurring(DEAD_GAMES_JOB, { dailyAtUtc: DEAD_GAMES_AT_UTC });
 }

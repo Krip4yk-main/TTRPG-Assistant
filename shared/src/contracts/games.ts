@@ -4,6 +4,7 @@ import { availabilityInputSchema } from './availability.js';
 import { toZoned, type Weekday } from '../schedule/tz.js';
 import type { Recurrence } from '../schedule/occurrences.js';
 import type { SeenState } from './views.js';
+import type { StalenessState } from './dead-games.js';
 
 export const GAME_FORMATS = ['online', 'offline'] as const;
 export type GameFormat = (typeof GAME_FORMATS)[number];
@@ -247,6 +248,10 @@ export interface MyGameCardDto extends GameCardDto {
   pendingApplications: number;
   /** Стан перегляду гри майстром (див. `SeenState`). */
   seen: SeenState;
+  /** Давність гри (детектор «мертвих» ігор): `stale` — давно не проводилась, `dead` — «мертва». */
+  staleness: StalenessState;
+  /** Позначено «підозрілою» (накладання сесій з іншою грою майстра). */
+  suspicious: boolean;
 }
 
 /** Вид гри 18+/21+ для гостя чи молодшого за вікову позначку — рівно ці ключі. */
@@ -298,6 +303,8 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   updatedAt: string;
   /** Опублікований загальний рейтинг майстра (див. `GameCardDto.gmRating`). */
   gmRating: number | null;
+  /** Гру закрила адміністрація (вкладка «Мертві ігри»). */
+  closedByAdmin: boolean;
   /** Лише у `GET /api/games/:id` для автентифікованого глядача. */
   viewer?: GameViewerDto;
   /**

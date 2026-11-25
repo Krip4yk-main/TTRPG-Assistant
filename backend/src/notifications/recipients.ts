@@ -199,7 +199,11 @@ async function planEventNotifications(db: DbLike, batch: EventRow[]): Promise<Ne
         to = [game.gmUserId, ...(membersByGame.get(gameId) ?? [])];
         break;
     }
-    const recipients = [...new Set(to)].filter((u) => u !== actorId);
+    // Гру закрила адміністрація: майстер отримує окреме `game.closed_by_admin`, не `game.*`.
+    const skipGm = p.closedByAdmin === true;
+    const recipients = [...new Set(to)].filter(
+      (u) => u !== actorId && !(skipGm && u === game.gmUserId),
+    );
     return recipients.length ? [{ ev, rule, game, p, actorId, recipients }] : [];
   });
   if (planned.length === 0) return [];

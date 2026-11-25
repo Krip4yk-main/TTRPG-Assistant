@@ -22,3 +22,4 @@ export * from './contracts/telegram.js';
 export * from './contracts/views.js';
 export * from './contracts/ratings.js';
 export * from './contracts/moderation.js';
+export * from './contracts/dead-games.js';

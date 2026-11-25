@@ -217,6 +217,14 @@ export function openGamePredicate(now: Date): SQL {
   return or(ne(games.recurrence, 'none'), gt(games.startsAt, now))!;
 }
 
+/**
+ * Гра в публічних списках (пошук, sitemap): актуальна й не «мертва». «Мертва» гра лишається
+ * доступною за посиланням, учасникам і в профілі майстра.
+ */
+export function listedGamePredicate(now: Date): SQL {
+  return and(openGamePredicate(now), isNull(games.deadAt))!;
+}
+
 /** Активні учасники (`left_at IS NULL`). */
 const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers.gameId} = ${games.id} and ${gameMembers.leftAt} is null)`;
 
@@ -224,8 +232,8 @@ const memberCount = sql`(select count(*) from ${gameMembers} where ${gameMembers
 function sqlFilters(deps: AppDeps, f: SearchFilters, now: Date): SQL[] {
   const c: (SQL | undefined)[] = [
     // Видимі: набір гравців (повна гра — лише з show_when_full); гра, що йде, — лише з
-    // show_when_full. Разова гра з початком у минулому — не видима.
-    openGamePredicate(now),
+    // show_when_full. Разова гра з початком у минулому й «мертва» гра — не видимі.
+    listedGamePredicate(now),
     or(
       and(
         eq(games.status, 'recruiting'),

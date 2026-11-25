@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import {
   cancelSessionInputSchema,
   finishSessionInputSchema,
@@ -17,6 +17,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
+import { keepUpdatedAt } from '../games/dead-games/rules.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { materializeSessions, sessionsWindow } from './materialize.js';
@@ -289,6 +290,16 @@ export async function finishSession(
       .update(gameSessions)
       .set({ status: 'done', summary: input.summary, doneAt: now })
       .where(eq(gameSessions.id, sessionId));
+    // Проведена сесія одразу знімає «мертвість» і адмінське звільнення (до наступної сесії).
+    await tx
+      .update(games)
+      .set({ deadAt: null, deadExemptUntilSession: false, ...keepUpdatedAt })
+      .where(
+        and(
+          eq(games.id, g.id),
+          or(isNotNull(games.deadAt), eq(games.deadExemptUntilSession, true)),
+        ),
+      );
     return rows;
   });
   await logEvent(deps.db, {

@@ -78,6 +78,7 @@ const game: PublicGameDto = {
   createdAt: '2026-11-01T10:00:00.000Z',
   updatedAt: '2026-11-01T10:00:00.000Z',
   gmRating: null,
+  closedByAdmin: false,
   viewer: { relation: 'none', applicationId: null },
 };
 

@@ -55,6 +55,7 @@ import {
 import { assertNoSanction, isPaid } from '../moderation/sanctions.enforce.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
+import { deadGameIdsOf, sessionAnchors, stalenessOf } from './dead-games/rules.js';
 import {
   applicationsChanged,
   closeMembersRoom,
@@ -304,6 +305,7 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
     createdAt: l.row.createdAt.toISOString(),
     updatedAt: l.row.updatedAt.toISOString(),
     gmRating: l.gmOverall === null ? null : round1(l.gmOverall),
+    closedByAdmin: l.row.closedByAdmin,
   };
 }
 
@@ -391,7 +393,7 @@ async function assertCatalogRefs(deps: AppDeps, g: GameInput, prev?: GameInput):
 }
 
 /** Гра, якою керує користувач: чужа чернетка → 404, інша чужа гра → 403. */
-async function loadOwned(deps: AppDeps, userId: number, id: number): Promise<Loaded> {
+export async function loadOwned(deps: AppDeps, userId: number, id: number): Promise<Loaded> {
   const l = await loadOne(deps, id);
   if (!l) throw new AppError(404, 'NOT_FOUND');
   if (l.row.gmUserId !== userId) {
@@ -411,6 +413,9 @@ function columns(g: GameInput) {
 export async function createGame(deps: AppDeps, userId: number, body: unknown): Promise<GameDto> {
   const { db } = deps;
   const gm = await loadGm(deps, userId);
+  // «Мертві» ігри майстра блокують створення нових, доки він їх не закриє чи не скаже «все ок».
+  const deadGameIds = await deadGameIdsOf(db, userId);
+  if (deadGameIds.length) throw new AppError(409, 'GAME_CREATION_BLOCKED', { deadGameIds });
   const input = gameInputSchema(gm.timezone).parse(body);
   const now = new Date();
   assertGmAge(gm, input, now);
@@ -716,20 +721,46 @@ export async function transitionGame(
   id: number,
   action: GameAction,
 ): Promise<GameTransitionDto> {
-  const { db } = deps;
-  const t = TRANSITIONS[action];
   const { row } = await loadOwned(deps, userId, id);
+  return applyTransition(deps, userId, row, action);
+}
+
+/** Закриття адміністрацією (вкладка «Мертві ігри»): хто й що ще записати в транзакції переходу. */
+export interface AdminClose {
+  /** Записи журналу модерації й сповіщення майстру — у транзакції самого переходу. */
+  inTx: (tx: Tx, now: Date) => Promise<void>;
+}
+
+/**
+ * Перехід статусу гри від імені майстра (`actorId`) або адміністрації (`admin`: подія — без
+ * автора й з `closedByAdmin`, гра — з позначкою `closed_by_admin`). Завершення й скасування
+ * знімають позначки «мертва»/«підозріла».
+ */
+export async function applyTransition(
+  deps: AppDeps,
+  actorId: number,
+  row: GameRow,
+  action: GameAction,
+  admin?: AdminClose,
+): Promise<GameTransitionDto> {
+  const { db } = deps;
+  const id = row.id;
+  const userId = actorId;
+  const t = TRANSITIONS[action];
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
   const endReason =
     action === 'cancel' ? 'game_cancelled' : action === 'finish' ? 'game_finished' : null;
+  const ends = endReason
+    ? { deadAt: null, suspiciousAt: null, ...(admin ? { closedByAdmin: true } : {}) }
+    : {};
   const { cancelled, belowMin, doneSessionIds, cancelledSessions } = await db.transaction(
     async (tx) => {
       // Умова за поточним статусом захищає від гонки двох переходів.
       const [res] = await tx
         .update(games)
-        .set({ status: t.to, [t.stamp]: now })
+        .set({ status: t.to, [t.stamp]: now, ...ends })
         .where(and(eq(games.id, id), eq(games.status, row.status)));
       if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
       // Публікація й старт зсувають вікно сесій (рядок гри вже під X-блокуванням).
@@ -748,33 +779,39 @@ export async function transitionGame(
       const cancelledSessions = endReason
         ? await cancelFutureSessions(tx, [id], now, endReason)
         : [];
+      if (admin) await admin.inTx(tx, now);
       return { cancelled, belowMin, doneSessionIds, cancelledSessions };
     },
   );
+  // Закриття адміністрацією: подія без автора (учасники не бачать, хто з персоналу закрив),
+  // майстер отримує окреме `game.closed_by_admin` замість `game.*` з події.
+  const eventUserId = admin ? null : userId;
   await logEvent(db, {
     type: EVENT[action],
-    userId,
+    userId: eventUserId,
     entityType: 'game',
     entityId: id,
-    payload: { from: row.status, to: t.to },
+    payload: { from: row.status, to: t.to, ...(admin ? { closedByAdmin: true } : {}) },
   });
   await logCancelled(db, cancelled, 'application.cancelled_game');
   for (const sessionId of doneSessionIds) {
     await logEvent(db, {
       type: 'session.done',
-      userId,
+      userId: eventUserId,
       entityType: 'session',
       entityId: sessionId,
       payload: { gameId: id, present: [], absent: [], reason: 'game_finished' },
     });
   }
-  if (endReason) await logSessionsCancelled(db, userId, cancelledSessions, endReason);
-  await markOwnChange(deps, userId, 'game', [id]);
-  await markGameSessionsViewed(deps, userId, id);
+  if (endReason) await logSessionsCancelled(db, eventUserId, cancelledSessions, endReason);
+  if (!admin) {
+    await markOwnChange(deps, userId, 'game', [id]);
+    await markGameSessionsViewed(deps, userId, id);
+  }
   // Публікація: учасників ще немає — лише `details` (інші вкладки майстра).
   if (action === 'publish') emitGameChanged(deps, id, 'details', 'watchers');
   else sessionsChanged(deps, id);
-  pingCancelledApplications(deps, id, userId, cancelled);
+  pingCancelledApplications(deps, id, row.gmUserId, cancelled);
   if (action === 'cancel') closeMembersRoom(deps, id);
   const view = await gmView(deps, id);
   return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
@@ -863,6 +900,10 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGame
     )
     .groupBy(gameApplications.gameId);
   const byGame = new Map(pending.map((p) => [p.gameId, p.n]));
+  const anchors = await sessionAnchors(
+    deps.db,
+    loaded.map((l) => l.row.id),
+  );
   const seen = await seenFor(
     deps,
     userId,
@@ -875,6 +916,8 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGame
     memberCount: l.memberCount,
     pendingApplications: byGame.get(l.row.id) ?? 0,
     seen: seen.get(l.row.id) ?? 'new',
+    staleness: stalenessOf(l.row, anchors.get(l.row.id), now),
+    suspicious: l.row.suspiciousAt !== null,
   }));
 }
 

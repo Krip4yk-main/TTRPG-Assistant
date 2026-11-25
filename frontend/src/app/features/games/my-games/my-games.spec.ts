@@ -49,6 +49,8 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
     memberCount: 1,
     pendingApplications: 0,
     seen: 'seen',
+    staleness: 'ok',
+    suspicious: false,
   };
 }
 

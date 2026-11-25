@@ -103,6 +103,19 @@ export const games = mysqlTable(
     startedAt: datetime('started_at'),
     finishedAt: datetime('finished_at'),
     cancelledAt: datetime('cancelled_at'),
+    // «Мертві» ігри (План 7, `games/dead-games`): стан перераховує щоденний детектор.
+    /** Позначено «мертвою» (> 90 днів без проведеної сесії): прихована з пошуку й sitemap. */
+    deadAt: datetime('dead_at'),
+    /** «Все ок» від майстра: до цього моменту гра не нагадується й не позначається. */
+    deadSnoozedUntil: datetime('dead_snoozed_until'),
+    /** Адмін зняв позначку «мертва»: гра звільнена від перевірки до наступної проведеної сесії. */
+    deadExemptUntilSession: boolean('dead_exempt_until_session').notNull().default(false),
+    /** Позначено «підозрілою» (накладання сесій з іншою грою майстра). */
+    suspiciousAt: datetime('suspicious_at'),
+    /** Адмін зняв позначку «підозріла»: до цього моменту вона не повертається. */
+    suspiciousDismissedUntil: datetime('suspicious_dismissed_until'),
+    /** Гру закрила адміністрація (з вкладки «Мертві ігри»). */
+    closedByAdmin: boolean('closed_by_admin').notNull().default(false),
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
@@ -115,7 +128,32 @@ export const games = mysqlTable(
   (t) => [
     index('games_status_starts_at_idx').on(t.status, t.startsAt),
     index('games_gm_user_id_idx').on(t.gmUserId),
+    index('games_dead_at_idx').on(t.deadAt),
+    index('games_suspicious_at_idx').on(t.suspiciousAt),
   ],
+);
+
+const STALENESS_KINDS = ['stale_reminder', 'dead', 'suspicious'] as const;
+
+/**
+ * Журнал сповіщень детектора «мертвих» ігор: UNIQUE(гра, вид, період) не дає повторному чи
+ * паралельному прогону надіслати те саме сповіщення двічі. `period_key` — епізод (див.
+ * `games/dead-games/detector.ts`).
+ */
+export const gameStalenessLog = mysqlTable(
+  'game_staleness_log',
+  {
+    id: id('id').autoincrement().primaryKey(),
+    gameId: id('game_id')
+      .notNull()
+      .references(() => games.id, { onDelete: 'cascade' }),
+    kind: mysqlEnum('kind', STALENESS_KINDS).notNull(),
+    periodKey: varchar('period_key', { length: 64 }).notNull(),
+    createdAt: datetime('created_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [uniqueIndex('game_staleness_log_uq').on(t.gameId, t.kind, t.periodKey)],
 );
 
 export const gameContentWarnings = mysqlTable(

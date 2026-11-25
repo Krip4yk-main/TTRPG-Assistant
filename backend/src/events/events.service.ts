@@ -5,7 +5,8 @@ import { events } from '../db/schema/index.js';
 export interface LogEventInput {
   /** Лише відомі типи (`EVENT_TYPES` у `@nri/shared`). */
   type: EventType;
-  userId?: number;
+  /** `null` — без автора (система, адміністрація). */
+  userId?: number | null;
   entityType?: string;
   entityId?: number;
   payload?: unknown;

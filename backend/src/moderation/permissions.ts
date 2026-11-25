@@ -10,7 +10,8 @@ export const ROLE_RANK: Record<Role, number> = { user: 0, moderator: 1, admin: 2
 /**
  * Дії персоналу (матриця дизайну Плану 6):
  * - `complaints.review`, `ratings.moderate`, `sanctions.impose` (крім глобального бану),
- *   `appeals.decide` (апеляції на ці санкції) — модератор+;
+ *   `appeals.decide` (апеляції на ці санкції), `games.moderate` («Мертві ігри»: закрити гру чи
+ *   зняти позначку, План 7) — модератор+;
  * - `sanctions.ban` (глобальний бан/розбан), `appeals.decide_ban`, `roles.moderator`
  *   (призначити/зняти модератора), `log.view` — адмін+;
  * - `roles.admin` (призначити/зняти адміна), `owner.transfer` — лише власник.
@@ -21,6 +22,7 @@ export type StaffAction =
   | 'sanctions.impose'
   | 'sanctions.ban'
   | 'appeals.decide'
+  | 'games.moderate'
   | 'appeals.decide_ban'
   | 'roles.moderator'
   | 'roles.admin'
@@ -33,6 +35,7 @@ export const ACTION_MIN_ROLE: Record<StaffAction, Role> = {
   'ratings.moderate': 'moderator',
   'sanctions.impose': 'moderator',
   'appeals.decide': 'moderator',
+  'games.moderate': 'moderator',
   'sanctions.ban': 'admin',
   'appeals.decide_ban': 'admin',
   'roles.moderator': 'admin',
