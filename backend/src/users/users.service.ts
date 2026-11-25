@@ -33,6 +33,12 @@ import { logEvent } from '../events/events.service.js';
 import { cancelFutureSessions, logSessionsCancelled } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { cancelPendingOutbox } from '../notifications/telegram-outbox.js';
+import {
+  applicationsChanged,
+  closeMembersRoom,
+  membersChanged,
+  sessionsChanged,
+} from '../realtime/game-rooms.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
 
@@ -433,4 +439,36 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     });
   }
   await logEvent(db, { type: 'user.deleted', userId });
+  await pingAccountDeleted(deps, userId, result);
+}
+
+/** Пінги змін після видалення акаунта (сокети самого користувача вже розірвано). */
+async function pingAccountDeleted(
+  deps: AppDeps,
+  userId: number,
+  r: {
+    cancelledGameIds: { id: number }[];
+    cancelledApps: { gameId: number; userId: number }[];
+    withdrawn: { gameId: number }[];
+    leftGameIds: number[];
+  },
+): Promise<void> {
+  if (!deps.realtime) return;
+  for (const gameId of r.leftGameIds) membersChanged(deps, gameId, [userId]);
+  for (const g of r.cancelledGameIds) {
+    sessionsChanged(deps, g.id);
+    closeMembersRoom(deps, g.id);
+  }
+  for (const a of r.cancelledApps) applicationsChanged(deps, a.gameId, [a.userId]);
+  const gameIds = [...new Set(r.withdrawn.map((w) => w.gameId))];
+  if (gameIds.length === 0) return;
+  try {
+    const gms = await deps.db
+      .select({ id: games.id, gmUserId: games.gmUserId })
+      .from(games)
+      .where(inArray(games.id, gameIds));
+    for (const g of gms) applicationsChanged(deps, g.id, [g.gmUserId]);
+  } catch (err) {
+    console.error('[realtime] account-deleted pings failed', err);
+  }
 }

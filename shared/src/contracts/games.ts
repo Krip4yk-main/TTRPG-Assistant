@@ -3,6 +3,7 @@ import type { AgeRating } from '../age.js';
 import { availabilityInputSchema } from './availability.js';
 import { toZoned, type Weekday } from '../schedule/tz.js';
 import type { Recurrence } from '../schedule/occurrences.js';
+import type { SeenState } from './views.js';
 
 export const GAME_FORMATS = ['online', 'offline'] as const;
 export type GameFormat = (typeof GAME_FORMATS)[number];
@@ -237,6 +238,8 @@ export interface MyGameCardDto extends GameCardDto {
   memberCount: number;
   /** Заявки зі статусом `pending`. */
   pendingApplications: number;
+  /** Стан перегляду гри майстром (див. `SeenState`). */
+  seen: SeenState;
 }
 
 /** Вид гри 18+/21+ для гостя чи молодшого за вікову позначку — рівно ці ключі. */
@@ -286,6 +289,11 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   updatedAt: string;
   /** Лише у `GET /api/games/:id` для автентифікованого глядача. */
   viewer?: GameViewerDto;
+  /**
+   * Лише у `GET /api/games/:id` для автентифікованого глядача: стан до цього запиту (сам
+   * запит позначає гру переглянутою).
+   */
+  seen?: SeenState;
 }
 
 /** Приватні поля гри: лише майстру й учасникам. */

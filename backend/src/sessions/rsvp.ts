@@ -9,6 +9,7 @@ import type { AppDeps } from '../app.js';
 import { gameMembers, games, gameSessions, sessionRsvp, users } from '../db/schema/index.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
+import { emitGameChanged } from '../realtime/game-rooms.js';
 
 export type RsvpView = Pick<SessionDto, 'myRsvp' | 'rsvpSummary'>;
 
@@ -87,7 +88,7 @@ export const rsvpOf = (views: Map<number, RsvpView>, sessionId: number): RsvpVie
  * скасування сесії, виключення чи бан (X на грі) серіалізуються з RSVP.
  */
 export async function setRsvp(
-  deps: Pick<AppDeps, 'db'>,
+  deps: Pick<AppDeps, 'db' | 'realtime'>,
   userId: number,
   sessionId: number,
   body: unknown,
@@ -133,5 +134,7 @@ export async function setRsvp(
       .values({ sessionId, userId, status, updatedAt: now })
       .onDuplicateKeyUpdate({ set: { status, updatedAt: now } });
   });
+  // Відповідь бачать лише майстер (зведення) і сам учасник — пінг лише їм.
+  emitGameChanged(deps, r.game.id, 'sessions', { userIds: [r.game.gmUserId, userId] });
   return status;
 }

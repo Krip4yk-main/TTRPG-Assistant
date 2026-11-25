@@ -12,6 +12,7 @@ import * as notifications from './notifications.js';
 import * as profiles from './profiles.js';
 import * as sessions from './sessions.js';
 import * as users from './users.js';
+import * as views from './views.js';
 
 export * from './appeals.js';
 export * from './applications.js';
@@ -27,6 +28,7 @@ export * from './notifications.js';
 export * from './profiles.js';
 export * from './sessions.js';
 export * from './users.js';
+export * from './views.js';
 
 export const schema = {
   ...users,
@@ -43,4 +45,5 @@ export const schema = {
   ...appeals,
   ...jobs,
   ...notifications,
+  ...views,
 };

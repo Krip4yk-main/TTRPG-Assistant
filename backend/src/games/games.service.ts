@@ -52,6 +52,18 @@ import {
 } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
+import {
+  applicationsChanged,
+  closeMembersRoom,
+  emitGameChanged,
+  sessionsChanged,
+} from '../realtime/game-rooms.js';
+import {
+  markGameSessionsViewed,
+  markOwnChange,
+  markViewed,
+  seenFor,
+} from '../views/views.service.js';
 
 type GameRow = typeof games.$inferSelect;
 
@@ -306,7 +318,7 @@ async function gmView(deps: AppDeps, id: number): Promise<GameDto> {
 // ---------- перевірки ----------
 
 /** Глядач за id користувача; пояс і дата народження — свіжі з БД. */
-export async function viewerById(deps: AppDeps, userId: number): Promise<Viewer> {
+export async function viewerById(deps: Pick<AppDeps, 'db'>, userId: number): Promise<Viewer> {
   const [u] = await deps.db
     .select({ birthDate: users.birthDate, timezone: users.timezone })
     .from(users)
@@ -394,6 +406,7 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
     return gameId;
   });
   await logEvent(db, { type: 'game.created', userId, entityType: 'game', entityId: id });
+  await markOwnChange(deps, userId, 'game', [id]);
   return gmView(deps, id);
 }
 
@@ -484,6 +497,13 @@ export async function updateGame(
   });
   if (ruleChanged) await logRuleChanged(deps, userId, id, current, next);
   await logSessionsCancelled(db, userId, ruleCancelled, RULE_CHANGED_REASON);
+  await markOwnChange(deps, userId, 'game', [id]);
+  emitGameChanged(deps, id, 'details', 'watchers');
+  if (ruleChanged) {
+    await markGameSessionsViewed(deps, userId, id);
+    emitGameChanged(deps, id, 'sessions', 'members');
+  }
+  pingCancelledApplications(deps, id, userId, cancelled);
   return gmView(deps, id);
 }
 
@@ -589,7 +609,21 @@ export async function changeScheduleRule(
     mode === 'convert' ? 'game.converted_to_campaign' : 'game.rule_changed',
   );
   await logSessionsCancelled(db, userId, ruleCancelled, RULE_CHANGED_REASON);
+  await markOwnChange(deps, userId, 'game', [id]);
+  await markGameSessionsViewed(deps, userId, id);
+  sessionsChanged(deps, id);
   return gmView(deps, id);
+}
+
+/** Скасовані разом зі зміною гри `pending`-заявки: пінг майстру й авторам. */
+function pingCancelledApplications(
+  deps: AppDeps,
+  gameId: number,
+  gmUserId: number,
+  cancelled: CancelledApplication[],
+): void {
+  if (cancelled.length === 0) return;
+  applicationsChanged(deps, gameId, [gmUserId, ...cancelled.map((c) => c.userId)]);
 }
 
 const TRANSITIONS: Record<
@@ -706,6 +740,13 @@ export async function transitionGame(
     });
   }
   if (endReason) await logSessionsCancelled(db, userId, cancelledSessions, endReason);
+  await markOwnChange(deps, userId, 'game', [id]);
+  await markGameSessionsViewed(deps, userId, id);
+  // Публікація: учасників ще немає — лише `details` (інші вкладки майстра).
+  if (action === 'publish') emitGameChanged(deps, id, 'details', 'watchers');
+  else sessionsChanged(deps, id);
+  pingCancelledApplications(deps, id, userId, cancelled);
+  if (action === 'cancel') closeMembersRoom(deps, id);
   const view = await gmView(deps, id);
   return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
 }
@@ -719,10 +760,21 @@ export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Pr
   if (!base) throw new AppError(404, 'NOT_FOUND');
   // Стосунок (4 запити) — лише для автентифікованого глядача з повним видом.
   if (!viewer || isRestrictedGame(base)) return base;
-  const rel = await viewerRelation(deps, l.row, viewer.userId);
+  const [rel, seen] = await Promise.all([
+    viewerRelation(deps, l.row, viewer.userId),
+    seenFor(deps, viewer.userId, 'game', [l.row]),
+  ]);
   const view =
     rel.relation === 'member' ? (toGameView(dto, l.row.gmUserId, viewer, true, now) ?? base) : base;
-  return { ...view, viewer: rel };
+  // Відкриття деталей — перегляд саме завантаженої версії (зміна після завантаження
+  // лишиться «оновленням»); `seen` у відповіді — стан ДО цього запиту.
+  try {
+    await markViewed(deps, viewer.userId, 'game', [id], l.row.updatedAt);
+  } catch (err) {
+    // Перегляд — побічний ефект: його збій не ламає показ гри.
+    console.error('[views] mark game viewed failed', err);
+  }
+  return { ...view, viewer: rel, seen: seen.get(id) ?? 'new' };
 }
 
 /** Стосунок автентифікованого глядача до гри (див. `GameViewerDto`). */
@@ -786,11 +838,18 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGame
     )
     .groupBy(gameApplications.gameId);
   const byGame = new Map(pending.map((p) => [p.gameId, p.n]));
+  const seen = await seenFor(
+    deps,
+    userId,
+    'game',
+    loaded.map((l) => l.row),
+  );
   return loaded.map((l) => ({
     ...toCardDto(l, now),
     minPlayers: l.row.minPlayers,
     memberCount: l.memberCount,
     pendingApplications: byGame.get(l.row.id) ?? 0,
+    seen: seen.get(l.row.id) ?? 'new',
   }));
 }
 

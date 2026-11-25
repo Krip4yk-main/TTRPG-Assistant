@@ -13,6 +13,7 @@ import {
 } from '../db/schema/index.js';
 import { purgeTelegramOutbox } from '../notifications/telegram-outbox.js';
 import { materializeSessions } from '../sessions/materialize.js';
+import { sessionsChanged } from '../realtime/game-rooms.js';
 
 export const DAILY_JOB = 'maintenance.daily';
 export const DAILY_AT_UTC = '03:00';
@@ -29,7 +30,10 @@ const PURGE_BATCH = 1000;
  * тимчасова помилка БД прокидається в кінці (задача повторить), інша — лише логується.
  * Повертає кількість створених сесій.
  */
-export async function materializeAll(deps: Pick<AppDeps, 'db'>, now = new Date()): Promise<number> {
+export async function materializeAll(
+  deps: Pick<AppDeps, 'db' | 'realtime'>,
+  now = new Date(),
+): Promise<number> {
   const rows = await deps.db
     .select({ id: games.id })
     .from(games)
@@ -38,7 +42,9 @@ export async function materializeAll(deps: Pick<AppDeps, 'db'>, now = new Date()
   let failure: unknown;
   for (const { id } of rows) {
     try {
-      created += await materializeSessions(deps, id, now);
+      const n = await materializeSessions(deps, id, now);
+      if (n > 0) sessionsChanged(deps, id);
+      created += n;
     } catch (err) {
       console.error(`daily: materialize game ${id} failed`, err);
       if (isTransientDbError(err)) failure ??= err;

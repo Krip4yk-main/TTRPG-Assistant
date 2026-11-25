@@ -13,6 +13,7 @@ import {
 import { logEvent } from '../events/events.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
+import { applicationsChanged, membersChanged } from '../realtime/game-rooms.js';
 
 type GameRow = typeof games.$inferSelect;
 type UserRow = typeof users.$inferSelect;
@@ -136,6 +137,7 @@ export async function leaveGame(
     entityId: gameId,
     payload: { gameId },
   });
+  membersChanged(deps, gameId, [userId]);
 }
 
 // ---------- дії майстра ----------
@@ -172,6 +174,7 @@ export async function kickMember(
     entityId: gameId,
     payload: { gameId, memberId: target.id },
   });
+  membersChanged(deps, gameId, [target.id]);
 }
 
 /**
@@ -223,6 +226,8 @@ export async function banMember(
       cancelledApplicationIds: cancelled.map((c) => c.id),
     },
   });
+  if (wasMember) membersChanged(deps, gameId, [target.id]);
+  if (cancelled.length) applicationsChanged(deps, gameId, [gmUserId, target.id]);
 }
 
 // ---------- чорний список майстра ----------

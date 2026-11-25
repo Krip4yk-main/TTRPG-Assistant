@@ -69,6 +69,11 @@ export const gameApplications = mysqlTable(
       .default(sql`CURRENT_TIMESTAMP`),
     decidedAt: datetime('decided_at'),
     decidedBy: id('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Будь-яка зміна заявки (статус, відповідь майстра на обмеження) — для стану «оновлено». */
+    updatedAt: datetime('updated_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`)
+      .$onUpdate(() => new Date()),
     activeKey: varchar('active_key', { length: 41 }).generatedAlwaysAs(
       sql`IF(status = 'pending', CONCAT(game_id, ':', user_id), NULL)`,
       { mode: 'virtual' },

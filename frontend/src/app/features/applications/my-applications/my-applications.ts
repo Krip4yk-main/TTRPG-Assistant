@@ -110,7 +110,7 @@ export class MyApplications {
     try {
       const dto = await firstValueFrom(this.api.withdraw(a.id));
       this.items.update((list) =>
-        (list ?? []).map((x) => (x.id === a.id ? { ...dto, game: x.game } : x)),
+        (list ?? []).map((x) => (x.id === a.id ? { ...dto, game: x.game, seen: x.seen } : x)),
       );
       this.message.set({ kind: 'info', key: 'games.applications.my.withdrawn' });
     } catch (err) {

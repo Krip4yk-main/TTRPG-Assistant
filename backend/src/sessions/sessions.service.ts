@@ -3,6 +3,7 @@ import {
   cancelSessionInputSchema,
   finishSessionInputSchema,
   rescheduleSessionInputSchema,
+  type SeenState,
   type SessionDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -12,6 +13,8 @@ import { logEvent } from '../events/events.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { materializeSessions, sessionsWindow } from './materialize.js';
+import { sessionsChanged } from '../realtime/game-rooms.js';
+import { markGameSessionsViewed, markOwnChange, seenFor } from '../views/views.service.js';
 import { rsvpOf, rsvpViews, type RsvpView } from './rsvp.js';
 
 type GameRow = typeof games.$inferSelect;
@@ -21,7 +24,7 @@ const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
 const NO_RSVP: RsvpView = { myRsvp: null, rsvpSummary: null };
 
-export function toSessionDto(s: SessionRow, rsvp: RsvpView = NO_RSVP): SessionDto {
+export function toSessionDto(s: SessionRow, seen: SeenState, rsvp: RsvpView = NO_RSVP): SessionDto {
   return {
     id: s.id,
     gameId: s.gameId,
@@ -35,6 +38,7 @@ export function toSessionDto(s: SessionRow, rsvp: RsvpView = NO_RSVP): SessionDt
     doneAt: iso(s.doneAt),
     myRsvp: rsvp.myRsvp,
     rsvpSummary: rsvp.rsvpSummary,
+    seen,
   };
 }
 
@@ -71,19 +75,22 @@ export async function listGameSessions(
     if (!(await isActiveMember(deps, gameId, userId))) throw new AppError(403, 'NOT_A_MEMBER');
   }
   const now = new Date();
-  await materializeSessions(deps, gameId, now);
+  if ((await materializeSessions(deps, gameId, now)) > 0) sessionsChanged(deps, gameId);
   const rows = await deps.db
     .select()
     .from(gameSessions)
     .where(sessionsWindow(gameId, now))
     .orderBy(asc(gameSessions.startsAt), asc(gameSessions.id));
-  const views = await rsvpViews(
-    deps,
-    userId,
-    g,
-    rows.map((r) => r.id),
-  );
-  return rows.map((r) => toSessionDto(r, rsvpOf(views, r.id)));
+  const [views, seen] = await Promise.all([
+    rsvpViews(
+      deps,
+      userId,
+      g,
+      rows.map((r) => r.id),
+    ),
+    seenFor(deps, userId, 'session', rows),
+  ]);
+  return rows.map((r) => toSessionDto(r, seen.get(r.id) ?? 'new', rsvpOf(views, r.id)));
 }
 
 // ---------- дії майстра над сесією ----------
@@ -140,10 +147,22 @@ export async function reload(
     .innerJoin(games, eq(games.id, gameSessions.gameId))
     .where(eq(gameSessions.id, sessionId));
   if (!r) throw new AppError(404, 'NOT_FOUND');
-  const views = await rsvpViews(deps, userId, { id: r.s.gameId, gmUserId: r.gmUserId }, [
-    sessionId,
+  const [views, seen] = await Promise.all([
+    rsvpViews(deps, userId, { id: r.s.gameId, gmUserId: r.gmUserId }, [sessionId]),
+    seenFor(deps, userId, 'session', [r.s]),
   ]);
-  return toSessionDto(r.s, rsvpOf(views, sessionId));
+  return toSessionDto(r.s, seen.get(sessionId) ?? 'new', rsvpOf(views, sessionId));
+}
+
+/** Після коміту дії майстра: власна зміна не «оновлення» для нього; пінги учасникам. */
+async function afterGmSessionChange(
+  deps: AppDeps,
+  userId: number,
+  gameId: number,
+  sessionId: number,
+): Promise<void> {
+  await markOwnChange(deps, userId, 'session', [sessionId]);
+  sessionsChanged(deps, gameId);
 }
 
 /** Перенесення: новий час (ціла хвилина, у майбутньому), за бажанням — тривалість. */
@@ -182,6 +201,7 @@ export async function rescheduleSession(
       durationMinutes: input.durationMinutes ?? from.durationMinutes,
     },
   });
+  await afterGmSessionChange(deps, userId, g.id, sessionId);
   return reload(deps, userId, sessionId);
 }
 
@@ -208,6 +228,7 @@ export async function cancelSession(
     entityId: sessionId,
     payload: { gameId: g.id, reason: input.reason },
   });
+  await afterGmSessionChange(deps, userId, g.id, sessionId);
   return reload(deps, userId, sessionId);
 }
 
@@ -272,6 +293,10 @@ export async function finishSession(
       absent: attendance.filter((a) => !a.present).map((a) => a.userId),
     },
   });
-  await materializeSessions(deps, g.id, now);
+  // Нові сесії з матеріалізації створив сам майстер своєю дією — для нього не «нові».
+  if ((await materializeSessions(deps, g.id, now)) > 0) {
+    await markGameSessionsViewed(deps, userId, g.id);
+  }
+  await afterGmSessionChange(deps, userId, g.id, sessionId);
   return reload(deps, userId, sessionId);
 }

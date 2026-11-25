@@ -2,7 +2,12 @@ import type { Server as HttpServer } from 'node:http';
 import { parse as parseCookie } from 'cookie';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Server } from 'socket.io';
-import { SESSION_REVOKED_EVENT } from '@nri/shared';
+import {
+  GAME_UNWATCH_EVENT,
+  GAME_WATCH_EVENT,
+  SESSION_REVOKED_EVENT,
+  type GameWatchAck,
+} from '@nri/shared';
 import { and, eq, gt, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import {
@@ -12,6 +17,7 @@ import {
   SESSION_COOKIE,
 } from '../auth/session.service.js';
 import { sessions, users } from '../db/schema/index.js';
+import { gameMembersRoom, gameRoom, watchAccess } from './game-rooms.js';
 
 export interface RealtimeHub {
   toUser(userId: number, event: string, payload: unknown): void;
@@ -20,6 +26,12 @@ export interface RealtimeHub {
   disconnectUser(userId: number): void;
   /** Розриває сокети однієї сесії за хешем токена. */
   disconnectSession(tokenHash: string): void;
+  /** Усі сокети користувача (на всіх вузлах) входять у кімнату. */
+  joinRoom(userId: number, room: string): void;
+  /** Усі сокети користувача (на всіх вузлах) виходять із кімнати. */
+  leaveRoom(userId: number, room: string): void;
+  /** Усі сокети виходять із кімнати (на всіх вузлах). */
+  closeRoom(room: string): void;
   /**
    * Перевіряє сесії сокетів ЦЬОГО вузла (сплила, відкликана, користувач забанений/видалений/
    * не активний) і розриває недійсні. Повертає кількість розірваних. Викликається таймером.
@@ -29,6 +41,8 @@ export interface RealtimeHub {
 }
 
 export const REVALIDATE_EVERY_MS = 5 * 60_000;
+/** Скільки ігор один сокет може дивитися одночасно (захист від роздування кімнат). */
+export const MAX_WATCHED_GAMES = 50;
 const REVALIDATE_CHUNK = 500;
 
 export type RealtimeOptions = { revalidateEveryMs?: number };
@@ -81,6 +95,57 @@ export function attachRealtime(
       await socket.join([userRoom(user.userId), sessionRoom(hash)]);
       next();
     })().catch(() => next(new Error('UNAUTHENTICATED')));
+  });
+
+  const parseGameId = (input: unknown): number | null => {
+    const id = (input as { gameId?: unknown } | null)?.gameId;
+    return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
+  };
+
+  io.on('connection', (socket) => {
+    const userId = socket.data.userId as number;
+    const reply = (ack: unknown, value: GameWatchAck) => {
+      if (typeof ack === 'function') (ack as (v: GameWatchAck) => void)(value);
+    };
+    // Підписка на пінги гри: право перевіряється щоразу заново (колишній учасник не
+    // повернеться в `game-members:<id>`); без права — виходимо з обох кімнат гри.
+    socket.on(GAME_WATCH_EVENT, (input: unknown, ack?: unknown) => {
+      const gameId = parseGameId(input);
+      if (gameId === null) return reply(ack, { ok: false });
+      const watching = [...socket.rooms].filter((r) => r.startsWith('game:')).length;
+      if (watching >= MAX_WATCHED_GAMES && !socket.rooms.has(gameRoom(gameId))) {
+        return reply(ack, { ok: false });
+      }
+      void watchAccess(deps, userId, gameId)
+        .then(async (access) => {
+          if (!access.members) await socket.leave(gameMembersRoom(gameId));
+          if (!access.watch) {
+            await socket.leave(gameRoom(gameId));
+            return reply(ack, { ok: false });
+          }
+          await socket.join(
+            access.members ? [gameRoom(gameId), gameMembersRoom(gameId)] : gameRoom(gameId),
+          );
+          // Повторна перевірка після входу закриває гонку з виключенням: якщо виселення
+          // (після коміту) пройшло між першою перевіркою й входом, тут членства вже немає.
+          if (access.members && !(await watchAccess(deps, userId, gameId)).members) {
+            await socket.leave(gameMembersRoom(gameId));
+            return reply(ack, { ok: true, members: false });
+          }
+          reply(ack, { ok: true, members: access.members });
+        })
+        .catch((err: unknown) => {
+          console.error('[realtime] game.watch failed', err);
+          reply(ack, { ok: false });
+        });
+    });
+    socket.on(GAME_UNWATCH_EVENT, (input: unknown, ack?: unknown) => {
+      const gameId = parseGameId(input);
+      if (gameId === null) return reply(ack, { ok: false });
+      void Promise.all([socket.leave(gameRoom(gameId)), socket.leave(gameMembersRoom(gameId))])
+        .then(() => reply(ack, { ok: true, members: false }))
+        .catch(() => reply(ack, { ok: false }));
+    });
   });
 
   /**
@@ -150,6 +215,27 @@ export function attachRealtime(
         // Клієнт має дізнатися причину до розриву (інакше не відрізнить від мережевого збою).
         io.in(userRoom(userId)).emit(SESSION_REVOKED_EVENT);
         io.in(userRoom(userId)).disconnectSockets(true);
+      } catch (err) {
+        logErr(err);
+      }
+    },
+    joinRoom: (userId, room) => {
+      try {
+        io.in(userRoom(userId)).socketsJoin(room);
+      } catch (err) {
+        logErr(err);
+      }
+    },
+    leaveRoom: (userId, room) => {
+      try {
+        io.in(userRoom(userId)).socketsLeave(room);
+      } catch (err) {
+        logErr(err);
+      }
+    },
+    closeRoom: (room) => {
+      try {
+        io.in(room).socketsLeave(room);
       } catch (err) {
         logErr(err);
       }

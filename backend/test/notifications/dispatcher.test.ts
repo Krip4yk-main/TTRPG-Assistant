@@ -28,10 +28,15 @@ const { userWithAge, call, createGame } = harness(deps, app);
 
 const emitted: { userId: number; event: string; payload: unknown }[] = [];
 deps.realtime = {
-  toUser: (userId, event, payload) => void emitted.push({ userId, event, payload }),
+  // Лише сповіщення: пінги `game.changed` (Task 6) тут не перевіряються.
+  toUser: (userId, event, payload) =>
+    void (event === 'notification.new' && emitted.push({ userId, event, payload })),
   toRoom: () => {},
   disconnectUser: () => {},
   disconnectSession: () => {},
+  joinRoom: () => {},
+  leaveRoom: () => {},
+  closeRoom: () => {},
   revalidateSockets: async () => 0,
   close: async () => {},
 } satisfies RealtimeHub;

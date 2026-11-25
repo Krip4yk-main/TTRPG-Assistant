@@ -26,6 +26,8 @@ import { loadGames, toCardDto, viewerById } from '../games/games.service.js';
 import { isHiddenFromNonGm, toCardView, viewerAge } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { lockUser, type Tx } from './applications.rules.js';
+import { applicationsChanged, memberJoined } from '../realtime/game-rooms.js';
+import { markOwnChange, seenFor } from '../views/views.service.js';
 
 type ApplicationRow = typeof gameApplications.$inferSelect;
 type GameRow = typeof games.$inferSelect;
@@ -147,6 +149,31 @@ async function loadForGm(deps: AppDeps, gmUserId: number, id: number): Promise<A
 
 // ---------- операції ----------
 
+/**
+ * Після коміту зміни заявки: для автора дії вона переглянута (власна зміна — не
+ * «оновлення»); пінг `applications` — лише майстру гри й автору заявки.
+ */
+async function afterChange(
+  deps: AppDeps,
+  actorId: number,
+  applicationId: number,
+  gameId: number,
+  otherUserId?: number,
+): Promise<void> {
+  await markOwnChange(deps, actorId, 'application', [applicationId]);
+  const gmUserId =
+    otherUserId === undefined
+      ? (
+          await deps.db.select({ gmUserId: games.gmUserId }).from(games).where(eq(games.id, gameId))
+        )[0]?.gmUserId
+      : undefined;
+  applicationsChanged(
+    deps,
+    gameId,
+    [actorId, otherUserId ?? gmUserId].filter((u): u is number => u !== undefined),
+  );
+}
+
 export async function createApplication(
   deps: AppDeps,
   userId: number,
@@ -211,6 +238,7 @@ export async function createApplication(
     entityId: id,
     payload: { gameId },
   });
+  await afterChange(deps, userId, id, gameId);
   return dtoById(deps, id);
 }
 
@@ -238,6 +266,7 @@ export async function withdrawApplication(
     entityId: id,
     payload: { gameId: row.gameId },
   });
+  await afterChange(deps, userId, id, row.gameId);
   return dtoById(deps, id);
 }
 
@@ -298,6 +327,8 @@ export async function approveApplication(
     entityId: id,
     payload: { gameId: app.gameId, applicantId: app.userId },
   });
+  await afterChange(deps, gmUserId, id, app.gameId, app.userId);
+  memberJoined(deps, app.gameId, app.userId);
   return dtoById(deps, id);
 }
 
@@ -320,6 +351,7 @@ export async function rejectApplication(
     entityId: id,
     payload: { gameId: app.gameId, applicantId: app.userId },
   });
+  await afterChange(deps, gmUserId, id, app.gameId, app.userId);
   return dtoById(deps, id);
 }
 
@@ -340,10 +372,18 @@ export async function respondToConstraint(
     throw new AppError(409, 'APPLICATION_CLOSED');
   }
   const values = { response: input.response, comment: input.comment };
-  await deps.db
-    .insert(applicationConstraintResponses)
-    .values({ applicationId: id, constraintId: constraintIdParam, ...values })
-    .onDuplicateKeyUpdate({ set: values });
+  await deps.db.transaction(async (tx) => {
+    await tx
+      .insert(applicationConstraintResponses)
+      .values({ applicationId: id, constraintId: constraintIdParam, ...values })
+      .onDuplicateKeyUpdate({ set: values });
+    // Відповідь майстра — зміна заявки для автора (стан «оновлено»).
+    await tx
+      .update(gameApplications)
+      .set({ updatedAt: new Date() })
+      .where(eq(gameApplications.id, id));
+  });
+  await afterChange(deps, gmUserId, id, app.gameId, app.userId);
   return dtoById(deps, id);
 }
 
@@ -360,13 +400,14 @@ export async function listMyApplications(
     .orderBy(desc(gameApplications.createdAt), desc(gameApplications.id));
   if (rows.length === 0) return [];
   const gameIds = [...new Set(rows.map((r) => r.gameId))];
-  const [loaded, responses, viewer] = await Promise.all([
+  const [loaded, responses, viewer, seen] = await Promise.all([
     loadGames(deps, inArray(games.id, gameIds)),
     responsesOf(
       deps,
       rows.map((r) => r.id),
     ),
     viewerById(deps, userId),
+    seenFor(deps, userId, 'application', rows),
   ]);
   const now = new Date();
   const cards = new Map(
@@ -374,7 +415,7 @@ export async function listMyApplications(
   );
   return rows.flatMap((r) => {
     const game = cards.get(r.gameId);
-    return game ? [{ ...toDto(r, responses.get(r.id)), game }] : [];
+    return game ? [{ ...toDto(r, responses.get(r.id)), game, seen: seen.get(r.id) ?? 'new' }] : [];
   });
 }
 
@@ -403,12 +444,21 @@ export async function listGameApplications(
     .innerJoin(users, eq(users.id, gameApplications.userId))
     .where(eq(gameApplications.gameId, gameId))
     .orderBy(asc(gameApplications.createdAt), asc(gameApplications.id));
-  const responses = await responsesOf(
-    deps,
-    rows.map((r) => r.app.id),
-  );
+  const [responses, seen] = await Promise.all([
+    responsesOf(
+      deps,
+      rows.map((r) => r.app.id),
+    ),
+    seenFor(
+      deps,
+      gmUserId,
+      'application',
+      rows.map((r) => r.app),
+    ),
+  ]);
   const now = new Date();
   return rows.map((r) => ({
+    seen: seen.get(r.app.id) ?? ('new' as const),
     ...toDto(r.app, responses.get(r.app.id)),
     applicant: { publicId: r.publicId, nickname: r.nickname, avatarUrl: r.avatarUrl },
     meetsAgeRating: meetsAgeRating(

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SeenState } from './views.js';
 
 export const SESSION_STATUSES = ['scheduled', 'done', 'cancelled'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
@@ -82,4 +83,6 @@ export interface SessionDto {
   myRsvp: RsvpStatus | null;
   /** Лише в DTO майстра (приватність учасників); іншим — `null`. */
   rsvpSummary: SessionRsvpSummary | null;
+  /** Стан перегляду сесії глядачем (майстер чи активний учасник). */
+  seen: SeenState;
 }

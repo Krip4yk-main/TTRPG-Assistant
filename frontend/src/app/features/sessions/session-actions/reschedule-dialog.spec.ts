@@ -19,6 +19,7 @@ const session: SessionDto = {
   doneAt: null,
   myRsvp: null,
   rsvpSummary: null,
+  seen: 'seen',
 };
 
 describe('RescheduleDialog', () => {

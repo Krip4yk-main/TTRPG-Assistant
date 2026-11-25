@@ -106,9 +106,10 @@ export const games = mysqlTable(
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
-    updatedAt: datetime('updated_at')
+    /** Мілісекунди: порівнюється з `entity_views.viewed_at` (стан «оновлено»). */
+    updatedAt: datetime('updated_at', { fsp: 3 })
       .notNull()
-      .default(sql`CURRENT_TIMESTAMP`)
+      .default(sql`CURRENT_TIMESTAMP(3)`)
       .$onUpdate(() => new Date()),
   },
   (t) => [

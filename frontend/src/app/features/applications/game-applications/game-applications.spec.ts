@@ -66,6 +66,7 @@ const pending: GameApplicationDto = {
   decidedAt: null,
   applicant: { publicId: 'pppppppppp', nickname: 'Frodo', avatarUrl: null },
   meetsAgeRating: true,
+  seen: 'seen',
 };
 
 const rejected: GameApplicationDto = {

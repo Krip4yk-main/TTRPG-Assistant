@@ -39,6 +39,7 @@ const base: SessionDto = {
   doneAt: null,
   myRsvp: null,
   rsvpSummary: null,
+  seen: 'seen',
 };
 const done: SessionDto = {
   ...base,

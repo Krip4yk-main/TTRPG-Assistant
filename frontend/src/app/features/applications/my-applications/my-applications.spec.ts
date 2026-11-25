@@ -44,6 +44,7 @@ const base: MyApplicationDto = {
   createdAt: '2026-11-20T10:00:00.000Z',
   decidedAt: null,
   game: card,
+  seen: 'seen',
 };
 
 const list: MyApplicationDto[] = [

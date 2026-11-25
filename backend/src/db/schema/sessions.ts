@@ -45,6 +45,11 @@ export const gameSessions = mysqlTable(
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
+    /** Зміни сесії (перенесення, скасування, завершення); RSVP не рахується. */
+    updatedAt: datetime('updated_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`)
+      .$onUpdate(() => new Date()),
   },
   (t) => [
     uniqueIndex('game_sessions_game_id_rule_starts_at_uq').on(t.gameId, t.ruleStartsAt),

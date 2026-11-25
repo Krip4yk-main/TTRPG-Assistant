@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GameCardDto, GameGmDto, RestrictedGameDto } from './games.js';
+import type { SeenState } from './views.js';
 
 export const APPLICATION_STATUSES = [
   'pending',
@@ -92,10 +93,14 @@ export interface ApplicationDto {
 /** `GET /api/me/applications`: картка гри — через ті самі вікові правила (`toCardView`). */
 export interface MyApplicationDto extends ApplicationDto {
   game: GameCardDto | RestrictedGameDto;
+  /** Стан перегляду заявки її автором. */
+  seen: SeenState;
 }
 
 /** `GET /api/games/:id/applications` (майстер): вік заявника не розкривається. */
 export interface GameApplicationDto extends ApplicationDto {
   applicant: GameGmDto;
   meetsAgeRating: boolean;
+  /** Стан перегляду заявки майстром. */
+  seen: SeenState;
 }
