@@ -106,20 +106,34 @@ export async function runLeaveCascade(
     .where(and(eq(games.gmUserId, userId), inArray(games.status, ACTIVE_GAME_STATUSES)))
     .for('update');
   for (const g of late) if (!own.some((a) => a.id === g.id)) own.push(g);
-  // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри): нові
-  // членства/заявки неможливі — затвердження й заявка чекають на X рядка `users`. Членство не
+  // Блокувальне читання лише членств (без рядків ігор — їх не блокуємо поза порядком): бачить і
+  // членство, закомічене затвердженням, поки каскад чекав на рядок гри (знімок транзакції міг
+  // застаріти). Статус гри — звичайним читанням: потрібні лише активні ігри. Членство не
   // видаляється, а завершується: присутність на сесіях лишається в історії.
-  const memberships = await tx
+  const open = await tx
     .select({ id: gameMembers.id, gameId: gameMembers.gameId })
     .from(gameMembers)
-    .innerJoin(games, eq(games.id, gameMembers.gameId))
-    .where(
-      and(
-        eq(gameMembers.userId, userId),
-        isNull(gameMembers.leftAt),
-        inArray(games.status, ['recruiting', 'started']),
-      ),
-    );
+    .where(and(eq(gameMembers.userId, userId), isNull(gameMembers.leftAt)))
+    .for('update');
+  const activeGames = open.length
+    ? new Set(
+        (
+          await tx
+            .select({ id: games.id })
+            .from(games)
+            .where(
+              and(
+                inArray(
+                  games.id,
+                  open.map((m) => m.gameId),
+                ),
+                inArray(games.status, ['recruiting', 'started']),
+              ),
+            )
+        ).map((g) => g.id),
+      )
+    : new Set<number>();
+  const memberships = open.filter((m) => activeGames.has(m.gameId));
   if (memberships.length) {
     await tx
       .update(gameMembers)

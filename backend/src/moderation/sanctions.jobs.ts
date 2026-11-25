@@ -8,6 +8,11 @@ export const EXPIRE_JOB = 'moderation.expire';
 export const EXPIRE_EVERY_MS = 60_000;
 const BATCH = 200;
 
+/** Момент прогону: слот задачі, але не раніше за поточний час (запізнілий прогін не відстає). */
+export function expireSlot(runAt: Date, now: Date = new Date()): Date {
+  return new Date(Math.max(runAt.getTime(), now.getTime()));
+}
+
 /**
  * Знімає санкції, чий строк минув до `now` (`ends_at <= now`), від імені системи: `lifted_at` =
  * `ends_at`, журнал `sanction.expire`, сповіщення `sanction.lifted`; бан — `is_banned=0` і

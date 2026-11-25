@@ -211,9 +211,10 @@ export async function createApplication(
   let id: number;
   try {
     id = await db.transaction(async (tx) => {
-      // Порядок блокувань: гра → користувач → заявки (див. `lockUser`).
+      // Порядок блокувань: гра → користувач → заявки (див. `lockUser`). Користувач — X: заявки
+      // однієї людини на різні ігри серіалізуються (ліміт `application_limit` рахує `pending`).
       const g = await lockGame(tx, gameId);
-      const u = await lockUser(tx, userId);
+      const u = await lockUser(tx, userId, 'update');
       if (!u || u.status === 'deleted') throw new AppError(404, 'NOT_FOUND');
       if (u.isBanned) throw new AppError(403, 'ACCOUNT_BANNED');
       const isGm = g.gmUserId === userId;

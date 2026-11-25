@@ -24,6 +24,7 @@ import {
 import { writeLog } from './log.js';
 import { assertCan, ROLE_RANK, type Role } from './permissions.js';
 import { imposeSanctionTx } from './sanctions.service.js';
+import { leaveCandidates } from '../users/leave-cascade.js';
 
 type DbLike = Db | Tx;
 /** Хто дивиться/діє: id і роль із сесії. */
@@ -332,6 +333,17 @@ export async function dismissComplaint(
   return dto;
 }
 
+/** Кандидати каскаду бану для цілі скарги `id` (звичайне читання поза транзакцією). */
+async function banCandidates(db: Db, id: number): Promise<number[] | undefined> {
+  const [c] = await db
+    .select({ targetUserId: complaints.targetUserId, gmUserId: games.gmUserId })
+    .from(complaints)
+    .leftJoin(games, eq(games.id, complaints.targetGameId))
+    .where(eq(complaints.id, id));
+  const userId = c?.targetUserId ?? c?.gmUserId ?? null;
+  return userId === null ? undefined : leaveCandidates(db, userId);
+}
+
 /**
  * `POST /api/admin/complaints/:id/action {sanction}`: санкція (`imposeSanction`) людині-цілі або
  * майстру гри-цілі, статус `actioned` з посиланням на санкцію, журнал, сповіщення скаржнику. Усе
@@ -346,6 +358,8 @@ export async function actionComplaint(
 ): Promise<ComplaintDto> {
   assertCan(viewer.role, 'complaints.review');
   const { sanction } = complaintActionSchema.parse(body);
+  // Бан: ігри для блокування — до транзакції (див. `leave-cascade.ts`); ціль скарги незмінна.
+  const candidates = sanction.type === 'global_ban' ? await banCandidates(deps.db, id) : undefined;
   const { dto, row, afterCommit } = await deps.db.transaction(async (tx) => {
     const c = await lockNew(tx, viewer, id);
     let userId = c.targetUserId;
@@ -363,6 +377,7 @@ export async function actionComplaint(
       userId,
       sanction,
       id,
+      candidates,
     );
     await tx
       .update(complaints)

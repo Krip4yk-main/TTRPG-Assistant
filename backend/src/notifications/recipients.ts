@@ -271,8 +271,9 @@ function paramsFor(
     case 'game.cancelled':
     case 'member.left':
     case 'application.withdrawn':
-      // Код причини (`account_deleted`) або null — не вільний текст.
-      params.reason = str(p.reason) ?? null;
+      // Код причини (`account_deleted`) або null — не вільний текст. Бан адміністрацією іншим не
+      // розкривається: звичайне сповіщення без причини.
+      params.reason = str(p.reason) === 'banned_by_admin' ? null : (str(p.reason) ?? null);
       break;
     case 'game.finished':
       // Подяка після гри — текст за жанром (`thanks.<genreSlug>`).

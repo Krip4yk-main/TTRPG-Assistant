@@ -51,8 +51,12 @@ async function cancelPending(
  * Користувач під спільним блокуванням: видалення акаунта (X на `users`) чекає на
  * заявку/затвердження й навпаки. Неіснуючий — `null`.
  */
-export async function lockUser(tx: Tx, userId: number): Promise<typeof users.$inferSelect | null> {
-  const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('share');
+export async function lockUser(
+  tx: Tx,
+  userId: number,
+  mode: 'share' | 'update' = 'share',
+): Promise<typeof users.$inferSelect | null> {
+  const [u] = await tx.select().from(users).where(eq(users.id, userId)).for(mode);
   return u ?? null;
 }
 

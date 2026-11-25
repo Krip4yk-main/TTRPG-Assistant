@@ -160,8 +160,9 @@ export async function imposeSanctionTx(
 ): Promise<SanctionTxResult> {
   const parsed = sanctionInputSchema.parse(input);
   const isBan = parsed.type === 'global_ban';
-  const role = await actorRole(tx, actorId);
-  assertCan(role, actionFor(parsed.type));
+  // Перша дія транзакції — блокування (ігри, потім `users`): звичайне читання до них зафіксувало
+  // б знімок REPEATABLE READ, і каскад не побачив би закомічене, поки чекали на блокування.
+  // Роль діяча читаємо вже після блокувань.
   const active = isBan
     ? await lockLeaveGames(tx, userId, candidates ?? (await leaveCandidates(tx, userId)))
     : [];
@@ -176,6 +177,8 @@ export async function imposeSanctionTx(
     .for('update');
   if (!target || target.status === 'pending') throw new AppError(404, 'NOT_FOUND');
   if (target.status === 'deleted' && !isBan) throw new AppError(404, 'NOT_FOUND');
+  const role = await actorRole(tx, actorId);
+  assertCan(role, actionFor(parsed.type));
   assertCanActOn(role, target.role);
 
   const startsAt = new Date();
@@ -303,7 +306,7 @@ export async function liftSanctionTx(
     .where(eq(sanctions.id, sanctionId));
   if (!peek) throw new AppError(404, 'NOT_FOUND');
   const [target] = await tx
-    .select({ role: users.role, status: users.status })
+    .select({ role: users.role, status: users.status, isBanned: users.isBanned })
     .from(users)
     .where(eq(users.id, peek.userId))
     .for('update');
@@ -360,7 +363,9 @@ export async function liftSanctionTx(
   }
 
   let row: NotificationRow | null = null;
-  if (target.status === 'active' && !stillBanned && opts.notify !== false) {
+  // Бан: «знято» — лише якщо людина справді була забанена під блокуванням (інакше дубль).
+  const banNoop = s.type === 'global_ban' && !target.isBanned;
+  if (target.status === 'active' && !stillBanned && !banNoop && opts.notify !== false) {
     row = await createNotification(deps, tx, {
       userId: s.userId,
       type: 'sanction.lifted',

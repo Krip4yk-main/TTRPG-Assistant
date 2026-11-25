@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
   authIdentities,
+  complaints,
   gameApplications,
   gameMembers,
   games,
@@ -17,7 +18,7 @@ import { linkIdentity, resolveLogin } from '../../src/auth/identity.service.js';
 import { deleteAccount, unlinkIdentity } from '../../src/users/users.service.js';
 import { runDispatch } from '../../src/notifications/dispatcher.js';
 import { activeSanctions } from '../../src/moderation/sanctions.enforce.js';
-import { expireSanctions } from '../../src/moderation/sanctions.jobs.js';
+import { expireSanctions, expireSlot } from '../../src/moderation/sanctions.jobs.js';
 import { imposeSanction, imposeSanctionTx } from '../../src/moderation/sanctions.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { bornYearsAgo, harness } from '../games/fixtures.js';
@@ -533,5 +534,117 @@ describe('imposeSanction (own transaction)', () => {
     });
     expect(dto).toMatchObject({ type: 'global_ban', active: true, imposedBy: { role: 'admin' } });
     expect(await db.select().from(sessions).where(eq(sessions.userId, u.id))).toHaveLength(0);
+  });
+});
+
+describe('Task 3 review: races and notices', () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it.each(['direct', 'complaint'] as const)(
+    'an approval committed while the ban (%s) waits on the game lock still removes the user',
+    async (path) => {
+      const admin = await user('Admin', 'admin');
+      const gm = await user('GM');
+      const p = await user('P');
+      const g = await recruiting(gm.id);
+      await pendingApp(g, p.id);
+      const [c] = await db
+        .insert(complaints)
+        .values({ reporterId: gm.id, targetUserId: p.id, reason: 'scam' })
+        .$returningId();
+
+      let locked!: () => void;
+      const lockedP = new Promise<void>((r) => (locked = r));
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      // «Затвердження» в іншій транзакції: тримає X на грі, поки бан чекає на неї.
+      const approval = db.transaction(async (tx) => {
+        await tx.select({ id: games.id }).from(games).where(eq(games.id, g)).for('update');
+        locked();
+        await gate;
+        await tx
+          .update(gameApplications)
+          .set({ status: 'approved', decidedAt: new Date() })
+          .where(eq(gameApplications.gameId, g));
+        await tx.insert(gameMembers).values({ gameId: g, userId: p.id, joinedAt: new Date() });
+      });
+      await lockedP;
+      const sanction = { type: 'global_ban', duration: 'permanent', reason: 'Шахрайство' };
+      const ban =
+        path === 'direct'
+          ? imposeSanction(deps, admin.id, p.id, sanction)
+          : call('post', `/api/admin/complaints/${c!.id}/action`, admin.cookie, { sanction });
+      await sleep(300);
+      release();
+      await approval;
+      await ban;
+      const [m] = await db.select().from(gameMembers).where(eq(gameMembers.userId, p.id));
+      expect(m!.leftAt).not.toBeNull();
+      expect(m!.leftReason).toBe('banned_by_admin');
+    },
+  );
+
+  it('application_limit: two parallel applications → one 201, one 409', async () => {
+    const mod = await user('Mod', 'moderator');
+    const gm = await user('GM');
+    const p = await user('P');
+    const g1 = await recruiting(gm.id);
+    const g2 = await recruiting(gm.id);
+    await impose(mod.cookie, p.publicId, {
+      type: 'application_limit',
+      duration: '30d',
+      reason: 'Спам',
+    });
+    const res = await Promise.all([apply(p.cookie, g1), apply(p.cookie, g2)]);
+    expect(res.map((r) => r.status).sort()).toEqual([201, 409]);
+    const pending = await db
+      .select()
+      .from(gameApplications)
+      .where(eq(gameApplications.status, 'pending'));
+    expect(pending).toHaveLength(1);
+  });
+
+  it('lifting a ban of a user that is no longer banned sends no sanction.lifted', async () => {
+    const admin = await user('Admin', 'admin');
+    const u = await user('U');
+    const s = await imposeSanction(deps, admin.id, u.id, {
+      type: 'global_ban',
+      duration: '7d',
+      reason: 'Бан',
+    });
+    await db.update(users).set({ isBanned: false }).where(eq(users.id, u.id));
+    expect((await lift(admin.cookie, s.id)).status).toBe(200);
+    const lifted = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.userId, u.id), eq(notifications.type, 'sanction.lifted')));
+    expect(lifted).toEqual([]);
+  });
+
+  it("players' notices about a banned GM carry no ban reason", async () => {
+    const admin = await user('Admin', 'admin');
+    const gm = await user('GM');
+    const player = await user('Player');
+    const g = await fx.game(gm.id);
+    await fx.member(g, player.id, at(Date.now() - 10 * DAY));
+    await impose(admin.cookie, gm.publicId, {
+      type: 'global_ban',
+      duration: 'permanent',
+      reason: 'Шахрайство',
+    });
+    await runDispatch(deps);
+    const [n] = await db
+      .select({ payload: notifications.payload })
+      .from(notifications)
+      .where(and(eq(notifications.userId, player.id), eq(notifications.type, 'game.cancelled')));
+    expect(n!.payload.reason ?? null).toBeNull();
+    expect(JSON.stringify(n!.payload)).not.toContain('banned_by_admin');
+  });
+
+  it('expire job slot: never earlier than now', () => {
+    const now = new Date('2026-11-25T10:00:30.000Z');
+    expect(expireSlot(new Date('2026-11-25T10:00:00.000Z'), now)).toEqual(now);
+    const later = new Date('2026-11-25T10:01:00.000Z');
+    expect(expireSlot(later, now)).toEqual(later);
   });
 });

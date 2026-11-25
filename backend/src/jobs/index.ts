@@ -1,5 +1,10 @@
 import { DIGEST_EVERY_MS, DIGEST_JOB, sendModerationDigest } from '../moderation/digest.js';
-import { EXPIRE_EVERY_MS, EXPIRE_JOB, expireSanctions } from '../moderation/sanctions.jobs.js';
+import {
+  EXPIRE_EVERY_MS,
+  EXPIRE_JOB,
+  expireSanctions,
+  expireSlot,
+} from '../moderation/sanctions.jobs.js';
 import { DISPATCH_EVERY_MS, DISPATCH_JOB, runDispatch } from '../notifications/dispatcher.js';
 import { REMINDERS_EVERY_MS, REMINDERS_JOB, sendReminders } from '../notifications/reminders.js';
 import {
@@ -41,9 +46,9 @@ export function registerJobs(): void {
   });
   registerRecurring(DIGEST_JOB, { everyMs: DIGEST_EVERY_MS });
 
-  // Строки санкцій: прострочені знімає система (слот — job.runAt).
+  // Строки санкцій: прострочені знімає система (слот — job.runAt, не раніше за «зараз»).
   registerHandler(EXPIRE_JOB, async (deps, _payload, job) => {
-    await expireSanctions(deps, job.runAt);
+    await expireSanctions(deps, expireSlot(job.runAt));
   });
   registerRecurring(EXPIRE_JOB, { everyMs: EXPIRE_EVERY_MS });
 
