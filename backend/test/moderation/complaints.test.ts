@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
   complaints,
+  users,
   gameApplications,
   moderationLog,
   notifications,
@@ -310,6 +311,19 @@ describe('POST /api/admin/complaints/:id/dismiss | action', () => {
   const action = (id: number, cookie: string, body: object) =>
     call('post', `/api/admin/complaints/${id}/action`, cookie, body);
   const sanction = { type: 'warning', duration: '7d', reason: 'Не ображайте інших.' };
+
+  it('dismiss/action use the role from the DB, not the cached session', async () => {
+    const { mod, id } = await setup();
+    // Перший запит кешує сесію з роллю moderator; далі роль знято повз сервіс (без скидання кешу).
+    expect((await queue(mod.cookie)).status).toBe(200);
+    await db.update(users).set({ role: 'user' }).where(eq(users.id, mod.id));
+    const d = await dismiss(id, mod.cookie);
+    expect(d.status).toBe(403);
+    expect(d.body.error.code).toBe('MODERATION_FORBIDDEN');
+    expect((await action(id, mod.cookie, { sanction })).status).toBe(403);
+    const [c] = await db.select().from(complaints).where(eq(complaints.id, id));
+    expect(c!.status).toBe('new');
+  });
 
   it('dismiss: status, resolver, log entry; complainant gets complaint.resolved without details', async () => {
     const { mod, reporter, target, id } = await setup();

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
   sanctionEndsAt,
   sanctionInputSchema,
@@ -10,7 +10,7 @@ import {
 import type { AppDeps } from '../app.js';
 import type { Tx } from '../applications/applications.rules.js';
 import { markUserTombstones } from '../auth/identity.service.js';
-import { evictUserSessionCache, revokeAllUserSessions } from '../auth/session.service.js';
+import { evictUserSessionCache } from '../auth/session.service.js';
 import type { Db } from '../db/client.js';
 import { sanctionAppeals, sanctions, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
@@ -29,7 +29,7 @@ import {
 } from '../users/leave-cascade.js';
 import { writeLog } from './log.js';
 import { assertCan, assertCanActOn, type Role } from './permissions.js';
-import { activeAt } from './sanctions.enforce.js';
+import { activeAt, sanctionActiveError } from './sanctions.enforce.js';
 
 type DbLike = Db | Tx;
 
@@ -39,7 +39,7 @@ export type SanctionDeps = Pick<AppDeps, 'db' | 'env' | 'redis'> &
 
 /**
  * Результат дії в транзакції викликача: DTO і побічні ефекти, які викликач запускає лише
- * ПІСЛЯ свого коміту (пінги сповіщень, відкликання сесій, події каскаду). Відкат — і їх нема.
+ * ПІСЛЯ свого коміту (пінги сповіщень, скидання кешу сесій і сокетів, події каскаду). Відкат — і їх нема.
  */
 export interface SanctionTxResult {
   dto: SanctionDto;
@@ -143,7 +143,8 @@ export async function runAfterCommit(label: string, fn: () => Promise<void>): Pr
  * `global_ban` додатково: `is_banned=1` (`ban_epoch+1`, якщо ще не забанений), позначка всіх
  * надгробків користувача, каскад як при видаленні акаунта (`banned_by_admin`): скасування
  * активних ігор майстра, відкликання заявок, вихід з ігор. Після коміту (`afterCommit`) —
- * відкликання всіх сесій, події каскаду (з них звичайні сповіщення гравцям) і пінги.
+ * скидання кешу сесій і розрив сокетів (наступний запит — 403 `ACCOUNT_BANNED` з токеном
+ * апеляції, тоді ж відкликання сесій), події каскаду (з них звичайні сповіщення гравцям) і пінги.
  *
  * Порядок блокувань (як у каскаді): ігри → рядок користувача → заявки/членства. `candidates` —
  * ігри для блокування, прочитані до транзакції (`leaveCandidates`); без них читаються тут.
@@ -182,6 +183,20 @@ export async function imposeSanctionTx(
   assertCanActOn(role, target.role);
 
   const startsAt = new Date();
+  if (isBan) {
+    // Уже забанений чинним баном → 409 `SANCTION_ACTIVE` (другий бан нічого не додає, а апеляція
+    // на перший його не зняла б). Блокувальне читання під X рядка `users` — свіжий стан.
+    const [existing] = await tx
+      .select({ endsAt: sanctions.endsAt })
+      .from(sanctions)
+      .where(
+        and(eq(sanctions.userId, userId), eq(sanctions.type, 'global_ban'), activeAt(startsAt)),
+      )
+      .orderBy(sql`${sanctions.endsAt} IS NULL DESC`, desc(sanctions.endsAt))
+      .limit(1)
+      .for('share');
+    if (existing) throw sanctionActiveError('global_ban', existing.endsAt);
+  }
   const endsAt = sanctionEndsAt(startsAt, parsed.duration);
   const [res] = await tx
     .insert(sanctions)
@@ -242,7 +257,10 @@ export async function imposeSanctionTx(
     runAfterCommit('impose', async () => {
       if (row) emitNotificationsNew(deps, [row]);
       if (!isBan) return;
-      await revokeAllUserSessions(deps, userId);
+      // Як `banUser`: скидаємо кеш сесій і рвемо сокети, а самі сесії відкликає `requireAuth` на
+      // наступному запиті — після 403 ACCOUNT_BANNED з токеном апеляції (екран бану одразу).
+      await evictUserSessionCache(deps, userId);
+      deps.realtime?.disconnectUser(userId);
       if (cascade) {
         await logLeaveCascade(deps.db, userId, cascade, 'banned_by_admin');
         await pingLeaveCascade(deps, userId, cascade);
@@ -379,7 +397,7 @@ export async function liftSanctionTx(
   const afterCommit = () =>
     runAfterCommit('lift', async () => {
       if (row) emitNotificationsNew(deps, [row]);
-      // Кеш сесій міг зберегти `isBanned` — скидаємо (самі сесії бан уже відкликав).
+      // Кеш сесій міг зберегти `isBanned` — скидаємо.
       if (unbanned) await evictUserSessionCache(deps, s.userId);
     });
   return { dto, afterCommit };

@@ -98,7 +98,10 @@ describe('RF 1 — rights', () => {
     expect(ok.status).toBe(201);
     expect(ok.body).toMatchObject({ type: 'warning', active: true, reason: 'Грубість' });
     expect((await impose(admin.cookie, bad.publicId, ban)).status).toBe(201);
-    // Звичайний користувач — до адмінки взагалі не допущений.
+    // Щойно забанений: перший запит — 403 ACCOUNT_BANNED (екран бану), далі сесій уже немає.
+    const banned = await impose(bad.cookie, mod.publicId, warn);
+    expect(banned.status).toBe(403);
+    expect(banned.body.error.code).toBe('ACCOUNT_BANNED');
     expect((await impose(bad.cookie, mod.publicId, warn)).status).toBe(401);
   });
 
@@ -241,10 +244,26 @@ describe('RF 4 — terms', () => {
       duration: '7d',
       reason: 'Перший',
     });
-    await impose(admin.cookie, u.publicId, {
+    // Другий бан через API — 409: уже забанений.
+    const dup = await impose(admin.cookie, u.publicId, {
       type: 'global_ban',
       duration: 'permanent',
       reason: 'Другий',
+    });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error).toEqual({
+      code: 'SANCTION_ACTIVE',
+      details: { type: 'global_ban', endsAt: b1.body.endsAt },
+    });
+    expect(await db.select().from(sanctions)).toHaveLength(1);
+    // Перекриття банів (напр. перенесені міграцією) — зняття одного лишає бан.
+    await db.insert(sanctions).values({
+      userId: u.id,
+      type: 'global_ban',
+      reason: 'Другий',
+      imposedBy: admin.id,
+      startsAt: new Date(),
+      endsAt: null,
     });
     expect((await lift(admin.cookie, b1.body.id as number)).status).toBe(200);
     const [after] = await db.select().from(users).where(eq(users.id, u.id));
@@ -320,7 +339,7 @@ describe('RF 3 — ban evasion', () => {
 });
 
 describe('global ban: sessions, cascade, blocked flag', () => {
-  it('revokes sessions, sets is_banned and ban_epoch+1', async () => {
+  it('mid-session ban: next request → 403 ACCOUNT_BANNED with an appeal token, then sessions revoked', async () => {
     const admin = await user('Admin', 'admin');
     const u = await user('U');
     expect((await call('get', '/api/me', u.cookie)).status).toBe(200);
@@ -328,6 +347,15 @@ describe('global ban: sessions, cascade, blocked flag', () => {
       type: 'global_ban',
       duration: '30d',
       reason: 'Бан',
+    });
+    // Кеш сесії скинуто, сама сесія ще є — перший запит бачить бан і отримує екран апеляції.
+    const banned = await call('get', '/api/me', u.cookie);
+    expect(banned.status).toBe(403);
+    expect(banned.body.error.code).toBe('ACCOUNT_BANNED');
+    expect(banned.body.error.details).toMatchObject({
+      appealToken: expect.any(String),
+      appealSent: false,
+      appealStatus: null,
     });
     expect(await db.select().from(sessions).where(eq(sessions.userId, u.id))).toHaveLength(0);
     expect((await call('get', '/api/me', u.cookie)).status).toBe(401);
@@ -533,6 +561,8 @@ describe('imposeSanction (own transaction)', () => {
       reason: 'Бан',
     });
     expect(dto).toMatchObject({ type: 'global_ban', active: true, imposedBy: { role: 'admin' } });
+    // Після коміту скинуто кеш сесії: наступний запит бачить бан.
+    expect((await call('get', '/api/me', u.cookie)).body.error.code).toBe('ACCOUNT_BANNED');
     expect(await db.select().from(sessions).where(eq(sessions.userId, u.id))).toHaveLength(0);
   });
 });

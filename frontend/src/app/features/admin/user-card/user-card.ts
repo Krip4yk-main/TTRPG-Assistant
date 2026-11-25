@@ -65,8 +65,11 @@ export class AdminUserCard {
   protected readonly imposable = computed<readonly SanctionType[]>(() => {
     const u = this.user();
     if (!u || u.status === 'pending' || !canActOn(this.myRole(), u.role)) return [];
-    if (u.status === 'deleted') return this.isAdmin() ? ['global_ban'] : [];
-    return ['warning', 'application_limit', 'no_paid_apply', 'no_paid_create', 'global_ban'];
+    // Чинний бан — другий не пропонуємо (бекенд відповів би 409 SANCTION_ACTIVE).
+    const banned = u.isBanned || u.sanctions.some((s) => s.active && s.type === 'global_ban');
+    const ban: SanctionType[] = this.isAdmin() && !banned ? ['global_ban'] : [];
+    if (u.status === 'deleted') return ban;
+    return ['warning', 'application_limit', 'no_paid_apply', 'no_paid_create', ...ban];
   });
 
   constructor() {

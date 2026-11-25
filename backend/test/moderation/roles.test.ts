@@ -234,6 +234,22 @@ describe('admin users: search and card', () => {
     expect((await call('get', `/api/admin/users/${mod.publicId}`, target.cookie)).status).toBe(403);
   });
 
+  it("card sanctions follow the rank rule: a moderator does not see an admin's or a moderator's sanctions", async () => {
+    const owner = await user('owner');
+    const mod = await user('moderator');
+    const admin = await user('admin');
+    const mod2 = await user('moderator');
+    const warn = { type: 'warning', duration: '7d', reason: 'r' } as const;
+    await imposeSanction(deps, owner.id, admin.id, warn);
+    await imposeSanction(deps, owner.id, mod2.id, warn);
+    const card = (cookie: string, publicId: string) =>
+      call('get', `/api/admin/users/${publicId}`, cookie);
+    expect((await card(mod.cookie, admin.publicId)).body.sanctions).toEqual([]);
+    expect((await card(mod.cookie, mod2.publicId)).body.sanctions).toEqual([]);
+    expect((await card(admin.cookie, mod2.publicId)).body.sanctions).toHaveLength(1);
+    expect((await card(owner.cookie, admin.publicId)).body.sanctions).toHaveLength(1);
+  });
+
   it("a moderator does not see complaints about an admin in the admin's card", async () => {
     const mod = await user('moderator');
     const admin = await user('admin');

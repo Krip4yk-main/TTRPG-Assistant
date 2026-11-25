@@ -11,7 +11,7 @@ import type { AppDeps } from '../app.js';
 import { evictUserSessionCache } from '../auth/session.service.js';
 import { sanctions, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { complaintsAboutUser, type StaffViewer } from './complaints.service.js';
+import { complaintsAboutUser, complaintVisibleTo, type StaffViewer } from './complaints.service.js';
 import { writeLog } from './log.js';
 import { assertCan, assertCanActOn, type Role } from './permissions.js';
 import { runAfterCommit, sanctionDto } from './sanctions.service.js';
@@ -69,8 +69,9 @@ export async function searchUsers(
 }
 
 /**
- * `GET /api/admin/users/:publicId` (модератор+): роль, усі санкції (новіші першими), скарги на
- * людину (видимі ролі переглядача; скаржники — лише для адміна/власника).
+ * `GET /api/admin/users/:publicId` (модератор+): роль, санкції (новіші першими; лише людей
+ * видимої переглядачу ролі), скарги на людину (видимі ролі переглядача; скаржники — лише для
+ * адміна/власника).
  */
 export async function adminUserCard(
   deps: Pick<AppDeps, 'db'>,
@@ -80,11 +81,15 @@ export async function adminUserCard(
   assertCan(viewer.role, 'complaints.review');
   const [u] = await deps.db.select().from(users).where(eq(users.publicId, publicId));
   if (!u || u.status === 'pending') throw new AppError(404, 'NOT_FOUND');
-  const ids = await deps.db
-    .select({ id: sanctions.id })
-    .from(sanctions)
-    .where(eq(sanctions.userId, u.id))
-    .orderBy(desc(sanctions.startsAt), desc(sanctions.id));
+  // Санкції — за тим самим правилом рангу, що й скарги/апеляції: модератор не бачить санкцій
+  // модераторів і адмінів, адмін — адмінів (власник — усі).
+  const ids = complaintVisibleTo(viewer.role, u.role)
+    ? await deps.db
+        .select({ id: sanctions.id })
+        .from(sanctions)
+        .where(eq(sanctions.userId, u.id))
+        .orderBy(desc(sanctions.startsAt), desc(sanctions.id))
+    : [];
   const now = new Date();
   const list = [];
   for (const { id } of ids) list.push(await sanctionDto(deps.db, id, now));

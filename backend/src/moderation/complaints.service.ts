@@ -23,7 +23,7 @@ import {
 } from '../notifications/notifications.service.js';
 import { writeLog } from './log.js';
 import { assertCan, ROLE_RANK, type Role } from './permissions.js';
-import { imposeSanctionTx } from './sanctions.service.js';
+import { actorRole, imposeSanctionTx } from './sanctions.service.js';
 import { leaveCandidates } from '../users/leave-cascade.js';
 
 type DbLike = Db | Tx;
@@ -247,7 +247,10 @@ export async function countVisibleComplaints(
 
 // ---------- рішення ----------
 
-/** Скарга під блокуванням; невидима для ролі чи відсутня → 404; вже розглянута → 409. */
+/**
+ * Скарга під блокуванням; роль діяча — з БД (без права → 403); невидима для ролі чи відсутня →
+ * 404; вже розглянута → 409.
+ */
 async function lockNew(tx: Tx, viewer: StaffViewer, id: number) {
   const [c] = await tx
     .select({
@@ -275,7 +278,10 @@ async function lockNew(tx: Tx, viewer: StaffViewer, id: number) {
     const [t] = await tx.select({ role: users.role }).from(users).where(eq(users.id, subjectId));
     targetRole = t?.role ?? 'user';
   }
-  if (!complaintVisibleTo(viewer.role, targetRole)) throw new AppError(404, 'NOT_FOUND');
+  // Роль діяча — з БД (кеш сесії живе до 5 хв після зміни ролі).
+  const role = await actorRole(tx, viewer.userId);
+  assertCan(role, 'complaints.review');
+  if (!complaintVisibleTo(role, targetRole)) throw new AppError(404, 'NOT_FOUND');
   if (c.status !== 'new') throw new AppError(409, 'COMPLAINT_RESOLVED');
   return c;
 }
