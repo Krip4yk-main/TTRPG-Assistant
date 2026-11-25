@@ -225,6 +225,103 @@ describe('GameForm', () => {
     await settle();
   });
 
+  describe('creation blocked by «dead» games', () => {
+    const dead = (id: number, title: string, status: 'recruiting' | 'started') => ({
+      id,
+      title,
+      status,
+      state: 'dead' as const,
+      suspicious: false,
+      lastActivityAt: '2026-07-01T10:00:00.000Z',
+      deadAt: '2026-10-01T04:00:00.000Z',
+      suspiciousAt: null,
+    });
+    const notice = () => el.querySelector<HTMLElement>('nri-dead-games-notice');
+    const button = (id: number, action: string) =>
+      notice()!.querySelector<HTMLButtonElement>(
+        `[data-game-id="${id}"] [data-action="${action}"]`,
+      )!;
+
+    async function blocked(): Promise<void> {
+      await setup();
+      await fillValid();
+      await submit();
+      http
+        .expectOne('/api/games')
+        .flush(
+          { error: { code: 'GAME_CREATION_BLOCKED', details: { deadGameIds: [3, 4] } } },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await settle();
+      http.expectOne('/api/me/dead-games').flush({
+        items: [
+          dead(3, 'Покинута кампанія', 'started'),
+          dead(4, 'Забутий набір', 'recruiting'),
+          // «Давно не проводилась» — не блокує, у поясненні її немає.
+          { ...dead(9, 'Стара', 'recruiting'), state: 'stale' },
+        ],
+        deadGameIds: [3, 4],
+      });
+      await settle();
+    }
+
+    it('explains the block and lists the dead games with links and actions', async () => {
+      await blocked();
+      expect(notice()!.textContent).toContain('games.dead.blocked.title');
+      expect(notice()!.querySelector('a[href="/games/3"]')!.textContent).toContain(
+        'Покинута кампанія',
+      );
+      expect(notice()!.querySelector('a[href="/games/4"]')).not.toBeNull();
+      expect(notice()!.querySelector('[data-game-id="9"]')).toBeNull();
+      expect(el.querySelector('.form-actions + p.nri-alert, p.nri-alert[role="alert"]')).toBeNull();
+    });
+
+    it('«all ok» and «close» resolve the games; then the form may be saved again', async () => {
+      await blocked();
+      button(3, 'still-alive').click();
+      await settle();
+      http.expectOne('/api/games/3/still-alive').flush({ ...dead(3, 'x', 'started'), state: 'ok' });
+      await settle();
+      expect(notice()!.querySelector('[data-game-id="3"]')).toBeNull();
+
+      // «Закрити» — лише після підтвердження (текст залежить від статусу).
+      open.mockReturnValueOnce({ afterClosed: () => of(false) });
+      button(4, 'close-dead').click();
+      await settle();
+      expect(open.mock.calls[0]![1].data.note).toBe('games.dead.closeConfirm.recruiting');
+      http.expectNone('/api/games/4/close-dead');
+
+      open.mockReturnValueOnce({ afterClosed: () => of(true) });
+      button(4, 'close-dead').click();
+      await settle();
+      http.expectOne('/api/games/4/close-dead').flush({ id: 4, status: 'cancelled' });
+      await settle();
+      expect(notice()).toBeNull();
+      expect(el.querySelector('.unblocked-notice')!.textContent).toContain(
+        'games.dead.blocked.unblocked',
+      );
+
+      await submit();
+      http.expectOne('/api/games').flush(game());
+      await settle();
+      expect(el.querySelector('.unblocked-notice')).toBeNull();
+    });
+
+    it('a 409 on an action reloads the list', async () => {
+      await blocked();
+      button(3, 'still-alive').click();
+      await settle();
+      http
+        .expectOne('/api/games/3/still-alive')
+        .flush({ error: { code: 'GAME_INVALID_TRANSITION' } }, { status: 409, statusText: 'C' });
+      await settle();
+      http.expectOne('/api/me/dead-games').flush({ items: [], deadGameIds: [] });
+      await settle();
+      expect(notice()).toBeNull();
+      expect(el.querySelector('.unblocked-notice')).not.toBeNull();
+    });
+  });
+
   it('editing a recruiting game: system and kind are disabled with a hint', async () => {
     await setup(5, game({ status: 'recruiting' }));
     expect(selectOf('system').disabled).toBe(true);

@@ -79,6 +79,11 @@
                   'games.status.' + g.status | translate
                 }}</span>
               }
+              @if (g.closedByAdmin) {
+                <span class="badge closed-by-admin">{{
+                  'games.details.closedByAdmin' | translate
+                }}</span>
+              }
               @if (g.ageRating !== 'none') {
                 <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
               }

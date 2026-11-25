@@ -198,6 +198,21 @@ describe('GameDetails', () => {
     expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
   });
 
+  it('a game closed by the administration carries the label; others do not', async () => {
+    expect(game.closedByAdmin).toBe(false);
+    await open(null, (r) =>
+      r.flush({ ...game, status: 'cancelled', cancelledAt: game.updatedAt, closedByAdmin: true }),
+    );
+    expect(el().querySelector('.badge.closed-by-admin')!.textContent).toContain(
+      'games.details.closedByAdmin',
+    );
+  });
+
+  it('no «closed by the administration» label on a regular game', async () => {
+    await open(null, (r) => r.flush(game));
+    expect(el().querySelector('.closed-by-admin')).toBeNull();
+  });
+
   describe('live updates', () => {
     const banner = () => document.querySelector<HTMLElement>('nri-update-banner .banner');
 

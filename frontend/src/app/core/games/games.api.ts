@@ -8,6 +8,8 @@ import type {
   GamePatch,
   GameTransitionDto,
   GameViewDto,
+  MyDeadGameDto,
+  MyDeadGamesDto,
   MyGameCardDto,
   ScheduleRuleInput,
   SearchFiltersInput,
@@ -54,5 +56,20 @@ export class GamesApi {
 
   transition(id: number, action: GameAction): Observable<GameTransitionDto> {
     return this.http.post<GameTransitionDto>(`/api/games/${id}/${action}`, {});
+  }
+
+  /** Ігри майстра з позначками «давно не проводилась» / «мертва» / «підозріла». */
+  myDeadGames(): Observable<MyDeadGamesDto> {
+    return this.http.get<MyDeadGamesDto>('/api/me/dead-games');
+  }
+
+  /** «Все ок»: знімає позначку «мертва» (повернеться через 14 днів, якщо сесій не буде). */
+  stillAlive(id: number): Observable<MyDeadGameDto> {
+    return this.http.post<MyDeadGameDto>(`/api/games/${id}/still-alive`, {});
+  }
+
+  /** Закрити гру з позначкою: набір → скасована, почата → завершена. */
+  closeDead(id: number): Observable<GameTransitionDto> {
+    return this.http.post<GameTransitionDto>(`/api/games/${id}/close-dead`, {});
   }
 }

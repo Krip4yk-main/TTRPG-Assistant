@@ -1,0 +1,72 @@
+<section class="nri-alert notice" role="alert" aria-labelledby="dead-games-title">
+  <h2 id="dead-games-title" class="title">{{ 'games.dead.blocked.title' | translate }}</h2>
+  <p>{{ 'games.dead.blocked.text' | translate }}</p>
+
+  @if (loadFailed()) {
+    <ul class="games">
+      @for (id of ids(); track id) {
+        <li class="game" [attr.data-game-id]="id">
+          <a class="game-link" [routerLink]="['/games', id]">{{
+            'games.dead.blocked.game' | translate: { id }
+          }}</a>
+        </li>
+      }
+    </ul>
+    <div class="load-error">
+      <span>{{ 'games.dead.blocked.loadError' | translate }}</span>
+      <button mat-stroked-button type="button" class="retry" (click)="load()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (items(); as list) {
+    <ul class="games">
+      @for (g of list; track g.id) {
+        <li class="game" [attr.data-game-id]="g.id">
+          <div class="game-info">
+            <a class="game-link" [routerLink]="['/games', g.id]">{{ g.title }}</a>
+            @if (since(g); as date) {
+              <span class="nri-muted since">{{
+                'games.dead.lastActivity' | translate: { date }
+              }}</span>
+            }
+          </div>
+          <div class="actions">
+            <button
+              mat-stroked-button
+              type="button"
+              data-action="still-alive"
+              [disabled]="busyId() !== null"
+              [attr.aria-label]="
+                'games.actions.aria'
+                  | translate: { action: ('games.dead.stillAlive' | translate), title: g.title }
+              "
+              (click)="stillAlive(g)"
+            >
+              {{ 'games.dead.stillAlive' | translate }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              class="danger"
+              data-action="close-dead"
+              [disabled]="busyId() !== null"
+              [attr.aria-label]="
+                'games.actions.aria'
+                  | translate: { action: ('games.dead.close' | translate), title: g.title }
+              "
+              (click)="close(g)"
+            >
+              {{ 'games.dead.close' | translate }}
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+  }
+
+  @if (error(); as key) {
+    <p class="action-error">{{ key | translate }}</p>
+  }
+</section>

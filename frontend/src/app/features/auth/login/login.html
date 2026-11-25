@@ -27,7 +27,12 @@
       @if (googleLogin) {
         <a mat-flat-button class="google" [href]="googleUrl()">{{ 'login.google' | translate }}</a>
       }
-      @if (!telegramBot && !googleLogin && !devLoginEnabled) {
+      @if (discordLogin) {
+        <a mat-flat-button class="discord" [href]="discordUrl()">{{
+          'login.discord' | translate
+        }}</a>
+      }
+      @if (!telegramBot && !googleLogin && !discordLogin && !devLoginEnabled) {
         <p class="nri-muted">{{ 'login.noProviders' | translate }}</p>
       }
     </div>

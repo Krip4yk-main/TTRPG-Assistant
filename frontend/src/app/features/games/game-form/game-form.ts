@@ -69,6 +69,7 @@ import { fromIsoDate, provideUkDates } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
 import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
+import { DeadGamesNotice } from '../dead-games/dead-games-notice';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -222,6 +223,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
     TranslatePipe,
     WarningChip,
     SanctionActiveNotice,
+    DeadGamesNotice,
   ],
   providers: [provideUkDates()],
   templateUrl: './game-form.html',
@@ -262,6 +264,10 @@ export class GameForm {
   protected readonly formError = signal<string | null>(null);
   /** Відмова через санкцію (409 `SANCTION_ACTIVE`, напр. платна гра під забороною). */
   protected readonly sanction = signal<SanctionActiveDetails | null>(null);
+  /** Відмова 409 `GAME_CREATION_BLOCKED`: «мертві» ігри майстра (`details.deadGameIds`). */
+  protected readonly blockedBy = signal<readonly number[] | null>(null);
+  /** Блок знято («Все ок» / «Закрити» для всіх «мертвих» ігор) — можна зберегти ще раз. */
+  protected readonly unblocked = signal(false);
   /** Помилки API біля полів: контрол → ключ i18n. */
   protected readonly apiErrors = signal<Readonly<Record<string, string>>>({});
   /** Значення контролів у момент помилки API: зміна значення прибирає помилку. */
@@ -412,6 +418,8 @@ export class GameForm {
     this.gameId.set(null);
     this.loadError.set(null);
     this.formError.set(null);
+    this.blockedBy.set(null);
+    this.unblocked.set(false);
     this.setApiErrors({});
     this.submitted.set(false);
     this.prefilling = true;
@@ -530,6 +538,8 @@ export class GameForm {
     this.busy.set(true);
     this.formError.set(null);
     this.sanction.set(null);
+    this.blockedBy.set(null);
+    this.unblocked.set(false);
     this.setApiErrors({});
     try {
       const id = this.gameId();
@@ -574,6 +584,14 @@ export class GameForm {
     if (sanction) {
       this.sanction.set(sanction);
       this.focusSanction();
+      return;
+    }
+    if (code === 'GAME_CREATION_BLOCKED') {
+      const ids = (details as { deadGameIds?: unknown } | undefined)?.deadGameIds;
+      this.blockedBy.set(
+        Array.isArray(ids) ? ids.filter((id): id is number => typeof id === 'number') : [],
+      );
+      this.focusNotice('.dead-games-notice');
       return;
     }
     const fieldErrors: Record<string, string> = {};
@@ -1020,12 +1038,21 @@ export class GameForm {
     });
   }
 
+  /** «Мертвих» ігор більше немає — створення знову доступне. */
+  protected onUnblocked(): void {
+    this.blockedBy.set(null);
+    this.unblocked.set(true);
+  }
+
   /** Пояснення санкції — у live-регіоні; фокус на ньому, щоб його було видно й почуто. */
   private focusSanction(): void {
-    afterNextRender(
-      () => this.host.nativeElement.querySelector<HTMLElement>('.sanction-notice')?.focus(),
-      { injector: this.injector },
-    );
+    this.focusNotice('.sanction-notice');
+  }
+
+  private focusNotice(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 
   /** Фокус на першому полі з помилкою після рендеру. */

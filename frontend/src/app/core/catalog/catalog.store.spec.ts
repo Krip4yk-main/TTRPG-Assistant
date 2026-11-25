@@ -80,6 +80,20 @@ describe('CatalogStore', () => {
     expect(store.catalog()).not.toBeNull();
   });
 
+  it('invalidate() makes the next load refetch while keeping the current data', async () => {
+    const p = store.load();
+    http.expectOne('/api/catalog').flush(catalogFixture);
+    await p;
+    store.invalidate();
+    expect(store.catalog()).toEqual(catalogFixture);
+    const p2 = store.load();
+    const fresh = { ...catalogFixture, systems: [] };
+    http.expectOne('/api/catalog').flush(fresh);
+    await p2;
+    expect(store.catalog()).toEqual(fresh);
+    await store.load();
+  });
+
   it('uk.json has a translation for every genre, warning label and hint', () => {
     const t = uk as unknown as {
       genres: Record<string, string>;

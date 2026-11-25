@@ -1,0 +1,94 @@
+<h2 mat-dialog-title>
+  @if (isNew) {
+    {{ 'admin.catalog.createTitle' | translate }}
+  } @else {
+    {{ 'admin.catalog.editTitle' | translate: { name: data.system?.name } }}
+  }
+</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.catalog.name' | translate }}</mat-label>
+      <input
+        matInput
+        class="name"
+        formControlName="name"
+        required
+        autocomplete="off"
+        [attr.maxlength]="nameMax"
+      />
+      @if (c.name.hasError('required')) {
+        <mat-error>{{ 'admin.catalog.errors.required' | translate }}</mat-error>
+      } @else if (c.name.hasError('maxlength')) {
+        <mat-error>{{ 'admin.catalog.errors.tooLong' | translate: { max: nameMax } }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (isNew) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'admin.catalog.slug' | translate }}</mat-label>
+        <input
+          matInput
+          class="slug"
+          formControlName="slug"
+          required
+          autocomplete="off"
+          spellcheck="false"
+          [attr.maxlength]="slugMax"
+        />
+        <mat-hint>{{ 'admin.catalog.slugHint' | translate }}</mat-hint>
+        @if (c.slug.hasError('taken')) {
+          <mat-error>{{ 'errors.CATALOG_SLUG_TAKEN' | translate }}</mat-error>
+        } @else if (c.slug.hasError('required')) {
+          <mat-error>{{ 'admin.catalog.errors.required' | translate }}</mat-error>
+        } @else if (c.slug.hasError('maxlength')) {
+          <mat-error>{{ 'admin.catalog.errors.tooLong' | translate: { max: slugMax } }}</mat-error>
+        } @else if (c.slug.hasError('pattern')) {
+          <mat-error>{{ 'admin.catalog.errors.slugFormat' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    } @else {
+      <p class="nri-muted slug-readonly">
+        {{ 'admin.catalog.slug' | translate }}: <code>{{ data.system?.slug }}</code>
+      </p>
+    }
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.catalog.genre' | translate }}</mat-label>
+      <select matNativeControl class="genre" formControlName="genreId" required>
+        <option [ngValue]="null" disabled></option>
+        @for (g of data.genres; track g.id) {
+          <option [ngValue]="g.id">{{ 'genres.' + g.slug | translate }}</option>
+        }
+      </select>
+      @if (c.genreId.hasError('unknown')) {
+        <mat-error>{{ 'games.form.errors.UNKNOWN_GENRE' | translate }}</mat-error>
+      } @else if (c.genreId.hasError('required')) {
+        <mat-error>{{ 'admin.catalog.errors.required' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'admin.catalog.sort' | translate }}</mat-label>
+      <input matInput class="sort" type="number" step="1" formControlName="sort" required />
+      <mat-hint>{{ 'admin.catalog.sortHint' | translate }}</mat-hint>
+      @if (c.sort.invalid) {
+        <mat-error>{{ 'admin.catalog.errors.sort' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="confirm" [disabled]="submitting()">
+      {{ (isNew ? 'admin.catalog.create' : 'admin.catalog.save') | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

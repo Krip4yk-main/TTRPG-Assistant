@@ -74,8 +74,10 @@ export class Login implements OnInit {
   protected readonly telegramBot = runtimeConfig.telegramBotUsername;
   protected readonly devLoginEnabled = runtimeConfig.devLogin;
   protected readonly googleLogin = runtimeConfig.googleLogin;
+  protected readonly discordLogin = runtimeConfig.discordLogin;
   private readonly target = computed(() => safeReturnTo(this.returnTo()) ?? '/');
   protected readonly googleUrl = computed(() => this.api.googleStartUrl('login', this.target()));
+  protected readonly discordUrl = computed(() => this.api.discordStartUrl('login', this.target()));
 
   protected readonly busy = signal(false);
   private readonly actionError = signal<ErrorCode | null>(null);

@@ -55,6 +55,12 @@
                   'games.status.' + game.status | translate
                 }}</span>
               </header>
+              @for (flag of flags(game); track flag) {
+                <div class="dead-flag" [attr.data-flag]="flag">
+                  <span class="flag-badge">{{ 'games.dead.badge.' + flag | translate }}</span>
+                  <p class="flag-explain">{{ 'games.dead.explain.' + flag | translate }}</p>
+                </div>
+              }
               <p class="nri-muted meta">
                 {{ systemName(game) }} · {{ 'games.format.' + game.format | translate }}
                 @if (game.city) {
@@ -85,6 +91,36 @@
                 </p>
               }
               <div class="actions">
+                @if (isStale(game)) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    data-action="still-alive"
+                    [disabled]="busyId() !== null"
+                    [attr.aria-label]="
+                      'games.actions.aria'
+                        | translate
+                          : { action: ('games.dead.stillAlive' | translate), title: game.title }
+                    "
+                    (click)="stillAlive(game)"
+                  >
+                    {{ 'games.dead.stillAlive' | translate }}
+                  </button>
+                  <button
+                    mat-button
+                    type="button"
+                    class="danger"
+                    data-action="close-dead"
+                    [disabled]="busyId() !== null"
+                    [attr.aria-label]="
+                      'games.actions.aria'
+                        | translate: { action: ('games.dead.close' | translate), title: game.title }
+                    "
+                    (click)="closeDead(game)"
+                  >
+                    {{ 'games.dead.close' | translate }}
+                  </button>
+                }
                 @if (canEdit(game.status)) {
                   <a
                     mat-stroked-button

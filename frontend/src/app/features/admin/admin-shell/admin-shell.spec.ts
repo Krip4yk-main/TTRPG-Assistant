@@ -51,18 +51,29 @@ describe('AdminShell', () => {
     return [...el.querySelectorAll('a[mat-tab-link]')].map((a) => a.getAttribute('data-tab')!);
   }
 
-  it('a moderator sees complaints, users, appeals and ratings — no roles or log', async () => {
-    expect(await tabsFor('moderator')).toEqual(['complaints', 'users', 'appeals', 'ratings']);
-  });
-
-  it.each(['admin', 'owner'] as const)('%s also sees roles and the log', async (role) => {
-    expect(await tabsFor(role)).toEqual([
+  it('a moderator sees complaints, users, appeals, ratings and dead games — no roles, catalog or log', async () => {
+    expect(await tabsFor('moderator')).toEqual([
       'complaints',
       'users',
       'appeals',
       'ratings',
-      'roles',
-      'log',
+      'dead-games',
     ]);
   });
+
+  it.each(['admin', 'owner'] as const)(
+    '%s also sees roles, the catalog and the log',
+    async (role) => {
+      expect(await tabsFor(role)).toEqual([
+        'complaints',
+        'users',
+        'appeals',
+        'ratings',
+        'dead-games',
+        'roles',
+        'catalog',
+        'log',
+      ]);
+    },
+  );
 });

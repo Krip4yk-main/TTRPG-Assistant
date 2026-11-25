@@ -1,0 +1,41 @@
+.catalog-toolbar {
+  justify-content: space-between;
+}
+
+.intro {
+  flex: 1 1 280px;
+  margin: 0;
+}
+
+.system {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+  padding: var(--nri-space-md);
+
+  &.inactive .name {
+    color: var(--nri-text-muted);
+  }
+}
+
+.system-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+  min-width: 0;
+}
+
+.details {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.status[data-status='inactive'] {
+  color: var(--nri-text-muted);
+}
+
+.danger {
+  --mat-button-text-label-text-color: var(--nri-danger-text);
+}

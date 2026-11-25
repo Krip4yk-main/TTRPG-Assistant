@@ -17,7 +17,9 @@ const TABS: readonly AdminTab[] = [
   { path: 'users', label: 'admin.tabs.users', min: 'moderator' },
   { path: 'appeals', label: 'admin.tabs.appeals', min: 'moderator' },
   { path: 'ratings', label: 'admin.tabs.ratings', min: 'moderator' },
+  { path: 'dead-games', label: 'admin.tabs.deadGames', min: 'moderator' },
   { path: 'roles', label: 'admin.tabs.roles', min: 'admin' },
+  { path: 'catalog', label: 'admin.tabs.catalog', min: 'admin' },
   { path: 'log', label: 'admin.tabs.log', min: 'admin' },
 ];
 

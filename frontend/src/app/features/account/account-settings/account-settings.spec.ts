@@ -9,6 +9,7 @@ import { AccountSettings } from './account-settings';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { browserZone } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { runtimeConfig } from '../../../../environments/runtime-config';
 
 const me: MeDto = {
   id: 1,
@@ -241,5 +242,66 @@ describe('AccountSettings nickname', () => {
       await recreate();
       expect(el.querySelector('button.use-device-tz')).toBeNull();
     });
+  });
+});
+
+describe('AccountSettings Discord identity', () => {
+  const config = runtimeConfig as { discordLogin: boolean };
+  const initial = config.discordLogin;
+  let http: HttpTestingController;
+
+  async function render(flag: boolean, identities: MeDto['identities']): Promise<HTMLElement> {
+    config.discordLogin = flag;
+    await TestBed.configureTestingModule({
+      imports: [AccountSettings],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    }).compileComponents();
+    TestBed.inject(AuthStore).setMe({ ...me, identities });
+    const fixture = TestBed.createComponent(AccountSettings);
+    http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  afterEach(() => {
+    config.discordLogin = initial;
+    http.verify();
+  });
+
+  it('no «link Discord» button while the flag is off', async () => {
+    const el = await render(false, me.identities);
+    expect(el.querySelector('a.link-discord')).toBeNull();
+  });
+
+  it('with the flag on: a link button to the Discord OAuth start in link mode', async () => {
+    const el = await render(true, me.identities);
+    const link = el.querySelector<HTMLAnchorElement>('a.link-discord')!;
+    expect(link.textContent).toContain('account.identities.linkDiscord');
+    expect(link.getAttribute('href')).toBe('/api/auth/discord/start?mode=link&returnTo=%2Faccount');
+  });
+
+  it('a linked Discord is listed as an identity, without the link button', async () => {
+    const el = await render(true, [...me.identities, { provider: 'discord', displayName: 'gm#1' }]);
+    expect(el.querySelector('a.link-discord')).toBeNull();
+    expect(el.querySelector('.identities')!.textContent).toContain('account.providers.discord');
+    expect(el.querySelector('.identities')!.textContent).toContain('gm#1');
   });
 });

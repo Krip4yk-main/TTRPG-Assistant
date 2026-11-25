@@ -2,6 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import type {
+  AdminCatalogSystemCreateInput,
+  AdminCatalogSystemDto,
+  AdminCatalogSystemPatchInput,
+  AdminDeadGameDto,
   AdminPageDto,
   AdminRatingDto,
   AdminRatingFilter,
@@ -12,6 +16,7 @@ import type {
   AssignableRole,
   ComplaintDto,
   ComplaintStatus,
+  DeadGameKind,
   ModerationLogDto,
   OwnerTransferInput,
   SanctionAppealStatus,
@@ -118,5 +123,41 @@ export class AdminApi {
     return this.http.get<AdminPageDto<ModerationLogDto>>('/api/admin/log', {
       params: params({ cursor }),
     });
+  }
+
+  deadGames(
+    kind: DeadGameKind,
+    cursor?: number | null,
+  ): Observable<AdminPageDto<AdminDeadGameDto>> {
+    return this.http.get<AdminPageDto<AdminDeadGameDto>>('/api/admin/dead-games', {
+      params: params({ kind, cursor }),
+    });
+  }
+
+  closeDeadGame(id: number, reason?: string): Observable<AdminDeadGameDto> {
+    return this.http.post<AdminDeadGameDto>(`/api/admin/dead-games/${id}/close`, { reason });
+  }
+
+  dismissDeadGame(id: number, kind: DeadGameKind, reason?: string): Observable<AdminDeadGameDto> {
+    return this.http.post<AdminDeadGameDto>(`/api/admin/dead-games/${id}/dismiss`, {
+      kind,
+      reason,
+    });
+  }
+
+  /** Каталог систем (адмін+): усі, зокрема вимкнені. */
+  catalogSystems(): Observable<{ items: AdminCatalogSystemDto[] }> {
+    return this.http.get<{ items: AdminCatalogSystemDto[] }>('/api/admin/catalog/systems');
+  }
+
+  createCatalogSystem(input: AdminCatalogSystemCreateInput): Observable<AdminCatalogSystemDto> {
+    return this.http.post<AdminCatalogSystemDto>('/api/admin/catalog/systems', input);
+  }
+
+  updateCatalogSystem(
+    id: number,
+    patch: AdminCatalogSystemPatchInput,
+  ): Observable<AdminCatalogSystemDto> {
+    return this.http.patch<AdminCatalogSystemDto>(`/api/admin/catalog/systems/${id}`, patch);
   }
 }

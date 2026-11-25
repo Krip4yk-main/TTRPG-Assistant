@@ -116,6 +116,38 @@
   margin: 0;
 }
 
+// Позначки детектора «мертвих» ігор: бейдж + коротке пояснення.
+.dead-flag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nri-space-xs);
+  padding: var(--nri-space-xs) var(--nri-space-sm);
+  border-left: 3px solid var(--nri-accent);
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-surface-sunken);
+
+  &[data-flag='dead'] {
+    border-left-color: var(--nri-danger);
+  }
+}
+
+.flag-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--nri-accent-text);
+
+  [data-flag='dead'] > & {
+    color: var(--nri-danger-text);
+  }
+}
+
+.flag-explain {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--nri-text-muted);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

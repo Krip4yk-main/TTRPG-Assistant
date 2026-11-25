@@ -10,6 +10,7 @@ import { Subject } from 'rxjs';
 import { Login } from './login';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { runtimeConfig } from '../../../../environments/runtime-config';
 
 describe('Login — banned account', () => {
   let harness: RouterTestingHarness;
@@ -178,5 +179,55 @@ describe('Login — banned account', () => {
     const req = http.expectOne('/api/appeals');
     expect(req.request.body).toEqual({ appealToken: 'tok-m', message: 'Чому?' });
     req.flush({ id: 1 }, { status: 201, statusText: 'Created' });
+  });
+});
+
+describe('Login — Discord', () => {
+  const config = runtimeConfig as { discordLogin: boolean };
+  const initial = config.discordLogin;
+
+  async function render(flag: boolean): Promise<HTMLElement> {
+    config.discordLogin = flag;
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(Login);
+    fixture.componentRef.setInput('returnTo', '/calendar');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  afterEach(() => {
+    config.discordLogin = initial;
+  });
+
+  it('no Discord button while the flag is off', async () => {
+    const el = await render(false);
+    expect(el.querySelector('a.discord')).toBeNull();
+  });
+
+  it('with the flag on: a Discord button to the OAuth start that keeps returnTo', async () => {
+    const el = await render(true);
+    const link = el.querySelector<HTMLAnchorElement>('a.discord')!;
+    expect(link.textContent).toContain('login.discord');
+    expect(link.getAttribute('href')).toBe(
+      '/api/auth/discord/start?mode=login&returnTo=%2Fcalendar',
+    );
+    expect(el.textContent).not.toContain('login.noProviders');
   });
 });

@@ -1,0 +1,69 @@
+<div class="toolbar">
+  <mat-button-toggle-group
+    class="filter"
+    hideSingleSelectionIndicator
+    [value]="kind()"
+    (change)="setKind($event.value)"
+    [attr.aria-label]="'admin.filter' | translate"
+  >
+    @for (k of kinds; track k) {
+      <mat-button-toggle [value]="k">{{
+        'admin.deadGames.filter.' + k | translate
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</div>
+
+<div class="notice-area" aria-live="polite">
+  @if (notice(); as key) {
+    <p class="nri-notice">{{ key | translate }}</p>
+  }
+</div>
+
+<ul class="list">
+  @for (g of list.items(); track g.id) {
+    <li class="nri-card item dead-game" [attr.data-game]="g.id">
+      <div class="item-head">
+        <h2>
+          <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+        </h2>
+        <span class="status">{{ 'games.status.' + g.status | translate }}</span>
+        <span class="status flag" [attr.data-flag]="kind()">{{
+          'admin.deadGames.flag.' + kind() | translate
+        }}</span>
+      </div>
+      <dl class="meta">
+        <div>
+          <dt>{{ 'admin.deadGames.gm' | translate }}</dt>
+          <dd><nri-admin-user-ref [user]="g.gm" emptyKey="user.deleted" /></dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.deadGames.lastActivity' | translate }}</dt>
+          <dd>{{ (g.lastActivityAt | adminDate) || ('admin.deadGames.none' | translate) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.deadGames.publishedAt' | translate }}</dt>
+          <dd>{{ (g.publishedAt | adminDate) || ('admin.deadGames.none' | translate) }}</dd>
+        </div>
+        <div>
+          @if (kind() === 'dead') {
+            <dt>{{ 'admin.deadGames.deadAt' | translate }}</dt>
+            <dd>{{ (g.deadAt | adminDate) || ('admin.deadGames.none' | translate) }}</dd>
+          } @else {
+            <dt>{{ 'admin.deadGames.suspiciousAt' | translate }}</dt>
+            <dd>{{ (g.suspiciousAt | adminDate) || ('admin.deadGames.none' | translate) }}</dd>
+          }
+        </div>
+      </dl>
+      <div class="actions">
+        <button mat-stroked-button type="button" class="dismiss" (click)="dismiss(g)">
+          {{ 'admin.deadGames.dismiss' | translate }}
+        </button>
+        <button mat-stroked-button type="button" class="close-game danger" (click)="close(g)">
+          {{ 'admin.deadGames.close' | translate }}
+        </button>
+      </div>
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" [emptyKey]="'admin.deadGames.empty.' + kind()" />

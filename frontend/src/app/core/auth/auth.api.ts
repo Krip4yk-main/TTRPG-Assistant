@@ -12,7 +12,7 @@ import type {
 /** Дані Telegram Login Widget (передаються бекенду як є для перевірки підпису). */
 export type TelegramAuthData = Record<string, string | number>;
 
-export type GoogleMode = 'login' | 'link';
+export type OAuthMode = 'login' | 'link';
 
 /** Тонкий шар над HTTP API автентифікації та профілю. */
 @Injectable({ providedIn: 'root' })
@@ -71,8 +71,14 @@ export class AuthApi {
   }
 
   /** URL для повної навігації браузера (OAuth-редирект, не XHR). */
-  googleStartUrl(mode: GoogleMode, returnTo: string): string {
+  googleStartUrl(mode: OAuthMode, returnTo: string): string {
     const q = new URLSearchParams({ mode, returnTo });
     return `/api/auth/google/start?${q.toString()}`;
+  }
+
+  /** Те саме для Discord (вмикається `runtimeConfig.discordLogin`). */
+  discordStartUrl(mode: OAuthMode, returnTo: string): string {
+    const q = new URLSearchParams({ mode, returnTo });
+    return `/api/auth/discord/start?${q.toString()}`;
   }
 }

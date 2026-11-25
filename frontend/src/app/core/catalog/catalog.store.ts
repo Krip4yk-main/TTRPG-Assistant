@@ -9,19 +9,27 @@ export class CatalogStore {
   private readonly http = inject(HttpClient);
   private readonly state = signal<CatalogDto | null>(null);
   private loading: Promise<void> | null = null;
+  /** Каталог змінено в адмінці: наступний `load()` перечитає його (поточні дані лишаються). */
+  private stale = false;
 
   readonly catalog = this.state.asReadonly();
 
   load(): Promise<void> {
-    if (this.state()) return Promise.resolve();
+    if (this.state() && !this.stale) return Promise.resolve();
     this.loading ??= firstValueFrom(this.http.get<CatalogDto>('/api/catalog'))
       .then((dto) => {
         this.state.set(dto);
+        this.stale = false;
       })
       .finally(() => {
         this.loading = null;
       });
     return this.loading;
+  }
+
+  /** Каталог змінено (адмінка): наступний `load()` візьме свіжі дані. */
+  invalidate(): void {
+    this.stale = true;
   }
 
   systemName(id: number): string | null {

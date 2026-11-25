@@ -20,6 +20,11 @@ const KNOWN_ACTIONS = new Set([
   'rating.cancel',
   'role.change',
   'owner.transfer',
+  'game.close',
+  'game.dismiss_dead',
+  'game.dismiss_suspicious',
+  'catalog.system_create',
+  'catalog.system_update',
 ]);
 
 /**

@@ -3,8 +3,8 @@ import { staffGuard } from './admin.guards';
 import { AdminShell } from './admin-shell/admin-shell';
 
 /**
- * Розділ `/admin` (окремий чанк). Вкладки «Скарги», «Користувачі», «Апеляції», «Відгуки» —
- * модератору й вище; «Ролі» і «Журнал» — адміну й власнику.
+ * Розділ `/admin` (окремий чанк). Вкладки «Скарги», «Користувачі», «Апеляції», «Відгуки»,
+ * «Мертві ігри» — модератору й вище; «Ролі», «Каталог» і «Журнал» — адміну й власнику.
  */
 export const ADMIN_ROUTES: Routes = [
   {
@@ -39,10 +39,21 @@ export const ADMIN_ROUTES: Routes = [
         loadComponent: () => import('./ratings/ratings').then((m) => m.AdminRatings),
       },
       {
+        path: 'dead-games',
+        title: 'titles.admin',
+        loadComponent: () => import('./dead-games/dead-games').then((m) => m.AdminDeadGames),
+      },
+      {
         path: 'roles',
         title: 'titles.admin',
         canActivate: [staffGuard('admin')],
         loadComponent: () => import('./roles/roles').then((m) => m.AdminRoles),
+      },
+      {
+        path: 'catalog',
+        title: 'titles.admin',
+        canActivate: [staffGuard('admin')],
+        loadComponent: () => import('./catalog/catalog').then((m) => m.AdminCatalog),
       },
       {
         path: 'log',

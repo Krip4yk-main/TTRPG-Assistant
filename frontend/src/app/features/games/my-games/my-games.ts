@@ -15,6 +15,7 @@ import {
   ConfirmDialog,
   type ConfirmDialogData,
 } from '../../../shared/confirm-dialog/confirm-dialog';
+import { confirmCloseDead } from '../dead-games/dead-game-close';
 
 /** Дії-переходи, доступні в кожному статусі (редагування — окремо). */
 const ACTIONS: Record<GameStatus, GameAction[]> = {
@@ -29,13 +30,20 @@ const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 /** Статуси, у яких у гри можуть бути заявки (чернетка — ще ні). */
 const HAS_APPLICATIONS = new Set<GameStatus>(['recruiting', 'started', 'finished', 'cancelled']);
 
+/** Позначка детектора «мертвих» ігор на картці (ключ `games.dead.badge.*`). */
+type DeadFlag = 'stale' | 'dead' | 'suspicious';
+
 /** Повідомлення сторінки: ключ i18n. */
 interface Message {
   kind: 'error' | 'info';
   key: string;
 }
 
-/** «Мої ігри»: ігри майстра в усіх статусах з діями за статусом. */
+/**
+ * «Мої ігри»: ігри майстра в усіх статусах з діями за статусом. Позначки «давно не
+ * проводилась» / «мертва» мають пояснення й дії «Все ок» і «Закрити»; «підозріла» — лише
+ * пояснення (закрити гру можна звичайною дією).
+ */
 @Component({
   selector: 'nri-my-games',
   imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe],
@@ -92,6 +100,69 @@ export class MyGames {
 
   protected systemName(g: MyGameCardDto): string {
     return g.system?.name ?? g.systemOther ?? '';
+  }
+
+  /** Позначки гри в порядку важливості. */
+  protected flags(game: MyGameCardDto): DeadFlag[] {
+    const flags: DeadFlag[] = [];
+    if (game.staleness !== 'ok') flags.push(game.staleness);
+    if (game.suspicious) flags.push('suspicious');
+    return flags;
+  }
+
+  protected isStale(game: MyGameCardDto): boolean {
+    return game.staleness !== 'ok';
+  }
+
+  /** «Все ок»: позначку «давно не проводилась» / «мертва» знято на 14 днів. */
+  protected async stillAlive(game: MyGameCardDto): Promise<void> {
+    if (this.busyId() !== null) return;
+    await this.act(game, 'stillAlive', async () => {
+      const dto = await firstValueFrom(this.api.stillAlive(game.id));
+      this.patch(game.id, { staleness: dto.state, suspicious: dto.suspicious });
+    });
+  }
+
+  /** «Закрити» гру з позначкою: набір → скасована, почата → завершена. */
+  protected async closeDead(game: MyGameCardDto): Promise<void> {
+    if (this.busyId() !== null) return;
+    if (!(await confirmCloseDead(this.dialog, game))) return;
+    await this.act(game, 'close', async () => {
+      const dto = await firstValueFrom(this.api.closeDead(game.id));
+      this.patch(game.id, {
+        status: dto.status,
+        nextSessionAt: dto.nextSessionAt,
+        freeSlots: dto.freeSlots,
+        staleness: 'ok',
+        suspicious: false,
+      });
+      void this.refresh();
+    });
+  }
+
+  private async act(
+    game: MyGameCardDto,
+    done: string,
+    request: () => Promise<void>,
+  ): Promise<void> {
+    this.busyId.set(game.id);
+    this.message.set(null);
+    try {
+      await request();
+      this.message.set({ kind: 'info', key: `games.dead.done.${done}` });
+    } catch (err) {
+      const { status, code } = toApiError(err);
+      if (code === 'UNAUTHENTICATED') return;
+      this.message.set({ kind: 'error', key: `errors.${code}` });
+      // Стан гри вже інший (закрита, сесію відмічено) — показуємо актуальний.
+      if (status === 409) void this.refresh();
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  private patch(id: number, changes: Partial<MyGameCardDto>): void {
+    this.games.update((list) => (list ?? []).map((g) => (g.id === id ? { ...g, ...changes } : g)));
   }
 
   protected when(game: MyGameCardDto, iso: string): string {

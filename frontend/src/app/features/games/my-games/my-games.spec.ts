@@ -105,6 +105,9 @@ describe('MyGames', () => {
         { ...card(3, 'started'), memberCount: 2, seen: 'updated' },
         card(4, 'finished'),
         { ...card(5, 'recruiting'), memberCount: 2 },
+        { ...card(6, 'recruiting'), staleness: 'stale' },
+        { ...card(7, 'started'), staleness: 'dead', suspicious: true },
+        { ...card(8, 'started'), suspicious: true },
       ]);
     await settle();
   });
@@ -200,5 +203,97 @@ describe('MyGames', () => {
     expect(el.textContent).toContain('games.my.done.start');
     http.expectOne('/api/games/mine').flush([{ ...card(5, 'started'), memberCount: 2 }]);
     await settle();
+  });
+
+  describe('«dead» games flags', () => {
+    const flags = (id: number) =>
+      Array.from(article(id).querySelectorAll<HTMLElement>('.dead-flag')).map(
+        (f) => f.dataset['flag'],
+      );
+
+    it('shows badges with short explanations; no flags on a regular game', () => {
+      expect(flags(2)).toEqual([]);
+      expect(flags(6)).toEqual(['stale']);
+      expect(flags(7)).toEqual(['dead', 'suspicious']);
+      expect(flags(8)).toEqual(['suspicious']);
+      const dead = article(7).querySelector('[data-flag="dead"]')!;
+      expect(dead.textContent).toContain('games.dead.badge.dead');
+      expect(dead.textContent).toContain('games.dead.explain.dead');
+      expect(article(6).textContent).toContain('games.dead.badge.stale');
+      expect(article(8).textContent).toContain('games.dead.explain.suspicious');
+    });
+
+    it('«all ok» and «close» are offered for stale and dead games only', () => {
+      expect(actions(6)).toEqual(['still-alive', 'close-dead', 'edit', 'start', 'cancel']);
+      expect(actions(7)).toEqual(['still-alive', 'close-dead', 'edit', 'finish', 'cancel']);
+      expect(actions(8)).toEqual(['edit', 'finish', 'cancel']);
+      expect(actions(2)).toEqual(['edit', 'start', 'cancel']);
+    });
+
+    it('«all ok» clears the dead flag and says when it may return', async () => {
+      article(7).querySelector<HTMLButtonElement>('[data-action="still-alive"]')!.click();
+      await settle();
+      const req = http.expectOne('/api/games/7/still-alive');
+      expect(req.request.method).toBe('POST');
+      req.flush({
+        id: 7,
+        title: 'Гра 7',
+        status: 'started',
+        state: 'ok',
+        suspicious: true,
+        lastActivityAt: null,
+        deadAt: null,
+        suspiciousAt: '2026-11-20T04:00:00.000Z',
+      });
+      await settle();
+      expect(flags(7)).toEqual(['suspicious']);
+      expect(actions(7)).toEqual(['edit', 'finish', 'cancel']);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(el.textContent).toContain('games.dead.done.stillAlive');
+      });
+    });
+
+    it('«close» asks for confirmation first, then closes the game', async () => {
+      open.mockReturnValueOnce({ afterClosed: () => of(false) });
+      article(7).querySelector<HTMLButtonElement>('[data-action="close-dead"]')!.click();
+      await settle();
+      expect(open.mock.calls[0]![1].data).toMatchObject({
+        title: 'games.dead.closeConfirm.title',
+        note: 'games.dead.closeConfirm.started',
+        danger: true,
+      });
+      http.expectNone('/api/games/7/close-dead');
+
+      open.mockReturnValueOnce({ afterClosed: () => of(true) });
+      article(7).querySelector<HTMLButtonElement>('[data-action="close-dead"]')!.click();
+      await settle();
+      http
+        .expectOne('/api/games/7/close-dead')
+        .flush({ ...card(7, 'finished'), status: 'finished', nextSessionAt: null });
+      await settle();
+      expect(article(7).querySelector('.status')!.textContent).toContain('games.status.finished');
+      expect(flags(7)).toEqual([]);
+      http.expectOne('/api/games/mine').flush([card(7, 'finished')]);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(el.textContent).toContain('games.dead.done.close');
+      });
+    });
+
+    it('a 409 shows the error and reloads the cards', async () => {
+      article(6).querySelector<HTMLButtonElement>('[data-action="still-alive"]')!.click();
+      await settle();
+      http
+        .expectOne('/api/games/6/still-alive')
+        .flush({ error: { code: 'GAME_INVALID_TRANSITION' } }, { status: 409, statusText: 'C' });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(el.textContent).toContain('errors.GAME_INVALID_TRANSITION');
+      });
+      http.expectOne('/api/games/mine').flush([card(6, 'cancelled')]);
+      await settle();
+      expect(flags(6)).toEqual([]);
+    });
   });
 });

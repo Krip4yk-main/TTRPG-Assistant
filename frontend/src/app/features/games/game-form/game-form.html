@@ -584,6 +584,19 @@
         @if (sanction(); as details) {
           <nri-sanction-active-notice class="sanction-notice" tabindex="-1" [details]="details" />
         }
+        @if (blockedBy(); as ids) {
+          <nri-dead-games-notice
+            class="dead-games-notice"
+            tabindex="-1"
+            [ids]="ids"
+            (resolved)="onUnblocked()"
+          />
+        }
+        @if (unblocked()) {
+          <p class="nri-notice unblocked-notice">
+            {{ 'games.dead.blocked.unblocked' | translate }}
+          </p>
+        }
         @if (formError(); as key) {
           <p class="nri-alert" role="alert">{{ key | translate }}</p>
         }

@@ -104,13 +104,14 @@ export class AccountSettings {
   private readonly translate = inject(TranslateService);
   private readonly calendarApi = inject(CalendarApi);
 
-  /** `?error=CODE` після невдалої прив'язки Google. */
+  /** `?error=CODE` після невдалої прив'язки Google чи Discord. */
   readonly error = input<string>();
 
   protected readonly me = this.auth.me;
   protected readonly identities = computed(() => this.me()?.identities ?? []);
   protected readonly hasTelegram = computed(() => this.has('telegram'));
   protected readonly hasGoogle = computed(() => this.has('google'));
+  protected readonly hasDiscord = computed(() => this.has('discord'));
   /** Відв'язати не можна останній спосіб входу (бекенд відповів би 409 LAST_IDENTITY). */
   protected readonly isLastIdentity = computed(() => this.identities().length <= 1);
   protected readonly canLinkTelegram = computed(
@@ -118,6 +119,10 @@ export class AccountSettings {
   );
   protected readonly canLinkGoogle = computed(() => runtimeConfig.googleLogin && !this.hasGoogle());
   protected readonly googleLinkUrl = this.api.googleStartUrl('link', '/account');
+  protected readonly canLinkDiscord = computed(
+    () => runtimeConfig.discordLogin && !this.hasDiscord(),
+  );
+  protected readonly discordLinkUrl = this.api.discordStartUrl('link', '/account');
   protected readonly birthDateIso = computed(() => this.me()?.birthDate ?? null);
   protected readonly minAge = MIN_REGISTRATION_AGE;
   protected readonly maxBirthDate = new Date();

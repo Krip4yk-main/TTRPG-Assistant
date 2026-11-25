@@ -120,6 +120,11 @@
           'account.identities.linkGoogle' | translate
         }}</a>
       }
+      @if (canLinkDiscord()) {
+        <a mat-flat-button class="link-discord" [href]="discordLinkUrl">{{
+          'account.identities.linkDiscord' | translate
+        }}</a>
+      }
     </div>
 
     <div aria-live="polite">
