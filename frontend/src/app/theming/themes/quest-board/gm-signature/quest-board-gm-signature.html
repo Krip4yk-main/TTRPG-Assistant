@@ -5,7 +5,12 @@
     <span class="name">
       <span class="nri-visually-hidden">{{ 'search.card.gm' | translate }}:</span>
       @if (g.nickname) {
-        <a class="gm-link" [routerLink]="['/users', g.publicId]">{{ g.nickname }}</a>
+        <a
+          class="gm-link"
+          [routerLink]="['/users', g.publicId]"
+          [nriTruncateTooltip]="g.nickname"
+          >{{ g.nickname }}</a
+        >
       } @else {
         {{ 'user.deleted' | translate }}
       }

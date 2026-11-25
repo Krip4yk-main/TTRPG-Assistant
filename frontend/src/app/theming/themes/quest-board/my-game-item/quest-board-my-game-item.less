@@ -1,7 +1,9 @@
 // Тінь — через filter на хості: clip-path «рваного» краю обрізав би box-shadow аркуша.
+// Висота — не менша за оголошення пошуку; на дошці всі рядки однакові (сітка 1fr).
 :host {
   display: block;
   height: 100%;
+  min-height: 23.75rem;
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
 }
 
@@ -56,14 +58,22 @@
   color: var(--nri-primary-text);
   font-size: 0.875rem;
   font-weight: 700;
-  overflow-wrap: anywhere;
+}
+
+// Однорядкові поля: «…» замість переносу (повний текст — у підказці).
+.sys,
+.title,
+.facts dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .title {
+  flex: none;
   margin: 0 0 var(--nri-space-xs);
   font-size: 1.6rem;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 // Позначки детектора «мертвих» ігор — приписка на полях: штамп + пояснення.
@@ -114,7 +124,6 @@
 
   dd {
     margin: 0;
-    overflow-wrap: anywhere;
   }
 }
 

@@ -11,7 +11,7 @@
         }
       </div>
       <h2 class="title">
-        <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+        <a [routerLink]="['/games', g.id]" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
       </h2>
       <p class="restricted-text">{{ g.restrictedKey | translate }}</p>
       @if (g.loginReturnTo; as returnTo) {
@@ -36,7 +36,7 @@
         </div>
       }
       <h2 class="title">
-        <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+        <a [routerLink]="['/games', g.id]" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
       </h2>
       <p class="meta">
         {{ g.systemName }}

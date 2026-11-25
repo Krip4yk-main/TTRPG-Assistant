@@ -21,7 +21,8 @@
   }
 }
 
-// Дерев'яна планка: світліше дерево з темним нижнім торцем.
+// Дерев'яна планка: темний дуб, трохи світліший за стіну, з темним нижнім торцем. Бічні
+// відступи — як у сторінок-дошок (.nri-board), щоб назва стояла над заголовком сторінки.
 .plank {
   position: sticky;
   top: 0;
@@ -30,11 +31,11 @@
   align-items: center;
   gap: var(--nri-space-md);
   min-height: 72px;
-  padding: var(--nri-space-sm) clamp(var(--nri-space-md), 4vw, 56px);
+  padding: var(--nri-space-sm) clamp(var(--nri-space-md), 2.5vw, var(--nri-space-xl));
   background: linear-gradient(var(--qb-plank), var(--qb-plank-dark));
   box-shadow:
     0 6px 0 var(--qb-plank-edge),
-    0 14px 24px rgba(0, 0, 0, 0.4);
+    0 12px 24px rgba(0, 0, 0, 0.45);
   margin-bottom: 6px;
 }
 

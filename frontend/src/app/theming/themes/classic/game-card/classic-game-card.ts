@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { GameCardVm } from '../../../../core/games/game-card.vm';
 import type { GameCardSlot } from '../../../slots';
+import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 import { ClassicBadge } from '../badge/classic-badge';
 import { ClassicGmSignature } from '../gm-signature/classic-gm-signature';
 
@@ -13,7 +14,14 @@ import { ClassicGmSignature } from '../gm-signature/classic-gm-signature';
  */
 @Component({
   selector: 'nri-classic-game-card',
-  imports: [RouterLink, MatIconModule, TranslatePipe, ClassicBadge, ClassicGmSignature],
+  imports: [
+    RouterLink,
+    MatIconModule,
+    TranslatePipe,
+    ClassicBadge,
+    ClassicGmSignature,
+    TruncateTooltip,
+  ],
   templateUrl: './classic-game-card.html',
   styleUrl: './classic-game-card.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

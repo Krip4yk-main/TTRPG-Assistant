@@ -3,7 +3,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
-import type { Type } from '@angular/core';
+import type { DebugElement, Type } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import type { MyGameCardDto, SearchGameCardDto } from '@nri/shared';
 import uk from '../../assets/i18n/uk.json';
 import type { ThemeSlots } from './slots';
@@ -101,6 +103,10 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
     return fixture;
   };
 
+  /** Повні тексти підказок обрізаних рядків (RF 5: обрізане видно повністю при наведенні). */
+  const tooltips = (root: DebugElement): string[] =>
+    root.queryAll(By.directive(MatTooltip)).map((d) => d.injector.get(MatTooltip).message);
+
   const cardVm = (g: object): GameCardVm =>
     toGameCardVm(g as SearchGameCardDto, null, { guest: false, genreKey: () => null });
 
@@ -175,7 +181,8 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
         badges: [...base.badges, ...extra],
         gm: { ...base.gm, nickname: LONG_NICK, rating: null },
       };
-      const el: HTMLElement = (await mount(slots['game-card'], { game: vm })).nativeElement;
+      const fixture = await mount(slots['game-card'], { game: vm });
+      const el: HTMLElement = fixture.nativeElement;
       expect(el.textContent).toContain(LONG_TITLE);
       expect(el.textContent).toContain(LONG_NICK);
       expect(el.textContent).toContain('Позначка 9');
@@ -186,8 +193,13 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       // Немає горизонтального переповнення (у браузері — реальна розкладка; jsdom — 0 ≤ 0).
       const card = el.querySelector<HTMLElement>('article')!;
       expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
-      // Довга назва переноситься, бейджі — у кілька рядків.
-      expect(getComputedStyle(el.querySelector('h2')!).overflowWrap).toBe('anywhere');
+      // Розмір картки не залежить від даних: довгі назва й нік обрізаються (overflow: hidden),
+      // а повний текст — у підказці.
+      const titleEl = el.querySelector<HTMLElement>('h2 a')!;
+      expect(getComputedStyle(titleEl).overflow).toBe('hidden');
+      expect(tooltips(fixture.debugElement)).toEqual(
+        expect.arrayContaining([LONG_TITLE, LONG_NICK]),
+      );
     });
   });
 
@@ -250,12 +262,11 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
     });
 
     it('long data (RF 5): long title keeps every action visible, no overflow', async () => {
-      const el: HTMLElement = (
-        await mount(slots['my-game-item'], {
-          item: itemVm(myGame({ title: LONG_TITLE, staleness: 'dead', suspicious: true })),
-          busy: false,
-        })
-      ).nativeElement;
+      const fixture = await mount(slots['my-game-item'], {
+        item: itemVm(myGame({ title: LONG_TITLE, staleness: 'dead', suspicious: true })),
+        busy: false,
+      });
+      const el: HTMLElement = fixture.nativeElement;
       expect(el.textContent).toContain(LONG_TITLE);
       const actions = Array.from(el.querySelectorAll<HTMLElement>('[data-action]'));
       expect(actions.map((a) => a.getAttribute('data-action'))).toEqual([
@@ -268,7 +279,9 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       for (const a of actions) expect(getComputedStyle(a).display).not.toBe('none');
       const card = el.querySelector<HTMLElement>('article')!;
       expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
-      expect(getComputedStyle(el.querySelector('h2')!).overflowWrap).toBe('anywhere');
+      // Назва обрізається «…», повна — у підказці.
+      expect(getComputedStyle(el.querySelector('h2')!).overflow).toBe('hidden');
+      expect(tooltips(fixture.debugElement)).toContain(LONG_TITLE);
     });
   });
 });

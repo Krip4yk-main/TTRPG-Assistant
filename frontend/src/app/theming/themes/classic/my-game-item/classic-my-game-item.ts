@@ -8,11 +8,12 @@ import type {
   MyGameItemVm,
 } from '../../../../core/games/my-game-item.vm';
 import type { MyGameItemSlot } from '../../../slots';
+import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 
 /** Слот `my-game-item` дизайну «Класичний»: картка гри майстра з позначками й діями. */
 @Component({
   selector: 'nri-classic-my-game-item',
-  imports: [RouterLink, MatButtonModule, TranslatePipe],
+  imports: [RouterLink, MatButtonModule, TranslatePipe, TruncateTooltip],
   templateUrl: './classic-my-game-item.html',
   styleUrl: './classic-my-game-item.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

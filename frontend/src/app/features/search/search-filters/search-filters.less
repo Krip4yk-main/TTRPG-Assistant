@@ -1,5 +1,18 @@
+// Щільна панель, щоб якомога більше фільтрів уміщалось у висоту вікна (довший список
+// прокручується всередині панелі): поля 38px замість 56px, менші прапорці й перемикач —
+// токени Material успадковуються.
 :host {
   display: block;
+  --mat-form-field-container-height: 38px;
+  --mat-form-field-container-vertical-padding: 7px;
+  --mat-form-field-container-text-size: 0.9375rem;
+  --mat-form-field-subscript-text-size: 0.75rem;
+  --mat-form-field-subscript-text-line-height: 1rem;
+  --mat-checkbox-state-layer-size: 32px;
+  --mat-checkbox-touch-target-size: 32px;
+  --mat-checkbox-label-text-size: 0.875rem;
+  --mat-slide-toggle-label-text-size: 0.875rem;
+  --mat-slide-toggle-label-text-line-height: 1.3;
 }
 
 .toggle {
@@ -20,18 +33,20 @@
 .group {
   display: flex;
   flex-direction: column;
-  gap: var(--nri-space-sm);
+  gap: 0.625rem;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 
+  // Компактні заголовки розділів.
   legend {
     padding: 0;
-    margin-bottom: var(--nri-space-sm);
+    margin-bottom: var(--nri-space-xs);
     font-family: var(--nri-font-heading);
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     font-weight: 600;
+    line-height: 1.25;
   }
 }
 
@@ -39,15 +54,26 @@ mat-form-field {
   width: 100%;
 }
 
+// Material задає полям дати line-height: 1 — висота поля дорівнює кеглю, і в щільному полі
+// нижні виносні елементи («д», «р») обрізаються. 18px — текст дати вміщається повністю;
+// поле — посередині 24px рядка, як значення інших полів.
+input[type='date'] {
+  height: 18px;
+  margin-block: 3px;
+  line-height: 18px;
+}
+
 .row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  align-items: start;
   gap: var(--nri-space-sm);
 }
 
 .hint {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .custom-notice {
@@ -63,19 +89,23 @@ mat-form-field {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 var(--nri-space-sm);
+  gap: 0 var(--nri-space-xs);
 }
 
 .checks-label {
   width: 100%;
   color: var(--nri-text-muted);
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
 }
 
+// Чипи тем — дрібніші, щоб довгий список ліг у кілька рядків.
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--nri-space-xs);
+  --nri-chip-font-size: 0.75rem;
+  --nri-chip-height: 1.625rem;
+  --nri-chip-inset: 0.5rem;
 }
 
 .field-error {

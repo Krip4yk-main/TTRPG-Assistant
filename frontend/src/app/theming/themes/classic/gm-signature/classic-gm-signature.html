@@ -1,6 +1,8 @@
 @let g = gm(); {{ 'search.card.gm' | translate }}:
 @if (g.nickname) {
-  <a class="gm-link" [routerLink]="['/users', g.publicId]">{{ g.nickname }}</a>
+  <a class="gm-link" [routerLink]="['/users', g.publicId]" [nriTruncateTooltip]="g.nickname">{{
+    g.nickname
+  }}</a>
 } @else {
   {{ 'user.deleted' | translate }}
 }

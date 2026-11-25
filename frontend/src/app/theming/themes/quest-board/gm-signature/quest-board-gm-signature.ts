@@ -5,6 +5,7 @@ import type { GmSignatureVm } from '../../../../core/games/game-card.vm';
 import { BlockedBadge } from '../../../../shared/blocked-badge/blocked-badge';
 import { GmRating } from '../../../../features/ratings/gm-rating/gm-rating';
 import type { GmSignatureSlot } from '../../../slots';
+import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 
 /**
  * Слот `gm-signature` дизайну «Дошка оголошень»: кружок з першою літерою ніку, нік-посилання,
@@ -12,7 +13,7 @@ import type { GmSignatureSlot } from '../../../slots';
  */
 @Component({
   selector: 'nri-qb-gm-signature',
-  imports: [RouterLink, TranslatePipe, BlockedBadge, GmRating],
+  imports: [RouterLink, TranslatePipe, BlockedBadge, GmRating, TruncateTooltip],
   templateUrl: './quest-board-gm-signature.html',
   styleUrl: './quest-board-gm-signature.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

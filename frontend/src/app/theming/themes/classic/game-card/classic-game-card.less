@@ -48,8 +48,13 @@
   font-size: 1.3rem;
   overflow-wrap: anywhere;
 
+  // Довга назва — не більше двох рядків з «…» (повна — у підказці).
   a {
+    display: -webkit-box;
+    overflow: hidden;
     color: inherit;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     text-decoration: none;
 
     &:hover,

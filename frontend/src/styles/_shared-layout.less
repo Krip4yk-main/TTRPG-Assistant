@@ -9,23 +9,58 @@
 //   .nri-panel      — допоміжна панель сторінки (напр. фільтри пошуку);
 //   .nri-card-grid  — сітка карток; ширину колонки й проміжки задають токени дизайну
 //                     --nri-card-grid-min / --nri-card-grid-gap, а сторінка може підняти
-//                     мінімум через --nri-card-grid-page-min.
+//                     мінімум через --nri-card-grid-page-min. Кількість колонок рахується
+//                     від мінімуму (на широкому екрані — більше колонок), а --nri-card-grid-max
+//                     обмежує ширину самої картки (оголошення не розтягуються в широкий
+//                     «альбомний» аркуш, коли колонок мало) — картка стає по центру колонки.
 .nri-card-grid {
   display: grid;
   grid-template-columns: repeat(
     auto-fill,
     minmax(min(100%, max(var(--nri-card-grid-min), var(--nri-card-grid-page-min, 0px))), 1fr)
   );
+  // Усі рядки — однакової висоти (найвищої картки): дошка рівна.
+  grid-auto-rows: 1fr;
   gap: var(--nri-card-grid-gap);
   margin: 0;
   padding: 0;
   list-style: none;
+
+  > * {
+    justify-self: center;
+    width: 100%;
+    max-width: var(--nri-card-grid-max);
+  }
 }
 
 // Типові значення токенів сітки; дизайн перевизначає їх під :root[data-theme='<id>'].
+// --nri-header-height — висота липкої шапки каркаса дизайну (з торцем/межею): під нею
+// «прилипають» панелі сторінок (фільтри пошуку).
 :root {
   --nri-card-grid-min: 260px;
   --nri-card-grid-gap: var(--nri-space-md);
+  --nri-card-grid-max: none;
+  --nri-header-height: 64px;
+}
+
+// Сторінки-дошки — майже на всю ширину (сітка оголошень, фільтри), з бічними відступами 32 /
+// 24 / 16px і стелею 1680px, щоб на дуже широкому екрані рядки карток не розповзались.
+// Текстові сторінки й форми лишаються в --nri-content-max-width.
+.nri-page.nri-board {
+  max-width: 1680px;
+  padding-inline: var(--nri-space-xl);
+}
+
+@media (max-width: 1024px) {
+  .nri-page.nri-board {
+    padding-inline: var(--nri-space-lg);
+  }
+}
+
+@media (max-width: 599.98px) {
+  .nri-page.nri-board {
+    padding-inline: var(--nri-space-md);
+  }
 }
 
 // Підказки й помилки полів Material: у фіксованому режимі вони position: absolute на один

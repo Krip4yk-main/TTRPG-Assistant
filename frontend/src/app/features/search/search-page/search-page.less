@@ -1,19 +1,19 @@
-.search {
-  max-width: 1200px;
-}
-
 .layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   align-items: start;
   gap: var(--nri-space-xl);
 }
 
+// Фільтри «прилипають» під шапкою каркаса й не вищі за видиму частину вікна (dvh — без
+// панелей браузера): довгий список фільтрів прокручується всередині панелі, а не подовжує
+// сторінку.
 .filters {
   position: sticky;
-  top: var(--nri-space-md);
-  max-height: calc(100vh - 2 * var(--nri-space-md));
+  top: calc(var(--nri-header-height) + var(--nri-space-md));
+  max-height: calc(100dvh - var(--nri-header-height) - 2 * var(--nri-space-md));
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: var(--nri-space-xs);
 }
 

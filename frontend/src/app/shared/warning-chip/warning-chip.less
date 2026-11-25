@@ -2,6 +2,9 @@
   display: inline-block;
 }
 
+// Розмір чипа батько може зменшити токенами --nri-chip-font-size / --nri-chip-height /
+// --nri-chip-inset (щільні панелі, напр. фільтри пошуку).
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -11,7 +14,7 @@
   border-radius: var(--nri-radius-lg);
   background: var(--nri-surface-sunken);
   color: var(--nri-text);
-  font-size: 0.875rem;
+  font-size: var(--nri-chip-font-size, 0.875rem);
 }
 
 .info {
@@ -50,8 +53,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--nri-space-xs);
-  min-height: 2.25rem;
-  padding: 0 var(--nri-space-xs) 0 var(--nri-space-md);
+  min-height: var(--nri-chip-height, 2.25rem);
+  padding: 0 var(--nri-space-xs) 0 var(--nri-chip-inset, var(--nri-space-md));
   border: 0;
   border-radius: var(--nri-radius-lg);
   background: none;
