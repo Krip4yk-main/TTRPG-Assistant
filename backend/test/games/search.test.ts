@@ -624,6 +624,23 @@ describe('POST /api/games/search — gm_rating', () => {
     expect((await search({ sort: 'gm_rating', cursor: soon.body.nextCursor })).status).toBe(400);
   });
 
+  it('card summary: description excerpt in one line, cut with «…»; none on a restricted card', async () => {
+    const short = await insertGame({ description: '  Готичний жах\n\nу тумані.  ' });
+    const long = await insertGame({ description: `${'слово '.repeat(60)}кінець` });
+    const empty = await insertGame({ description: '' });
+    const adult = await insertGame({ description: 'Таємниця', ageRating: '18+' });
+    const res = await search({});
+    const byId = new Map(res.body.items.map((i: { id: number }) => [i.id, i]));
+    expect(byId.get(short)).toMatchObject({ summary: 'Готичний жах у тумані.' });
+    const cut = (byId.get(long) as { summary: string }).summary;
+    expect(cut.endsWith('слово…')).toBe(true);
+    expect(cut.length).toBeLessThanOrEqual(201);
+    expect(cut).not.toContain('кінець');
+    expect(byId.get(empty)).toMatchObject({ summary: null });
+    expect(byId.get(adult)).not.toHaveProperty('summary');
+    expect(JSON.stringify(res.body)).not.toContain('Таємниця');
+  });
+
   it('gmRating on cards and details; null below 5 units; no rating on a restricted card', async () => {
     const rated = await gmWith(3.95);
     const few = await gmWith(4.7, 4);

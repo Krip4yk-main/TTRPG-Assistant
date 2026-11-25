@@ -212,6 +212,11 @@ export interface GameSystemRefDto {
 export interface GameCardDto {
   id: number;
   title: string;
+  /**
+   * Короткий опис для картки: початок опису (до ~200 символів) одним рядком, без переносів;
+   * обрізаний — з «…» в кінці. `null` — опису немає.
+   */
+  summary: string | null;
   coverUrl: string | null;
   /** `null` — система «Інша», див. `systemOther`. */
   system: GameSystemRefDto | null;
