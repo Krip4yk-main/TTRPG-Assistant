@@ -56,6 +56,12 @@
     "myApplications": "Мої заявки",
     "admin": "Адмінка"
   },
+  "theme": {
+    "names": {
+      "quest-board": "Дошка оголошень",
+      "classic": "Класичний"
+    }
+  },
   "user": {
     "deleted": "Видалений користувач",
     "noNickname": "Без ніку"

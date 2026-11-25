@@ -5,11 +5,11 @@ import { Router, provideRouter, withComponentInputBinding } from '@angular/route
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import type { MeDto } from '@nri/shared';
-import { Shell } from './shell';
-import { routes } from '../../app.routes';
-import { AuthStore } from '../../core/auth/auth.store';
-import { ViewModeStore } from '../../core/view-mode/view-mode.store';
-import { SocketService } from '../../core/realtime/socket.service';
+import { ClassicShell } from './classic-shell';
+import { routes } from '../../../../app.routes';
+import { AuthStore } from '../../../../core/auth/auth.store';
+import { ViewModeStore } from '../../../../core/view-mode/view-mode.store';
+import { SocketService } from '../../../../core/realtime/socket.service';
 
 const me = {
   id: 1,
@@ -26,8 +26,8 @@ const me = {
   identities: [],
 } satisfies MeDto;
 
-describe('Shell home by view mode', () => {
-  let fixture: ComponentFixture<Shell>;
+describe('ClassicShell (slot «shell»): home by view mode', () => {
+  let fixture: ComponentFixture<ClassicShell>;
   let http: HttpTestingController;
   let el: HTMLElement;
 
@@ -39,7 +39,7 @@ describe('Shell home by view mode', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Shell],
+      imports: [ClassicShell],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -60,7 +60,7 @@ describe('Shell home by view mode', () => {
     }).compileComponents();
     TestBed.inject(AuthStore).setMe(me);
     http = TestBed.inject(HttpTestingController);
-    fixture = TestBed.createComponent(Shell);
+    fixture = TestBed.createComponent(ClassicShell);
     el = fixture.nativeElement as HTMLElement;
   });
 

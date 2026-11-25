@@ -35,7 +35,19 @@
                 "output": "assets"
               }
             ],
-            "styles": ["src/styles/material-dark.scss", "src/styles.less"]
+            "styles": [
+              "src/styles.less",
+              {
+                "input": "src/app/theming/themes/classic/classic.less",
+                "bundleName": "theme-classic",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/classic/classic-material.scss",
+                "bundleName": "theme-classic",
+                "inject": false
+              }
+            ]
           },
           "configurations": {
             "production": {

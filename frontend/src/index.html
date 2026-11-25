@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="uk" data-theme="dark">
+<html lang="uk" data-theme="quest-board">
   <head>
     <meta charset="utf-8" />
     <title>НРІ Асистент</title>
@@ -10,16 +10,38 @@
     <meta name="color-scheme" content="dark" />
     <meta name="description" content="НРІ Асистент — пошук ігор у настільні рольові ігри" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
-    />
+    <!--
+      Дизайн до старту застосунку (без мигання): data-theme, color-scheme і <link> бандла стилів
+      з останнього чинного дизайну в localStorage. Кеш — лише підказка: права й версію
+      перевіряє ThemeService після /api/me. Мапа «дизайн → [бандл, схема]» — як THEMES у
+      src/app/theming/theme.registry.ts. Якщо з'явиться CSP зі script-src — потрібен хеш скрипту.
+    -->
+    <script>
+      (function () {
+        var themes = {
+          'quest-board': ['classic', 'dark'],
+          classic: ['classic', 'dark'],
+        };
+        var id = 'quest-board';
+        var v = '';
+        try {
+          var stored = localStorage.getItem('nri.theme');
+          if (stored && Object.prototype.hasOwnProperty.call(themes, stored)) id = stored;
+          v = localStorage.getItem('nri.theme.v') || '';
+        } catch (e) {
+          // Сховище недоступне — дизайн за замовчуванням.
+        }
+        var theme = themes[id];
+        var root = document.documentElement;
+        root.setAttribute('data-theme', id);
+        root.style.colorScheme = theme[1];
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.id = 'nri-theme-style';
+        link.href = 'theme-' + theme[0] + '.css' + (/^[a-z0-9]+$/.test(v) ? '?v=' + v : '');
+        document.head.appendChild(link);
+      })();
+    </script>
   </head>
   <body>
     <nri-root></nri-root>

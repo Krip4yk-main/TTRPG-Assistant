@@ -1,8 +1,5 @@
 <section class="nri-page search">
-  <header class="page-header">
-    <h1>{{ 'search.title' | translate }}</h1>
-    <p class="nri-muted lead">{{ 'search.lead' | translate }}</p>
-  </header>
+  <nri-slot name="page-header" [inputs]="{ titleKey: 'search.title', leadKey: 'search.lead' }" />
 
   <div class="layout">
     <aside class="filters" [attr.aria-label]="'search.filters.title' | translate">

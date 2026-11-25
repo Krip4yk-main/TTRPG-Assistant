@@ -1,0 +1,50 @@
+@let g = game();
+<article class="nri-card" [class.restricted]="g.restricted" [attr.data-game-id]="g.id">
+  <p class="badges">
+    @for (b of g.badges; track b.kind) {
+      <nri-fallback-badge [badge]="b" />
+    }
+  </p>
+  <h2>
+    <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+  </h2>
+  @if (g.restricted) {
+    <p>{{ g.restrictedKey | translate }}</p>
+    @if (g.loginReturnTo; as returnTo) {
+      <a routerLink="/login" [queryParams]="{ returnTo }">{{
+        'games.restricted.login' | translate
+      }}</a>
+    }
+  } @else {
+    <p>
+      {{ g.systemName }}
+      @if (g.genreKey; as key) {
+        · {{ key | translate }}
+      }
+      · {{ g.formatKey | translate }}
+      @if (g.city) {
+        · {{ g.city }}
+      }
+      · {{ g.kindKey | translate }} · {{ g.languageKey | translate }}
+    </p>
+    @if (g.showSchedule) {
+      <p>
+        {{ 'search.card.next' | translate }}:
+        {{ g.nextSession ?? ('search.card.noNext' | translate) }}
+      </p>
+      <p>
+        {{ 'search.card.slots' | translate }}:
+        {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+      </p>
+    }
+    <p>
+      {{ 'search.card.price' | translate }}:
+      @if (g.priceUah === null) {
+        {{ 'search.card.free' | translate }}
+      } @else {
+        {{ 'search.card.priceValue' | translate: { price: g.priceUah } }}
+      }
+    </p>
+  }
+  <p class="gm"><nri-fallback-gm-signature [gm]="g.gm" /></p>
+</article>

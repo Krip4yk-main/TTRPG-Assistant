@@ -1,10 +1,33 @@
-// Темна тема (основна). Палітра — design-system/nri-assistant/MASTER.md:
+// Дизайн «Класичний» (колишня темна тема): окремий бандл `theme-classic.css` (`inject: false`
+// в angular.json), який підключає ThemeService / інлайн-скрипт index.html з `?v=<версія>`.
+// Тут — шрифти дизайну (локально, @fontsource: лише кирилиця й латиниця) і кольорові токени.
+// Material для цього дизайну — classic-material.scss (той самий бандл).
+
+@import (css) '@fontsource/cormorant-garamond/cyrillic-500.css';
+@import (css) '@fontsource/cormorant-garamond/latin-500.css';
+@import (css) '@fontsource/cormorant-garamond/cyrillic-600.css';
+@import (css) '@fontsource/cormorant-garamond/latin-600.css';
+@import (css) '@fontsource/cormorant-garamond/cyrillic-700.css';
+@import (css) '@fontsource/cormorant-garamond/latin-700.css';
+@import (css) '@fontsource/lora/cyrillic-400.css';
+@import (css) '@fontsource/lora/latin-400.css';
+@import (css) '@fontsource/lora/cyrillic-400-italic.css';
+@import (css) '@fontsource/lora/latin-400-italic.css';
+@import (css) '@fontsource/lora/cyrillic-500.css';
+@import (css) '@fontsource/lora/latin-500.css';
+@import (css) '@fontsource/lora/cyrillic-600.css';
+@import (css) '@fontsource/lora/latin-600.css';
+
+// Палітра. Палітра — design-system/nri-assistant/MASTER.md:
 // фон #0F172A, картки #192134, primary #15803D (felt green), accent #D97706 (gold).
 // Кольори для ТЕКСТУ на темному фоні — світліші відтінки, контраст ≥ 4.5:1:
 //   #F8FAFC на #0F172A ≈ 17:1, #94A3B8 ≈ 6.9:1, #4ADE80 ≈ 10:1, #FBBF24 ≈ 10:1, #F87171 ≈ 6.4:1.
 // Заливки: білий на #15803D ≈ 5:1, чорний на #D97706 ≈ 6.6:1, білий на #DC2626 ≈ 4.8:1.
 
-:root[data-theme='dark'] {
+// Тимчасово «Дошка оголошень» (quest-board) ще не має власних стилів і показує «Класичний»:
+// другий селектор прибирає задача 3 плану 8 разом із власним бандлом «Дошки».
+:root[data-theme='classic'],
+:root[data-theme='quest-board'] {
   --nri-bg: #0f172a;
   --nri-surface: #0f172a;
   --nri-surface-raised: #192134;

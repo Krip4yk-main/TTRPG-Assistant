@@ -1,0 +1,40 @@
+// Простий резервний каркас: лише розкладка, без декору.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+
+  &:focus {
+    top: var(--nri-space-sm);
+  }
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-md);
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border-bottom: 1px solid var(--nri-border);
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--nri-space-sm);
+  }
+}
+
+.brand {
+  margin-right: auto;
+  font-weight: 700;
+}
+
+.main {
+  flex: 1 0 auto;
+  outline: none;
+}

@@ -1,5 +1,6 @@
-// ЄДИНИЙ .scss у проєкті: Angular Material генерує токени теми лише через Sass API.
-// Усе інше — LESS (src/styles/themes/*.less) і CSS-змінні (--mat-sys-*, --nri-*).
+// Material для дизайну «Класичний» (бандл `theme-classic`). Angular Material генерує токени
+// теми лише через Sass API, тож на кожен дизайн — один .scss; усе інше — LESS і CSS-змінні
+// (--mat-sys-*, --nri-*). Структурні стилі Material — у стилях самих компонентів (глобально).
 // Палітра й шрифти — з design-system/nri-assistant/MASTER.md (felt green + gold on dark).
 //
 // Відображення MASTER.md → системні токени Material (темна тема):
@@ -16,7 +17,9 @@
 $master-primary: #15803d;
 $on-master-primary: #ffffff;
 
-html {
+// Тимчасово й для «Дошки оголошень» (quest-board) — до її власного Material у задачі 3.
+:root[data-theme='classic'],
+:root[data-theme='quest-board'] {
   color-scheme: dark;
 
   @include mat.theme(

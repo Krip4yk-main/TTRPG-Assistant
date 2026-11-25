@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { UserRole } from './me.js';
 
 /** Дизайни сайту, які може обрати користувач (План 8). */
@@ -28,8 +27,7 @@ export function resolveTheme(stored: string | null, role: UserRole): ThemeId {
   return id && availableThemes(role).includes(id) ? id : DEFAULT_THEME;
 }
 
-/** `PATCH /api/me/theme` → `MeDto`. */
-export const updateThemeSchema = z.object({ theme: z.enum(THEME_IDS) }).strict();
+/** `PATCH /api/me/theme` → `MeDto` (схема — `theme-schema.ts`). */
 export interface UpdateThemeRequest {
   theme: ThemeId;
 }

@@ -1,0 +1,70 @@
+@let game = item();
+<article class="nri-card" [attr.data-game-id]="game.id">
+  <h2>{{ game.title }}</h2>
+  <p>
+    @if (game.seen; as b) {
+      <span class="nri-seen-badge" [attr.data-seen]="b">{{ 'live.badge.' + b | translate }}</span>
+    }
+    <span class="status" [attr.data-status]="game.status">{{ game.statusKey | translate }}</span>
+  </p>
+  @for (f of game.flags; track f.flag) {
+    <p class="dead-flag" [attr.data-flag]="f.flag">
+      <strong>{{ f.badgeKey | translate }}</strong> — {{ f.explainKey | translate }}
+    </p>
+  }
+  <p>
+    {{ game.systemName }} · {{ game.formatKey | translate }}
+    @if (game.city) {
+      · {{ game.city }}
+    }
+    · {{ game.kindKey | translate }}
+  </p>
+  <p>
+    @if (game.nextSession; as at) {
+      {{ 'games.my.nextSession' | translate: { date: at } }}
+    } @else {
+      {{ 'games.my.noNextSession' | translate }}
+    }
+  </p>
+  <p>{{ 'games.my.slots' | translate: { free: game.freeSlots, max: game.maxPlayers } }}</p>
+  @if (game.applications; as apps) {
+    <p>
+      <a class="applications-link" [routerLink]="apps.link">{{
+        'games.my.applications' | translate
+      }}</a>
+      @if (apps.pending > 0) {
+        <span class="pending-count" [attr.data-count]="apps.pending">{{
+          'games.my.pendingCount' | translate: { count: apps.pending }
+        }}</span>
+      }
+    </p>
+  }
+  <div class="actions">
+    @for (a of game.actions; track a.id) {
+      @if (a.link) {
+        <a
+          [attr.data-action]="a.id"
+          [routerLink]="a.link"
+          [attr.aria-label]="
+            'games.actions.aria'
+              | translate: { action: (a.labelKey | translate), title: game.title }
+          "
+          >{{ a.labelKey | translate }}</a
+        >
+      } @else {
+        <button
+          type="button"
+          [attr.data-action]="a.id"
+          [disabled]="busy()"
+          [attr.aria-label]="
+            'games.actions.aria'
+              | translate: { action: (a.labelKey | translate), title: game.title }
+          "
+          (click)="emit(a)"
+        >
+          {{ a.labelKey | translate }}
+        </button>
+      }
+    }
+  </div>
+</article>

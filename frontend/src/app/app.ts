@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { Shell } from './layout/shell/shell';
+import { Slot } from './theming/slot';
 
+/** Корінь: каркас сторінки — слот `shell` чинного дизайну. */
 @Component({
   selector: 'nri-root',
-  imports: [Shell],
+  imports: [Slot],
   templateUrl: './app.html',
   styleUrl: './app.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

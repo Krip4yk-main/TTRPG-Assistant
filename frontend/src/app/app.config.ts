@@ -13,6 +13,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/api/auth.interceptor';
 import { AuthStore } from './core/auth/auth.store';
 import { TranslatedTitleStrategy } from './core/i18n/translated-title.strategy';
+import { ThemeService } from './theming/theme.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -32,7 +33,13 @@ export const appConfig: ApplicationConfig = {
       lang: 'uk',
     }),
     { provide: MAT_ICON_DEFAULT_OPTIONS, useValue: { fontSet: 'material-symbols-outlined' } },
-    // Перше завантаження /api/me (і кука CSRF) — до першої навігації.
-    provideAppInitializer(() => inject(AuthStore).load()),
+    // Перше завантаження /api/me (і кука CSRF) — до першої навігації; потім чинний дизайн
+    // (права з /me) і його слоти — до першого рендера, без мигання.
+    provideAppInitializer(async () => {
+      const auth = inject(AuthStore);
+      const theme = inject(ThemeService);
+      await auth.load();
+      await theme.init();
+    }),
   ],
 };

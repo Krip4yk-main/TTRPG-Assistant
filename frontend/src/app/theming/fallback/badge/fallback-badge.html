@@ -1,0 +1,8 @@
+@let b = badge();
+<span
+  class="badge"
+  [class]="b.kind"
+  [attr.data-fit]="b.kind === 'fit' ? b.value : null"
+  [attr.data-status]="b.kind === 'status' ? b.value : null"
+  >{{ b.labelKey | translate }}</span
+>

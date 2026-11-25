@@ -1,37 +1,44 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { GameAction, GameStatus, MyGameCardDto } from '@nri/shared';
+import type { GameAction, MyGameCardDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { ViewsService } from '../../../core/views/views.service';
-import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
+import {
+  toMyGameItemVm,
+  type MyGameActionEvent,
+  type MyGameItemVm,
+} from '../../../core/games/my-game-item.vm';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
 } from '../../../shared/confirm-dialog/confirm-dialog';
 import { confirmCloseDead } from '../dead-games/dead-game-close';
+import { Slot } from '../../../theming/slot';
+import type { SlotLinkAction, SlotOutputEvent } from '../../../theming/slots';
 
-/** Дії-переходи, доступні в кожному статусі (редагування — окремо). */
-const ACTIONS: Record<GameStatus, GameAction[]> = {
-  draft: ['publish', 'cancel'],
-  recruiting: ['start', 'cancel'],
-  started: ['finish', 'cancel'],
-  finished: [],
-  cancelled: [],
+/** Дії заголовка сторінки. */
+const HEADER_ACTIONS: readonly SlotLinkAction[] = [
+  {
+    id: 'blacklist',
+    labelKey: 'games.my.blacklist',
+    icon: 'block',
+    link: '/blacklist',
+    primary: false,
+  },
+  { id: 'new-game', labelKey: 'games.my.newGame', icon: 'add', link: '/games/new', primary: true },
+];
+const EMPTY_ACTION: SlotLinkAction = {
+  id: 'new-game',
+  labelKey: 'games.my.newGame',
+  icon: null,
+  link: '/games/new',
+  primary: true,
 };
-
-const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
-/** Статуси, у яких у гри можуть бути заявки (чернетка — ще ні). */
-const HAS_APPLICATIONS = new Set<GameStatus>(['recruiting', 'started', 'finished', 'cancelled']);
-
-/** Позначка детектора «мертвих» ігор на картці (ключ `games.dead.badge.*`). */
-type DeadFlag = 'stale' | 'dead' | 'suspicious';
 
 /** Повідомлення сторінки: ключ i18n. */
 interface Message {
@@ -42,11 +49,12 @@ interface Message {
 /**
  * «Мої ігри»: ігри майстра в усіх статусах з діями за статусом. Позначки «давно не
  * проводилась» / «мертва» мають пояснення й дії «Все ок» і «Закрити»; «підозріла» — лише
- * пояснення (закрити гру можна звичайною дією).
+ * пояснення (закрити гру можна звичайною дією). Що показати й які дії доступні — у
+ * `toMyGameItemVm`; рядок малює слот `my-game-item` чинного дизайну.
  */
 @Component({
   selector: 'nri-my-games',
-  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [MatButtonModule, TranslatePipe, Slot],
   templateUrl: './my-games.html',
   styleUrl: './my-games.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +69,19 @@ export class MyGames {
   protected readonly busyId = signal<number | null>(null);
   protected readonly message = signal<Message | null>(null);
   protected readonly seen = inject(ViewsService).tracker('game');
+  protected readonly headerActions = HEADER_ACTIONS;
+  protected readonly emptyAction = EMPTY_ACTION;
+
+  /** Рядки для слоту: гра + її view-model. */
+  protected readonly items = computed<{ game: MyGameCardDto; vm: MyGameItemVm }[] | null>(() => {
+    const me = this.auth.me();
+    return (
+      this.games()?.map((game) => ({
+        game,
+        vm: toMyGameItemVm(game, { me, seen: this.seen.badge(game.id) }),
+      })) ?? null
+    );
+  });
 
   constructor() {
     void this.load();
@@ -86,32 +107,13 @@ export class MyGames {
     }
   }
 
-  protected actionsFor(status: GameStatus): GameAction[] {
-    return ACTIONS[status];
-  }
-
-  protected canEdit(status: GameStatus): boolean {
-    return EDITABLE.has(status);
-  }
-
-  protected hasApplications(status: GameStatus): boolean {
-    return HAS_APPLICATIONS.has(status);
-  }
-
-  protected systemName(g: MyGameCardDto): string {
-    return g.system?.name ?? g.systemOther ?? '';
-  }
-
-  /** Позначки гри в порядку важливості. */
-  protected flags(game: MyGameCardDto): DeadFlag[] {
-    const flags: DeadFlag[] = [];
-    if (game.staleness !== 'ok') flags.push(game.staleness);
-    if (game.suspicious) flags.push('suspicious');
-    return flags;
-  }
-
-  protected isStale(game: MyGameCardDto): boolean {
-    return game.staleness !== 'ok';
+  /** Подія зі слоту рядка: дія-кнопка над грою. */
+  protected onItemOutput(game: MyGameCardDto, event: SlotOutputEvent): void {
+    if (event.name !== 'action') return;
+    const { action } = event.value as MyGameActionEvent;
+    if (action === 'still-alive') void this.stillAlive(game);
+    else if (action === 'close-dead') void this.closeDead(game);
+    else void this.run(game, action);
   }
 
   /** «Все ок»: позначку «давно не проводилась» / «мертва» знято на 14 днів. */
@@ -163,11 +165,6 @@ export class MyGames {
 
   private patch(id: number, changes: Partial<MyGameCardDto>): void {
     this.games.update((list) => (list ?? []).map((g) => (g.id === id ? { ...g, ...changes } : g)));
-  }
-
-  protected when(game: MyGameCardDto, iso: string): string {
-    const tz = viewerTimeZone(this.auth.me());
-    return formatDateTime(iso, tz, { showZone: differentZones(tz, game.timezone) });
   }
 
   /** Перехід статусу — лише після підтвердження в діалозі. */

@@ -4,9 +4,10 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
-import { GameCard } from './game-card';
-import { browserZone } from '../../../core/i18n/dates';
-import { AuthStore } from '../../../core/auth/auth.store';
+import { ClassicGameCard } from './classic-game-card';
+import { browserZone } from '../../../../core/i18n/dates';
+import { AuthStore } from '../../../../core/auth/auth.store';
+import { toGameCardVm } from '../../../../core/games/game-card.vm';
 
 const game: SearchGameCardDto = {
   id: 5,
@@ -39,13 +40,13 @@ const restricted: RestrictedGameDto = {
   restricted: true,
 };
 
-describe('GameCard', () => {
-  let fixture: ComponentFixture<GameCard>;
+describe('ClassicGameCard (slot «game-card»)', () => {
+  let fixture: ComponentFixture<ClassicGameCard>;
   let el: HTMLElement;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GameCard],
+      imports: [ClassicGameCard],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -53,13 +54,17 @@ describe('GameCard', () => {
         provideTranslateService(),
       ],
     }).compileComponents();
-    fixture = TestBed.createComponent(GameCard);
+    fixture = TestBed.createComponent(ClassicGameCard);
     el = fixture.nativeElement as HTMLElement;
   });
 
+  // Картка отримує view-model, як від контейнера `nri-game-card` (той самий шлях даних).
   const render = async (g: object, guest = false) => {
-    fixture.componentRef.setInput('game', g);
-    fixture.componentRef.setInput('guest', guest);
+    const vm = toGameCardVm(g as SearchGameCardDto, TestBed.inject(AuthStore).me(), {
+      guest,
+      genreKey: () => null,
+    });
+    fixture.componentRef.setInput('game', vm);
     fixture.detectChanges();
     await fixture.whenStable();
   };

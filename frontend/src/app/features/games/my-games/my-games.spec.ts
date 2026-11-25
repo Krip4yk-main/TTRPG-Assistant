@@ -10,6 +10,8 @@ import { MyGames } from './my-games';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { ViewsService } from '../../../core/views/views.service';
+import { provideThemeSlots } from '../../../theming/theme-testing';
+import { CLASSIC_SLOTS } from '../../../theming/themes/classic/slots';
 
 const me = {
   id: 1,
@@ -83,6 +85,8 @@ describe('MyGames', () => {
         provideRouter([]),
         provideTranslateService(),
         { provide: MatDialog, useValue: { open } },
+        // Рядки малює слот `my-game-item` дизайну «Класичний».
+        provideThemeSlots(CLASSIC_SLOTS),
         {
           provide: SocketService,
           useValue: {

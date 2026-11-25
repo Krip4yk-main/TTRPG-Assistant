@@ -34,6 +34,7 @@ import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { viewerTimeZone } from '../../../core/i18n/dates';
 import { AvailabilityEditor } from '../../calendar/availability-editor/availability-editor';
+import { Slot } from '../../../theming/slot';
 import { GameCard } from '../game-card/game-card';
 import { SearchFilters, type EffectiveCalendarMode } from '../search-filters/search-filters';
 import {
@@ -78,6 +79,7 @@ function isInvalidCursor(err: unknown): boolean {
     AvailabilityEditor,
     GameCard,
     SearchFilters,
+    Slot,
   ],
   templateUrl: './search-page.html',
   styleUrl: './search-page.less',

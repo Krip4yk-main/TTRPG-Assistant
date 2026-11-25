@@ -55,7 +55,7 @@
       class="view-mode"
       hideSingleSelectionIndicator
       [value]="viewMode.mode()"
-      (change)="setMode($event.value)"
+      (change)="shell.setMode($event.value)"
       [attr.aria-label]="'shell.viewMode.label' | translate"
     >
       <mat-button-toggle value="player">
@@ -97,14 +97,14 @@
           <mat-icon aria-hidden="true">settings</mat-icon>
           <span>{{ 'shell.account' | translate }}</span>
         </a>
-        @if (isStaff()) {
+        @if (shell.isStaff()) {
           <a mat-menu-item class="admin-link" routerLink="/admin">
             <mat-icon aria-hidden="true">shield</mat-icon>
             <span>{{ 'shell.admin' | translate }}</span>
           </a>
         }
       }
-      <button mat-menu-item type="button" (click)="logout()">
+      <button mat-menu-item type="button" (click)="shell.logout()">
         <mat-icon aria-hidden="true">logout</mat-icon>
         <span>{{ 'shell.logout' | translate }}</span>
       </button>
@@ -117,7 +117,7 @@
 @if (auth.loadFailed()) {
   <div class="connection-banner" role="alert">
     <span>{{ 'shell.connectionError' | translate }}</span>
-    <button mat-stroked-button type="button" [disabled]="retrying()" (click)="retry()">
+    <button mat-stroked-button type="button" [disabled]="shell.retrying()" (click)="shell.retry()">
       {{ 'common.retry' | translate }}
     </button>
   </div>

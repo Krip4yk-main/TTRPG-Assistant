@@ -1,0 +1,17 @@
+<div class="nri-card empty">
+  <p>{{ messageKey() | translate }}</p>
+  @if (hintKey(); as hint) {
+    <p class="nri-muted">{{ hint | translate }}</p>
+  }
+  @if (action(); as a) {
+    @if (a.primary) {
+      <a mat-flat-button [routerLink]="a.link" [attr.data-action]="a.id">{{
+        a.labelKey | translate
+      }}</a>
+    } @else {
+      <a mat-stroked-button [routerLink]="a.link" [attr.data-action]="a.id">{{
+        a.labelKey | translate
+      }}</a>
+    }
+  }
+</div>

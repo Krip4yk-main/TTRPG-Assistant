@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "dev:db": "docker compose up -d",
-    "lint": "eslint .",
+    "lint": "eslint . && npm run lint:styles",
+    "lint:styles": "stylelint \"frontend/src/**/*.less\"",
     "format": "prettier --write .",
     "test": "node scripts/run-workspaces.mjs test",
     "typecheck": "node scripts/run-workspaces.mjs typecheck"
@@ -22,7 +23,9 @@
   "devDependencies": {
     "angular-eslint": "^22.8.0",
     "eslint": "^10.15.0",
+    "postcss-less": "^8.0.0",
     "prettier": "^3.10.1",
+    "stylelint": "^18.1.0",
     "typescript": "~6.0",
     "typescript-eslint": "^8.74.0"
   }

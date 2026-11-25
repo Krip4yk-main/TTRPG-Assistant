@@ -1,0 +1,9 @@
+<header>
+  <h1>{{ titleKey() | translate }}</h1>
+  @if (leadKey(); as lead) {
+    <p>{{ lead | translate }}</p>
+  }
+  @for (a of actions(); track a.id) {
+    <a [routerLink]="a.link" [attr.data-action]="a.id">{{ a.labelKey | translate }}</a>
+  }
+</header>

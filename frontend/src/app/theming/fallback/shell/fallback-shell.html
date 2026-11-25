@@ -1,0 +1,77 @@
+<a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | translate }}</a>
+
+<header class="bar" role="banner">
+  <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
+  @if (auth.isActive()) {
+    @defer (on idle) {
+      <nri-rate-link />
+    }
+    @if (viewMode.mode() === 'gm') {
+      <nav [attr.aria-label]="'shell.viewMode.gm' | translate">
+        <a routerLink="/my-games">{{ 'shell.myGames' | translate }}</a>
+        <a routerLink="/games/new">{{ 'shell.newGame' | translate }}</a>
+      </nav>
+    } @else {
+      <nav [attr.aria-label]="'shell.viewMode.player' | translate">
+        <a routerLink="/my-applications">{{ 'shell.myApplications' | translate }}</a>
+      </nav>
+    }
+    <div class="view-mode" role="group" [attr.aria-label]="'shell.viewMode.label' | translate">
+      <button
+        type="button"
+        [attr.aria-pressed]="viewMode.mode() === 'player'"
+        (click)="shell.setMode('player')"
+      >
+        {{ 'shell.viewMode.player' | translate }}
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="viewMode.mode() === 'gm'"
+        (click)="shell.setMode('gm')"
+      >
+        {{ 'shell.viewMode.gm' | translate }}
+      </button>
+    </div>
+    @defer (on idle) {
+      <nri-notification-bell />
+    }
+  }
+  @if (auth.me(); as me) {
+    <nav [attr.aria-label]="'shell.accountMenu' | translate">
+      @if (auth.isActive()) {
+        <a [routerLink]="['/users', me.publicId]">{{ 'shell.myProfile' | translate }}</a>
+        <a routerLink="/account">{{ 'shell.account' | translate }}</a>
+        @if (shell.isStaff()) {
+          <a routerLink="/admin">{{ 'shell.admin' | translate }}</a>
+        }
+      }
+      <button type="button" (click)="shell.logout()">{{ 'shell.logout' | translate }}</button>
+    </nav>
+  } @else {
+    <a routerLink="/login">{{ 'shell.login' | translate }}</a>
+  }
+</header>
+
+@if (auth.loadFailed()) {
+  <div class="nri-alert" role="alert">
+    <span>{{ 'shell.connectionError' | translate }}</span>
+    <button type="button" [disabled]="shell.retrying()" (click)="shell.retry()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+}
+
+@if (auth.isActive()) {
+  @defer (on idle) {
+    <nri-sanctions-banner />
+  }
+}
+
+<main id="main-content" class="main" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="bar">
+  <span class="nri-muted">© {{ 'app.title' | translate }}</span>
+  <a routerLink="/about">{{ 'shell.about' | translate }}</a>
+</footer>

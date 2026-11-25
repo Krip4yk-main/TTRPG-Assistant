@@ -1,17 +1,5 @@
 <section class="nri-page my-games">
-  <header class="page-header">
-    <h1>{{ 'games.my.title' | translate }}</h1>
-    <div class="header-actions">
-      <a mat-stroked-button routerLink="/blacklist">
-        <mat-icon aria-hidden="true">block</mat-icon>
-        {{ 'games.my.blacklist' | translate }}
-      </a>
-      <a mat-flat-button routerLink="/games/new">
-        <mat-icon aria-hidden="true">add</mat-icon>
-        {{ 'games.my.newGame' | translate }}
-      </a>
-    </div>
-  </header>
+  <nri-slot name="page-header" [inputs]="{ titleKey: 'games.my.title', actions: headerActions }" />
 
   <div aria-live="polite">
     @if (message(); as msg) {
@@ -32,127 +20,25 @@
         {{ 'common.retry' | translate }}
       </button>
     </div>
-  } @else if (games(); as list) {
+  } @else if (items(); as list) {
     @if (list.length === 0) {
-      <div class="nri-card empty">
-        <p>{{ 'games.my.empty' | translate }}</p>
-        <p class="nri-muted">{{ 'games.my.emptyCta' | translate }}</p>
-        <a mat-flat-button routerLink="/games/new">{{ 'games.my.newGame' | translate }}</a>
-      </div>
+      <nri-slot
+        name="empty-state"
+        [inputs]="{
+          messageKey: 'games.my.empty',
+          hintKey: 'games.my.emptyCta',
+          action: emptyAction,
+        }"
+      />
     } @else {
       <ul class="cards">
-        @for (game of list; track game.id) {
+        @for (row of list; track row.game.id) {
           <li>
-            <article class="nri-card game" [attr.data-game-id]="game.id">
-              <header class="game-header">
-                <h2 class="game-title">{{ game.title }}</h2>
-                @if (seen.badge(game.id); as b) {
-                  <span class="nri-seen-badge" [attr.data-seen]="b">{{
-                    'live.badge.' + b | translate
-                  }}</span>
-                }
-                <span class="status" [attr.data-status]="game.status">{{
-                  'games.status.' + game.status | translate
-                }}</span>
-              </header>
-              @for (flag of flags(game); track flag) {
-                <div class="dead-flag" [attr.data-flag]="flag">
-                  <span class="flag-badge">{{ 'games.dead.badge.' + flag | translate }}</span>
-                  <p class="flag-explain">{{ 'games.dead.explain.' + flag | translate }}</p>
-                </div>
-              }
-              <p class="nri-muted meta">
-                {{ systemName(game) }} · {{ 'games.format.' + game.format | translate }}
-                @if (game.city) {
-                  · {{ game.city }}
-                }
-                · {{ 'games.kind.' + game.kind | translate }}
-              </p>
-              <p class="meta">
-                @if (game.nextSessionAt; as at) {
-                  {{ 'games.my.nextSession' | translate: { date: when(game, at) } }}
-                } @else {
-                  {{ 'games.my.noNextSession' | translate }}
-                }
-              </p>
-              <p class="meta">
-                {{ 'games.my.slots' | translate: { free: game.freeSlots, max: game.maxPlayers } }}
-              </p>
-              @if (hasApplications(game.status)) {
-                <p class="meta applications">
-                  <a class="applications-link" [routerLink]="['/games', game.id, 'applications']">{{
-                    'games.my.applications' | translate
-                  }}</a>
-                  @if (game.pendingApplications > 0) {
-                    <span class="pending-count" [attr.data-count]="game.pendingApplications">{{
-                      'games.my.pendingCount' | translate: { count: game.pendingApplications }
-                    }}</span>
-                  }
-                </p>
-              }
-              <div class="actions">
-                @if (isStale(game)) {
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    data-action="still-alive"
-                    [disabled]="busyId() !== null"
-                    [attr.aria-label]="
-                      'games.actions.aria'
-                        | translate
-                          : { action: ('games.dead.stillAlive' | translate), title: game.title }
-                    "
-                    (click)="stillAlive(game)"
-                  >
-                    {{ 'games.dead.stillAlive' | translate }}
-                  </button>
-                  <button
-                    mat-button
-                    type="button"
-                    class="danger"
-                    data-action="close-dead"
-                    [disabled]="busyId() !== null"
-                    [attr.aria-label]="
-                      'games.actions.aria'
-                        | translate: { action: ('games.dead.close' | translate), title: game.title }
-                    "
-                    (click)="closeDead(game)"
-                  >
-                    {{ 'games.dead.close' | translate }}
-                  </button>
-                }
-                @if (canEdit(game.status)) {
-                  <a
-                    mat-stroked-button
-                    data-action="edit"
-                    [routerLink]="['/games', game.id, 'edit']"
-                    [attr.aria-label]="
-                      'games.actions.aria'
-                        | translate
-                          : { action: ('games.actions.edit' | translate), title: game.title }
-                    "
-                    >{{ 'games.actions.edit' | translate }}</a
-                  >
-                }
-                @for (action of actionsFor(game.status); track action) {
-                  <button
-                    mat-button
-                    type="button"
-                    [attr.data-action]="action"
-                    [class.danger]="action === 'cancel'"
-                    [disabled]="busyId() !== null"
-                    [attr.aria-label]="
-                      'games.actions.aria'
-                        | translate
-                          : { action: ('games.actions.' + action | translate), title: game.title }
-                    "
-                    (click)="run(game, action)"
-                  >
-                    {{ 'games.actions.' + action | translate }}
-                  </button>
-                }
-              </div>
-            </article>
+            <nri-slot
+              name="my-game-item"
+              [inputs]="{ item: row.vm, busy: busyId() !== null }"
+              (output)="onItemOutput(row.game, $event)"
+            />
           </li>
         }
       </ul>

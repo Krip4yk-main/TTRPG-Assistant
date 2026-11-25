@@ -1,0 +1,12 @@
+@let g = gm(); {{ 'search.card.gm' | translate }}:
+@if (g.nickname) {
+  <a class="gm-link" [routerLink]="['/users', g.publicId]">{{ g.nickname }}</a>
+} @else {
+  {{ 'user.deleted' | translate }}
+}
+@if (g.blocked) {
+  <nri-blocked-badge />
+}
+@if (g.showRating) {
+  <nri-gm-rating [value]="g.rating" [showEmpty]="true" />
+}
