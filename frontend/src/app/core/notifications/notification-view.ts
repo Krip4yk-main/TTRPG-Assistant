@@ -85,6 +85,10 @@ export interface NotificationView {
   closes: string | null;
   /** Кількість нових скарг (`moderation.digest`); інакше 0. */
   count: number;
+  /** Ключ назви типу санкції (`sanction.*`, `notifications.sanction.types.<type>`); інакше null. */
+  sanction: string | null;
+  /** Кінець санкції (`sanction.imposed`); безстрокова — окремий текст `_permanent`. */
+  until: string | null;
   icon: string;
 }
 
@@ -104,6 +108,8 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     ratee: p.ratee?.nickname || null,
     closes: null,
     count: p.count ?? 0,
+    sanction: null,
+    until: null,
     icon: CATEGORY_ICONS[n.category] ?? 'notifications',
   };
   if (!isType(n.type)) return view;
@@ -140,6 +146,16 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
 
   if (n.type.startsWith('rating.') && p.closesAt) {
     view.closes = formatDateTime(p.closesAt, timeZone);
+  }
+
+  // Санкції: тип, кінець і причина (її бачить лише сам покараний).
+  if (n.type === 'sanction.imposed' || n.type === 'sanction.lifted') {
+    view.sanction = `notifications.sanction.types.${p.sanctionType ?? 'unknown'}`;
+  }
+  if (n.type === 'sanction.imposed') {
+    if (p.endsAt) view.until = formatDateTime(p.endsAt, timeZone);
+    else view.key = 'notifications.sanction.imposed_permanent';
+    if (reason) view.reason = { code: null, text: reason };
   }
 
   if (n.type === 'game.finished') {

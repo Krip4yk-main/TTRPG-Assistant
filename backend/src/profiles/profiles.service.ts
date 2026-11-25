@@ -114,6 +114,7 @@ export async function getPublicProfile(
     nickname: u.nickname,
     avatarUrl: u.avatarUrl,
     status: u.status,
+    ...(u.isBanned ? { blocked: true as const } : {}),
     ratings: await userRatings(deps, u.id),
   };
   if (visible.bio && row.bio !== null) dto.bio = row.bio;

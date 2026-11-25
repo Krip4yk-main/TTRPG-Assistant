@@ -89,6 +89,10 @@ export function renderNotification(
     offset: offsetPhrase(params.offsetMin, t),
     ratee: params.ratee?.nickname || t('notify.someone'),
     count: String(params.count ?? 0),
+    sanction: params.sanctionType
+      ? t(`notify.sanction.types.${params.sanctionType}`)
+      : t('notify.sanction.types.unknown'),
+    until: formatWhen(params.endsAt ?? undefined, tz) ?? t('notify.unknownTime'),
   };
 
   const parts: string[] = [];
@@ -106,6 +110,8 @@ export function renderNotification(
     for (const m of missing) {
       if (m && lookup(dict, `${key}_${m}`) !== undefined) key = `${key}_${m}`;
     }
+    // Безстрокова санкція — без «до …».
+    if (kind === 'sanction.imposed' && !params.endsAt) key = 'notify.sanction.imposed_permanent';
     // Нагадування про дедлайн сесійного набору — з датою сесії.
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
@@ -114,7 +120,7 @@ export function renderNotification(
     // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
     const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;
     if (closes) parts.push(t('notify.rating.until', { closes }));
-    if (kind === 'session.cancelled' && params.reason) {
+    if ((kind === 'session.cancelled' || kind === 'sanction.imposed') && params.reason) {
       parts.push(t('notify.reason', { reason: params.reason }));
     }
     if (kind === 'game.finished') {

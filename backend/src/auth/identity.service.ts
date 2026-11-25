@@ -1,9 +1,10 @@
 import { createHmac } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import { authIdentities, identityTombstones, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import type { Db } from '../db/client.js';
+import type { Tx } from '../applications/applications.rules.js';
 import { isDuplicateKey } from '../db/errors.js';
 import { AppError } from '../http/errors.js';
 import { generatePublicId, PUBLIC_ID_ATTEMPTS } from '../users/nickname.js';
@@ -29,6 +30,50 @@ export async function insertUserWithPublicId(
       if (!isDuplicateKey(err) || attempt >= PUBLIC_ID_ATTEMPTS) throw err;
     }
   }
+}
+
+/**
+ * Надгробок ідентичності (відв'язування чи видалення акаунта) з посиланням на користувача:
+ * бан користувача позначає всі його надгробки (`markUserTombstones`). Повтор для тієї ж
+ * ідентичності: позначка бану не знімається (`GREATEST`), а банований надгробок лишається за
+ * забаненим власником — інакше розбан іншого акаунта зняв би чужий бан.
+ */
+export async function upsertTombstone(
+  tx: Db | Tx,
+  pepper: string,
+  userId: number,
+  isBanned: boolean,
+  identity: { provider: Provider; subject: string },
+): Promise<void> {
+  const banned = isBanned ? 1 : 0;
+  await tx
+    .insert(identityTombstones)
+    .values({
+      provider: identity.provider,
+      subjectHash: subjectHash(identity.provider, identity.subject, pepper),
+      userId,
+      isBanned,
+    })
+    // Порядок присвоєнь важливий: MySQL обчислює їх зліва направо, тож `user_id` бачить
+    // ще старе `is_banned`.
+    .onDuplicateKeyUpdate({
+      set: {
+        userId: sql`IF(${identityTombstones.isBanned} = 1, ${identityTombstones.userId}, ${userId})`,
+        isBanned: sql`GREATEST(${identityTombstones.isBanned}, ${banned})`,
+      },
+    });
+}
+
+/** Позначає (бан) чи знімає позначку (розбан) з усіх надгробків користувача. */
+export async function markUserTombstones(
+  tx: Db | Tx,
+  userId: number,
+  isBanned: boolean,
+): Promise<void> {
+  await tx
+    .update(identityTombstones)
+    .set({ isBanned })
+    .where(eq(identityTombstones.userId, userId));
 }
 
 async function assertNotBanned({ env, db }: Deps, identity: VerifiedIdentity): Promise<void> {

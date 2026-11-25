@@ -36,7 +36,12 @@ function restrictedView(g: Pick<GameDto, 'id' | 'title' | 'gm' | 'ageRating'>): 
   return {
     id: g.id,
     title: g.title,
-    gm: { publicId: g.gm.publicId, nickname: g.gm.nickname, avatarUrl: g.gm.avatarUrl },
+    gm: {
+      publicId: g.gm.publicId,
+      nickname: g.gm.nickname,
+      avatarUrl: g.gm.avatarUrl,
+      ...(g.gm.blocked ? { blocked: true as const } : {}),
+    },
     ageRating: g.ageRating,
     restricted: true,
   };

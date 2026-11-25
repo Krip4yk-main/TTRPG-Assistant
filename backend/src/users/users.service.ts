@@ -1,10 +1,9 @@
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
   canRegister,
   localDate,
   type CompleteProfileInput,
-  type GameStatus,
   type MeDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -14,39 +13,34 @@ import {
   revokeTokenHashes,
 } from '../auth/session.service.js';
 import { isDuplicateKey } from '../db/errors.js';
-import { subjectHash } from '../auth/identity.service.js';
+import { upsertTombstone } from '../auth/identity.service.js';
 import {
   authIdentities,
   availabilityBusyDates,
   calendarPinnedGames,
   availabilitySlots,
-  gameApplications,
-  gameMembers,
-  games,
-  identityTombstones,
   sessions,
   userProfiles,
   users,
 } from '../db/schema/index.js';
-import { cancelPendingForGames, logCancelled } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
-import { cancelFutureSessions, logSessionsCancelled } from '../sessions/materialize.js';
 import { AppError } from '../http/errors.js';
 import { cancelPendingOutbox } from '../notifications/telegram-outbox.js';
 import {
-  applicationsChanged,
-  closeMembersRoom,
-  membersChanged,
-  sessionsChanged,
-} from '../realtime/game-rooms.js';
+  leaveCandidates,
+  lockLeaveGames,
+  logLeaveCascade,
+  pingLeaveCascade,
+  runLeaveCascade,
+} from './leave-cascade.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
 
 const DAY_MS = 86_400_000;
-/** Ігри майстра, які видалення акаунта скасовує. */
-const ACTIVE_GAME_STATUSES: GameStatus[] = ['draft', 'recruiting', 'started'];
 export type Clock = () => Date;
 /**
+ * Низькорівневий бан без санкції (тести, аварійний доступ): лише прапорець. Модерація банить
+ * через `imposeSanction` (`global_ban`) — там і каскад, і надгробки, і журнал.
  * Ставить is_banned і скидає Redis-кеш сесій, тож бан діє з наступного ж запиту:
  * requireAuth бачить isBanned -> 403 ACCOUNT_BANNED і викликає revokeAllUserSessions
  * (далі 401). Рядки БД тут свідомо лишаються, щоб перший запит отримав зрозумілий 403.
@@ -221,14 +215,25 @@ export async function unlinkIdentity(
   const { db } = deps;
   await db.transaction(async (tx) => {
     // Лок рядка користувача серіалізує паралельні відв'язування.
-    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
+    const [u] = await tx
+      .select({ isBanned: users.isBanned })
+      .from(users)
+      .where(eq(users.id, userId))
+      .for('update');
     const rows = await tx
-      .select({ id: authIdentities.id, provider: authIdentities.provider })
+      .select({
+        id: authIdentities.id,
+        provider: authIdentities.provider,
+        subject: authIdentities.subject,
+      })
       .from(authIdentities)
       .where(eq(authIdentities.userId, userId));
     const target = rows.find((r) => r.provider === provider);
     if (!target) throw new AppError(404, 'NOT_FOUND');
     if (rows.length <= 1) throw new AppError(409, 'LAST_IDENTITY');
+    // Надгробок на кожне відв'язування: бан (зараз чи пізніше) закриває цій ідентичності
+    // повторну реєстрацію й прив'язку (ухилення від бану).
+    await upsertTombstone(tx, deps.env.IDENTITY_PEPPER, userId, u?.isBanned ?? false, target);
     await tx.delete(authIdentities).where(eq(authIdentities.id, target.id));
     // Ще не надіслане в цей чат більше не доставляємо.
     if (provider === 'telegram') await cancelPendingOutbox(tx, userId, 'unlinked');
@@ -241,66 +246,21 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
   const now = new Date();
   // Хеші токенів збираємо в транзакції (до видалення рядків), щоб відкликання
   // не залежало лише від Redis-сету `usess:`. Рядок `users` лишається надгробком, тож
-  // FK-каскади не спрацьовують: профіль і календар видаляємо явно, членства в активних
-  // іграх завершуємо (`account_deleted`, історія присутності лишається), а активні ігри
-  // майстра скасовуємо (рішення R8).
-  // Порядок блокувань той самий, що в заявках/затвердженні: спершу рядки ігор, потім
-  // рядок користувача (див. `lockUser` у applications.rules.ts), потім заявки/членства —
-  // інакше видалення й затвердження в тій самій грі блокують одне одного по колу.
-  // Ігри блокуємо одним запитом за зростанням id: свої активні (скасуємо) і ті, куди є
-  // своя `pending`-заявка (відкличемо). Тоді два одночасні видалення з перехресними
-  // заявками (кожен подався в гру іншого) серіалізуються на рядках ігор, а не
-  // зустрічаються по колу на заявках. Кандидатів читаємо до транзакції: неблокувальне
-  // читання всередині зафіксувало б знімок REPEATABLE READ ще до блокувань, і членство,
-  // затверджене, поки ми чекали на `users`, лишилось би непоміченим.
-  const own = await db
-    .select({ id: games.id })
-    .from(games)
-    .where(and(eq(games.gmUserId, userId), inArray(games.status, ACTIVE_GAME_STATUSES)));
-  const appliedTo = await db
-    .select({ id: gameApplications.gameId })
-    .from(gameApplications)
-    .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')));
-  const lockIds = [...new Set([...own, ...appliedTo].map((g) => g.id))];
+  // FK-каскади не спрацьовують: профіль і календар видаляємо явно, а вихід з ігор, заявки й
+  // скасування своїх активних ігор (рішення R8) — спільний каскад `leave-cascade.ts` (той самий,
+  // що для глобального бану), з його порядком блокувань: ігри → `users` → заявки/членства.
+  const lockIds = await leaveCandidates(db, userId);
   const result = await db.transaction(async (tx) => {
-    const locked = lockIds.length
-      ? await tx
-          .select({ id: games.id, status: games.status, gmUserId: games.gmUserId })
-          .from(games)
-          .where(inArray(games.id, lockIds))
-          .orderBy(asc(games.id))
-          .for('update')
-      : [];
-    const active = locked
-      .filter((g) => g.gmUserId === userId && ACTIVE_GAME_STATUSES.includes(g.status))
-      .map(({ id, status }) => ({ id, status }));
+    const active = await lockLeaveGames(tx, userId, lockIds);
     const [u] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.role === 'owner') throw new AppError(409, 'OWNER_CANNOT_DELETE');
-    // Гра, створена між читанням кандидатів і транзакцією, теж скасовується: після X на
-    // `users` дочитуємо свої активні ігри блокувальним читанням (свої рядки ігор не беруть
-    // ні заявки, ні затвердження чужих користувачів у зворотному порядку).
-    const late = await tx
-      .select({ id: games.id, status: games.status })
-      .from(games)
-      .where(and(eq(games.gmUserId, userId), inArray(games.status, ACTIVE_GAME_STATUSES)))
-      .for('update');
-    for (const g of late) if (!active.some((a) => a.id === g.id)) active.push(g);
     const identities = await tx
       .select()
       .from(authIdentities)
       .where(eq(authIdentities.userId, userId));
     for (const i of identities) {
-      await tx
-        .insert(identityTombstones)
-        .values({
-          provider: i.provider,
-          subjectHash: subjectHash(i.provider, i.subject, env.IDENTITY_PEPPER),
-          isBanned: u.isBanned,
-        })
-        .onDuplicateKeyUpdate({
-          set: { isBanned: sql`GREATEST(${identityTombstones.isBanned}, ${u.isBanned ? 1 : 0})` },
-        });
+      await upsertTombstone(tx, env.IDENTITY_PEPPER, userId, u.isBanned, i);
     }
     await tx.delete(authIdentities).where(eq(authIdentities.userId, userId));
     await cancelPendingOutbox(tx, userId, 'unlinked');
@@ -313,60 +273,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
     await tx.delete(calendarPinnedGames).where(eq(calendarPinnedGames.userId, userId));
-    // Склад завершених/скасованих ігор лишаємо: історія інших гравців зберігається, а
-    // видалений користувач показується анонімно. Виходимо лише з активних ігор.
-    // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри):
-    // нові членства/заявки неможливі — затвердження й заявка чекають на X рядка `users`.
-    // Членство не видаляється, а завершується: присутність на сесіях лишається в історії.
-    const memberships = await tx
-      .select({ id: gameMembers.id, gameId: gameMembers.gameId })
-      .from(gameMembers)
-      .innerJoin(games, eq(games.id, gameMembers.gameId))
-      .where(
-        and(
-          eq(gameMembers.userId, userId),
-          isNull(gameMembers.leftAt),
-          inArray(games.status, ['recruiting', 'started']),
-        ),
-      );
-    const memberIds = memberships.map((m) => m.id);
-    if (memberIds.length) {
-      await tx
-        .update(gameMembers)
-        .set({ leftAt: now, leftReason: 'account_deleted' })
-        .where(and(inArray(gameMembers.id, memberIds), isNull(gameMembers.leftAt)));
-    }
-    // Свої `pending`-заявки — відкликано (FK-каскад на надгробку не спрацює).
-    const withdrawn = await tx
-      .select({ id: gameApplications.id, gameId: gameApplications.gameId })
-      .from(gameApplications)
-      .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')))
-      .for('update');
-    if (withdrawn.length) {
-      await tx
-        .update(gameApplications)
-        .set({ status: 'withdrawn', decidedAt: now })
-        .where(
-          and(
-            inArray(
-              gameApplications.id,
-              withdrawn.map((w) => w.id),
-            ),
-            eq(gameApplications.status, 'pending'),
-          ),
-        );
-    }
-    if (active.length) {
-      await tx
-        .update(games)
-        .set({ status: 'cancelled', cancelledAt: now })
-        .where(
-          inArray(
-            games.id,
-            active.map((g) => g.id),
-          ),
-        );
-    }
+    const cascade = await runLeaveCascade(tx, userId, active, now, 'account_deleted');
     await tx
       .update(users)
       .set({
@@ -379,96 +286,11 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         deletedAt: now,
       })
       .where(eq(users.id, userId));
-    const cancelledApps = await cancelPendingForGames(
-      tx,
-      active.map((g) => g.id),
-      now,
-    );
-    const cancelledSessions = await cancelFutureSessions(
-      tx,
-      active.map((g) => g.id),
-      now,
-      'game_cancelled',
-    );
-    return {
-      tokenHashes: sess.map((r) => r.tokenHash),
-      cancelledGameIds: active,
-      cancelledApps,
-      cancelledSessions,
-      withdrawn,
-      leftGameIds: memberships.map((m) => m.gameId),
-    };
+    return { tokenHashes: sess.map((r) => r.tokenHash), cascade };
   });
-  const {
-    tokenHashes,
-    cancelledGameIds,
-    cancelledApps,
-    cancelledSessions,
-    withdrawn,
-    leftGameIds,
-  } = result;
-  await revokeTokenHashes(deps, tokenHashes);
+  await revokeTokenHashes(deps, result.tokenHashes);
   await revokeAllUserSessions(deps, userId);
-  for (const g of cancelledGameIds) {
-    await logEvent(db, {
-      type: 'game.cancelled',
-      userId,
-      entityType: 'game',
-      entityId: g.id,
-      payload: { from: g.status, to: 'cancelled', reason: 'account_deleted' },
-    });
-  }
-  await logCancelled(db, cancelledApps, 'application.cancelled_game');
-  await logSessionsCancelled(db, userId, cancelledSessions, 'game_cancelled');
-  for (const w of withdrawn) {
-    await logEvent(db, {
-      type: 'application.withdrawn',
-      userId,
-      entityType: 'application',
-      entityId: w.id,
-      payload: { gameId: w.gameId, reason: 'account_deleted' },
-    });
-  }
-  for (const gameId of leftGameIds) {
-    await logEvent(db, {
-      type: 'member.left',
-      userId,
-      entityType: 'game',
-      entityId: gameId,
-      payload: { gameId, reason: 'account_deleted' },
-    });
-  }
+  await logLeaveCascade(db, userId, result.cascade, 'account_deleted');
   await logEvent(db, { type: 'user.deleted', userId });
-  await pingAccountDeleted(deps, userId, result);
-}
-
-/** Пінги змін після видалення акаунта (сокети самого користувача вже розірвано). */
-async function pingAccountDeleted(
-  deps: AppDeps,
-  userId: number,
-  r: {
-    cancelledGameIds: { id: number }[];
-    cancelledApps: { gameId: number; userId: number }[];
-    withdrawn: { gameId: number }[];
-    leftGameIds: number[];
-  },
-): Promise<void> {
-  if (!deps.realtime) return;
-  for (const gameId of r.leftGameIds) membersChanged(deps, gameId, [userId]);
-  for (const g of r.cancelledGameIds) {
-    sessionsChanged(deps, g.id);
-    closeMembersRoom(deps, g.id);
-  }
-  for (const a of r.cancelledApps) applicationsChanged(deps, a.gameId, [a.userId]);
-  const gameIds = [...new Set(r.withdrawn.map((w) => w.gameId))];
-  if (gameIds.length === 0) return;
-  try {
-    const gms = await deps.db
-      .select({ id: games.id, gmUserId: games.gmUserId })
-      .from(games)
-      .where(inArray(games.id, gameIds));
-    for (const g of gms) applicationsChanged(deps, g.id, [g.gmUserId]);
-  } catch (err) {
-    console.error('[realtime] account-deleted pings failed', err);
-  }
+  await pingLeaveCascade(deps, userId, result.cascade);
 }

@@ -32,7 +32,11 @@ describe('notificationView', () => {
   it('every NOTIFICATION_TYPE has a translation (and every account_deleted variant)', () => {
     const missing: string[] = [];
     for (const type of NOTIFICATION_TYPES) {
-      const key = notificationView(dto(type), 'Europe/Kyiv').key;
+      // `endsAt` — строкова санкція (безстрокова має окремий текст `_permanent`).
+      const key = notificationView(
+        dto(type, { endsAt: '2026-12-02T10:00:00.000Z' }),
+        'Europe/Kyiv',
+      ).key;
       expect(key).toBe(`notifications.${type}`);
       if (typeof lookup(key) !== 'string') missing.push(key);
       const deleted = notificationView(dto(type, { reason: 'account_deleted' }), 'Europe/Kyiv');
@@ -170,6 +174,56 @@ describe('notificationView', () => {
     expect(lookup(digest.key)).toContain('{{count}}');
     expect(lookup('notifications.categories.moderation.label')).toBe('Модерація');
     expect(lookup('notifications.categories.moderation.hint')).toEqual(expect.any(String));
+  });
+
+  it('sanctions: type name, end date, reason; permanent variant; lifted without reason', () => {
+    const imposed = notificationView(
+      {
+        ...dto('sanction.imposed'),
+        category: 'moderation',
+        params: {
+          sanctionType: 'no_paid_apply',
+          endsAt: '2026-12-02T10:00:00.000Z',
+          reason: 'Неявка без попередження',
+        },
+      },
+      'Europe/Kyiv',
+    );
+    expect(imposed.key).toBe('notifications.sanction.imposed');
+    expect(imposed.sanction).toBe('notifications.sanction.types.no_paid_apply');
+    expect(lookup(imposed.sanction!)).toBe('заборона подаватися на платні ігри');
+    expect(imposed.until).toEqual(expect.stringContaining('12:00'));
+    expect(imposed.reason).toEqual({ code: null, text: 'Неявка без попередження' });
+    expect(lookup(imposed.key)).toContain('{{until}}');
+
+    const permanent = notificationView(
+      {
+        ...dto('sanction.imposed'),
+        category: 'moderation',
+        params: { sanctionType: 'global_ban', endsAt: null, reason: 'Шахрайство' },
+      },
+      'UTC',
+    );
+    expect(permanent.key).toBe('notifications.sanction.imposed_permanent');
+    expect(permanent.until).toBeNull();
+    expect(lookup(permanent.key)).not.toContain('{{until}}');
+
+    const lifted = notificationView(
+      { ...dto('sanction.lifted'), category: 'moderation', params: { sanctionType: 'warning' } },
+      'UTC',
+    );
+    expect(lifted.key).toBe('notifications.sanction.lifted');
+    expect(lifted.reason).toBeNull();
+    for (const t of [
+      'warning',
+      'application_limit',
+      'no_paid_apply',
+      'no_paid_create',
+      'global_ban',
+      'unknown',
+    ]) {
+      expect(lookup(`notifications.sanction.types.${t}`)).toEqual(expect.any(String));
+    }
   });
 
   it('unknown type renders the generic text', () => {

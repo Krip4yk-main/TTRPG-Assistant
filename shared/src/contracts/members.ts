@@ -4,8 +4,17 @@ import type { GameDto } from './games.js';
 export const MEMBER_ROLES = ['player'] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
-/** Чому членство завершилось (`left_at` встановлено); `account_deleted` — видалення акаунта. */
-export const MEMBER_LEFT_REASONS = ['left', 'kicked', 'banned', 'account_deleted'] as const;
+/**
+ * Чому членство завершилось (`left_at` встановлено); `account_deleted` — видалення акаунта;
+ * `banned_by_admin` — глобальний бан адміністрацією (не плутати з `banned` — бан майстром у грі).
+ */
+export const MEMBER_LEFT_REASONS = [
+  'left',
+  'kicked',
+  'banned',
+  'account_deleted',
+  'banned_by_admin',
+] as const;
 export type MemberLeftReason = (typeof MEMBER_LEFT_REASONS)[number];
 
 export const LEAVE_NOTE_MIN = 10;

@@ -23,7 +23,7 @@ import {
 } from '../notifications/notifications.service.js';
 import { writeLog } from './log.js';
 import { assertCan, ROLE_RANK, type Role } from './permissions.js';
-import { imposeSanction } from './sanctions.service.js';
+import { imposeSanctionTx } from './sanctions.service.js';
 
 type DbLike = Db | Tx;
 /** Хто дивиться/діє: id і роль із сесії. */
@@ -326,7 +326,7 @@ export async function actionComplaint(
 ): Promise<ComplaintDto> {
   assertCan(viewer.role, 'complaints.review');
   const { sanction } = complaintActionSchema.parse(body);
-  const { dto, row } = await deps.db.transaction(async (tx) => {
+  const { dto, row, afterCommit } = await deps.db.transaction(async (tx) => {
     const c = await lockNew(tx, viewer, id);
     let userId = c.targetUserId;
     if (userId === null) {
@@ -336,7 +336,14 @@ export async function actionComplaint(
         .where(eq(games.id, c.targetGameId!));
       userId = g!.gmUserId;
     }
-    const s = await imposeSanction({ ...deps, db: tx }, viewer.userId, userId, sanction, id);
+    const { dto: s, afterCommit } = await imposeSanctionTx(
+      deps,
+      tx,
+      viewer.userId,
+      userId,
+      sanction,
+      id,
+    );
     await tx
       .update(complaints)
       .set({
@@ -355,8 +362,10 @@ export async function actionComplaint(
       meta: { sanctionId: s.id },
     });
     const row = await notifyReporter(deps, tx, c.reporterId, id);
-    return { dto: await complaintDto(tx, id), row };
+    return { dto: await complaintDto(tx, id), row, afterCommit };
   });
+  // Побічні ефекти санкції (сесії, каскад, пінги) — лише після коміту скарги.
+  await afterCommit();
   if (row) emitNotificationsNew(deps, [row]);
   return dto;
 }

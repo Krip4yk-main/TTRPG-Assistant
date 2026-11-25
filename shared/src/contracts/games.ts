@@ -198,6 +198,8 @@ export interface GameGmDto {
   publicId: string;
   nickname: string | null;
   avatarUrl: string | null;
+  /** Майстра глобально заблоковано (позначка «Акаунт заблоковано»); інакше поля немає. */
+  blocked?: true;
 }
 
 export interface GameSystemRefDto {

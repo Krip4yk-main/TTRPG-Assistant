@@ -176,6 +176,13 @@
       "when": 1795612018031,
       "tag": "0024_plan6_moderation_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1795612907953,
+      "tag": "0025_plan6_member_left_banned_by_admin",
+      "breakpoints": true
     }
   ]
 }

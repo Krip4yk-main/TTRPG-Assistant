@@ -137,6 +137,7 @@ const MEMBER_LEFT_REASONS = [
   'kicked',
   'banned',
   'account_deleted',
+  'banned_by_admin',
 ] as const satisfies MemberLeftReason[];
 
 /**

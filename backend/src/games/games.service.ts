@@ -52,6 +52,7 @@ import {
   replaceRuleSessions,
   RULE_CHANGED_REASON,
 } from '../sessions/materialize.js';
+import { assertNoSanction, isPaid } from '../moderation/sanctions.enforce.js';
 import { AppError } from '../http/errors.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
 import {
@@ -111,6 +112,7 @@ export async function loadGames(
       gmPublicId: users.publicId,
       gmNickname: users.nickname,
       gmAvatarUrl: users.avatarUrl,
+      gmIsBanned: users.isBanned,
       systemName: gameSystems.name,
       gmOverall: publishedRatings.overall,
       gmUnits: publishedRatings.units,
@@ -147,7 +149,12 @@ export async function loadGames(
   );
   return rows.map((r) => ({
     row: r.row,
-    gm: { publicId: r.gmPublicId, nickname: r.gmNickname, avatarUrl: r.gmAvatarUrl },
+    gm: {
+      publicId: r.gmPublicId,
+      nickname: r.gmNickname,
+      avatarUrl: r.gmAvatarUrl,
+      ...(r.gmIsBanned ? { blocked: true as const } : {}),
+    },
     systemName: r.systemName,
     memberCount: byGame.get(r.row.id) ?? 0,
     sessions: stats.get(r.row.id) ?? null,
@@ -408,6 +415,8 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
   const now = new Date();
   assertGmAge(gm, input, now);
   await assertCatalogRefs(deps, input);
+  // `no_paid_create`: нову платну гру не створити (безплатну — можна).
+  if (isPaid(input.priceUah)) await assertNoSanction(db, userId, 'no_paid_create', now);
   const id = await db.transaction(async (tx) => {
     const [res] = await tx
       .insert(games)
@@ -469,6 +478,10 @@ export async function updateGame(
     }
     const next = gameInputSchema(row.timezone).parse({ ...current, ...patch });
     assertGmAge(gm, next, now);
+    // `no_paid_create`: безплатну гру не зробити платною (наявна платна лишається як є).
+    if (isPaid(next.priceUah) && !isPaid(row.priceUah)) {
+      await assertNoSanction(tx, userId, 'no_paid_create', now);
+    }
     await assertCatalogRefs(deps, next, current);
     // Зміна розкладу опублікованої гри — те саме, що нове правило (`PUT /schedule`): перша
     // сесія має бути в майбутньому, майбутні сесії правила замінюються.

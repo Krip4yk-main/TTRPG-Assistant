@@ -131,6 +131,8 @@
                               ? (row.view.offset.key | translate: row.view.offset.params)
                               : '',
                             count: row.view.count,
+                            sanction: row.view.sanction ? (row.view.sanction | translate) : '',
+                            until: row.view.until ?? '',
                           }
                   }}</span>
                   @if (row.view.reason; as r) {

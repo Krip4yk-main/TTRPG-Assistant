@@ -19,7 +19,12 @@ const render = (kind: string, p: NotificationParams = base, b: TelegramButton[] 
   renderNotification(kind, p, b, { siteUrl: SITE });
 
 describe('renderNotification', () => {
-  const MODERATION = ['complaint.resolved', 'moderation.digest'];
+  const MODERATION = [
+    'complaint.resolved',
+    'moderation.digest',
+    'sanction.imposed',
+    'sanction.lifted',
+  ];
   const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
 
   it.each(gameTypes)('%s: has a real template, game title and site link', (kind) => {
@@ -44,6 +49,29 @@ describe('renderNotification', () => {
       '',
       'Детальніше: https://nri.example/admin/complaints',
     ]);
+  });
+
+  it('sanctions: type, end date and reason; permanent without a date; lifted', () => {
+    const imposed = render('sanction.imposed', {
+      sanctionType: 'no_paid_apply',
+      endsAt: '2026-12-02T10:00:00.000Z',
+      reason: 'Неявка без попередження',
+    });
+    expect(imposed.text.split('\n')).toEqual([
+      '⚠️ На твій акаунт накладено обмеження «заборона подаватися на платні ігри» до ср, 2 грудня о 12:00.',
+      'Причина: Неявка без попередження',
+      '',
+      'Детальніше: https://nri.example/my-sanctions',
+    ]);
+    const permanent = render('sanction.imposed', {
+      sanctionType: 'global_ban',
+      endsAt: null,
+      reason: 'Шахрайство',
+    });
+    expect(permanent.text).toContain('безстрокове обмеження «блокування акаунта»');
+    expect(permanent.text).not.toContain('{');
+    const lifted = render('sanction.lifted', { sanctionType: 'warning' });
+    expect(lifted.text.split('\n')[0]).toBe('✅ Обмеження «попередження» з твого акаунта знято.');
   });
 
   it('every NotificationType has a uk.json template', () => {

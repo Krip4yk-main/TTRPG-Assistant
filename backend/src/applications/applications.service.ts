@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   applicationInputSchema,
   constraintResponseInputSchema,
@@ -26,6 +26,11 @@ import { loadGames, toCardDto, viewerById } from '../games/games.service.js';
 import { isHiddenFromNonGm, toCardView, viewerAge } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { lockUser, type Tx } from './applications.rules.js';
+import {
+  activeSanctionEnds,
+  isPaid,
+  sanctionActiveError,
+} from '../moderation/sanctions.enforce.js';
 import { applicationsChanged, memberJoined } from '../realtime/game-rooms.js';
 import { markOwnChange, seenFor } from '../views/views.service.js';
 
@@ -174,6 +179,26 @@ async function afterChange(
   );
 }
 
+/**
+ * Санкції проти нової заявки (наявні заявки й участь не чіпаються): `application_limit` — уже є
+ * хоч одна заявка в статусі `pending` (членства не рахуються); `no_paid_apply` — гра платна.
+ */
+async function assertApplySanctions(tx: Tx, userId: number, g: GameRow, now: Date): Promise<void> {
+  const ends = await activeSanctionEnds(tx, userId, now);
+  if (ends.has('application_limit')) {
+    const [p] = await tx
+      .select({ n: count() })
+      .from(gameApplications)
+      .where(and(eq(gameApplications.userId, userId), eq(gameApplications.status, 'pending')));
+    if ((p?.n ?? 0) >= 1) {
+      throw sanctionActiveError('application_limit', ends.get('application_limit')!);
+    }
+  }
+  if (ends.has('no_paid_apply') && isPaid(g.priceUah)) {
+    throw sanctionActiveError('no_paid_apply', ends.get('no_paid_apply')!);
+  }
+}
+
 export async function createApplication(
   deps: AppDeps,
   userId: number,
@@ -206,6 +231,7 @@ export async function createApplication(
         .where(and(eq(gmBlacklist.gmUserId, g.gmUserId), eq(gmBlacklist.userId, userId)));
       if (black) throw new AppError(403, 'GM_BLACKLISTED');
       if (await isActiveMember(tx, gameId, userId)) throw new AppError(409, 'APPLICATION_EXISTS');
+      await assertApplySanctions(tx, userId, g, now);
       if (input.warningsAccepted !== true && (await hasWarnings(tx, g))) {
         throw new AppError(400, 'WARNINGS_NOT_ACCEPTED');
       }

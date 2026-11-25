@@ -71,6 +71,8 @@ export type ProfileInput = z.input<typeof profileInputSchema>;
 export interface PublicProfileDto {
   publicId: string;
   status: UserStatus;
+  /** Акаунт глобально заблоковано адміністрацією (позначка «Акаунт заблоковано»); інакше поля немає. */
+  blocked?: true;
   nickname?: string | null;
   avatarUrl?: string | null;
   bio?: string;

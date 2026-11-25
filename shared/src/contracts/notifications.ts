@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SanctionType } from './moderation.js';
 
 /** Категорії сповіщень; Telegram вмикається/вимикається для кожної окремо. */
 export const NOTIFICATION_CATEGORIES = [
@@ -17,7 +18,9 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * `session.reminder` (нагадування перед сесією, не з подій) і запрошення/нагадування оцінити
  * (`rating.*`: з подій завершення сесії/гри та виходу; `rating.deadline` — за 2 дні до кінця
  * вікна, не з подій). Модерація (не з подій): `complaint.resolved` — скаржнику, без подробиць;
- * `moderation.digest` — персоналу щоденне зведення нових скарг (`count`). Текст —
+ * `moderation.digest` — персоналу щоденне зведення нових скарг (`count`); `sanction.imposed` /
+ * `sanction.lifted` — покараному: тип (`sanctionType`), кінець (`endsAt`), причина (`reason`,
+ * лише для накладення — її бачить сам покараний). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -44,6 +47,8 @@ export const NOTIFICATION_TYPES = [
   'rating.deadline',
   'complaint.resolved',
   'moderation.digest',
+  'sanction.imposed',
+  'sanction.lifted',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -87,6 +92,10 @@ export interface NotificationParams {
   ratee?: NotificationActor;
   /** Кількість нових скарг, видимих отримувачу (`moderation.digest`). */
   count?: number;
+  /** Тип санкції (`sanction.imposed` / `sanction.lifted`). */
+  sanctionType?: SanctionType;
+  /** Кінець санкції (ISO UTC); `null` — назавжди (`sanction.imposed`). */
+  endsAt?: string | null;
   actor?: NotificationActor | null;
 }
 
@@ -168,6 +177,8 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   // Модерація — без гри: черга скарг персоналу; «скаргу розглянуто» — без подробиць.
   if (type === 'moderation.digest') return '/admin/complaints';
   if (type === 'complaint.resolved') return '/';
+  // Санкції — сторінка «Обмеження акаунта» (фронтенд, Task 5).
+  if (type === 'sanction.imposed' || type === 'sanction.lifted') return '/my-sanctions';
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'rating.session_open':

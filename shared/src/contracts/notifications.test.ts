@@ -20,7 +20,13 @@ const telegram = {
 
 describe('notification contracts', () => {
   it('every type except session.reminder, rating.* and moderation is a domain event', () => {
-    const notFromEvents = ['session.reminder', 'complaint.resolved', 'moderation.digest'];
+    const notFromEvents = [
+      'session.reminder',
+      'complaint.resolved',
+      'moderation.digest',
+      'sanction.imposed',
+      'sanction.lifted',
+    ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
     }
@@ -82,6 +88,10 @@ describe('notificationLink', () => {
     expect(notificationLink('moderation.digest', { count: 3 })).toBe('/admin/complaints');
     expect(notificationLink('complaint.resolved', {})).toBe('/');
     expect(notificationLink('complaint.resolved', { gameId: 5 })).toBe('/');
+    expect(notificationLink('sanction.imposed', { sanctionType: 'warning' })).toBe('/my-sanctions');
+    expect(notificationLink('sanction.lifted', { sanctionType: 'global_ban' })).toBe(
+      '/my-sanctions',
+    );
   });
 
   it('routes by type', () => {

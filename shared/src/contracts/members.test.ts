@@ -26,6 +26,12 @@ describe('leaveGameInputSchema', () => {
 
 describe('MEMBER_LEFT_REASONS', () => {
   it('includes account deletion', () => {
-    expect(MEMBER_LEFT_REASONS).toEqual(['left', 'kicked', 'banned', 'account_deleted']);
+    expect(MEMBER_LEFT_REASONS).toEqual([
+      'left',
+      'kicked',
+      'banned',
+      'account_deleted',
+      'banned_by_admin',
+    ]);
   });
 });
