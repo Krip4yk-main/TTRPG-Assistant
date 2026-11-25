@@ -81,6 +81,12 @@ describe('authInterceptor', () => {
     expect(auth.me()).not.toBeNull();
   });
 
+  it('401 на апеляцію заблокованого не перенаправляє', async () => {
+    await fail('POST', '/api/appeals', 401);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(auth.me()).not.toBeNull();
+  });
+
   it('5xx не розлогінює', async () => {
     await fail('POST', '/api/me/telegram-link-token', 500);
     expect(navigate).not.toHaveBeenCalled();

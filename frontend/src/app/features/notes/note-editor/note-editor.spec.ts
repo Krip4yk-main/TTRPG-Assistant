@@ -317,4 +317,68 @@ describe('NoteEditor', () => {
     expect(source.saves).toHaveLength(0);
     document.cookie = 'nri_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
+  it('retry after a failed restore load re-runs the draft restore', async () => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ body: 'Чернетка' }));
+    await create(note('Старе', 1));
+    source.loads[0]!.error(new HttpErrorResponse({ status: 500 }));
+    await tick();
+    el().querySelector<HTMLButtonElement>('.load-error button')!.click();
+    await tick();
+    expect(source.loads).toHaveLength(2);
+    reply(source.loads[1]!, note('Чуже', 3));
+    await tick();
+    expect(status()).toBe('notes.status.conflict');
+    const panel = el().querySelector<HTMLElement>('.conflict')!;
+    expect(panel.querySelector('.mine')!.textContent).toContain('Чернетка');
+    expect(panel.querySelector('.theirs')!.textContent).toContain('Чуже');
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).body).toBe('Чернетка');
+  });
+
+  it('retry after a failed load without a draft simply reloads', async () => {
+    await create();
+    source.loads[0]!.error(new HttpErrorResponse({ status: 500 }));
+    await tick();
+    el().querySelector<HTMLButtonElement>('.load-error button')!.click();
+    await tick();
+    reply(source.loads[1]!, note('Текст', 2));
+    await tick();
+    expect(area().value).toBe('Текст');
+    expect(el().querySelector('.conflict')).toBeNull();
+  });
+
+  it('during a conflict the local copy is written with a 500 ms pause, flushed on destroy', async () => {
+    await create(note('Старе', 1));
+    type('Моє');
+    await tick(1000);
+    conflict(source.saves[0]!.reply, 'Чуже', 5);
+    await tick();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    type('Моє 1');
+    type('Моє 12');
+    type('Моє 123');
+    expect(setItem).not.toHaveBeenCalled();
+    await tick(500);
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).body).toBe('Моє 123');
+
+    type('Моє 1234');
+    fixture.destroy();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).body).toBe('Моє 1234');
+  });
+
+  it('a pending conflict draft write is flushed on pagehide and cancelled by «take theirs»', async () => {
+    await create(note('Старе', 1));
+    type('Моє');
+    await tick(1000);
+    conflict(source.saves[0]!.reply, 'Чуже', 5);
+    await tick();
+    type('Моє, нове');
+    window.dispatchEvent(new Event('pagehide'));
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).body).toBe('Моє, нове');
+
+    type('Моє, ще новіше');
+    el().querySelector<HTMLButtonElement>('.conflict button.take-theirs')!.click();
+    await tick(1000);
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
 });

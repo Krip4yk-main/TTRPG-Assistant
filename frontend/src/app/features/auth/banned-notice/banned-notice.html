@@ -1,0 +1,73 @@
+<section class="nri-card banned" aria-labelledby="banned-title">
+  <h1 id="banned-title" #title tabindex="-1">{{ 'banned.title' | translate }}</h1>
+  <p class="nri-muted">{{ 'banned.intro' | translate }}</p>
+
+  <div class="state" aria-live="polite">
+    @switch (state()) {
+      @case ('form') {
+        <form
+          class="appeal"
+          [formGroup]="form"
+          (ngSubmit)="submit()"
+          novalidate
+          [attr.aria-busy]="busy()"
+        >
+          <h2 class="state-title">{{ 'banned.form.title' | translate }}</h2>
+          <p class="nri-muted">{{ 'banned.form.hint' | translate }}</p>
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'banned.form.message' | translate }}</mat-label>
+            <textarea
+              matInput
+              class="message"
+              rows="6"
+              formControlName="message"
+              [maxLength]="max"
+              required
+            ></textarea>
+            <mat-hint align="end" class="counter">{{
+              'banned.form.counter' | translate: { count: length(), max: max }
+            }}</mat-hint>
+            @if (message.hasError('required')) {
+              <mat-error>{{ 'banned.form.required' | translate }}</mat-error>
+            } @else if (message.hasError('maxlength')) {
+              <mat-error>{{ 'banned.form.tooLong' | translate: { max: max } }}</mat-error>
+            }
+          </mat-form-field>
+          <div class="error-slot">
+            @if (failed()) {
+              <p class="nri-alert send-error" role="alert">
+                {{ 'banned.form.sendError' | translate }}
+              </p>
+            }
+          </div>
+          <div class="actions">
+            <button mat-flat-button type="submit" class="send" [disabled]="busy()">
+              {{ (busy() ? 'banned.form.sending' : 'banned.form.submit') | translate }}
+            </button>
+          </div>
+        </form>
+      }
+      @case ('sent') {
+        <div class="result sent">
+          <h2 class="state-title" #stateTitle tabindex="-1">
+            {{ 'banned.sent.title' | translate }}
+          </h2>
+          <p>{{ 'banned.sent.text' | translate }}</p>
+        </div>
+      }
+      @case ('expired') {
+        <div class="result expired">
+          <h2 class="state-title" #stateTitle tabindex="-1">
+            {{ 'banned.expired.title' | translate }}
+          </h2>
+          <p>{{ 'banned.expired.text' | translate }}</p>
+          <div class="actions">
+            <button mat-stroked-button type="button" class="back" (click)="back.emit()">
+              {{ 'banned.expired.back' | translate }}
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</section>

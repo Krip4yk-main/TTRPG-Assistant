@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   type ElementRef,
+  type OnInit,
   afterNextRender,
   computed,
   inject,
@@ -11,18 +12,19 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { ErrorCode, MeDto } from '@nri/shared';
+import type { BannedLoginDetails, ErrorCode, MeDto } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { runtimeConfig } from '../../../../environments/runtime-config';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { BannedNotice } from '../banned-notice/banned-notice';
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
 /** Глобальна функція, яку викликає віджет Telegram (`data-onauth`). */
@@ -38,20 +40,27 @@ type TelegramWindow = Window & { [TELEGRAM_CALLBACK]?: (user: TelegramAuthData) 
     MatFormFieldModule,
     MatInputModule,
     TranslatePipe,
+    BannedNotice,
   ],
   templateUrl: './login.html',
   styleUrl: './login.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Login {
+export class Login implements OnInit {
   private readonly api = inject(AuthApi);
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   /** `?error=CODE` після OAuth-редиректу або відхиленої реєстрації. */
   readonly error = input<string>();
   /** `?returnTo=/path` — куди повернутися після входу (лише внутрішні шляхи). */
   readonly returnTo = input<string>();
+  /** `?appeal=TOKEN` разом з `error=ACCOUNT_BANNED` після OAuth-входу заблокованого. */
+  readonly appeal = input<string>();
+
+  /** Акаунт заблоковано: показуємо екран апеляції замість способів входу. */
+  protected readonly banned = signal<BannedLoginDetails | null>(null);
 
   protected readonly telegramBot = runtimeConfig.telegramBotUsername;
   protected readonly devLoginEnabled = runtimeConfig.devLogin;
@@ -94,6 +103,28 @@ export class Login {
     });
   }
 
+  ngOnInit(): void {
+    const token = this.appeal();
+    if (this.error() === 'ACCOUNT_BANNED' && token) {
+      this.banned.set({ appealToken: token, appealSent: false });
+    }
+    // Токен не лишаємо ні в адресі, ні в історії (заміна поточного запису).
+    if (token !== undefined) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { error: null, appeal: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
+  }
+
+  /** З екрана бану — назад до способів входу (отримати новий токен). */
+  protected leaveBanned(): void {
+    this.banned.set(null);
+    this.actionError.set(null);
+  }
+
   protected async devLogin(): Promise<void> {
     if (this.devForm.invalid) {
       this.devForm.markAllAsTouched();
@@ -120,9 +151,21 @@ export class Login {
         user.status === 'pending' ? '/complete-profile' : this.target(),
       );
     } catch (err) {
-      this.actionError.set(toApiError(err).code);
+      const { code, details } = toApiError(err);
+      if (code === 'ACCOUNT_BANNED' && isBannedDetails(details)) {
+        this.banned.set({ appealToken: details.appealToken, appealSent: details.appealSent });
+      } else {
+        this.actionError.set(code);
+      }
     } finally {
       this.busy.set(false);
     }
   }
+}
+
+function isBannedDetails(d: unknown): d is BannedLoginDetails {
+  const v = d as Partial<BannedLoginDetails> | null | undefined;
+  return (
+    typeof v?.appealToken === 'string' && v.appealToken !== '' && typeof v.appealSent === 'boolean'
+  );
 }

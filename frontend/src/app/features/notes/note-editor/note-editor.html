@@ -16,7 +16,7 @@
 } @else if (st === 'loadError') {
   <div class="nri-alert load-error" role="alert">
     <span>{{ 'notes.loadError' | translate }}</span>
-    <button mat-stroked-button type="button" (click)="load()">
+    <button mat-stroked-button type="button" (click)="retryLoad()">
       {{ 'common.retry' | translate }}
     </button>
   </div>

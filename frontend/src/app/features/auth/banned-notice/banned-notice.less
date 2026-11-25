@@ -1,0 +1,53 @@
+:host {
+  display: block;
+}
+
+// Фокус на заголовок ставимо програмно — рамку показуємо лише для клавіатури.
+h1:focus,
+.state-title:focus {
+  outline: none;
+}
+
+h1:focus-visible,
+.state-title:focus-visible {
+  outline: 2px solid var(--nri-focus-ring);
+  outline-offset: 2px;
+}
+
+.state {
+  margin-top: var(--nri-space-lg);
+  padding-top: var(--nri-space-lg);
+  border-top: 1px solid var(--nri-border);
+}
+
+.state-title {
+  margin-top: 0;
+}
+
+.appeal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.counter {
+  font-variant-numeric: tabular-nums;
+}
+
+// Місце під помилку відправки зарезервоване — кнопка не стрибає.
+.error-slot {
+  min-height: 2.75rem;
+
+  .nri-alert {
+    margin: 0;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

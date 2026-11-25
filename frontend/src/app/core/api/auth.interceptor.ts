@@ -7,10 +7,14 @@ import { safeReturnTo } from '../auth/return-to';
 
 export { safeReturnTo };
 
-/** Запити, чий 401 обробляє сам викликач: початкова перевірка сесії та вхід/вихід. */
+/**
+ * Запити, чий 401 обробляє сам викликач: початкова перевірка сесії, вхід/вихід і
+ * апеляція заблокованого (без сесії; 401 там — прострочений токен апеляції).
+ */
 function isExempt(method: string, url: string): boolean {
   const path = url.split('?')[0] ?? url;
   if (method === 'GET' && path === '/api/me') return true;
+  if (method === 'POST' && path === '/api/appeals') return true;
   return path.startsWith('/api/auth/');
 }
 

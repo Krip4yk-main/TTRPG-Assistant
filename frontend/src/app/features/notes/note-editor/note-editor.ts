@@ -25,6 +25,8 @@ import type { NoteSource } from '../../../core/notes/notes.api';
 
 /** Пауза після введення до автозбереження, мс. */
 export const NOTE_AUTOSAVE_MS = 1000;
+/** Пауза запису локальної копії, поки відкрито конфлікт, мс. */
+export const NOTE_DRAFT_WRITE_MS = 500;
 /** Лічильник символів з'являється, коли до межі лишається менше 10 %. */
 const COUNTER_FROM = Math.floor(NOTE_BODY_MAX * 0.9);
 
@@ -77,6 +79,8 @@ export class NoteEditor implements OnInit {
   private savedBody = '';
   private version = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Відкладений запис локальної копії під час конфлікту. */
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private inFlight = false;
   private destroyed = false;
   private readonly onPageHide = () => this.flushOnPageHide();
@@ -86,19 +90,27 @@ export class NoteEditor implements OnInit {
     inject(DestroyRef).onDestroy(() => {
       window.removeEventListener('pagehide', this.onPageHide);
       this.destroyed = true;
+      this.clearDraftTimer();
       if (this.conflict()) this.keepDraft();
       else void this.flush();
     });
   }
 
   ngOnInit(): void {
-    const draft = this.draftKey ? readNoteDraft(this.draftKey) : null;
+    const draft = this.readDraft();
     if (draft !== null) void this.restore(draft);
     else if (this.initial()) this.apply(this.initial()!);
     else void this.load();
   }
 
-  protected async load(): Promise<void> {
+  /** «Спробувати ще раз» після збою завантаження: з локальною копією — знову відновлення. */
+  protected retryLoad(): void {
+    const draft = this.readDraft();
+    if (draft !== null) void this.restore(draft);
+    else void this.load();
+  }
+
+  private async load(): Promise<void> {
     this.status.set('loading');
     try {
       this.apply(await firstValueFrom(this.source().load()));
@@ -110,7 +122,7 @@ export class NoteEditor implements OnInit {
   protected onInput(value: string): void {
     this.body.set(value);
     if (this.conflict()) {
-      this.keepDraft();
+      this.scheduleDraft();
       return;
     }
     this.schedule();
@@ -131,6 +143,7 @@ export class NoteEditor implements OnInit {
     if (!server) return;
     this.version = server.version;
     this.savedBody = server.body;
+    this.clearDraftTimer();
     this.conflict.set(null);
     await this.flush();
     // Текст збігся з актуальним — зберігати нічого, але стан узгоджено.
@@ -144,6 +157,7 @@ export class NoteEditor implements OnInit {
   protected takeTheirs(): void {
     const server = this.conflict();
     if (!server) return;
+    this.clearDraftTimer();
     this.conflict.set(null);
     this.dropDraft();
     this.apply({ ...server, updatedAt: null });
@@ -156,9 +170,28 @@ export class NoteEditor implements OnInit {
     return userId ? noteDraftKey(userId, this.source().key) : null;
   }
 
+  private readDraft(): string | null {
+    const key = this.draftKey;
+    return key ? readNoteDraft(key) : null;
+  }
+
   private keepDraft(): void {
     const key = this.draftKey;
     if (key) writeNoteDraft(key, this.body());
+  }
+
+  /** Під час конфлікту копію пишемо не на кожне натискання, а з паузою. */
+  private scheduleDraft(): void {
+    this.clearDraftTimer();
+    this.draftTimer = setTimeout(() => {
+      this.draftTimer = null;
+      this.keepDraft();
+    }, NOTE_DRAFT_WRITE_MS);
+  }
+
+  private clearDraftTimer(): void {
+    if (this.draftTimer !== null) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
   }
 
   private dropDraft(): void {
@@ -245,6 +278,10 @@ export class NoteEditor implements OnInit {
    * `keepalive` (звичайний запит браузер може обірвати).
    */
   private flushOnPageHide(): void {
+    if (this.draftTimer !== null) {
+      this.clearDraftTimer();
+      this.keepDraft();
+    }
     if (this.inFlight || this.conflict() || this.timer === null) return;
     const body = this.body();
     this.clearTimer();
