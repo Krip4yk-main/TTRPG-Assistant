@@ -17,9 +17,7 @@
 $master-primary: #15803d;
 $on-master-primary: #ffffff;
 
-// Тимчасово й для «Дошки оголошень» (quest-board) — до її власного Material у задачі 3.
-:root[data-theme='classic'],
-:root[data-theme='quest-board'] {
+:root[data-theme='classic'] {
   color-scheme: dark;
 
   @include mat.theme(

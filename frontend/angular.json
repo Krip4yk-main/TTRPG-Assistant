@@ -46,6 +46,16 @@
                 "input": "src/app/theming/themes/classic/classic-material.scss",
                 "bundleName": "theme-classic",
                 "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/quest-board/quest-board.less",
+                "bundleName": "theme-quest-board",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/quest-board/quest-board-material.scss",
+                "bundleName": "theme-quest-board",
+                "inject": false
               }
             ]
           },

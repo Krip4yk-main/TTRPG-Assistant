@@ -57,6 +57,8 @@ function themeStyleVersion() {
   for (const pkg of [
     '@angular/material',
     '@fontsource/cormorant-garamond',
+    '@fontsource/kurale',
+    '@fontsource/literata',
     '@fontsource/lora',
     '@material-symbols/font-400',
   ]) {

@@ -1,0 +1,159 @@
+// Тінь — через filter на хості: clip-path «рваного» краю обрізав би box-shadow аркуша.
+:host {
+  display: block;
+  height: 100%;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
+}
+
+// Оголошення майстра ніколи не повертається: на ньому кнопки дій.
+.note {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 34px 24px 22px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-sm);
+  min-height: 24px;
+}
+
+// Статус — штамп чорнилом.
+.status {
+  padding: 0 6px;
+  border: 1.5px solid currentcolor;
+  border-radius: var(--nri-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+
+  &[data-status='recruiting'] {
+    color: var(--nri-primary-text);
+  }
+
+  &[data-status='started'] {
+    color: var(--nri-accent-text);
+  }
+
+  &[data-status='finished'] {
+    color: var(--nri-text-muted);
+  }
+
+  &[data-status='cancelled'] {
+    color: var(--nri-danger-text);
+  }
+}
+
+.sys {
+  margin: 0;
+  color: var(--nri-primary-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.title {
+  margin: 0 0 var(--nri-space-xs);
+  font-size: 1.6rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+// Позначки детектора «мертвих» ігор — приписка на полях: штамп + пояснення.
+.dead-flag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--nri-accent);
+  background: rgba(201, 162, 39, 0.14);
+
+  &[data-flag='dead'] {
+    border-left-color: var(--nri-danger);
+    background: var(--nri-danger-surface);
+  }
+}
+
+.flag-badge {
+  color: var(--nri-accent-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+
+  [data-flag='dead'] > & {
+    color: var(--nri-danger-text);
+  }
+}
+
+.flag-explain {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--qb-rule);
+  font-size: 0.9375rem;
+
+  dt {
+    color: var(--nri-text-muted);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.applications {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-sm);
+  margin: 0;
+}
+
+.applications-link {
+  color: var(--nri-primary-text);
+  font-weight: 600;
+}
+
+// Лічильник нових заявок — маленька сургучна мітка.
+.pending-count {
+  padding: 1px var(--nri-space-sm);
+  border-radius: var(--nri-radius-lg);
+  background: var(--nri-danger);
+  color: var(--nri-on-danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+  margin-top: auto;
+  padding-top: var(--nri-space-sm);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.danger {
+  --mat-button-text-label-text-color: var(--nri-danger-text);
+  --mat-button-outlined-label-text-color: var(--nri-danger-text);
+}

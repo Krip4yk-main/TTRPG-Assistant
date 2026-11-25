@@ -1,0 +1,85 @@
+@let g = game();
+@if (g.restricted) {
+  <article
+    class="note qb-paper qb-torn restricted"
+    [attr.data-game-id]="g.id"
+    [attr.data-tilt]="tilt()"
+  >
+    <span class="qb-pin" aria-hidden="true"></span>
+    <div class="veil" aria-hidden="true">
+      <mat-icon>visibility_off</mat-icon>
+    </div>
+    <div class="stamps">
+      @for (b of g.badges; track $index) {
+        <nri-qb-badge [badge]="b" />
+      }
+    </div>
+    <h2 class="title">
+      <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+    </h2>
+    <p class="restricted-text">{{ g.restrictedKey | translate }}</p>
+    @if (g.loginReturnTo; as returnTo) {
+      <a class="login" routerLink="/login" [queryParams]="{ returnTo }">{{
+        'games.restricted.login' | translate
+      }}</a>
+    }
+    <footer class="foot gm"><nri-qb-gm-signature [gm]="g.gm" /></footer>
+  </article>
+} @else {
+  <article class="note qb-paper qb-torn" [attr.data-game-id]="g.id" [attr.data-tilt]="tilt()">
+    <span class="qb-pin" aria-hidden="true"></span>
+    @if (ribbon(); as r) {
+      <span class="ribbon"><nri-qb-badge [badge]="r" /></span>
+    }
+    @if (g.coverUrl) {
+      <img class="cover" [src]="g.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" />
+    }
+    <p class="sys">
+      {{ g.systemName }} · {{ g.kindKey | translate }}
+      @if (g.genreKey; as key) {
+        · {{ key | translate }}
+      }
+    </p>
+    @if (stamps().length > 0) {
+      <div class="stamps">
+        @for (b of stamps(); track $index) {
+          <nri-qb-badge [badge]="b" />
+        }
+      </div>
+    }
+    <h2 class="title">
+      <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
+    </h2>
+    <dl class="facts">
+      @if (g.showSchedule) {
+        <dt>{{ 'questBoard.card.when' | translate }}</dt>
+        <dd class="next">{{ g.nextSession ?? ('search.card.noNext' | translate) }}</dd>
+      }
+      <dt>{{ 'questBoard.card.where' | translate }}</dt>
+      <dd>
+        {{ g.formatKey | translate }}
+        @if (g.city) {
+          · {{ g.city }}
+        }
+        · {{ g.languageKey | translate }}
+      </dd>
+      @if (g.showSchedule) {
+        <dt>{{ 'search.card.slots' | translate }}</dt>
+        <dd>
+          {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+        </dd>
+      }
+    </dl>
+    <footer class="foot">
+      <div class="gm"><nri-qb-gm-signature [gm]="g.gm" /></div>
+      <p class="qb-seal price">
+        <span class="nri-visually-hidden">{{ 'questBoard.seal.label' | translate }}:</span>
+        @if (g.priceUah === null) {
+          {{ 'questBoard.seal.free' | translate }}
+        } @else {
+          {{ 'questBoard.seal.price' | translate: { price: g.priceUah } }}
+        }
+      </p>
+    </footer>
+  </article>
+}

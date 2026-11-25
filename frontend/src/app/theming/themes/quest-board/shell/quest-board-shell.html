@@ -1,0 +1,166 @@
+<a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | translate }}</a>
+
+<header class="plank qb-wood">
+  <a class="brand" routerLink="/">
+    <span class="emblem" aria-hidden="true"><mat-icon>swords</mat-icon></span>
+    <span class="brand-name">{{ 'app.title' | translate }}</span>
+  </a>
+
+  @if (auth.isActive()) {
+    <nav class="nav" [attr.aria-label]="'shell.viewMode.' + viewMode.mode() | translate">
+      @if (viewMode.mode() === 'gm') {
+        <a
+          class="nav-link my-games-link"
+          routerLink="/my-games"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          >{{ 'shell.myGames' | translate }}</a
+        >
+        <a
+          class="nav-link new-game-link"
+          routerLink="/games/new"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+        >
+          <mat-icon aria-hidden="true">add</mat-icon>
+          {{ 'shell.newGame' | translate }}
+        </a>
+      } @else {
+        <a
+          class="nav-link my-applications-link"
+          routerLink="/my-applications"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          >{{ 'shell.myApplications' | translate }}</a
+        >
+      }
+    </nav>
+    <!-- «Оцінити» — окремий відкладений блок; поява не зсуває решту шапки (розпірка після). -->
+    @defer (on idle) {
+      <nri-rate-link />
+    }
+  }
+
+  <span class="spacer"></span>
+
+  @if (auth.isActive()) {
+    <mat-button-toggle-group
+      class="view-mode"
+      hideSingleSelectionIndicator
+      [value]="viewMode.mode()"
+      (change)="shell.setMode($event.value)"
+      [attr.aria-label]="'shell.viewMode.label' | translate"
+    >
+      <mat-button-toggle value="player">
+        <span class="long">{{ 'shell.viewMode.player' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.playerShort' | translate }}</span>
+      </mat-button-toggle>
+      <mat-button-toggle value="gm">
+        <span class="long">{{ 'shell.viewMode.gm' | translate }}</span>
+        <span class="short">{{ 'shell.viewMode.gmShort' | translate }}</span>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване. -->
+    @defer (on idle) {
+      <nri-notification-bell />
+    } @placeholder {
+      <span class="bell-placeholder" aria-hidden="true"></span>
+    }
+
+    <!-- Вузький екран: навігація — у меню. -->
+    <button
+      mat-icon-button
+      type="button"
+      class="nav-menu-button"
+      [matMenuTriggerFor]="navMenu"
+      [attr.aria-label]="'questBoard.shell.navMenu' | translate"
+    >
+      <mat-icon aria-hidden="true">menu</mat-icon>
+    </button>
+    <mat-menu #navMenu="matMenu" xPosition="before">
+      @if (viewMode.mode() === 'gm') {
+        <a mat-menu-item routerLink="/my-games">
+          <mat-icon aria-hidden="true">list_alt</mat-icon>
+          <span>{{ 'shell.myGames' | translate }}</span>
+        </a>
+        <a mat-menu-item routerLink="/games/new">
+          <mat-icon aria-hidden="true">add</mat-icon>
+          <span>{{ 'shell.newGame' | translate }}</span>
+        </a>
+      } @else {
+        <a mat-menu-item routerLink="/my-applications">
+          <mat-icon aria-hidden="true">assignment</mat-icon>
+          <span>{{ 'shell.myApplications' | translate }}</span>
+        </a>
+      }
+    </mat-menu>
+  }
+
+  @if (auth.me(); as me) {
+    <button
+      type="button"
+      class="avatar"
+      [matMenuTriggerFor]="accountMenu"
+      [attr.aria-label]="'shell.accountMenu' | translate"
+    >
+      @if (initial(); as letter) {
+        <span aria-hidden="true">{{ letter }}</span>
+      } @else {
+        <mat-icon aria-hidden="true">person</mat-icon>
+      }
+    </button>
+    <mat-menu #accountMenu="matMenu" xPosition="before">
+      <div class="menu-header" role="presentation">
+        <nri-user-name [user]="me" />
+      </div>
+      @if (auth.isActive()) {
+        <a mat-menu-item [routerLink]="['/users', me.publicId]">
+          <mat-icon aria-hidden="true">person</mat-icon>
+          <span>{{ 'shell.myProfile' | translate }}</span>
+        </a>
+        <a mat-menu-item routerLink="/account">
+          <mat-icon aria-hidden="true">settings</mat-icon>
+          <span>{{ 'shell.account' | translate }}</span>
+        </a>
+        @if (shell.isStaff()) {
+          <a mat-menu-item class="admin-link" routerLink="/admin">
+            <mat-icon aria-hidden="true">shield</mat-icon>
+            <span>{{ 'shell.admin' | translate }}</span>
+          </a>
+        }
+      }
+      <button mat-menu-item type="button" (click)="shell.logout()">
+        <mat-icon aria-hidden="true">logout</mat-icon>
+        <span>{{ 'shell.logout' | translate }}</span>
+      </button>
+    </mat-menu>
+  } @else {
+    <a mat-stroked-button class="login-link" routerLink="/login">{{ 'shell.login' | translate }}</a>
+  }
+</header>
+
+@if (auth.loadFailed()) {
+  <div class="connection-banner qb-paper" role="alert">
+    <span>{{ 'shell.connectionError' | translate }}</span>
+    <button mat-stroked-button type="button" [disabled]="shell.retrying()" (click)="shell.retry()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+}
+
+@if (auth.isActive()) {
+  <!-- Окремий чанк: банер чинних санкцій (запит лише після завантаження сторінки). -->
+  @defer (on idle) {
+    <nri-sanctions-banner />
+  }
+}
+
+<main id="main-content" class="main" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="footer qb-wood">
+  <span class="nri-muted">© {{ 'app.title' | translate }}</span>
+  <a routerLink="/about">{{ 'shell.about' | translate }}</a>
+</footer>

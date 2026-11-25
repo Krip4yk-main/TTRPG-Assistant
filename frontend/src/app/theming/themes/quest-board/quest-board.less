@@ -1,0 +1,333 @@
+// Дизайн «Дошка оголошень» (за замовчуванням): окремий бандл `theme-quest-board.css`
+// (`inject: false` в angular.json), який підключає ThemeService / інлайн-скрипт index.html з
+// `?v=<версія>`. Тут — шрифти (локально, @fontsource: лише кирилиця й латиниця), палітра,
+// кольорові токени, «дерев'яна стіна» й спільний декор (пергамент, шпилька, печатка, стрічка).
+// Material для цього дизайну — quest-board-material.scss (той самий бандл).
+//
+// Два контексти кольорів:
+//   - «пергамент» (за замовчуванням на :root, а отже й в оверлеях — діалоги, меню, списки):
+//     чорнило на пергаменті;
+//   - «дерево» (.qb-wood: шапка, підвал, сторінки-дошки): світлий текст на дереві.
+// Компоненти беруть лише var(--nri-…) / var(--mat-sys-…), тож той самий компонент читабельний
+// в обох контекстах; приколотий папірець (.qb-paper) повертає контекст «пергамент».
+
+@import (css) '@fontsource/kurale/cyrillic-400.css';
+@import (css) '@fontsource/kurale/latin-400.css';
+@import (css) '@fontsource/literata/cyrillic-400.css';
+@import (css) '@fontsource/literata/latin-400.css';
+@import (css) '@fontsource/literata/cyrillic-400-italic.css';
+@import (css) '@fontsource/literata/latin-400-italic.css';
+@import (css) '@fontsource/literata/cyrillic-600.css';
+@import (css) '@fontsource/literata/latin-600.css';
+@import (css) '@fontsource/literata/cyrillic-700.css';
+@import (css) '@fontsource/literata/latin-700.css';
+
+@qb: ~":root[data-theme='quest-board']";
+
+// Контраст (WCAG, розрахунок відносної яскравості):
+//   Пергамент #EADFC4 / світлий #F3EBD6 / темний #DDCFAD:
+//     чорнило #2B1E14 — 12.2 / 13.6 / 10.5; приглушений #654F36 — 5.8 / 6.5 / 5.0;
+//     мох #3F4A27 (посилання) — 7.1 / 8.0 / 6.1; латунь #6E5209 (текст) — 5.5 / 6.1 / 4.7;
+//     сургуч #8E1F1A — 6.7 / 7.5 / 5.8; лінія #B9A47A — 1.8 (декор, не текст).
+//   Заливки: #EFE8CF на моху #4E5B31 — 6.0; чорнило на латуні #C9A227 — 6.7, на #E8C766 — 9.9;
+//     #F3D9C4 на сургучі #8E1F1A — 6.6 (на світлій частині печатки #A82E26 — 5.0).
+//   Дерево #3A2718 / темне #2C1D12 / планка #5A3D25 / #47301D:
+//     крем #F3E3B5 — 11.1 / 12.8 / 7.7 / —; приглушений #D9C69C — 8.4 / 9.7 / — / 7.3;
+//     латунь #E8C766 — 8.6 / 9.9 / 6.0 / 7.5; #F4A39A (помилка) — 7.1 / — / — / 6.2;
+//     межа полів #A88F63 — 4.6 (≥ 3:1 для контурів); латунь #C9A227 (іконки) — 5.9.
+
+@{qb} {
+  // Палітра концепту docs/design-concepts/2-quest-board.html.
+  --qb-wood: #3a2718;
+  --qb-wood-dark: #2c1d12;
+  --qb-plank: #5a3d25;
+  --qb-plank-dark: #47301d;
+  --qb-plank-edge: #24170e;
+  --qb-parchment: #eadfc4;
+  --qb-parchment-light: #f3ebd6;
+  --qb-parchment-dark: #ddcfad;
+  --qb-ink: #2b1e14;
+  --qb-ink-soft: #4a3725;
+  --qb-ink-muted: #654f36;
+  --qb-rule: #b9a47a;
+  --qb-brass: #c9a227;
+  --qb-brass-light: #e8c766;
+  --qb-brass-dark: #6e5209;
+  --qb-wax: #8e1f1a;
+  --qb-wax-light: #a82e26;
+  --qb-wax-dark: #5a110e;
+  --qb-on-wax: #f3d9c4;
+  --qb-moss: #4e5b31;
+  --qb-moss-dark: #3f4a27;
+  --qb-on-moss: #efe8cf;
+  --qb-cream: #f3e3b5;
+  --qb-cream-muted: #d9c69c;
+  --qb-error-on-wood: #f4a39a;
+  --qb-outline-on-wood: #a88f63;
+
+  --nri-font-heading: 'Kurale', Georgia, 'Times New Roman', serif;
+  --nri-font-body: 'Literata', Georgia, 'Times New Roman', serif;
+
+  // Папір майже без заокруглень.
+  --nri-radius-sm: 3px;
+  --nri-radius-md: 4px;
+  --nri-radius-lg: 8px;
+  --nri-shadow-md: 0 6px 14px rgba(0, 0, 0, 0.35);
+  --nri-shadow-lg: 0 18px 28px rgba(0, 0, 0, 0.45);
+
+  --nri-bg: var(--qb-wood);
+  --nri-primary: var(--qb-moss);
+  --nri-on-primary: var(--qb-on-moss);
+  --nri-accent: var(--qb-brass);
+  --nri-on-accent: var(--qb-ink);
+  --nri-danger: var(--qb-wax);
+  --nri-on-danger: var(--qb-on-wax);
+  --nri-new-highlight: rgba(201, 162, 39, 0.25);
+  --nri-new-highlight-border: var(--qb-brass-dark);
+  --nri-blur-overlay: rgba(234, 223, 196, 0.8);
+  --nri-blur-radius: 8px;
+  --nri-backdrop: rgba(28, 18, 10, 0.72);
+  --nri-overlay-border: var(--qb-rule);
+  --nri-game-busy-stripe: rgba(142, 31, 26, 0.45);
+  --nri-game-busy-edge: var(--qb-wax);
+  --nri-game-busy-hatch: repeating-linear-gradient(
+    -45deg,
+    var(--nri-game-busy-stripe) 0 3px,
+    transparent 3px 7px
+  );
+
+  .qb-paper-tokens();
+
+  // У Kurale лише звичайне накреслення: без штучного «жирного» заголовків.
+  font-synthesis-weight: none;
+}
+
+// Контекст «пергамент»: чорнило на папері (і ті самі ролі Material, що в
+// quest-board-material.scss, — щоб папірець на дереві повертав їх).
+.qb-paper-tokens() {
+  --nri-surface: var(--qb-parchment);
+  --nri-surface-raised: var(--qb-parchment-light);
+  --nri-surface-sunken: var(--qb-parchment-dark);
+  --nri-text: var(--qb-ink);
+  --nri-text-muted: var(--qb-ink-muted);
+  --nri-border: rgba(74, 55, 37, 0.28);
+  --nri-primary-text: var(--qb-moss-dark);
+  --nri-accent-text: var(--qb-brass-dark);
+  --nri-danger-text: var(--qb-wax);
+  --nri-danger-surface: rgba(142, 31, 26, 0.1);
+  --nri-success-text: var(--qb-moss-dark);
+  --nri-focus-ring: var(--qb-wax);
+  --qb-heading-shadow: none;
+
+  --mat-sys-surface: var(--qb-parchment);
+  --mat-sys-on-surface: var(--qb-ink);
+  --mat-sys-on-surface-variant: var(--qb-ink-soft);
+  --mat-sys-outline: var(--qb-ink-muted);
+  --mat-sys-outline-variant: var(--qb-rule);
+  --mat-sys-primary: var(--qb-moss);
+  --mat-sys-on-primary: var(--qb-on-moss);
+  --mat-sys-secondary-container: var(--qb-moss);
+  --mat-sys-on-secondary-container: var(--qb-on-moss);
+  --mat-sys-error: var(--qb-wax);
+
+  color: var(--nri-text);
+}
+
+// Контекст «дерево»: світлий текст і контури на темному дереві.
+.qb-wood-tokens() {
+  --nri-text: var(--qb-cream);
+  --nri-text-muted: var(--qb-cream-muted);
+  --nri-border: rgba(243, 227, 181, 0.25);
+  --nri-primary-text: var(--qb-brass-light);
+  --nri-accent-text: var(--qb-brass-light);
+  --nri-danger-text: var(--qb-error-on-wood);
+  --nri-danger-surface: rgba(244, 163, 154, 0.12);
+  --nri-success-text: var(--qb-brass-light);
+  --nri-focus-ring: var(--qb-brass-light);
+  --qb-heading-shadow: 0 2px 0 rgba(0, 0, 0, 0.85);
+
+  --mat-sys-surface: var(--qb-plank-dark);
+  --mat-sys-on-surface: var(--qb-cream);
+  --mat-sys-on-surface-variant: var(--qb-cream-muted);
+  --mat-sys-outline: var(--qb-outline-on-wood);
+  --mat-sys-outline-variant: rgba(243, 227, 181, 0.25);
+  --mat-sys-primary: var(--qb-brass-light);
+  --mat-sys-on-primary: var(--qb-ink);
+  --mat-sys-secondary-container: var(--qb-brass);
+  --mat-sys-on-secondary-container: var(--qb-ink);
+  --mat-sys-error: var(--qb-error-on-wood);
+
+  color: var(--nri-text);
+}
+
+// ---- Дерев'яна стіна (лише CSS-градієнти) ----
+// Дошки по 180px з темними шпаринами, ледь помітні волокна й затемнення донизу. Стіна —
+// на хості каркаса (.qb-wall, росте з вмістом сторінки): на body (висота 100%) вертикальний
+// градієнт повторювався б кожен екран.
+@{qb} .qb-wall {
+  background-color: var(--qb-wood);
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 179px, rgba(0, 0, 0, 0.35) 179px 183px),
+    repeating-linear-gradient(3deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 9px),
+    linear-gradient(var(--qb-wood), var(--qb-wood-dark));
+}
+
+@{qb} {
+  .qb-wood {
+    .qb-wood-tokens();
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: 400;
+  }
+
+  // ---- Пергамент ----
+  // Аркуш: світлий папір з потемнілими краями (inset-тінь) і тінню на стіні.
+  .qb-paper {
+    .qb-paper-tokens();
+
+    background-color: var(--qb-parchment);
+    box-shadow:
+      0 18px 28px rgba(0, 0, 0, 0.45),
+      inset 0 0 60px rgba(120, 80, 30, 0.2);
+  }
+
+  // «Рваний» край — лише для оголошень (не для полів вводу й форм).
+  .qb-torn {
+    clip-path: polygon(
+      0 2%,
+      4% 0,
+      30% 1%,
+      55% 0,
+      80% 1.5%,
+      100% 0,
+      99% 30%,
+      100% 60%,
+      98.5% 100%,
+      70% 98.5%,
+      40% 100%,
+      12% 98.8%,
+      0 100%,
+      1% 60%
+    );
+  }
+
+  // Латунна шпилька.
+  .qb-pin {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #f7d774, #a57f12 60%, #5d470a);
+    box-shadow: 0 3px 3px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
+
+  // Сургучна печатка (ціна).
+  .qb-seal {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    padding: 4px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 40% 35%,
+      var(--qb-wax-light),
+      var(--qb-wax) 60%,
+      var(--qb-wax-dark)
+    );
+    box-shadow: 0 3px 4px rgba(0, 0, 0, 0.4);
+    color: var(--qb-on-wax);
+    font: 600 0.75rem/1.1 var(--nri-font-body);
+    text-align: center;
+    overflow-wrap: anywhere;
+    transform: rotate(-12deg);
+  }
+
+  // Стрічка-закладка (мох).
+  .qb-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nri-space-xs);
+    padding: 3px 12px;
+    background: var(--qb-moss);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+    color: var(--qb-on-moss);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  // ---- Сторінки ----
+  // Звичайна сторінка — великий пергаментний аркуш на стіні: форми, таблиці, тексти без
+  // повороту й «рваних» країв.
+  .nri-page {
+    .qb-paper-tokens();
+
+    margin-top: var(--nri-space-xl);
+    margin-bottom: var(--nri-space-2xl);
+    background-color: var(--qb-parchment);
+    box-shadow:
+      0 18px 28px rgba(0, 0, 0, 0.45),
+      inset 0 0 80px rgba(120, 80, 30, 0.18);
+  }
+
+  // Сторінки-дошки (оголошення приколоті прямо до стіни). Перелік — тимчасово тут; задача 4
+  // плану 8 переносить розкладку сторінок у самі сторінки.
+  .nri-page:is(.search, .my-games) {
+    .qb-wood-tokens();
+
+    margin-top: 0;
+    margin-bottom: 0;
+    background: none;
+    box-shadow: none;
+
+    .filters,
+    .nri-card,
+    .nri-alert,
+    .nri-notice {
+      .qb-paper-tokens();
+
+      background-color: var(--qb-parchment);
+      box-shadow: var(--nri-shadow-md);
+    }
+
+    .filters {
+      padding: var(--nri-space-md);
+    }
+
+    // Оголошенням потрібне місце для шпильки, печатки й нахилу.
+    .cards {
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: var(--nri-space-2xl) var(--nri-space-xl);
+    }
+  }
+
+  .nri-card {
+    background-color: var(--nri-surface-raised);
+    border-color: var(--nri-border);
+  }
+
+  // Межа відділяє спливні поверхні (пергамент) від затемненого фону.
+  .mat-mdc-dialog-surface.mdc-dialog__surface,
+  .mat-mdc-menu-panel.mat-mdc-menu-panel,
+  .mat-mdc-select-panel.mat-mdc-select-panel,
+  .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel {
+    box-shadow: var(--nri-shadow-lg);
+  }
+}
+
+@media (max-width: 599.98px) {
+  @{qb} .nri-page:not(.search, .my-games) {
+    margin-top: var(--nri-space-md);
+    margin-bottom: var(--nri-space-lg);
+  }
+}

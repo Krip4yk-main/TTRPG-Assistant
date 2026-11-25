@@ -40,7 +40,7 @@ const owner: MeDto = {
   availableThemes: ['quest-board', 'classic'],
 };
 
-// Окремі «бандли» для кожного дизайну: у справжньому реєстрі «Дошка» поки аліас «Класичного».
+// Окремі «бандли» для кожного дизайну (тест не тягне справжні чанки дизайнів).
 const QB_SLOTS = { ...CLASSIC_SLOTS } as ThemeSlots;
 const CL_SLOTS = { ...CLASSIC_SLOTS } as ThemeSlots;
 
@@ -190,5 +190,47 @@ describe('ThemeService', () => {
     expect(service.slots()).toBeNull();
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
+  });
+
+  it('after a failed chunk the same design retries loading on the next apply', async () => {
+    const load = vi
+      .fn<() => Promise<ThemeSlots>>()
+      .mockRejectedValueOnce(new Error('ChunkLoadError'))
+      .mockResolvedValue(QB_SLOTS);
+    setup(registry({ 'quest-board': load }));
+    auth.setMe(owner);
+    await service.init();
+    expect(service.slots()).toBe(CL_SLOTS);
+
+    // Перехід на «Дошку» — чанк не завантажився: резервні слоти.
+    let done = service.select('quest-board');
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...owner, uiTheme: 'quest-board' });
+    await done;
+    expect(service.slots()).toBeNull();
+
+    // Повторний вибір того самого дизайну вантажить чанк знову.
+    done = service.select('quest-board');
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...owner, uiTheme: 'quest-board' });
+    await done;
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(service.slots()).toBe(QB_SLOTS);
+  });
+
+  it('sets color-scheme on <html> and in <meta name="color-scheme">', async () => {
+    const meta = document.createElement('meta');
+    meta.name = 'color-scheme';
+    meta.content = 'dark';
+    document.head.appendChild(meta);
+    const reg = registry();
+    reg['quest-board'] = { ...reg['quest-board'], colorScheme: 'light' };
+    setup(reg);
+    await service.init();
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    expect(meta.content).toBe('light');
+    meta.remove();
   });
 });

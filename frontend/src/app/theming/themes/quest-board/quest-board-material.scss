@@ -1,0 +1,103 @@
+// Material для дизайну «Дошка оголошень» (бандл `theme-quest-board`). Angular Material генерує
+// токени теми лише через Sass API, тож на кожен дизайн — один .scss; усе інше — LESS і
+// CSS-змінні (--mat-sys-*, --nri-*). Структурні стилі Material — у стилях самих компонентів.
+//
+// Світла тема (чорнило на пергаменті): поверхні — пергамент, текст — чорнило, primary — мох
+// (заливка filled-кнопок, фокус полів, перемикачі), tertiary — латунь, error — сургуч.
+// Кольори — палітра --qb-* з quest-board.less; контраст — там же в коментарі. Ролі, які
+// перевизначає контекст «дерево» (.qb-wood), повторені в міксині .qb-paper-tokens() LESS.
+@use '@angular/material' as mat;
+
+:root[data-theme='quest-board'] {
+  color-scheme: light;
+
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$chartreuse-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: "'Literata', Georgia, 'Times New Roman', serif",
+        brand-family: "'Kurale', Georgia, 'Times New Roman', serif",
+      ),
+      density: 0,
+    )
+  );
+
+  @include mat.theme-overrides(
+    (
+      // Поверхні — пергамент (спливні — світліший аркуш).
+      surface: var(--qb-parchment),
+      background: var(--qb-parchment),
+      surface-container-lowest: var(--qb-parchment-light),
+      surface-container-low: var(--qb-parchment-light),
+      surface-container: var(--qb-parchment),
+      surface-container-high: var(--qb-parchment-light),
+      surface-container-highest: var(--qb-parchment-dark),
+      surface-bright: var(--qb-parchment-light),
+      surface-dim: var(--qb-parchment-dark),
+      on-surface: var(--qb-ink),
+      on-surface-variant: var(--qb-ink-soft),
+      inverse-surface: var(--qb-ink),
+      inverse-on-surface: var(--qb-parchment),
+      outline: var(--qb-ink-muted),
+      outline-variant: var(--qb-rule),
+      // Primary — мох.
+      primary: var(--qb-moss),
+      on-primary: var(--qb-on-moss),
+      primary-container: var(--qb-moss),
+      on-primary-container: var(--qb-on-moss),
+      inverse-primary: var(--qb-brass-light),
+      // Secondary — чорнило; контейнер (вибраний перемикач, чіпи) — мох.
+      secondary: var(--qb-ink-soft),
+      on-secondary: var(--qb-parchment),
+      secondary-container: var(--qb-moss),
+      on-secondary-container: var(--qb-on-moss),
+      // Tertiary — латунь.
+      tertiary: var(--qb-brass-dark),
+      on-tertiary: var(--qb-parchment-light),
+      tertiary-container: var(--qb-brass),
+      on-tertiary-container: var(--qb-ink),
+      // Error — сургуч.
+      error: var(--qb-wax),
+      on-error: var(--qb-on-wax),
+      error-container: var(--qb-wax),
+      on-error-container: var(--qb-on-wax),
+    )
+  );
+
+  // Спливні поверхні — світлий аркуш над затемненим фоном.
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+      container-shape: 4px,
+    )
+  );
+  @include mat.menu-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.select-overrides(
+    (
+      panel-background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.autocomplete-overrides(
+    (
+      background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+
+  // Кнопки «паперові»: майже прямі кути, як на оголошеннях.
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 4px,
+      outlined-container-shape: 4px,
+      protected-container-shape: 4px,
+      text-container-shape: 4px,
+    )
+  );
+}

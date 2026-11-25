@@ -1,0 +1,28 @@
+:host {
+  display: block;
+}
+
+// Приколотий папірець без повороту (на ньому кнопка).
+.note {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nri-space-sm);
+  max-width: 560px;
+  padding: 34px 28px 24px;
+
+  p {
+    margin: 0;
+  }
+}
+
+.message {
+  font-family: var(--nri-font-heading);
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.hint {
+  color: var(--nri-text-muted);
+}

@@ -62,6 +62,21 @@
       "classic": "Класичний"
     }
   },
+  "questBoard": {
+    "gm": "майстер",
+    "card": {
+      "when": "Коли",
+      "where": "Де"
+    },
+    "seal": {
+      "label": "Ціна за сесію",
+      "free": "без плати",
+      "price": "{{price}} грн"
+    },
+    "shell": {
+      "navMenu": "Навігація"
+    }
+  },
   "user": {
     "deleted": "Видалений користувач",
     "noNickname": "Без ніку"

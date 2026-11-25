@@ -81,8 +81,12 @@ export class ThemeService {
     this.applying = this.registry[id].loadSlots().then(
       (slots) => this.commit(id, slots),
       // Чанк дизайну не завантажився (мережа): токени й стилі дизайну все одно ставимо,
-      // а слоти малюють резервні компоненти — сторінка лишається робочою.
-      () => this.commit(id, null),
+      // а слоти малюють резервні компоненти — сторінка лишається робочою. `target` скидаємо,
+      // щоб наступний apply/select того самого дизайну спробував завантажити чанк знову.
+      () => {
+        this.commit(id, null);
+        if (this.target === id) this.target = null;
+      },
     );
     return this.applying;
   }

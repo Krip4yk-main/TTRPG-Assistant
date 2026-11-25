@@ -7,11 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- Токен апеляції з ?appeal= та інші параметри не потрапляють у Referer на інші сайти. -->
     <meta name="referrer" content="same-origin" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light" />
     <meta name="description" content="НРІ Асистент — пошук ігор у настільні рольові ігри" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <!--
-      Дизайн до старту застосунку (без мигання): data-theme, color-scheme і <link> бандла стилів
+      Дизайн до старту застосунку (без мигання): data-theme, color-scheme (style і meta) і <link> бандла стилів
       з останнього чинного дизайну в localStorage. Кеш — лише підказка: права й версію
       перевіряє ThemeService після /api/me. Мапа «дизайн → [бандл, схема]» — як THEMES у
       src/app/theming/theme.registry.ts. Якщо з'явиться CSP зі script-src — потрібен хеш скрипту.
@@ -19,7 +19,7 @@
     <script>
       (function () {
         var themes = {
-          'quest-board': ['classic', 'dark'],
+          'quest-board': ['quest-board', 'light'],
           classic: ['classic', 'dark'],
         };
         var id = 'quest-board';
@@ -35,6 +35,8 @@
         var root = document.documentElement;
         root.setAttribute('data-theme', id);
         root.style.colorScheme = theme[1];
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.setAttribute('content', theme[1]);
         var link = document.createElement('link');
         link.rel = 'stylesheet';
         link.id = 'nri-theme-style';

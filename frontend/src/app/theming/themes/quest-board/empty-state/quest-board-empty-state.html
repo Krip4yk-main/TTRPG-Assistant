@@ -1,0 +1,18 @@
+<div class="note qb-paper">
+  <span class="qb-pin" aria-hidden="true"></span>
+  <p class="message">{{ messageKey() | translate }}</p>
+  @if (hintKey(); as hint) {
+    <p class="hint">{{ hint | translate }}</p>
+  }
+  @if (action(); as a) {
+    @if (a.primary) {
+      <a mat-flat-button [routerLink]="a.link" [attr.data-action]="a.id">{{
+        a.labelKey | translate
+      }}</a>
+    } @else {
+      <a mat-stroked-button [routerLink]="a.link" [attr.data-action]="a.id">{{
+        a.labelKey | translate
+      }}</a>
+    }
+  }
+</div>

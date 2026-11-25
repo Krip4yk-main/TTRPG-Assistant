@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.sign {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.initial {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--qb-rule);
+  color: var(--qb-ink);
+  font-family: var(--nri-font-heading);
+  font-size: 1.05rem;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.gm-link {
+  color: inherit;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+.role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  color: var(--nri-text-muted);
+  font-size: 0.85rem;
+}

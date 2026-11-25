@@ -1,0 +1,46 @@
+// Хост не створює блоку: бейдж — пряма дитина рядка бейджів.
+:host {
+  display: contents;
+}
+
+// Штамп: обведений прямокутник, трохи нахилений, як від печатки.
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  padding: 0 6px;
+  border: 1.5px solid currentcolor;
+  border-radius: var(--nri-radius-sm);
+  color: var(--nri-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}
+
+.fit {
+  border: 0;
+  border-radius: 0;
+  padding: 1px 10px;
+}
+
+.fit[data-fit='partial'] {
+  background: var(--nri-accent);
+  color: var(--nri-on-accent);
+}
+
+.age,
+.status[data-status='cancelled'] {
+  color: var(--nri-danger-text);
+}
+
+.status[data-status='finished'] {
+  color: var(--nri-text-muted);
+}

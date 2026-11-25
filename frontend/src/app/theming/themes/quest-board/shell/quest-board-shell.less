@@ -1,0 +1,242 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--nri-space-md);
+  top: -100px;
+  z-index: 1000;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  background: var(--nri-accent);
+  color: var(--nri-on-accent);
+  border-radius: var(--nri-radius-sm);
+  text-decoration: none;
+  font-weight: 600;
+
+  &:focus {
+    top: var(--nri-space-sm);
+  }
+}
+
+// Дерев'яна планка: світліше дерево з темним нижнім торцем.
+.plank {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-md);
+  min-height: 72px;
+  padding: var(--nri-space-sm) clamp(var(--nri-space-md), 4vw, 56px);
+  background: linear-gradient(var(--qb-plank), var(--qb-plank-dark));
+  box-shadow:
+    0 6px 0 var(--qb-plank-edge),
+    0 14px 24px rgba(0, 0, 0, 0.4);
+  margin-bottom: 6px;
+}
+
+.brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  color: var(--qb-cream);
+  font-family: var(--nri-font-heading);
+  font-size: 1.9rem;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--qb-cream);
+  }
+}
+
+// Герб: латунне кільце з мечами.
+.emblem {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--qb-brass);
+  border-radius: 50%;
+  color: var(--qb-brass);
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin-left: var(--nri-space-md);
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--qb-cream-muted);
+  font-size: 1.05rem;
+  text-decoration: none;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+
+  &:hover,
+  &.active {
+    color: var(--qb-cream);
+    text-decoration: underline;
+    text-decoration-color: var(--qb-brass);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.view-mode {
+  flex: none;
+
+  .short {
+    display: none;
+  }
+}
+
+.bell-placeholder {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.nav-menu-button {
+  display: none;
+}
+
+// Акаунт — латунний кружок з літерою ніку.
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--qb-brass);
+  color: var(--qb-wood-dark);
+  font-family: var(--nri-font-heading);
+  font-size: 1.25rem;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  transition: background var(--nri-transition);
+
+  &:hover {
+    background: var(--qb-brass-light);
+  }
+}
+
+.login-link {
+  flex: none;
+}
+
+.menu-header {
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  font-weight: 600;
+  border-bottom: 1px solid var(--nri-border);
+}
+
+.main {
+  flex: 1 0 auto;
+  outline: none;
+  // Якір пропуску навігації не ховається під липкою планкою.
+  scroll-margin-top: 84px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--nri-space-lg);
+  padding: var(--nri-space-lg) var(--nri-space-md);
+  background: linear-gradient(var(--qb-plank-dark), var(--qb-wood-dark));
+  box-shadow: 0 -4px 0 var(--qb-plank-edge);
+}
+
+.connection-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nri-space-md);
+  margin: var(--nri-space-md) auto 0;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border-left: 4px solid var(--nri-danger);
+}
+
+// Середня ширина: навігація — у меню.
+@media (max-width: 959.98px) {
+  .nav {
+    display: none;
+  }
+
+  .nav-menu-button {
+    display: inline-flex;
+  }
+}
+
+// Вузький екран: перемикач виду — короткі підписи, назва — дрібніша.
+@media (max-width: 639.98px) {
+  .plank {
+    gap: var(--nri-space-xs);
+    min-height: 60px;
+    padding: var(--nri-space-xs) var(--nri-space-sm);
+  }
+
+  .brand {
+    font-size: 1.3rem;
+    gap: 8px;
+  }
+
+  .emblem {
+    width: 30px;
+    height: 30px;
+  }
+
+  .view-mode {
+    font-size: 0.8rem;
+
+    .long {
+      display: none;
+    }
+
+    .short {
+      display: inline;
+    }
+  }
+}
+
+// Дуже вузький екран із перемикачем виду: лише герб (назва лишається для читачів екрана).
+@media (max-width: 479.98px) {
+  .plank:has(.view-mode) .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
