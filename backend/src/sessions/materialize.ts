@@ -274,7 +274,8 @@ export async function logSessionsCancelled(
       userId,
       entityType: 'session',
       entityId: r.id,
-      payload: { gameId: r.gameId, reason },
+      // auto: скасовано разом із грою/правилом — окремого сповіщення немає (є про гру).
+      payload: { gameId: r.gameId, reason, auto: true },
     });
   }
 }

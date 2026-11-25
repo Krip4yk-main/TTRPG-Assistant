@@ -66,6 +66,7 @@ describe('notification contracts', () => {
       cursor: 10,
       limit: 50,
     });
+    expect(notificationsQuerySchema.parse({ cursor: '' })).toEqual({ limit: 20 });
     expect(notificationsQuerySchema.safeParse({ limit: '51' }).success).toBe(false);
     expect(notificationsQuerySchema.safeParse({ cursor: 'abc' }).success).toBe(false);
   });

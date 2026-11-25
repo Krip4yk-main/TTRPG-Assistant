@@ -1,4 +1,4 @@
-import { and, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type {
   EventType,
   NotificationActor,
@@ -8,7 +8,7 @@ import type {
 } from '@nri/shared';
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
-import { events, gameMembers, games, gameSessions, users } from '../db/schema/index.js';
+import { events, gameMembers, games, gameSessions, genres, users } from '../db/schema/index.js';
 
 export type EventRow = typeof events.$inferSelect;
 
@@ -78,12 +78,6 @@ export const NOTIFY_RULES: Partial<Record<EventType, Rule>> = {
   'game.rule_changed': { category: 'games', to: 'participants', actorIsEventUser: true },
 };
 
-/**
- * Автоскасування сесій разом із грою (завершення, скасування, нове правило) не сповіщають
- * окремо: учасники вже отримують сповіщення про саму гру — інакше по одному на кожну сесію.
- */
-const SYSTEM_SESSION_CANCEL_REASONS = new Set(['game_finished', 'game_cancelled', 'rule_changed']);
-
 type Payload = Record<string, unknown>;
 const asPayload = (p: unknown): Payload =>
   p && typeof p === 'object' && !Array.isArray(p) ? (p as Payload) : {};
@@ -94,9 +88,16 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
 function ruleFor(ev: EventRow): Rule | null {
   const rule = NOTIFY_RULES[ev.type as EventType];
   if (!rule) return null;
+  const p = asPayload(ev.payload);
+  // Автоскасування сесій разом із грою (завершення, скасування, нове правило) не сповіщають
+  // окремо: учасники вже отримують сповіщення про саму гру — інакше по одному на кожну сесію.
+  if (ev.type === 'session.cancelled' && p.auto === true) return null;
+  // Бан того, хто не був ні учасником, ні автором заявки, нічого в нього не забрав —
+  // без сповіщення (інакше майстер міг би слати сповіщення будь-кому).
   if (
-    ev.type === 'session.cancelled' &&
-    SYSTEM_SESSION_CANCEL_REASONS.has(str(asPayload(ev.payload).reason) ?? '')
+    ev.type === 'member.banned' &&
+    p.wasMember !== true &&
+    !(Array.isArray(p.cancelledApplicationIds) && p.cancelledApplicationIds.length > 0)
   ) {
     return null;
   }
@@ -125,8 +126,14 @@ export async function planNotifications(db: DbLike, batch: EventRow[]): Promise<
 
   const gameIds = [...new Set(todo.map((t) => t.gameId))];
   const gameRows = await db
-    .select({ id: games.id, title: games.title, gmUserId: games.gmUserId })
+    .select({
+      id: games.id,
+      title: games.title,
+      gmUserId: games.gmUserId,
+      genreSlug: genres.slug,
+    })
     .from(games)
+    .leftJoin(genres, eq(genres.id, games.genreId))
     .where(inArray(games.id, gameIds));
   const gameById = new Map(gameRows.map((g) => [g.id, g]));
 
@@ -224,7 +231,7 @@ export async function planNotifications(db: DbLike, batch: EventRow[]): Promise<
 
 function paramsFor(
   ev: EventRow,
-  game: { id: number; title: string },
+  game: { id: number; title: string; genreSlug: string | null },
   p: Payload,
   sessionStarts: Map<number, Date>,
 ): NotificationParams {
@@ -249,7 +256,14 @@ function paramsFor(
       params.reason = str(p.reason) ?? null;
       break;
     case 'game.cancelled':
+    case 'member.left':
+    case 'application.withdrawn':
+      // Код причини (`account_deleted`) або null — не вільний текст.
       params.reason = str(p.reason) ?? null;
+      break;
+    case 'game.finished':
+      // Подяка після гри — текст за жанром (`thanks.<genreSlug>`).
+      params.genreSlug = game.genreSlug;
       break;
   }
   return params;

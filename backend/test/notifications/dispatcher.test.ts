@@ -1,14 +1,22 @@
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asc, eq, isNull, sql } from 'drizzle-orm';
 import { toZoned, zonedToUtc } from '@nri/shared';
 import { createApp } from '../../src/app.js';
-import { events, gameSessions, jobs, notifications, users } from '../../src/db/schema/index.js';
+import {
+  events,
+  games,
+  gameSessions,
+  genres,
+  jobs,
+  notifications,
+  users,
+} from '../../src/db/schema/index.js';
 import { logEvent } from '../../src/events/events.service.js';
 import { registerJobs } from '../../src/jobs/index.js';
 import { ensureRecurring, resetRegistry } from '../../src/jobs/registry.js';
 import { runDueJobs } from '../../src/jobs/worker.js';
-import { DISPATCH_JOB, dispatchEvents } from '../../src/notifications/dispatcher.js';
+import { DISPATCH_JOB, dispatchEvents, dispatchHooks } from '../../src/notifications/dispatcher.js';
 import type { RealtimeHub } from '../../src/realtime/socket.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
@@ -183,9 +191,38 @@ describe('recipients: members', () => {
       gameTitle: 'Прокляття Страда',
       actor: { publicId: gm.publicId, nickname: 'Майстер' },
     });
-    // Бан не-учасника (сторонній) — теж йому.
+    // Бан стороннього (не учасник, без заявки) нічого в нього не забрав — без сповіщення.
     await ok(call('post', `/api/games/${gameId}/members/${stranger.publicId}/ban`, gm.cookie), 204);
-    expect(await notifiedOf('member.banned')).toEqual(ids(p2, stranger));
+    expect(await notifiedOf('member.banned')).toEqual(ids(p2));
+  });
+
+  it('banning twice → one event, one notification; ban of an applicant → notified', async () => {
+    const { gm, gameId, p1, stranger } = await party();
+    for (let i = 0; i < 3; i++) {
+      await ok(call('post', `/api/games/${gameId}/members/${p1.publicId}/ban`, gm.cookie), 204);
+    }
+    expect(await notifiedOf('member.banned')).toEqual(ids(p1));
+    expect(await db.select().from(events).where(eq(events.type, 'member.banned'))).toHaveLength(1);
+    await apply(gameId, stranger);
+    await ok(call('post', `/api/games/${gameId}/members/${stranger.publicId}/ban`, gm.cookie), 204);
+    expect(await notifiedOf('member.banned')).toEqual(ids(p1, stranger));
+  });
+
+  it('account deletion of a member → member.left to the GM with reason, anonymous actor', async () => {
+    const { gm, gameId, p1 } = await party();
+    await ok(call('delete', '/api/me', p1.cookie), 204);
+    await dispatchEvents(deps);
+    const rows = await db.select().from(notifications).where(eq(notifications.type, 'member.left'));
+    const last = rows[rows.length - 1]!;
+    expect(rows.map((r) => r.userId)).toEqual([gm.id, gm.id]);
+    expect(last.payload).toEqual({
+      gameId,
+      gameTitle: 'Прокляття Страда',
+      reason: 'account_deleted',
+      actor: null,
+    });
+    // Звичайний вихід — без причини.
+    expect(rows[0]!.payload).toMatchObject({ reason: null });
   });
 });
 
@@ -243,11 +280,19 @@ describe('recipients: games', () => {
       (await db.select().from(events).where(eq(events.type, 'session.cancelled'))).length,
     ).toBeGreaterThan(0);
     expect(await notifiedOf('session.cancelled')).toEqual([]);
+    const [g] = await db
+      .select({ slug: genres.slug })
+      .from(games)
+      .innerJoin(genres, eq(genres.id, games.genreId))
+      .where(eq(games.id, gameId));
     expect((await one('game.finished')).payload).toEqual({
       gameId,
       gameTitle: 'Прокляття Страда',
+      genreSlug: g!.slug,
       actor: { publicId: gm.publicId, nickname: 'Майстер' },
     });
+    // Жанр — лише для game.finished.
+    expect((await one('game.started')).payload).not.toHaveProperty('genreSlug');
   });
 
   it('converted_to_campaign → members', async () => {
@@ -291,6 +336,43 @@ describe('recipients: games', () => {
 });
 
 describe('dispatcher', () => {
+  afterEach(() => {
+    delete dispatchHooks.beforePlan;
+    vi.restoreAllMocks();
+  });
+
+  it('a poison event is retried alone, then skipped with dispatch_error; the rest go through', async () => {
+    const gm = await userWithAge(30);
+    const gameId = await createGame(gm.cookie, {}, true);
+    const [a, b, c] = await Promise.all([userWithAge(25), userWithAge(25), userWithAge(25)]);
+    await dispatchEvents(deps);
+    await apply(gameId, a);
+    await apply(gameId, b);
+    await apply(gameId, c);
+    const evs = await db.select().from(events).where(isNull(events.dispatchedAt));
+    const poison = evs.find((e) => e.userId === b.id)!;
+    dispatchHooks.beforePlan = async (batch) => {
+      if (batch.some((e) => e.id === poison.id)) throw new Error('boom');
+    };
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await dispatchEvents(deps)).toBe(3);
+    expect(err).toHaveBeenCalled();
+    const [p] = await db.select().from(events).where(eq(events.id, poison.id));
+    expect(p!.dispatchedAt).not.toBeNull();
+    expect(p!.dispatchError).toBe('boom');
+    const rows = await db.select().from(notifications);
+    expect(rows.map((r) => r.eventId).sort()).toEqual(
+      evs
+        .filter((e) => e !== poison)
+        .map((e) => e.id)
+        .sort(),
+    );
+    expect(await db.select().from(events).where(isNull(events.dispatchedAt))).toEqual([]);
+    const ok2 = await db.select().from(events).where(isNull(events.dispatchError));
+    expect(ok2.length).toBe((await db.select().from(events)).length - 1);
+    expect(emitted.filter((e) => e.userId === gm.id)).toHaveLength(2);
+  });
+
   it('events without recipients are marked dispatched and create nothing', async () => {
     const u = await userWithAge(30);
     await ok(call('patch', '/api/me/timezone', u.cookie, { timezone: 'Europe/Warsaw' }));

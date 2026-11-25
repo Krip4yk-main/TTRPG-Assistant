@@ -51,6 +51,8 @@ export const notifications = mysqlTable(
     uniqueIndex('notifications_event_id_user_id_uq').on(t.eventId, t.userId),
     index('notifications_user_id_id_idx').on(t.userId, sql`${t.id} desc`),
     index('notifications_user_id_read_at_idx').on(t.userId, t.readAt),
+    // Чистка прочитаних, старших 90 днів (Task 3).
+    index('notifications_read_at_idx').on(t.readAt),
   ],
 );
 

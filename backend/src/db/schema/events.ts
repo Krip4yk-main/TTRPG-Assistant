@@ -18,6 +18,8 @@ export const events = mysqlTable(
      * курсором id: id видаються до коміту, тож «пізній» коміт курсор пропустив би.
      */
     dispatchedAt: datetime('dispatched_at', { fsp: 3 }),
+    /** Подію не вдалося обробити й її пропущено (див. диспетчер); `NULL` — оброблено нормально. */
+    dispatchError: varchar('dispatch_error', { length: 255 }),
   },
   (t) => [
     index('events_type_created_at_idx').on(t.type, t.createdAt),

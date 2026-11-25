@@ -191,10 +191,10 @@ export async function banMember(
   const target = await userByPublicId(deps, publicId);
   if (target.id === gmUserId) throw new AppError(400, 'VALIDATION');
   const now = new Date();
-  const { wasMember, cancelled } = await deps.db.transaction(async (tx) => {
+  const { banned, wasMember, cancelled } = await deps.db.transaction(async (tx) => {
     const g = await lockGameX(tx, gameId);
     if (!isRunning(g)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
-    await tx.insert(gameBans).ignore().values({ gameId, userId: target.id });
+    const [ins] = await tx.insert(gameBans).ignore().values({ gameId, userId: target.id });
     const [res] = await tx
       .update(gameMembers)
       .set({ leftAt: now, leftReason: 'banned' })
@@ -207,8 +207,10 @@ export async function banMember(
       );
     const cancelled = await cancelPendingOfUser(tx, gameId, target.id, 'banned', now);
     await unpinGame(tx, target.id, gameId);
-    return { wasMember: res.affectedRows > 0, cancelled };
+    return { banned: ins.affectedRows > 0, wasMember: res.affectedRows > 0, cancelled };
   });
+  // Повторний бан (рядок уже був) нічого не змінює — без події, тож і без сповіщення.
+  if (!banned && !wasMember && cancelled.length === 0) return;
   await logEvent(deps.db, {
     type: 'member.banned',
     userId: gmUserId,

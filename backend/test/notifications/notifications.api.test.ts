@@ -69,6 +69,8 @@ describe('GET /api/me/notifications', () => {
     expect(all.body.items).toHaveLength(5);
     expect((await call('get', '/api/me/notifications?limit=51', u.cookie)).status).toBe(400);
     expect((await call('get', '/api/me/notifications?cursor=x', u.cookie)).status).toBe(400);
+    const empty = await call('get', '/api/me/notifications?cursor=', u.cookie);
+    expect(empty.body.items).toHaveLength(5);
   });
 
   it('requires an active session', async () => {

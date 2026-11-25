@@ -65,6 +65,8 @@ export interface NotificationParams {
   from?: string;
   /** Причина скасування сесії (текст майстра) або код (`account_deleted`). */
   reason?: string | null;
+  /** Жанр гри (slug) — для подяки після завершення (`thanks.<genreSlug>`). */
+  genreSlug?: string | null;
   /** Офсет нагадування, хвилини. */
   offsetMin?: number;
   actor?: NotificationActor | null;
@@ -95,7 +97,11 @@ export interface UnreadCountDto {
 
 /** Query `GET /api/me/notifications`. */
 export const notificationsQuerySchema = z.object({
-  cursor: z.coerce.number().int().positive().optional(),
+  // Порожній `cursor=` — як відсутній.
+  cursor: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
   limit: z.coerce
     .number()
     .int()

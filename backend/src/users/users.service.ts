@@ -308,19 +308,18 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     // Читання без блокування рядків ігор (не тягнемо S-блокування на всі активні ігри):
     // нові членства/заявки неможливі — затвердження й заявка чекають на X рядка `users`.
     // Членство не видаляється, а завершується: присутність на сесіях лишається в історії.
-    const memberIds = (
-      await tx
-        .select({ id: gameMembers.id })
-        .from(gameMembers)
-        .innerJoin(games, eq(games.id, gameMembers.gameId))
-        .where(
-          and(
-            eq(gameMembers.userId, userId),
-            isNull(gameMembers.leftAt),
-            inArray(games.status, ['recruiting', 'started']),
-          ),
-        )
-    ).map((m) => m.id);
+    const memberships = await tx
+      .select({ id: gameMembers.id, gameId: gameMembers.gameId })
+      .from(gameMembers)
+      .innerJoin(games, eq(games.id, gameMembers.gameId))
+      .where(
+        and(
+          eq(gameMembers.userId, userId),
+          isNull(gameMembers.leftAt),
+          inArray(games.status, ['recruiting', 'started']),
+        ),
+      );
+    const memberIds = memberships.map((m) => m.id);
     if (memberIds.length) {
       await tx
         .update(gameMembers)
@@ -387,9 +386,17 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       cancelledApps,
       cancelledSessions,
       withdrawn,
+      leftGameIds: memberships.map((m) => m.gameId),
     };
   });
-  const { tokenHashes, cancelledGameIds, cancelledApps, cancelledSessions, withdrawn } = result;
+  const {
+    tokenHashes,
+    cancelledGameIds,
+    cancelledApps,
+    cancelledSessions,
+    withdrawn,
+    leftGameIds,
+  } = result;
   await revokeTokenHashes(deps, tokenHashes);
   await revokeAllUserSessions(deps, userId);
   for (const g of cancelledGameIds) {
@@ -410,6 +417,15 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
       entityType: 'application',
       entityId: w.id,
       payload: { gameId: w.gameId, reason: 'account_deleted' },
+    });
+  }
+  for (const gameId of leftGameIds) {
+    await logEvent(db, {
+      type: 'member.left',
+      userId,
+      entityType: 'game',
+      entityId: gameId,
+      payload: { gameId, reason: 'account_deleted' },
     });
   }
   await logEvent(db, { type: 'user.deleted', userId });
