@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
+import type { Db } from '../db/client.js';
 import { jobs } from '../db/schema/index.js';
 import { enqueue } from './queue.js';
 
@@ -65,7 +66,7 @@ export const recurringKey = (type: string, runAt: Date): string => `${type}@${ru
 
 /** Ставить наступний запуск періодичної задачі після `after` (дубль ключа — no-op). */
 export async function scheduleNextRun(
-  deps: Pick<AppDeps, 'db'>,
+  deps: { db: Pick<Db, 'insert'> },
   type: string,
   after: Date,
 ): Promise<void> {
@@ -75,7 +76,10 @@ export async function scheduleNextRun(
   await enqueue(deps, { type, runAt, uniqueKey: recurringKey(type, runAt) });
 }
 
-/** Під час старту: для кожної періодичної задачі без pending/running-запуску ставить перший. */
+/**
+ * Для кожної періодичної задачі без pending/running-запуску ставить наступний. Воркер викликає
+ * її на старті й далі приблизно раз на хвилину — самовідновлення, якщо ланцюжок обірвався.
+ */
 export async function ensureRecurring(
   deps: Pick<AppDeps, 'db'>,
   now: Date = new Date(),

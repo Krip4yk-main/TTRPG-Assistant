@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { jobs } from '../../src/db/schema/index.js';
 import { enqueue } from '../../src/jobs/queue.js';
 import {
@@ -70,6 +70,36 @@ describe('runDueJobs', () => {
     expect(counts.size).toBe(6);
     const rows = await db.select().from(jobs);
     expect(rows.every((r) => r.status === 'done')).toBe(true);
+  });
+
+  it('SKIP LOCKED: заблоковані іншою транзакцією рядки пропускаються без очікування', async () => {
+    const ran: number[] = [];
+    registerHandler('t.skip', async (_d, payload) => {
+      ran.push((payload as { n: number }).n);
+    });
+    const ids: number[] = [];
+    for (let n = 0; n < 6; n++) {
+      ids.push((await enqueue(deps, { type: 't.skip', payload: { n }, runAt: T0 }))!.id);
+    }
+    // Інший «воркер» тримає відкриту транзакцію з локом на перших трьох рядках.
+    await db.transaction(
+      async (tx) => {
+        await tx
+          .select({ id: jobs.id })
+          .from(jobs)
+          .where(inArray(jobs.id, ids.slice(0, 3)))
+          .for('update');
+        const started = Date.now();
+        expect(await runDueJobs(deps, T0, { limit: 3 })).toBe(3);
+        // Не чекав на лок (innodb_lock_wait_timeout — 50 с).
+        expect(Date.now() - started).toBeLessThan(5_000);
+        // READ COMMITTED: у REPEATABLE READ на крихітній таблиці повний скан заблокував би всі рядки.
+      },
+      { isolationLevel: 'read committed' },
+    );
+    expect(ran.sort()).toEqual([3, 4, 5]);
+    expect(await runDueJobs(deps, T0)).toBe(3);
+    expect(ran.sort()).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
   it('limit обмежує кількість задач за прогін', async () => {
@@ -153,6 +183,35 @@ describe('runDueJobs', () => {
     const row = await jobRow(id);
     expect(row.status).toBe('failed');
     expect(row.lastError).toMatch(/lock/i);
+  });
+
+  it('прострочений лок після останньої спроби доповнює lastError, а не перезаписує', async () => {
+    registerHandler('t.crash5e', async () => {});
+    const { id } = (await enqueue(deps, { type: 't.crash5e', runAt: T0 }))!;
+    await db
+      .update(jobs)
+      .set({ status: 'running', attempts: MAX_ATTEMPTS, lockedUntil: T0, lastError: 'boom 4' })
+      .where(eq(jobs.id, id));
+    await runDueJobs(deps, at(1));
+    const row = await jobRow(id);
+    expect(row.status).toBe('failed');
+    expect(row.lastError).toContain('boom 4');
+    expect(row.lastError).toMatch(/lock expired/);
+  });
+
+  it('shouldStop між задачами: незапущені захоплені задачі повертаються в pending', async () => {
+    let calls = 0;
+    let stop = false;
+    registerHandler('t.halt', async () => {
+      calls++;
+      stop = true;
+    });
+    const a = (await enqueue(deps, { type: 't.halt', runAt: T0 }))!.id;
+    const b = (await enqueue(deps, { type: 't.halt', runAt: at(1) }))!.id;
+    expect(await runDueJobs(deps, at(1), { shouldStop: () => stop })).toBe(2);
+    expect(calls).toBe(1);
+    expect((await jobRow(a)).status).toBe('done');
+    expect(await jobRow(b)).toMatchObject({ status: 'pending', attempts: 0, lockedUntil: null });
   });
 
   it('застарілий виконавець (лок перехоплено) не перезаписує результат', async () => {
@@ -261,6 +320,51 @@ describe('recurring', () => {
 });
 
 describe('startWorker', () => {
+  it('самовідновлення: періодична задача без наступника отримує новий запуск', async () => {
+    registerHandler('t.heal', async () => {});
+    registerRecurring('t.heal', { everyMs: 3_600_000 });
+    // Ланцюжок обірвався: є лише виконаний запуск, наступного немає.
+    await db.insert(jobs).values({ type: 't.heal', runAt: T0, status: 'done', attempts: 1 });
+    const worker = startWorker(deps, { pollMs: 10 });
+    try {
+      for (let i = 0; i < 200; i++) {
+        const p = await db.select().from(jobs).where(eq(jobs.status, 'pending'));
+        if (p.length) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    } finally {
+      await worker.stop();
+    }
+    const pending = await db.select().from(jobs).where(eq(jobs.status, 'pending'));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.type).toBe('t.heal');
+    expect(pending[0]!.uniqueKey).toMatch(/^t\.heal@/);
+    expect(pending[0]!.runAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('stop() повертає незапущені задачі пакета в pending', async () => {
+    let release!: () => void;
+    let started = 0;
+    registerHandler('t.batch', async () => {
+      started++;
+      await new Promise<void>((r) => (release = r));
+    });
+    const first = (await enqueue(deps, { type: 't.batch', runAt: new Date(Date.now() - 1000) }))!;
+    const second = (await enqueue(deps, { type: 't.batch', runAt: new Date(Date.now() - 500) }))!;
+    const worker = startWorker(deps, { pollMs: 10 });
+    while (started === 0) await new Promise((r) => setTimeout(r, 5));
+    const stopping = worker.stop();
+    release();
+    await stopping;
+    expect(started).toBe(1);
+    expect((await jobRow(first.id)).status).toBe('done');
+    expect(await jobRow(second.id)).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+      lockedUntil: null,
+    });
+  });
+
   it('опитує чергу, stop() чекає завершення поточного прогону', async () => {
     let release!: () => void;
     let started = false;

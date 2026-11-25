@@ -4,6 +4,7 @@ import type { AppDeps } from '../app.js';
 import { authIdentities, identityTombstones, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import type { Db } from '../db/client.js';
+import { isDuplicateKey } from '../db/errors.js';
 import { AppError } from '../http/errors.js';
 import { generatePublicId, PUBLIC_ID_ATTEMPTS } from '../users/nickname.js';
 import type { Provider, VerifiedIdentity } from './providers/provider.js';
@@ -12,14 +13,6 @@ type Deps = Pick<AppDeps, 'env' | 'db'>;
 
 export const subjectHash = (provider: Provider, subject: string, pepper: string): string =>
   createHmac('sha256', pepper).update(`${provider}:${subject}`).digest('hex');
-
-export function isDuplicateKey(err: unknown): boolean {
-  for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
-    const o = e as { code?: string; errno?: number };
-    if (o.code === 'ER_DUP_ENTRY' || o.errno === 1062) return true;
-  }
-  return false;
-}
 
 /** Створює рядок користувача з унікальним publicId; колізія → повтор (до PUBLIC_ID_ATTEMPTS разів). */
 export async function insertUserWithPublicId(

@@ -5,7 +5,7 @@ import type { BannedLoginDetails } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { banAppeals, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { isDuplicateKey } from '../auth/identity.service.js';
+import { isDuplicateKey } from '../db/errors.js';
 import { logEvent } from '../events/events.service.js';
 
 const APPEAL_TTL_SEC = 30 * 60;

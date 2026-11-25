@@ -5,7 +5,6 @@ import { createHttpServer } from './http-server.js';
 import { createDb } from './db/client.js';
 import { createRedis } from './redis/client.js';
 import { registerJobs } from './jobs/index.js';
-import { ensureRecurring } from './jobs/registry.js';
 import { startWorker, type Worker } from './jobs/worker.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -21,10 +20,10 @@ httpServer.listen(env.PORT, () => {
 });
 
 // Фоновий воркер черги задач (у тестах не запускається — тести викликають runDueJobs).
+// ensureRecurring воркер викликає сам у циклі: недоступна на старті БД не валить API.
 let worker: Worker | undefined;
 if (env.NODE_ENV !== 'test') {
   registerJobs();
-  await ensureRecurring(deps);
   worker = startWorker(deps);
 }
 

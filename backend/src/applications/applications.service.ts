@@ -10,7 +10,7 @@ import {
   type MyApplicationDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
-import { isDuplicateKey } from '../auth/identity.service.js';
+import { isDuplicateKey } from '../db/errors.js';
 import {
   applicationConstraintResponses,
   gameApplications,

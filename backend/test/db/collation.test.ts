@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
-import { isDuplicateKey } from '../../src/auth/identity.service.js';
+import { isDuplicateKey } from '../../src/db/errors.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const deps = await testDeps();

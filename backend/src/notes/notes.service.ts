@@ -10,7 +10,7 @@ import type { AppDeps } from '../app.js';
 import { gameMembers, games, gameSessions, notes, users } from '../db/schema/index.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
-import { isDuplicateKey } from '../auth/identity.service.js';
+import { isDuplicateKey, isMissingReference } from '../db/errors.js';
 
 type GameRow = typeof games.$inferSelect;
 type NoteRow = typeof notes.$inferSelect;
@@ -80,15 +80,6 @@ async function readOwn(
  * UPDATE `WHERE version = ?`; рівно один із двох паралельних записів з однаковою версією
  * проходить, інший отримує 409 з актуальним текстом.
  */
-/** MySQL ER_NO_REFERENCED_ROW_2 (1452): FK посилається на рядок, якого вже немає. */
-function isMissingReference(err: unknown): boolean {
-  for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
-    const o = e as { code?: string; errno?: number };
-    if (o.code === 'ER_NO_REFERENCED_ROW_2' || o.errno === 1452) return true;
-  }
-  return false;
-}
-
 async function writeOwn(
   deps: AppDeps,
   scope: NoteScope,

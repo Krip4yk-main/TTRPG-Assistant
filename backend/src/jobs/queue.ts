@@ -1,14 +1,18 @@
 import { and, eq, lt, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { jobs } from '../db/schema/index.js';
-import { isDuplicateKey } from '../auth/identity.service.js';
+import { isDuplicateKey } from '../db/errors.js';
 
 export type EnqueueOptions = {
   type: string;
   payload?: unknown;
   /** За замовчуванням — зараз. */
   runAt?: Date;
-  /** Дедуплікація: задача з таким ключем уже є (у будь-якому статусі) → no-op. */
+  /**
+   * Дедуплікація: задача з таким ключем уже є (у будь-якому статусі) → no-op. Ключ унікальний
+   * лише доки рядок живе: `purgeFinishedJobs` видаляє завершені задачі, тож довготривала
+   * дедуплікація (сповіщення, нагадування) — на доменних UNIQUE, а не на `unique_key`.
+   */
   uniqueKey?: string;
 };
 

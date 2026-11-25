@@ -13,7 +13,8 @@ import {
   revokeAllUserSessions,
   revokeTokenHashes,
 } from '../auth/session.service.js';
-import { isDuplicateKey, subjectHash } from '../auth/identity.service.js';
+import { isDuplicateKey } from '../db/errors.js';
+import { subjectHash } from '../auth/identity.service.js';
 import {
   authIdentities,
   availabilityBusyDates,

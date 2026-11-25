@@ -8,7 +8,8 @@ import type { Env } from '../config/env.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { getMe } from '../users/users.service.js';
-import { isDuplicateKey, resolveLogin } from './identity.service.js';
+import { isDuplicateKey } from '../db/errors.js';
+import { resolveLogin } from './identity.service.js';
 import { bannedError } from '../appeals/appeals.service.js';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
