@@ -68,4 +68,9 @@ export class SeoService {
     }
     this.meta.removeTag("name='robots'");
   }
+
+  /** Лише `noindex` (для маршрутів з `data.noindex`, після `reset`). */
+  noindex(): void {
+    this.meta.updateTag({ name: 'robots', content: 'noindex' });
+  }
 }

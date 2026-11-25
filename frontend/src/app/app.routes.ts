@@ -142,6 +142,7 @@ export const routes: Routes = [
     // Неіснуюча адреса — сторінка 404 (адреса в рядку браузера лишається).
     path: '**',
     title: 'titles.notFound',
+    data: { noindex: true },
     loadComponent: () => import('./features/not-found/not-found').then((m) => m.NotFound),
   },
 ];

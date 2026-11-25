@@ -407,7 +407,7 @@ export async function seedDemo(db: Db, options: SeedDemoOptions = {}): Promise<S
       seed: options.seed ?? DEFAULT_SEED,
       now: at((options.now ?? new Date()).getTime()),
       ownerNickname: options.ownerNickname ?? DEFAULT_OWNER_NICKNAME,
-      publicBaseUrl: (options.publicBaseUrl ?? 'http://localhost:4200').replace(/\/+$/, ''),
+      publicBaseUrl: (options.publicBaseUrl || 'http://localhost:4200').replace(/\/+$/, ''),
       log,
       hooks: options.testHooks ?? {},
     });

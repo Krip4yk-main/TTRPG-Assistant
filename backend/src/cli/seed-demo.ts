@@ -67,6 +67,11 @@ async function main(): Promise<void> {
         : '\nrating snapshots: consistent',
     );
     if (res.ownerId !== null) console.log(`owner games: ${res.ownerGameIds.length}`);
+    // Канали демо-ігор — http-посилання на сторінку 404 (dev): форма гри приймає лише https.
+    console.log(
+      '\nNOTE: demo games have channel links to PUBLIC_BASE_URL/demo/… (http in dev, they open the 404 page).\n' +
+        '      The game editor accepts only https links: replace or remove them before saving such a game.',
+    );
     console.log('\naccounts to try (dev-login by nickname):');
     for (const a of res.accounts) console.log(`  ${a.nickname.padEnd(28)} ${a.label}`);
   } finally {
