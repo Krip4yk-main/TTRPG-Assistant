@@ -211,6 +211,19 @@ describe('games visibility — viewer relation', () => {
       applicationId: null,
     });
 
+    // Колишній учасник — `none` з `wasMember` (вхід у «вихідні» оцінки); поточний — без нього.
+    const former = await userWithAge(25);
+    await db
+      .insert(gameMembers)
+      .values({ gameId: id, userId: former.id, leftAt: new Date(), leftReason: 'left' });
+    expect(await viewerOf(former.cookie)).toEqual({
+      relation: 'none',
+      applicationId: null,
+      wasMember: true,
+    });
+    await db.insert(gameMembers).values({ gameId: id, userId: former.id });
+    expect(await viewerOf(former.cookie)).toEqual({ relation: 'member', applicationId: null });
+
     // Відкликана заявка — знову `none` (можна подати повторно).
     expect((await call('delete', `/api/applications/${app.body.id}`, pending!.cookie)).status).toBe(
       200,

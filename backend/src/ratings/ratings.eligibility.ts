@@ -31,11 +31,12 @@ const CLOSED = new Date(0);
 
 export type RatingGame = Pick<
   typeof games.$inferSelect,
-  'id' | 'gmUserId' | 'kind' | 'status' | 'publishedAt' | 'finishedAt' | 'cancelledAt'
+  'id' | 'title' | 'gmUserId' | 'kind' | 'status' | 'publishedAt' | 'finishedAt' | 'cancelledAt'
 >;
 
 const GAME_COLS = {
   id: games.id,
+  title: games.title,
   gmUserId: games.gmUserId,
   kind: games.kind,
   status: games.status,
@@ -260,17 +261,20 @@ const slotOf = (sessionId: number | null) => sessionId ?? 0;
 
 /**
  * Перетворює відкриті набори на DTO: лише активні акаунти, стан — з наявних оцінок
- * оцінювача (2 запити на всі набори). Майстер — першим, далі за ніком.
+ * оцінювача, початок сесій (до 3 запитів на всі набори). Майстер — першим, далі за ніком.
  */
 async function hydrate(
   q: Q,
   raterId: number,
   sets: CandidateSet[],
-  gmOf: Map<number, number>,
+  gameOf: Map<number, RatingGame>,
 ): Promise<RatingTargetsDto[]> {
   const userIds = [...new Set(sets.flatMap((s) => s.rateeIds))];
   const gameIds = [...new Set(sets.map((s) => s.gameId))];
-  const [people, mine] = await Promise.all([
+  const sessionIds = [
+    ...new Set(sets.map((s) => s.sessionId).filter((id): id is number => id !== null)),
+  ];
+  const [people, mine, sessionRows] = await Promise.all([
     userIds.length
       ? q
           .select({
@@ -293,13 +297,21 @@ async function hydrate(
           .from(ratings)
           .where(and(eq(ratings.raterId, raterId), inArray(ratings.gameId, gameIds)))
       : Promise.resolve([]),
+    sessionIds.length
+      ? q
+          .select({ id: gameSessions.id, startsAt: gameSessions.startsAt })
+          .from(gameSessions)
+          .where(inArray(gameSessions.id, sessionIds))
+      : Promise.resolve([]),
   ]);
   const byId = new Map(people.map((p) => [p.id, p]));
+  const startsAt = new Map(sessionRows.map((r) => [r.id, r.startsAt]));
   const state = new Map<string, RatingTargetState>(
     mine.map((r) => [`${r.gameId}:${r.slotKey}:${r.rateeId}`, r.declined ? 'declined' : 'rated']),
   );
   return sets.map((s) => {
-    const gm = gmOf.get(s.gameId)!;
+    const game = gameOf.get(s.gameId)!;
+    const gm = game.gmUserId;
     const targets: RatingTargetDto[] = s.rateeIds
       .filter((id) => byId.has(id))
       .sort(
@@ -320,7 +332,10 @@ async function hydrate(
       });
     return {
       gameId: s.gameId,
+      gameTitle: game.title,
       sessionId: s.sessionId,
+      sessionStartsAt:
+        s.sessionId === null ? null : (startsAt.get(s.sessionId)?.toISOString() ?? null),
       kind: s.sessionId === null ? 'final' : 'session',
       targets,
     };
@@ -363,26 +378,31 @@ export async function ratingTargets(
   const { db } = deps;
   const { game, involved } = await accessRatingGame(db, raterId, gameId);
   if (!involved) throw new AppError(403, 'RATING_NOT_ALLOWED');
-  if (sessionId !== null) await assertSessionOfGame(db, gameId, sessionId);
+  const sessionStartsAt =
+    sessionId === null ? null : await assertSessionOfGame(db, gameId, sessionId);
   const sets = await candidateSetsFor(db, game, raterId, now);
   const set = sets.find((s) => s.sessionId === sessionId);
   const empty: RatingTargetsDto = {
     gameId,
+    gameTitle: game.title,
     sessionId,
+    sessionStartsAt: sessionStartsAt?.toISOString() ?? null,
     kind: sessionId === null ? 'final' : 'session',
     targets: [],
   };
   if (!set || !isWindowOpen(set.closesAt, now)) return empty;
-  const [dto] = await hydrate(db, raterId, [set], new Map([[game.id, game.gmUserId]]));
+  const [dto] = await hydrate(db, raterId, [set], new Map([[game.id, game]]));
   return dto!;
 }
 
-export async function assertSessionOfGame(q: Q, gameId: number, sessionId: number) {
+/** Сесія належить грі (інакше 404); повертає її початок. */
+export async function assertSessionOfGame(q: Q, gameId: number, sessionId: number): Promise<Date> {
   const [s] = await q
-    .select({ id: gameSessions.id })
+    .select({ id: gameSessions.id, startsAt: gameSessions.startsAt })
     .from(gameSessions)
     .where(and(eq(gameSessions.id, sessionId), eq(gameSessions.gameId, gameId)));
   if (!s) throw new AppError(404, 'NOT_FOUND');
+  return s.startsAt;
 }
 
 /**
@@ -445,8 +465,8 @@ export async function pendingRatings(
       if (s.rateeIds.length && isWindowOpen(s.closesAt, now)) open.push(s);
     }
   }
-  const gmOf = new Map(list.map((g) => [g.id, g.gmUserId]));
-  const dtos = await hydrate(db, userId, open, gmOf);
+  const gameOf = new Map(list.map((g) => [g.id, g]));
+  const dtos = await hydrate(db, userId, open, gameOf);
   const closes = new Map(open.map((s, i) => [dtos[i]!, s.closesAt?.getTime() ?? null]));
   const byDeadline = (a: number | null, b: number | null) =>
     a === b ? 0 : a === null ? 1 : b === null ? -1 : a - b;

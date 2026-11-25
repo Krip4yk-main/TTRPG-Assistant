@@ -18,6 +18,8 @@ export class PendingRatingsStore {
   private readonly _error = signal(false);
   private seq = 0;
   private inFlight: Promise<void> | null = null;
+  /** Коли востаннє успішно отримано список (мс); для `refreshIfStale`. */
+  private loadedAt = 0;
 
   /** `null` — ще не завантажено. */
   readonly sets = this._sets.asReadonly();
@@ -46,6 +48,7 @@ export class PendingRatingsStore {
         this.inFlight = null;
         this._sets.set(null);
         this._error.set(false);
+        this.loadedAt = 0;
         if (id !== null) void this.refresh();
       });
     });
@@ -62,6 +65,13 @@ export class PendingRatingsStore {
     return p;
   }
 
+  /** Перечитати, лише якщо список старший за `maxAgeMs` (часті переходи між сторінками). */
+  refreshIfStale(maxAgeMs: number): Promise<void> {
+    if (this.inFlight) return this.inFlight;
+    if (this.loadedAt && Date.now() - this.loadedAt < maxAgeMs) return Promise.resolve();
+    return this.refresh();
+  }
+
   private async load(): Promise<void> {
     const seq = ++this.seq;
     try {
@@ -69,6 +79,7 @@ export class PendingRatingsStore {
       if (seq !== this.seq) return;
       this._sets.set(sets);
       this._error.set(false);
+      this.loadedAt = Date.now();
     } catch {
       if (seq === this.seq) this._error.set(true);
     }

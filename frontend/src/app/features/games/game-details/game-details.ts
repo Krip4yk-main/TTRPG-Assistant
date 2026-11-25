@@ -36,6 +36,7 @@ import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { RatingsApi } from '../../../core/ratings/ratings.api';
 import { SeoService } from '../../../core/seo/seo.service';
 import {
   differentZones,
@@ -113,6 +114,7 @@ export class GameDetails {
   private readonly catalog = inject(CatalogStore);
   private readonly seo = inject(SeoService);
   private readonly applications = inject(ApplicationsApi);
+  private readonly ratings = inject(RatingsApi);
   private readonly dialog = inject(MatDialog);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -174,6 +176,12 @@ export class GameDetails {
   });
   /** Відповіді майстра на обмеження з моєї затвердженої заявки (лише учаснику). */
   protected readonly myConstraints = signal<ApplicationConstraintDto[] | null>(null);
+  /**
+   * Є відкриті підсумкові чи «вихідні» оцінки (кінець гри, хтось вийшов) — кнопка
+   * «Оцінити учасників». Запит лише майстру, учасникам і колишнім учасникам.
+   */
+  protected readonly canRateMembers = signal(false);
+  private ratingKey: string | null = null;
   /** Гра, для якої вже запитано мою заявку (щоб тихе оновлення не повторювало запит). */
   private constraintsFor: number | null = null;
 
@@ -276,6 +284,17 @@ export class GameDetails {
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.flashTimer) clearTimeout(this.flashTimer);
+    });
+    effect(() => {
+      const g = this.game();
+      const involved = this.isGm() || this.relation() === 'member' || g?.viewer?.wasMember === true;
+      const key = g && involved && g.status !== 'draft' ? `${g.id}:${g.status}` : null;
+      untracked(() => {
+        if (key === this.ratingKey) return;
+        this.ratingKey = key;
+        this.canRateMembers.set(false);
+        if (key) void this.loadRatingTargets(g!.id, key);
+      });
     });
     // Учасник бачить відповіді майстра на свої обмеження.
     effect(() => {
@@ -470,6 +489,16 @@ export class GameDetails {
       if (code !== 'UNAUTHENTICATED') this.notice.set({ kind: 'error', key: `errors.${code}` });
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  private async loadRatingTargets(gameId: number, key: string): Promise<void> {
+    try {
+      const set = await firstValueFrom(this.ratings.targets(gameId));
+      if (this.ratingKey !== key) return;
+      this.canRateMembers.set(set.targets.some((t) => t.state === 'open'));
+    } catch {
+      // Кнопка необов'язкова: без неї оцінити можна зі сповіщення чи сторінки «Оцінити».
     }
   }
 

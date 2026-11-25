@@ -14,9 +14,14 @@ export function unitsKey(n: number): string {
   return `ratings.units.${plural.select(n)}`;
 }
 
-/** Короткий день (`12 груд.`) у поясі `timeZone` — для «до 12 груд.». */
-export function formatDay(iso: string, timeZone: string): string {
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+/** Кінець вікна оцінювання (`12 груд., 19:00`) у поясі `timeZone` — для «до …». */
+export function formatDeadline(iso: string, timeZone: string): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
   try {
     return new Intl.DateTimeFormat('uk-UA', { ...opts, timeZone }).format(new Date(iso));
   } catch {

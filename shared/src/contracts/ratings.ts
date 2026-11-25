@@ -92,8 +92,12 @@ export interface RatingTargetDto {
 
 export interface RatingTargetsDto {
   gameId: number;
+  /** Назва гри — для заголовків «Оцінити» без окремого запиту гри. */
+  gameTitle: string;
   /** `null` — підсумкові/«вихідні» цілі. */
   sessionId: number | null;
+  /** ISO; початок сесії для сесійних цілей, інакше `null`. */
+  sessionStartsAt: string | null;
   kind: RatingKind;
   targets: RatingTargetDto[];
 }

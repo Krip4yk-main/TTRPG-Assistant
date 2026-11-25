@@ -12,7 +12,6 @@ import {
   type MeDto,
   type RatingTargetDto,
   type RatingTargetsDto,
-  type SessionDto,
 } from '@nri/shared';
 import { RatePage } from './rate-page';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -49,7 +48,9 @@ const player: RatingTargetDto = {
 };
 const finalSet = (targets: RatingTargetDto[]): RatingTargetsDto => ({
   gameId: 7,
+  gameTitle: 'Туман над Дніпром',
   sessionId: null,
+  sessionStartsAt: null,
   kind: 'final',
   targets,
 });
@@ -118,9 +119,9 @@ describe('RatePage', () => {
     const req = targetsReq();
     expect(req.request.params.has('sessionId')).toBe(false);
     req.flush(finalSet(targets));
-    http.expectOne('/api/games/7').flush({ id: 7, title: 'Туман над Дніпром' });
-    http.expectNone('/api/games/7/sessions');
     await settle();
+    // Назва гри — з набору цілей, без окремого запиту гри.
+    http.expectNone('/api/games/7');
   }
 
   afterEach(() => {
@@ -200,12 +201,16 @@ describe('RatePage', () => {
     await open('/games/7/rate?session=9');
     const req = targetsReq();
     expect(req.request.params.get('sessionId')).toBe('9');
-    req.flush({ gameId: 7, sessionId: 9, kind: 'session', targets: [player] });
-    http.expectOne('/api/games/7').flush({ id: 7, title: 'Туман над Дніпром' });
-    http
-      .expectOne('/api/games/7/sessions')
-      .flush([{ id: 9, startsAt: '2026-11-20T17:00:00.000Z' } as SessionDto]);
+    req.flush({
+      gameId: 7,
+      gameTitle: 'Туман над Дніпром',
+      sessionId: 9,
+      sessionStartsAt: '2026-11-20T17:00:00.000Z',
+      kind: 'session',
+      targets: [player],
+    });
     await settle();
+    http.expectNone('/api/games/7/sessions');
     expect(el().querySelector('.kind')!.textContent).toContain('ratings.page.sessionOf');
 
     dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
@@ -271,6 +276,40 @@ describe('RatePage', () => {
     await settle();
     expect(t.querySelector('.nri-alert')!.textContent).toContain('errors.RATING_CRITERIA_INVALID');
     expect(t.querySelector('[data-score="3"]')!.getAttribute('aria-checked')).toBe('true');
+    // Кнопка була вимкнена на час запиту — фокус повертається на «Надіслати».
+    expect(document.activeElement).toBe(t.querySelector('button.send'));
+  });
+
+  it('stale submit whose re-read is 403 (access gone) shows the forbidden state', async () => {
+    await openFinal([gm]);
+    const t = target(gm.publicId);
+    await click(t.querySelector<HTMLButtonElement>('.overall [data-score="3"]'));
+    await click(t.querySelector<HTMLButtonElement>('button.send'));
+    postReq().flush(
+      { error: { code: 'RATING_NOT_ALLOWED' } },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await settle();
+    targetsReq().flush(
+      { error: { code: 'RATING_NOT_ALLOWED' } },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await settle();
+    expect(el().querySelector('.forbidden')).not.toBeNull();
+    expect(el().querySelector('[data-target]')).toBeNull();
+  });
+
+  it('the live message region has no nested alert role (single announcement)', async () => {
+    await openFinal([gm]);
+    const t = target(gm.publicId);
+    await click(t.querySelector<HTMLButtonElement>('.overall [data-score="5"]'));
+    await click(t.querySelector<HTMLButtonElement>('button.send'));
+    postReq().flush({ error: { code: 'RATING_EXISTS' } }, { status: 409, statusText: 'Conflict' });
+    await settle();
+    targetsReq().flush(finalSet([{ ...gm, state: 'rated' }]));
+    await settle();
+    expect(el().querySelector('[aria-live="polite"] [role="alert"]')).toBeNull();
+    expect(el().querySelector('[aria-live="polite"] .message')).not.toBeNull();
   });
 
   it('nothing to rate: empty state with a link to all pending ratings', async () => {
@@ -285,7 +324,6 @@ describe('RatePage', () => {
       { error: { code: 'RATING_NOT_ALLOWED' } },
       { status: 403, statusText: 'Forbidden' },
     );
-    http.expectOne('/api/games/7').flush({ id: 7, title: 'Туман над Дніпром' });
     await settle();
     expect(el().querySelector('.forbidden')!.textContent).toContain('errors.RATING_NOT_ALLOWED');
   });

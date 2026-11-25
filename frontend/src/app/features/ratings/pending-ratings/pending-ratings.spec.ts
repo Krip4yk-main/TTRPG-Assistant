@@ -23,7 +23,9 @@ const me = {
 const sets: RatingTargetsDto[] = [
   {
     gameId: 7,
+    gameTitle: 'Туман над Дніпром',
     sessionId: 9,
+    sessionStartsAt: '2026-11-20T17:00:00.000Z',
     kind: 'session',
     targets: [
       {
@@ -46,7 +48,9 @@ const sets: RatingTargetsDto[] = [
   },
   {
     gameId: 8,
+    gameTitle: 'Темна вежа',
     sessionId: null,
+    sessionStartsAt: null,
     kind: 'final',
     targets: [
       {
@@ -97,18 +101,17 @@ describe('PendingRatings', () => {
     await create();
     http.expectOne('/api/me/ratings/pending').flush(sets);
     await settle();
-    http.expectOne('/api/games/7').flush({ id: 7, title: 'Туман над Дніпром' });
-    http.expectOne('/api/games/8').flush({}, { status: 500, statusText: 'Server Error' });
-    await settle();
+    // Назви ігор і дати сесій — у самих наборах, без запитів ігор.
+    http.expectNone((r) => r.url.startsWith('/api/games/'));
 
     expect(set('7:9').querySelector('.game')!.textContent).toContain('Туман над Дніпром');
-    expect(set('7:9').textContent).toContain('ratings.pending.session');
+    expect(set('7:9').textContent).toContain('ratings.pending.sessionOf');
     expect(set('7:9').textContent).toContain('ratings.closes.until');
     expect(set('7:9').querySelector('a.rate')!.getAttribute('href')).toBe(
       '/games/7/rate?session=9',
     );
-    // Без назви (збій) — «Гра №8»; підсумкова без дедлайну, поки гра йде.
-    expect(set('8:final').querySelector('.game')!.textContent).toContain('ratings.pending.game');
+    // Підсумкова без дедлайну, поки гра йде.
+    expect(set('8:final').querySelector('.game')!.textContent).toContain('Темна вежа');
     expect(set('8:final').textContent).toContain('ratings.pending.final');
     expect(set('8:final').textContent).toContain('ratings.closes.none');
     expect(set('8:final').querySelector('a.rate')!.getAttribute('href')).toBe('/games/8/rate');

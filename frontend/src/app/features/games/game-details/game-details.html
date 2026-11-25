@@ -93,6 +93,12 @@
           </header>
 
           <div class="actions">
+            @if (canRateMembers()) {
+              <a mat-flat-button class="rate-members-link" [routerLink]="['/games', g.id, 'rate']">
+                <mat-icon aria-hidden="true">star</mat-icon>
+                {{ 'ratings.gameLink' | translate }}
+              </a>
+            }
             @if (isGm()) {
               @if (canEdit()) {
                 <a mat-flat-button [routerLink]="['/games', g.id, 'edit']">

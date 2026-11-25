@@ -30,7 +30,7 @@ import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { viewerTimeZone } from '../../../core/i18n/dates';
 import { RatingsApi } from '../../../core/ratings/ratings.api';
-import { formatDay } from '../../../core/ratings/rating-format';
+import { formatDeadline } from '../../../core/ratings/rating-format';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -105,7 +105,7 @@ export class RateTarget {
   protected readonly name = computed(() => this.target().nickname);
   protected readonly closes = computed(() => {
     const iso = this.target().closesAt;
-    return iso ? formatDay(iso, viewerTimeZone(this.auth.me())) : null;
+    return iso ? formatDeadline(iso, viewerTimeZone(this.auth.me())) : null;
   });
 
   protected criterionId(c: RatingCriterion): string {
@@ -146,7 +146,7 @@ export class RateTarget {
       ...(Object.keys(scores).length ? { criteria: scores } : {}),
       ...(comment ? { comment } : {}),
     };
-    await this.post(input);
+    await this.post(input, 'button.send');
   }
 
   protected async decline(): Promise<void> {
@@ -162,7 +162,7 @@ export class RateTarget {
       restoreFocus: true,
     });
     if (!(await firstValueFrom(ref.afterClosed()))) return;
-    await this.post({ ...this.base(), declined: true });
+    await this.post({ ...this.base(), declined: true }, 'button.decline');
   }
 
   private base(): { rateeId: string; sessionId?: number } {
@@ -173,7 +173,8 @@ export class RateTarget {
     };
   }
 
-  private async post(input: RatingInput): Promise<void> {
+  /** `returnFocus` — кнопка, на яку повернути фокус після помилки (вона була вимкнена). */
+  private async post(input: RatingInput, returnFocus: string): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -183,7 +184,10 @@ export class RateTarget {
       const { code } = toApiError(err);
       if (code === 'UNAUTHENTICATED') return;
       if (STALE_CODES.has(code)) this.stale.emit(code);
-      else this.error.set(`errors.${code}`);
+      else {
+        this.error.set(`errors.${code}`);
+        this.focus(returnFocus);
+      }
     } finally {
       this.busy.set(false);
     }

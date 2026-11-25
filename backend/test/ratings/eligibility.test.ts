@@ -84,7 +84,19 @@ describe('played together (Review Focus 2)', () => {
     const s = await fx.done(g, days(3), [a.id], [b.id]);
     const now = days(4);
     const t = await ratingTargets(deps, gm.id, g, s, now);
-    expect(t).toMatchObject({ gameId: g, sessionId: s, kind: 'session' });
+    expect(t).toMatchObject({
+      gameId: g,
+      gameTitle: 'Гра',
+      sessionId: s,
+      sessionStartsAt: new Date(days(3).getTime() - 4 * 3600_000).toISOString(),
+      kind: 'session',
+    });
+    // Закрите вікно (порожньо) — назва й початок сесії все одно є.
+    expect(await ratingTargets(deps, gm.id, g, s, days(30))).toMatchObject({
+      gameTitle: 'Гра',
+      sessionStartsAt: new Date(days(3).getTime() - 4 * 3600_000).toISOString(),
+      targets: [],
+    });
     expect(t.targets).toEqual([
       {
         publicId: a.publicId,
@@ -241,6 +253,12 @@ describe('submission and pending', () => {
       [g2, null, [b.publicId]],
     ]);
     expect(p[2]!.targets[0]!.closesAt).toBeNull();
+    // Назва гри й початок сесії — у самому наборі (без запитів гри з фронтенду).
+    expect(p.map((x) => [x.gameTitle, x.sessionStartsAt === null])).toEqual([
+      ['Гра', false],
+      ['Гра', true],
+      ['Гра', true],
+    ]);
     // Оцінив усіх у наборі — набір зникає.
     await rate(a, g1, gm, now, { sessionId: s1 });
     await submitRating(deps, a.id, g2, { rateeId: b.publicId, declined: true }, now);

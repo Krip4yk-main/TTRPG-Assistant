@@ -31,7 +31,6 @@
         class="message"
         [class.nri-alert]="msg.kind === 'error'"
         [class.nri-notice]="msg.kind === 'info'"
-        [attr.role]="msg.kind === 'error' ? 'alert' : null"
       >
         {{ msg.key | translate: { name: msg.name } }}
       </p>

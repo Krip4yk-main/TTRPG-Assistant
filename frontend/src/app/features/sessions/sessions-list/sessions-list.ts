@@ -252,8 +252,9 @@ export class SessionsList {
    * на кожну сесію тут.
    */
   protected canRate(s: SessionDto): boolean {
-    if (!this.rateable() || s.status !== 'done' || !s.doneAt) return false;
-    return this.now() - Date.parse(s.doneAt) <= SESSION_RATING_WINDOW_MS;
+    if (!this.rateable() || s.status !== 'done') return false;
+    // Старі записи без `doneAt` — від початку сесії (сервер усе одно перевірить вікно).
+    return this.now() - Date.parse(s.doneAt ?? s.startsAt) <= SESSION_RATING_WINDOW_MS;
   }
 
   /** Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. */

@@ -3,6 +3,12 @@
 }
 
 .rate-link {
+  animation: rate-link-in 200ms ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
   &.active {
     color: var(--nri-accent-text);
   }
@@ -29,5 +35,11 @@
 @media (max-width: 639px) {
   .label {
     display: none;
+  }
+}
+
+@keyframes rate-link-in {
+  from {
+    opacity: 0;
   }
 }

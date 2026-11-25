@@ -151,6 +151,7 @@ export async function submitRating(
     const [locked] = await tx
       .select({
         id: games.id,
+        title: games.title,
         gmUserId: games.gmUserId,
         kind: games.kind,
         status: games.status,

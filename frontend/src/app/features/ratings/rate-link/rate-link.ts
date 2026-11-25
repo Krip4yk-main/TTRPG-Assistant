@@ -9,10 +9,13 @@ import { filter, merge } from 'rxjs';
 import { PendingRatingsStore } from '../../../core/ratings/pending-ratings.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 
+/** Найменший проміжок між перечитуваннями через переходи між сторінками, мс. */
+export const NAVIGATION_REFRESH_MS = 60_000;
+
 /**
  * Посилання «Оцінити» в шапці з кількістю відкритих цілей; видно лише, коли є кого оцінити.
- * Список перечитується після кожного переходу між сторінками, нового сповіщення
- * (запрошення оцінити приходять сповіщеннями) і перепідключення сокета.
+ * Список перечитується після переходу між сторінками (не частіше ніж раз на
+ * хвилину), нового сповіщення (запрошення оцінити приходять сповіщеннями) і перепідключення.
  */
 @Component({
   selector: 'nri-rate-link',
@@ -26,12 +29,15 @@ export class RateLink {
   protected readonly count = this.store.openCount;
 
   constructor() {
+    // Переходи — не частіше ніж раз на хвилину; сповіщення й перепідключення — завжди.
+    inject(Router)
+      .events.pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => void this.store.refreshIfStale(NAVIGATION_REFRESH_MS));
     const socket = inject(SocketService);
-    merge(
-      inject(Router).events.pipe(filter((e) => e instanceof NavigationEnd)),
-      socket.on(NOTIFICATION_NEW_EVENT),
-      socket.connected$,
-    )
+    merge(socket.on(NOTIFICATION_NEW_EVENT), socket.connected$)
       .pipe(takeUntilDestroyed())
       .subscribe(() => void this.store.refresh());
   }

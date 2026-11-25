@@ -13,15 +13,16 @@
           <li class="nri-card set" [attr.data-set]="r.key">
             <div class="text">
               <h2 class="game">
-                {{
-                  titles().get(r.gameId) ?? ('ratings.pending.game' | translate: { id: r.gameId })
-                }}
+                {{ r.title }}
               </h2>
               <p class="nri-muted kind">
-                {{
-                  (r.sessionId === null ? 'ratings.pending.final' : 'ratings.pending.session')
-                    | translate
-                }}
+                @if (r.sessionId === null) {
+                  {{ 'ratings.pending.final' | translate }}
+                } @else if (r.sessionWhen; as when) {
+                  {{ 'ratings.pending.sessionOf' | translate: { when: when } }}
+                } @else {
+                  {{ 'ratings.pending.session' | translate }}
+                }
                 ·
                 @if (r.closes; as day) {
                   {{ 'ratings.closes.until' | translate: { date: day } }}
@@ -38,15 +39,7 @@
               class="rate"
               [routerLink]="['/games', r.gameId, 'rate']"
               [queryParams]="r.queryParams"
-              [attr.aria-label]="
-                'ratings.pending.rateAria'
-                  | translate
-                    : {
-                        game:
-                          titles().get(r.gameId) ??
-                          ('ratings.pending.game' | translate: { id: r.gameId }),
-                      }
-              "
+              [attr.aria-label]="'ratings.pending.rateAria' | translate: { game: r.title }"
             >
               {{ 'ratings.pending.rate' | translate }}
             </a>

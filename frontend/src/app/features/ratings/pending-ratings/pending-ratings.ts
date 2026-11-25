@@ -1,27 +1,21 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { RatingTargetsDto } from '@nri/shared';
-import { firstValueFrom } from 'rxjs';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { GamesApi } from '../../../core/games/games.api';
-import { viewerTimeZone } from '../../../core/i18n/dates';
+import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { PendingRatingsStore } from '../../../core/ratings/pending-ratings.store';
-import { formatDay } from '../../../core/ratings/rating-format';
+import { formatDeadline } from '../../../core/ratings/rating-format';
 
 interface Row {
   key: string;
   gameId: number;
+  title: string;
   sessionId: number | null;
+  /** Початок сесії для сесійного набору (у поясі глядача). */
+  sessionWhen: string | null;
   names: string[];
   closes: string | null;
   queryParams: Record<string, number> | null;
@@ -29,8 +23,7 @@ interface Row {
 
 /**
  * Сторінка «Оцінити» (`/ratings`): набори з відкритими цілями (після сесії чи підсумкові),
- * найближчий дедлайн першим, з посиланням на форму. Назви ігор довантажуються окремо
- * (по одному запиту на гру — їх зазвичай одиниці).
+ * найближчий дедлайн першим, з посиланням на форму. Назва гри й дата сесії — у самому наборі.
  */
 @Component({
   selector: 'nri-pending-ratings',
@@ -41,11 +34,7 @@ interface Row {
 })
 export class PendingRatings {
   protected readonly store = inject(PendingRatingsStore);
-  private readonly games = inject(GamesApi);
   private readonly auth = inject(AuthStore);
-
-  protected readonly titles = signal<ReadonlyMap<number, string>>(new Map());
-  private readonly requested = new Set<number>();
 
   protected readonly rows = computed<Row[] | null>(() => {
     const sets = this.store.sets();
@@ -56,9 +45,6 @@ export class PendingRatings {
 
   constructor() {
     void this.store.refresh();
-    effect(() => {
-      for (const s of this.store.sets() ?? []) void this.loadTitle(s.gameId);
-    });
   }
 
   protected retry(): void {
@@ -73,21 +59,12 @@ export class PendingRatings {
     return {
       key: `${s.gameId}:${s.sessionId ?? 'final'}`,
       gameId: s.gameId,
+      title: s.gameTitle,
       sessionId: s.sessionId,
+      sessionWhen: s.sessionStartsAt ? formatDateTime(s.sessionStartsAt, tz) : null,
       names: open.map((t) => t.nickname),
-      closes: closesAt ? formatDay(closesAt, tz) : null,
+      closes: closesAt ? formatDeadline(closesAt, tz) : null,
       queryParams: s.sessionId === null ? null : { session: s.sessionId },
     };
-  }
-
-  private async loadTitle(gameId: number): Promise<void> {
-    if (this.requested.has(gameId)) return;
-    this.requested.add(gameId);
-    try {
-      const g = await firstValueFrom(this.games.get(gameId));
-      this.titles.update((m) => new Map(m).set(gameId, g.title));
-    } catch {
-      // Без назви — показуємо «Гра №…».
-    }
   }
 }

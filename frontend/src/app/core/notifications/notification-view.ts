@@ -129,6 +129,11 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
       : { key: 'notifications.offset.other', params: { n: p.offsetMin } };
   }
 
+  // Нагадування про дедлайн сесійного набору — з датою сесії (як у боті).
+  if (n.type === 'rating.deadline' && p.sessionId !== undefined && p.startsAt) {
+    view.key = 'notifications.rating.deadline_session';
+  }
+
   if (n.type.startsWith('rating.') && p.closesAt) {
     view.closes = formatDateTime(p.closesAt, timeZone);
   }

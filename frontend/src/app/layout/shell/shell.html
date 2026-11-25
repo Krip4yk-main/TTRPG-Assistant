@@ -3,6 +3,12 @@
 <mat-toolbar class="toolbar" role="banner">
   <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
   <span class="spacer"></span>
+  @if (auth.isActive()) {
+    <!-- «Оцінити» — одразу за розпіркою: поява лише звужує її, решта шапки не зсувається. -->
+    @defer (on idle) {
+      <nri-rate-link />
+    }
+  }
 
   @if (auth.isActive() && viewMode.mode() === 'gm') {
     <nav class="gm-nav" [attr.aria-label]="'shell.viewMode.gm' | translate">
@@ -63,10 +69,8 @@
     </mat-button-toggle-group>
   }
   @if (auth.isActive()) {
-    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване.
-         «Оцінити» з’являється лише за наявності відкритих оцінок. -->
+    <!-- Окремий чанк (overlay, zod зі shared) — не в початковому бандлі; місце зарезервоване. -->
     @defer (on idle) {
-      <nri-rate-link />
       <nri-notification-bell />
     } @placeholder {
       <span class="bell-placeholder" aria-hidden="true"></span>

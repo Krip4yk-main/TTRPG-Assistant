@@ -275,6 +275,8 @@ export interface GameViewerDto {
   relation: ViewerRelation;
   /** Id активної (`pending`) заявки глядача; інакше `null`. */
   applicationId: number | null;
+  /** Колись був учасником, але вже ні (є лише тоді — для входу в «вихідні» оцінки). */
+  wasMember?: true;
 }
 
 /** Повна гра — для майстра й учасників (`game_members`). */

@@ -5,7 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { NOTIFICATION_NEW_EVENT, type MeDto, type RatingTargetsDto } from '@nri/shared';
-import { RateLink } from './rate-link';
+import { NAVIGATION_REFRESH_MS, RateLink } from './rate-link';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 
@@ -24,7 +24,9 @@ const me = {
 
 const set = (states: ('open' | 'rated')[]): RatingTargetsDto => ({
   gameId: 7,
+  gameTitle: 'Гра',
   sessionId: null,
+  sessionStartsAt: null,
   kind: 'final',
   targets: states.map((state, i) => ({
     publicId: `user${i}aaaaa`,
@@ -94,10 +96,18 @@ describe('RateLink', () => {
     expect(a.getAttribute('aria-label')).toBe('ratings.link.aria');
   });
 
-  it('refreshes after navigation and on a new notification', async () => {
+  it('navigation refreshes at most once a minute; a new notification always', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
     pending().flush([]);
     await settle();
-    await TestBed.inject(Router).navigateByUrl('/games/1');
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/games/1');
+    await settle();
+    http.expectNone('/api/me/ratings/pending');
+
+    now.mockReturnValue(1_000_000 + NAVIGATION_REFRESH_MS);
+    await router.navigateByUrl('/games/2');
     await settle();
     pending().flush([set(['open'])]);
     await settle();
@@ -108,5 +118,6 @@ describe('RateLink', () => {
     pending().flush([]);
     await settle();
     expect(el.querySelector('a.rate-link')).toBeNull();
+    now.mockRestore();
   });
 });

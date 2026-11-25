@@ -149,6 +149,14 @@ describe('SessionsList', () => {
       http.expectNone((r) => r.url.includes('/ratings'));
     });
 
+    it('a done session without doneAt falls back to its start for the 14-day window', async () => {
+      const legacy: SessionDto = { ...recent, id: 9, doneAt: null };
+      const legacyOld: SessionDto = { ...old, id: 10, doneAt: null };
+      await create(false, true, [legacy, legacyOld], true);
+      expect(rateLink(9)!.getAttribute('href')).toBe('/games/3/rate?session=9');
+      expect(rateLink(10)).toBeNull();
+    });
+
     it('the GM gets the link too; a oneshot (not rateable) does not', async () => {
       await create(true, true, [recent], true);
       expect(rateLink(7)).not.toBeNull();

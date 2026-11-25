@@ -19,11 +19,9 @@ import type { ErrorCode, RatingTargetDto, RatingTargetsDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { GamesApi } from '../../../core/games/games.api';
 import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { PendingRatingsStore } from '../../../core/ratings/pending-ratings.store';
 import { RatingsApi } from '../../../core/ratings/ratings.api';
-import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { RateTarget } from '../rate-target/rate-target';
 
 interface Message {
@@ -53,8 +51,6 @@ function parseSession(raw: string | undefined): number | null {
 })
 export class RatePage {
   private readonly api = inject(RatingsApi);
-  private readonly games = inject(GamesApi);
-  private readonly sessions = inject(SessionsApi);
   private readonly auth = inject(AuthStore);
   private readonly pending = inject(PendingRatingsStore);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -72,8 +68,11 @@ export class RatePage {
   protected readonly state = signal<'loading' | 'ready' | 'notFound' | 'forbidden' | 'error'>(
     'loading',
   );
-  protected readonly title = signal<string | null>(null);
-  protected readonly sessionWhen = signal<string | null>(null);
+  protected readonly title = computed(() => this.data()?.gameTitle ?? null);
+  protected readonly sessionWhen = computed(() => {
+    const iso = this.data()?.sessionStartsAt;
+    return iso ? formatDateTime(iso, viewerTimeZone(this.auth.me())) : null;
+  });
   protected readonly message = signal<Message | null>(null);
   private seq = 0;
 
@@ -99,23 +98,26 @@ export class RatePage {
     this.state.set('loading');
     this.data.set(null);
     this.message.set(null);
-    this.title.set(null);
-    this.sessionWhen.set(null);
     if (!Number.isInteger(gameId) || gameId <= 0 || Number.isNaN(sessionId)) {
       this.state.set('notFound');
       return;
     }
-    void this.loadTitle(seq, gameId, sessionId);
     try {
       await this.loadTargets(seq, gameId, sessionId);
     } catch (err) {
       if (seq !== this.seq) return;
-      const { status, code } = toApiError(err);
-      if (code === 'UNAUTHENTICATED') return;
-      if (status === 404 || code === 'VALIDATION') this.state.set('notFound');
-      else if (code === 'RATING_NOT_ALLOWED') this.state.set('forbidden');
-      else this.state.set('error');
+      const state = this.failureState(err);
+      if (state) this.state.set(state);
     }
+  }
+
+  /** Стан сторінки за помилкою читання цілей; `null` — сесію втрачено (нічого не міняємо). */
+  private failureState(err: unknown): 'notFound' | 'forbidden' | 'error' | null {
+    const { status, code } = toApiError(err);
+    if (code === 'UNAUTHENTICATED') return null;
+    if (status === 404 || code === 'VALIDATION') return 'notFound';
+    if (code === 'RATING_NOT_ALLOWED') return 'forbidden';
+    return 'error';
   }
 
   private async loadTargets(seq: number, gameId: number, sessionId: number | null): Promise<void> {
@@ -123,28 +125,6 @@ export class RatePage {
     if (seq !== this.seq) return;
     this.data.set(dto);
     this.state.set('ready');
-  }
-
-  /** Назва гри й дата сесії — лише для заголовка; збій не заважає оцінювати. */
-  private async loadTitle(seq: number, gameId: number, sessionId: number | null): Promise<void> {
-    const tz = viewerTimeZone(this.auth.me());
-    const title = firstValueFrom(this.games.get(gameId)).then(
-      (g) => {
-        if (seq === this.seq) this.title.set(g.title);
-      },
-      () => undefined,
-    );
-    const when =
-      sessionId === null
-        ? Promise.resolve()
-        : firstValueFrom(this.sessions.list(gameId)).then(
-            (list) => {
-              const s = list.find((x) => x.id === sessionId);
-              if (s && seq === this.seq) this.sessionWhen.set(formatDateTime(s.startsAt, tz));
-            },
-            () => undefined,
-          );
-    await Promise.all([title, when]);
   }
 
   protected onSubmitted(saved: RatingTargetDto): void {
@@ -165,8 +145,10 @@ export class RatePage {
     const seq = this.seq;
     try {
       await this.loadTargets(seq, this.gameId(), this.sessionId());
-    } catch {
-      // Лишаємо як було: причину конфлікту все одно показуємо нижче.
+    } catch (err) {
+      // Доступ зник (виключили, гру сховано) — показуємо це; інакше лишаємо список як був.
+      const state = seq === this.seq ? this.failureState(err) : null;
+      if (state === 'notFound' || state === 'forbidden') this.state.set(state);
     }
     if (seq !== this.seq) return;
     this.message.set({ kind: 'error', key: `errors.${code}` });

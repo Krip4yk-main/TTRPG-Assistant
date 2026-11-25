@@ -130,6 +130,20 @@ describe('notificationView', () => {
       'Europe/Kyiv',
     );
     expect(deadline.closes).toContain('19:00');
+    // Без дати сесії — загальний текст; з датою сесії — варіант «сесії {{when}}».
+    expect(deadline.key).toBe('notifications.rating.deadline');
+    const sessionDeadline = notificationView(
+      dto('rating.deadline', {
+        sessionId: 3,
+        startsAt: '2026-11-25T17:00:00.000Z',
+        closesAt: '2026-12-09T17:00:00.000Z',
+      }),
+      'Europe/Kyiv',
+    );
+    expect(sessionDeadline.key).toBe('notifications.rating.deadline_session');
+    expect(sessionDeadline.when).toContain('19:00');
+    expect(lookup('notifications.rating.deadline_session')).toContain('{{when}}');
+    expect(lookup('notifications.rating.member_left')).toContain('оцінити цього гравця');
     expect(lookup('notifications.rating.until')).toContain('{{closes}}');
     expect(lookup('notifications.categories.ratings.label')).toEqual(expect.any(String));
     expect(lookup('notifications.categories.ratings.hint')).toEqual(expect.any(String));

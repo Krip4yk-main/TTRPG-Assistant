@@ -169,7 +169,21 @@ describe('GameDetails', () => {
     else http.expectOne('/api/games/7/notes/shared').flush({ pages: [] });
   };
 
-  afterEach(() => http.verify());
+  const targetsUrl = '/api/games/7/ratings/targets';
+  const emptyTargets = {
+    gameId: 7,
+    gameTitle: 'Туман над Дніпром',
+    sessionId: null,
+    sessionStartsAt: null,
+    kind: 'final',
+    targets: [],
+  };
+
+  afterEach(() => {
+    // Майстру й учасникам сторінка перевіряє, чи є кого оцінити підсумково.
+    http.match(targetsUrl).forEach((r) => r.flush(emptyTargets));
+    http.verify();
+  });
 
   it('shows full info and warnings as chips', async () => {
     await open(me, (r) => r.flush(game));
@@ -541,6 +555,46 @@ describe('GameDetails', () => {
     await open(me, (r) => r.flush(game));
     expect(el().querySelector('header .gm .gm-rating')).toBeNull();
     expect(el().querySelector('header .gm')!.textContent).toContain('ratings.gmRating.none');
+  });
+
+  describe('"Rate members" entry (final / leave ratings)', () => {
+    const openTarget = {
+      publicId: 'pppppppppp',
+      nickname: 'Sam',
+      avatarUrl: null,
+      role: 'player_from_player',
+      state: 'open',
+      closesAt: null,
+    };
+    const rateLink = () => el().querySelector<HTMLAnchorElement>('a.rate-members-link');
+    const flushTargets = async (targets: unknown[]) => {
+      const req = http.expectOne(targetsUrl);
+      expect(req.request.params.has('sessionId')).toBe(false);
+      req.flush({ ...emptyTargets, targets });
+      await settle();
+    };
+
+    it('a former member with open targets gets the link to the rate page', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, viewer: { relation: 'none', applicationId: null, wasMember: true } }),
+      );
+      await flushTargets([openTarget]);
+      expect(rateLink()!.getAttribute('href')).toBe('/games/7/rate');
+    });
+
+    it('no link when everyone is rated or declined', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, viewer: { relation: 'none', applicationId: null, wasMember: true } }),
+      );
+      await flushTargets([{ ...openTarget, state: 'declined' }]);
+      expect(rateLink()).toBeNull();
+    });
+
+    it('outsiders and guests do not request rating targets', async () => {
+      await open(me, (r) => r.flush(game));
+      http.expectNone(targetsUrl);
+      expect(rateLink()).toBeNull();
+    });
   });
 
   it('an 18+ game is not indexed', async () => {

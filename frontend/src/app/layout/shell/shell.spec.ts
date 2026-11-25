@@ -65,7 +65,7 @@ describe('Shell home by view mode', () => {
   afterEach(() => {
     // Дзвіночок сповіщень тягне лічильник непрочитаних для активного користувача.
     http.match('/api/me/notifications/unread-count').forEach((r) => r.flush({ count: 0 }));
-    // «Оцінити» (той самий відкладений блок) тягне список відкритих оцінок.
+    // «Оцінити» (окремий відкладений блок) тягне список відкритих оцінок.
     http.match('/api/me/ratings/pending').forEach((r) => r.flush([]));
     http.verify();
     localStorage.clear();
@@ -113,7 +113,8 @@ describe('Shell home by view mode', () => {
 
   it('active user gets the notification bell (deferred chunk, reserved placeholder)', async () => {
     await settle();
-    const [block] = await fixture.getDeferBlocks();
+    // Перший відкладений блок — «Оцінити», другий — дзвіночок.
+    const [, block] = await fixture.getDeferBlocks();
     await block!.render(DeferBlockState.Placeholder);
     expect(el.querySelector('.bell-placeholder')).not.toBeNull();
     await block!.render(DeferBlockState.Complete);

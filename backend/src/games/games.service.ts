@@ -798,17 +798,11 @@ async function viewerRelation(deps: AppDeps, g: GameRow, userId: number): Promis
   const none = (relation: GameViewerDto['relation']) => ({ relation, applicationId: null });
   if (g.gmUserId === userId) return none('gm');
   const { db } = deps;
-  const [[m], [app], [ban], [black]] = await Promise.all([
+  const [memberships, [app], [ban], [black]] = await Promise.all([
     db
-      .select({ id: gameMembers.id })
+      .select({ id: gameMembers.id, leftAt: gameMembers.leftAt })
       .from(gameMembers)
-      .where(
-        and(
-          eq(gameMembers.gameId, g.id),
-          eq(gameMembers.userId, userId),
-          isNull(gameMembers.leftAt),
-        ),
-      ),
+      .where(and(eq(gameMembers.gameId, g.id), eq(gameMembers.userId, userId))),
     db
       .select({ id: gameApplications.id })
       .from(gameApplications)
@@ -828,11 +822,13 @@ async function viewerRelation(deps: AppDeps, g: GameRow, userId: number): Promis
       .from(gmBlacklist)
       .where(and(eq(gmBlacklist.gmUserId, g.gmUserId), eq(gmBlacklist.userId, userId))),
   ]);
-  if (m) return none('member');
-  if (app) return { relation: 'pending', applicationId: app.id };
-  if (ban) return none('banned');
-  if (black) return none('blacklisted');
-  return none('none');
+  if (memberships.some((r) => r.leftAt === null)) return none('member');
+  // Колишній учасник (вийшов, виключений, забанений) — може мати «вихідні» оцінки.
+  const former = memberships.length > 0 ? { wasMember: true as const } : {};
+  if (app) return { relation: 'pending', applicationId: app.id, ...former };
+  if (ban) return { ...none('banned'), ...former };
+  if (black) return { ...none('blacklisted'), ...former };
+  return { ...none('none'), ...former };
 }
 
 /** «Мої ігри»: усі ігри майстра в усіх статусах. */
