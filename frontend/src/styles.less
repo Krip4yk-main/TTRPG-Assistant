@@ -119,6 +119,46 @@ a,
   }
 }
 
+// Бейдж «Нове» / «Оновлено» (стан перегляду з сервера).
+.nri-seen-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--nri-space-sm);
+  border-radius: 999px;
+  border: 1px solid var(--nri-new-highlight-border);
+  background: var(--nri-new-highlight);
+  color: var(--nri-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+// Підсвітка елементів, що змінились після «Оновити» (2,5 с, див. HIGHLIGHT_MS).
+.nri-flash {
+  animation: nri-flash 2.5s ease-out;
+}
+
+@keyframes nri-flash {
+  from {
+    background-color: var(--nri-new-highlight);
+    box-shadow: 0 0 0 2px var(--nri-new-highlight-border);
+  }
+  to {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+// Без руху: статична рамка, поки клас на елементі.
+@media (prefers-reduced-motion: reduce) {
+  .nri-flash {
+    animation: none !important;
+    outline: 2px solid var(--nri-new-highlight-border);
+    outline-offset: 2px;
+  }
+}
+
 // ---- Оверлеї Angular Material / CDK ----
 // Структурні стилі CDK підвантажуються ліниво й ПІСЛЯ styles.css, тож тут потрібна вища
 // специфічність (`html …`), інакше стандартне rgba(0, 0, 0, 0.32) перекриє наше.

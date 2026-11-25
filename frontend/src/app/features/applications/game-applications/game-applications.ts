@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -9,6 +10,7 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -37,6 +39,10 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { MembersApi } from '../../../core/members/members.api';
+import { ChangeWatcher } from '../../../core/realtime/change-watcher';
+import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
+import { ViewsService } from '../../../core/views/views.service';
+import { UpdateBanner } from '../../../shared/update-banner/update-banner';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -81,6 +87,7 @@ const draftKey = (appId: number, cid: string) => `${appId}:${cid}`;
     MatInputModule,
     MatRadioModule,
     TranslatePipe,
+    UpdateBanner,
   ],
   templateUrl: './game-applications.html',
   styleUrl: './game-applications.less',
@@ -111,6 +118,12 @@ export class GameApplications {
   /** Заявка, над якою триває дія (захист від подвійного кліку). */
   protected readonly busyId = signal<number | null>(null);
   protected readonly drafts = signal<Record<string, Draft>>({});
+  protected readonly seen = inject(ViewsService).tracker('application');
+  protected readonly flash = new Highlighter<number>();
+  private readonly watcher = inject(ChangeWatcher);
+  private readonly watch = signal<ReturnType<ChangeWatcher['open']> | null>(null);
+  protected readonly hasUpdates = computed(() => (this.watch()?.pending().size ?? 0) > 0);
+  protected readonly refreshing = signal(false);
 
   /** Гра заповнена — затвердження піде понад максимум. */
   protected readonly full = computed(() => {
@@ -132,6 +145,37 @@ export class GameApplications {
   constructor() {
     effect(() => {
       void this.load(Number(this.id()));
+    });
+    // Пінги `applications` приходять в особисту кімнату майстра — лише цієї гри.
+    effect((onCleanup) => {
+      const gameId = Number(this.id());
+      const handle = untracked(() => this.watcher.open({ gameId, scopes: ['applications'] }));
+      this.watch.set(handle);
+      onCleanup(() => handle.stop());
+    });
+    inject(DestroyRef).onDestroy(() => this.flash.dispose());
+  }
+
+  /** «Оновити» на банері: перечитати заявки й підсвітити нові та змінені. */
+  protected async refreshUpdates(): Promise<void> {
+    const handle = this.watch();
+    if (!handle || this.refreshing()) return;
+    handle.take();
+    this.refreshing.set(true);
+    const before = this.items();
+    try {
+      await this.load(Number(this.id()), true);
+      const after = this.items();
+      if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+    } finally {
+      this.refreshing.set(false);
+    }
+    this.focusTitle();
+  }
+
+  private focusTitle(): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('h1')?.focus(), {
+      injector: this.injector,
     });
   }
 
@@ -193,6 +237,7 @@ export class GameApplications {
     }
     this.busyId.set(a.id);
     this.message.set(null);
+    this.watch()?.quiet();
     try {
       const dto = await firstValueFrom(
         this.api.respond(a.id, c.id, { response: d.response, comment: comment || null }),
@@ -264,6 +309,8 @@ export class GameApplications {
     const index = waiting.findIndex((x) => x.id === a.id);
     const rest = waiting.filter((x) => x.id !== a.id);
     const next = rest[Math.min(index, rest.length - 1)];
+    // Власна дія: її пінг не має піднімати банер (до й після відповіді — пінг може обігнати її).
+    this.watch()?.quiet();
     try {
       const dto = await firstValueFrom(
         action === 'approve' ? this.api.approve(a.id) : this.api.reject(a.id),
@@ -304,6 +351,7 @@ export class GameApplications {
   }
 
   private replace(dto: ApplicationDto): void {
+    this.watch()?.quiet();
     this.items.update((list) => (list ?? []).map((x) => (x.id === dto.id ? { ...x, ...dto } : x)));
   }
 
@@ -346,6 +394,7 @@ export class GameApplications {
       ]);
       this.game.set(isRestrictedGame(game) ? null : game);
       this.items.set(items);
+      this.seen.track(items);
       this.memberCount.set(members.length);
       this.state.set('ready');
     } catch (err) {

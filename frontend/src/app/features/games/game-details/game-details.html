@@ -58,7 +58,7 @@
             />
           }
 
-          <header class="head">
+          <header class="head" [class.nri-flash]="flashDetails()">
             <div class="badges">
               @if (g.status !== 'recruiting') {
                 <span class="badge" [attr.data-status]="g.status">{{
@@ -69,7 +69,7 @@
                 <span class="badge age">{{ 'games.ageRating.' + g.ageRating | translate }}</span>
               }
             </div>
-            <h1>{{ g.title }}</h1>
+            <h1 tabindex="-1">{{ g.title }}</h1>
             <p class="nri-muted sub">
               {{ systemName() }}
               @if (genreKey(); as key) {
@@ -299,6 +299,7 @@
               [isGm]="isGm()"
               [manageable]="manageable()"
               (changed)="membersChanged()"
+              (mutated)="quiet()"
             />
             <nri-members-panel
               class="nri-card members"
@@ -391,3 +392,5 @@
     }
   }
 </section>
+
+<nri-update-banner [visible]="hasUpdates()" [busy]="refreshing()" (refresh)="refreshUpdates()" />

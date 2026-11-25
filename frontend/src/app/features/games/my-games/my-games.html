@@ -46,6 +46,11 @@
             <article class="nri-card game" [attr.data-game-id]="game.id">
               <header class="game-header">
                 <h2 class="game-title">{{ game.title }}</h2>
+                @if (seen.badge(game.id); as b) {
+                  <span class="nri-seen-badge" [attr.data-seen]="b">{{
+                    'live.badge.' + b | translate
+                  }}</span>
+                }
                 <span class="status" [attr.data-status]="game.status">{{
                   'games.status.' + game.status | translate
                 }}</span>

@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { ViewsService } from '../../../core/views/views.service';
 import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import {
   ConfirmDialog,
@@ -51,6 +52,7 @@ export class MyGames {
   protected readonly loadFailed = signal(false);
   protected readonly busyId = signal<number | null>(null);
   protected readonly message = signal<Message | null>(null);
+  protected readonly seen = inject(ViewsService).tracker('game');
 
   constructor() {
     void this.load();
@@ -59,7 +61,9 @@ export class MyGames {
   protected async load(): Promise<void> {
     this.loadFailed.set(false);
     try {
-      this.games.set(await firstValueFrom(this.api.mine()));
+      const games = await firstValueFrom(this.api.mine());
+      this.games.set(games);
+      this.seen.track(games);
     } catch (err) {
       if (toApiError(err).code !== 'UNAUTHENTICATED') this.loadFailed.set(true);
     }

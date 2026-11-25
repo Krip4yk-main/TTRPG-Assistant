@@ -1,0 +1,17 @@
+<div class="region" role="status" aria-live="polite">
+  @if (visible()) {
+    <div class="banner">
+      <mat-icon aria-hidden="true">sync</mat-icon>
+      <span class="text">{{ 'live.updates' | translate }}</span>
+      <button
+        mat-flat-button
+        type="button"
+        class="refresh"
+        [disabled]="busy()"
+        (click)="refresh.emit()"
+      >
+        {{ 'live.refresh' | translate }}
+      </button>
+    </div>
+  }
+</div>

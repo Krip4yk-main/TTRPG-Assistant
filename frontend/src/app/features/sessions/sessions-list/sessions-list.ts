@@ -18,13 +18,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { SessionDto } from '@nri/shared';
+import type { RsvpStatus, SessionDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { NotesApi, type NoteSource } from '../../../core/notes/notes.api';
 import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { SessionsApi } from '../../../core/sessions/sessions.api';
+import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
+import { ViewsService } from '../../../core/views/views.service';
 import { NoteEditor } from '../../notes/note-editor/note-editor';
 import {
   FinishSessionDialog,
@@ -86,6 +88,8 @@ export class SessionsList {
   readonly manageable = input(false);
   /** Сесії змінились — сторінці варто оновити «найближчу сесію». */
   readonly changed = output<void>();
+  /** Глядач сам змінив дані (RSVP) — власний пінг не має піднімати банер. */
+  readonly mutated = output<void>();
 
   protected readonly sessions = signal<SessionDto[] | null>(null);
   protected readonly loadFailed = signal(false);
@@ -99,6 +103,14 @@ export class SessionsList {
   /** Сесії з розгорнутою приватною нотаткою. */
   protected readonly openNotes = signal<ReadonlySet<number>>(new Set());
   private readonly noteSources = new Map<number, NoteSource>();
+  /** Бейджі «Нове/Оновлено» — лише учасникам (сесії створює майстер). */
+  private readonly seen = inject(ViewsService).tracker('session');
+  protected readonly flash = new Highlighter<number>();
+  /** Сесія, RSVP якої зберігається. */
+  protected readonly rsvpBusy = signal<number | null>(null);
+  /** Розгорнуті списки учасників у зведенні RSVP (майстер). */
+  protected readonly openSummaries = signal<ReadonlySet<number>>(new Set());
+  protected readonly rsvpStatuses: readonly RsvpStatus[] = ['going', 'not_going'];
 
   private readonly viewerZone = computed(() => viewerTimeZone(this.auth.me()));
   private readonly showZone = computed(() => differentZones(this.viewerZone(), this.timezone()));
@@ -117,7 +129,66 @@ export class SessionsList {
       untracked(() => void this.load(id));
     });
     const clock = setInterval(() => this.now.set(Date.now()), CLOCK_MS);
-    inject(DestroyRef).onDestroy(() => clearInterval(clock));
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(clock);
+      this.flash.dispose();
+    });
+  }
+
+  protected badge(s: SessionDto) {
+    return this.isGm() ? null : this.seen.badge(s.id);
+  }
+
+  /** RSVP — учаснику (не майстру) на заплановану майбутню сесію. */
+  protected canRsvp(s: SessionDto): boolean {
+    return !this.isGm() && s.status === 'scheduled' && Date.parse(s.startsAt) > this.now();
+  }
+
+  /** Зведення RSVP майстру — на заплановані майбутні. */
+  protected summaryFor(s: SessionDto) {
+    return this.isGm() && s.status === 'scheduled' && Date.parse(s.startsAt) > this.now()
+      ? s.rsvpSummary
+      : null;
+  }
+
+  protected noAnswer(s: SessionDto): number {
+    const sum = s.rsvpSummary;
+    return sum ? sum.members.filter((m) => m.status === null).length : 0;
+  }
+
+  protected toggleSummary(s: SessionDto): void {
+    this.openSummaries.update((open) => {
+      const next = new Set(open);
+      if (!next.delete(s.id)) next.add(s.id);
+      return next;
+    });
+  }
+
+  /** Оптимістично: показуємо вибір одразу, при помилці — повертаємо попередній. */
+  protected async rsvp(s: SessionDto, status: RsvpStatus): Promise<void> {
+    if (this.rsvpBusy() !== null || s.myRsvp === status) return;
+    const previous = s.myRsvp;
+    this.rsvpBusy.set(s.id);
+    this.message.set(null);
+    this.patch(s.id, { myRsvp: status });
+    this.mutated.emit();
+    try {
+      const dto = await firstValueFrom(this.api.rsvp(s.id, status));
+      this.patch(s.id, dto);
+      this.message.set({ kind: 'info', key: `sessions.rsvp.saved.${status}` });
+    } catch (err) {
+      this.patch(s.id, { myRsvp: previous });
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') this.message.set({ kind: 'error', key: `errors.${code}` });
+    } finally {
+      this.rsvpBusy.set(null);
+    }
+  }
+
+  private patch(id: number, patch: Partial<SessionDto>): void {
+    this.sessions.update(
+      (list) => list?.map((x) => (x.id === id ? { ...x, ...patch } : x)) ?? list,
+    );
   }
 
   /** Розгорнути/згорнути приватну нотатку сесії (лише учасникам і майстру — як і сам список). */
@@ -139,9 +210,17 @@ export class SessionsList {
     return source;
   }
 
-  /** Перезавантажити (після зміни правила розкладу на сторінці). */
-  async reload(): Promise<void> {
+  /**
+   * Перезавантажити (після зміни правила розкладу чи за банером оновлень). `highlight` —
+   * підсвітити сесії, що зʼявились або змінились.
+   */
+  async reload(highlight = false): Promise<void> {
+    const before = this.sessions();
     await this.load(this.gameId(), true);
+    const after = this.sessions();
+    if (highlight && after && after !== before) {
+      this.flash.flash(changedKeys(before, after, (x) => x.id));
+    }
   }
 
   protected when(s: SessionDto): string {
@@ -235,6 +314,7 @@ export class SessionsList {
       const list = await firstValueFrom(this.api.list(gameId));
       this.now.set(Date.now());
       this.sessions.set(list);
+      if (!this.isGm()) this.seen.track(list);
     } catch (err) {
       const { code } = toApiError(err);
       if (code === 'UNAUTHENTICATED') return;

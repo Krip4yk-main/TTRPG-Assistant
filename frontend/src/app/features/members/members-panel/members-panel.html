@@ -31,7 +31,11 @@
     } @else {
       <ul class="members">
         @for (m of list; track m.publicId) {
-          <li class="member" [attr.data-member-id]="m.publicId">
+          <li
+            class="member"
+            [class.nri-flash]="flash.keys().has(m.publicId)"
+            [attr.data-member-id]="m.publicId"
+          >
             <span class="who">
               @if (m.nickname) {
                 <a class="member-link" [routerLink]="['/users', m.publicId]">{{ m.nickname }}</a>

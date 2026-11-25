@@ -49,6 +49,7 @@
   <li
     class="session"
     tabindex="-1"
+    [class.nri-flash]="flash.keys().has(s.id)"
     [attr.data-session-id]="s.id"
     [attr.aria-labelledby]="'session-when-' + s.id"
   >
@@ -58,6 +59,9 @@
       }}</time>
       <span class="nri-muted duration">{{ 'games.form.hours' | translate: { h: hours(s) } }}</span>
       <span class="status" [attr.data-status]="s.status">{{ statusKey(s) | translate }}</span>
+      @if (badge(s); as b) {
+        <span class="nri-seen-badge" [attr.data-seen]="b">{{ 'live.badge.' + b | translate }}</span>
+      }
       @if (s.rescheduled) {
         <span class="rescheduled">
           <mat-icon aria-hidden="true">update</mat-icon>
@@ -79,6 +83,62 @@
       <p class="summary">
         <span class="label">{{ 'sessions.summary' | translate }}:</span> {{ s.summary }}
       </p>
+    }
+    @if (canRsvp(s)) {
+      <div
+        class="rsvp"
+        role="group"
+        [attr.aria-label]="'sessions.rsvp.groupAria' | translate: { when: when(s) }"
+      >
+        @for (st of rsvpStatuses; track st) {
+          <button
+            mat-stroked-button
+            type="button"
+            class="rsvp-option"
+            [attr.data-rsvp]="st"
+            [class.selected]="s.myRsvp === st"
+            [attr.aria-pressed]="s.myRsvp === st"
+            [disabled]="rsvpBusy() !== null"
+            (click)="rsvp(s, st)"
+          >
+            @if (s.myRsvp === st) {
+              <mat-icon aria-hidden="true">check</mat-icon>
+            }
+            {{ 'sessions.rsvp.' + st | translate }}
+          </button>
+        }
+      </div>
+    }
+    @if (summaryFor(s); as sum) {
+      @let summaryOpen = openSummaries().has(s.id);
+      <div class="rsvp-summary">
+        <button
+          mat-button
+          type="button"
+          class="summary-toggle"
+          [attr.aria-expanded]="summaryOpen"
+          [attr.aria-controls]="'rsvp-list-' + s.id"
+          (click)="toggleSummary(s)"
+        >
+          <mat-icon aria-hidden="true">{{ summaryOpen ? 'expand_less' : 'groups' }}</mat-icon>
+          {{
+            'sessions.rsvp.summary'
+              | translate: { going: sum.going, notGoing: sum.notGoing, none: noAnswer(s) }
+          }}
+        </button>
+        <ul class="rsvp-list" [id]="'rsvp-list-' + s.id" [hidden]="!summaryOpen">
+          @for (m of sum.members; track m.publicId) {
+            <li [attr.data-rsvp]="m.status ?? 'none'">
+              <span class="name">{{ m.nickname }}</span>
+              <span class="nri-muted">{{
+                'sessions.rsvp.memberStatus.' + (m.status ?? 'none') | translate
+              }}</span>
+            </li>
+          } @empty {
+            <li class="nri-muted">{{ 'sessions.rsvp.noMembers' | translate }}</li>
+          }
+        </ul>
+      </div>
     }
     @let noteOpen = openNotes().has(s.id);
     <div class="actions">

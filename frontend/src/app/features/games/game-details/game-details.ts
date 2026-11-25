@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -62,6 +63,9 @@ import { CalendarPin } from '../../calendar/calendar-pin/calendar-pin';
 import { NoteEditor } from '../../notes/note-editor/note-editor';
 import { SharedPlayerNotes } from '../../notes/shared-player-notes/shared-player-notes';
 import { NotesApi } from '../../../core/notes/notes.api';
+import { ChangeWatcher, type ChangeHandle } from '../../../core/realtime/change-watcher';
+import { HIGHLIGHT_MS } from '../../../core/realtime/highlight';
+import { UpdateBanner } from '../../../shared/update-banner/update-banner';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -94,6 +98,7 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
     CalendarPin,
     NoteEditor,
     SharedPlayerNotes,
+    UpdateBanner,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
@@ -110,6 +115,16 @@ export class GameDetails {
   private readonly injector = inject(Injector);
   private readonly notes = inject(NotesApi);
   private readonly sessionsList = viewChild(SessionsList);
+  private readonly membersPanel = viewChild(MembersPanel);
+  private readonly watcher = inject(ChangeWatcher);
+  /** Підписка на кімнати поточної гри (лише автентифікованим). */
+  private readonly watch = signal<ChangeHandle | null>(null);
+  /** Банер «Є оновлення» — є пінги, які сторінка ще не перечитала. */
+  protected readonly hasUpdates = computed(() => (this.watch()?.pending().size ?? 0) > 0);
+  protected readonly refreshing = signal(false);
+  /** Підсвітити шапку гри після оновлення деталей. */
+  protected readonly flashDetails = signal(false);
+  private flashTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
@@ -231,6 +246,34 @@ export class GameDetails {
       const id = Number(this.id());
       void this.load(id);
     });
+    // Кімнати гри: підписка на вході на сторінку, відписка на виході чи зміні гри.
+    effect((onCleanup) => {
+      const id = Number(this.id());
+      if (!this.signedIn() || !Number.isInteger(id) || id <= 0) return;
+      const handle = untracked(() =>
+        this.watcher.open({
+          gameId: id,
+          watch: true,
+          scopes: ['details', 'sessions', 'members'],
+        }),
+      );
+      this.watch.set(handle);
+      onCleanup(() => {
+        handle.stop();
+        this.watch.set(null);
+      });
+    });
+    // Стосунок глядача змінився (вступ, вихід, виключення) — сервер переоцінює кімнати.
+    let relationKey: string | null = null;
+    effect(() => {
+      const key = `${this.game()?.id ?? ''}:${this.relation() ?? ''}:${this.isGm()}`;
+      const handle = untracked(() => this.watch());
+      if (relationKey !== null && key !== relationKey) handle?.rewatch();
+      relationKey = key;
+    });
+    inject(DestroyRef).onDestroy(() => {
+      if (this.flashTimer) clearTimeout(this.flashTimer);
+    });
     // Учасник бачить відповіді майстра на свої обмеження.
     effect(() => {
       const g = this.game();
@@ -249,7 +292,51 @@ export class GameDetails {
 
   /** Склад чи сесії змінились — тихо оновлюємо вільні місця й найближчу сесію. */
   protected async membersChanged(): Promise<void> {
+    this.quiet();
     await this.load(Number(this.id()), true);
+  }
+
+  /** Власна дія глядача: її ж пінги не мають піднімати банер. */
+  protected quiet(): void {
+    this.watch()?.quiet();
+  }
+
+  /**
+   * «Оновити» на банері: перечитати лише змінені частини й підсвітити те, що змінилось.
+   * Деталі перечитуються завжди: склад і сесії впливають на вільні місця й найближчу сесію.
+   */
+  protected async refreshUpdates(): Promise<void> {
+    const handle = this.watch();
+    if (!handle || this.refreshing()) return;
+    const scopes = handle.take();
+    this.refreshing.set(true);
+    try {
+      const before = this.game();
+      await this.load(Number(this.id()), true);
+      const after = this.game();
+      if (scopes.has('details') && before && after) {
+        // Стосунок глядача й позначка перегляду — не зміни гри.
+        const print = (g: FullGame) => JSON.stringify({ ...g, viewer: null, seen: null });
+        if (print(before) !== print(after)) this.flashHead();
+      }
+      await Promise.all([
+        scopes.has('sessions') ? this.sessionsList()?.reload(true) : undefined,
+        scopes.has('members') ? this.membersPanel()?.reload(true) : undefined,
+      ]);
+    } finally {
+      this.refreshing.set(false);
+    }
+    // Кнопка банера зникла — фокус на заголовок гри, а не в нікуди.
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('.game h1, h1')?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  private flashHead(): void {
+    if (this.flashTimer) clearTimeout(this.flashTimer);
+    this.flashDetails.set(true);
+    this.flashTimer = setTimeout(() => this.flashDetails.set(false), HIGHLIGHT_MS);
   }
 
   /** «Вийти з гри»: діалог робить запит сам; після виходу приватне зникає зі сторінки. */
@@ -267,6 +354,7 @@ export class GameDetails {
         maxWidth: 'calc(100vw - 32px)',
       });
       if (!(await firstValueFrom(ref.afterClosed()))) return;
+      this.quiet();
       await this.load(g.id, true);
       this.notice.set({ kind: 'info', key: 'games.details.left' });
       this.focusNotice();
@@ -293,6 +381,7 @@ export class GameDetails {
         },
       );
       if (!(await firstValueFrom(ref.afterClosed()))) return;
+      this.quiet();
       await this.load(g.id, true);
       await this.sessionsList()?.reload();
       this.notice.set({
@@ -332,6 +421,7 @@ export class GameDetails {
       });
       const result = await firstValueFrom(ref.afterClosed());
       if (!result) return;
+      this.quiet();
       if (result.status === 'applied') {
         this.setViewer({ relation: 'pending', applicationId: result.application.id });
         this.notice.set({ kind: 'info', key: 'games.details.applied', link: true });
@@ -364,6 +454,7 @@ export class GameDetails {
       });
       if (!(await firstValueFrom(ref.afterClosed()))) return;
       await firstValueFrom(this.applications.withdraw(id));
+      this.quiet();
       this.setViewer({ relation: 'none', applicationId: null });
       this.notice.set({ kind: 'info', key: 'games.details.withdrawn' });
     } catch (err) {

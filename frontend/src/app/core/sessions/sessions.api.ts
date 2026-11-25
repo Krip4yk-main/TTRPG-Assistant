@@ -5,6 +5,7 @@ import type {
   CancelSessionInput,
   FinishSessionInput,
   RescheduleSessionInput,
+  RsvpStatus,
   SessionDto,
 } from '@nri/shared';
 
@@ -24,6 +25,11 @@ export class SessionsApi {
 
   cancel(id: number, input: CancelSessionInput): Observable<SessionDto> {
     return this.http.post<SessionDto>(`/api/sessions/${id}/cancel`, input);
+  }
+
+  /** Відповідь учасника на майбутню сесію: «буду» / «не зможу». */
+  rsvp(id: number, status: RsvpStatus): Observable<SessionDto> {
+    return this.http.put<SessionDto>(`/api/sessions/${id}/rsvp`, { status });
   }
 
   /** Завершити сесію, що вже почалась: присутність кожного учасника + підсумок. */

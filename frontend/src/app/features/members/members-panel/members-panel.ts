@@ -1,4 +1,5 @@
 import {
+  DestroyRef,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -22,6 +23,7 @@ import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { MembersApi } from '../../../core/members/members.api';
+import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -69,11 +71,23 @@ export class MembersPanel {
   protected readonly loadFailed = signal(false);
   protected readonly busy = signal(false);
   protected readonly message = signal<Message | null>(null);
+  protected readonly flash = new Highlighter<string>();
 
   constructor() {
     effect(() => {
       void this.load(this.gameId());
     });
+    inject(DestroyRef).onDestroy(() => this.flash.dispose());
+  }
+
+  /** Перечитати склад (банер оновлень); `highlight` — підсвітити нових і змінених. */
+  async reload(highlight = false): Promise<void> {
+    const before = this.members();
+    await this.load(this.gameId(), true);
+    const after = this.members();
+    if (highlight && after && after !== before) {
+      this.flash.flash(changedKeys(before, after, (m) => m.publicId));
+    }
   }
 
   protected actions(): MemberAction[] {

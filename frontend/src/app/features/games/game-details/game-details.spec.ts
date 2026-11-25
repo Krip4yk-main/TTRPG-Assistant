@@ -96,6 +96,8 @@ describe('GameDetails', () => {
   let harness: RouterTestingHarness;
   let http: HttpTestingController;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let pings: Subject<unknown>;
+  let socket: { request: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> };
   /** Наступний `dialog.open(...)` закриється з `result`. */
   const nextDialog = (result: unknown) =>
     dialogOpen.mockReturnValueOnce({ afterClosed: () => of(result) });
@@ -109,6 +111,11 @@ describe('GameDetails', () => {
 
   async function open(user: MeDto | null, respond: (r: ReturnType<typeof expectGame>) => void) {
     dialogOpen = vi.fn();
+    pings = new Subject();
+    socket = {
+      request: vi.fn(() => Promise.resolve({ ok: true, members: true })),
+      send: vi.fn(),
+    };
     await TestBed.configureTestingModule({
       providers: [
         { provide: MatDialog, useValue: { open: dialogOpen } },
@@ -127,8 +134,15 @@ describe('GameDetails', () => {
           useValue: {
             connect: vi.fn(),
             disconnect: vi.fn(),
-            on: () => new Subject(),
+            on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
             sessionLost$: new Subject(),
+            connected$: new Subject(),
+            get request() {
+              return socket.request;
+            },
+            get send() {
+              return socket.send;
+            },
           },
         },
       ],
@@ -165,6 +179,50 @@ describe('GameDetails', () => {
     expect(el().querySelector<HTMLImageElement>('img.cover')!.alt).toBeTruthy();
     expect(el().querySelectorAll('nri-warning-chip')).toHaveLength(3);
     expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
+  });
+
+  describe('live updates', () => {
+    const banner = () => document.querySelector<HTMLElement>('nri-update-banner .banner');
+
+    it('watches the game room; a ping for this game shows the banner, refresh reloads and highlights', async () => {
+      await open(me, (r) => r.flush(game));
+      expect(socket.request).toHaveBeenCalledWith('game.watch', { gameId: 7 });
+      expect(banner()).toBeNull();
+      // Живий регіон є завжди — поява банера оголошується.
+      expect(
+        el().parentElement!.querySelector('nri-update-banner [aria-live="polite"]'),
+      ).not.toBeNull();
+
+      pings.next({ gameId: 8, scope: 'details' });
+      await settle();
+      expect(banner()).toBeNull();
+
+      pings.next({ gameId: 7, scope: 'details' });
+      await settle();
+      expect(banner()!.textContent).toContain('live.updates');
+      // Вміст не перечитується сам.
+      http.expectNone('/api/games/7');
+
+      banner()!.querySelector<HTMLButtonElement>('button.refresh')!.click();
+      await settle();
+      expectGame().flush({ ...game, title: 'Новий туман' });
+      await settle();
+      await settle();
+      expect(el().textContent).toContain('Новий туман');
+      expect(el().querySelector('header.head')!.classList).toContain('nri-flash');
+      expect(banner()).toBeNull();
+    });
+
+    it('leaving the page unwatches the room', async () => {
+      await open(me, (r) => r.flush(game));
+      await harness.navigateByUrl('/elsewhere');
+      expect(socket.send).toHaveBeenCalledWith('game.unwatch', { gameId: 7 });
+    });
+
+    it('a guest does not watch', async () => {
+      await open(null, (r) => r.flush(game));
+      expect(socket.request).not.toHaveBeenCalled();
+    });
   });
 
   describe('applying', () => {

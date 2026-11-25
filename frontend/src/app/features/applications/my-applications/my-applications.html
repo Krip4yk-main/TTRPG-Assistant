@@ -1,5 +1,5 @@
 <section class="nri-page my-applications">
-  <h1>{{ 'games.applications.my.title' | translate }}</h1>
+  <h1 tabindex="-1">{{ 'games.applications.my.title' | translate }}</h1>
 
   <div aria-live="polite">
     @if (message(); as msg) {
@@ -37,13 +37,22 @@
           <ul class="cards">
             @for (a of group.items; track a.id) {
               <li>
-                <article class="nri-card application" [attr.data-application-id]="a.id">
+                <article
+                  class="nri-card application"
+                  [class.nri-flash]="flash.keys().has(a.id)"
+                  [attr.data-application-id]="a.id"
+                >
                   <header class="app-header">
                     <h3 class="game-title">
                       <a class="game-link" [routerLink]="['/games', a.gameId]">{{
                         a.game.title
                       }}</a>
                     </h3>
+                    @if (seen.badge(a.id); as b) {
+                      <span class="nri-seen-badge" [attr.data-seen]="b">{{
+                        'live.badge.' + b | translate
+                      }}</span>
+                    }
                     <span class="status" [attr.data-status]="a.status">{{
                       'games.applications.status.' + a.status | translate
                     }}</span>
@@ -146,3 +155,5 @@
     <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
   }
 </section>
+
+<nri-update-banner [visible]="hasUpdates()" [busy]="refreshing()" (refresh)="refreshUpdates()" />

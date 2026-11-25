@@ -78,7 +78,7 @@ describe('SessionsList', () => {
     fixture.detectChanges();
   };
 
-  async function create(isGm: boolean, manageable = true) {
+  async function create(isGm: boolean, manageable = true, list: SessionDto[] = all) {
     dialogOpen = vi.fn();
     changed = vi.fn<() => void>();
     await TestBed.configureTestingModule({
@@ -109,7 +109,7 @@ describe('SessionsList', () => {
     fixture.componentInstance.changed.subscribe(() => changed());
     el = fixture.nativeElement as HTMLElement;
     await settle();
-    http.expectOne('/api/games/3/sessions').flush(all);
+    http.expectOne('/api/games/3/sessions').flush(list);
     await settle();
   }
 
@@ -278,6 +278,120 @@ describe('SessionsList', () => {
       toggle(3).click();
       await settle();
       expect(row(3)!.querySelector('nri-note-editor')).toBeNull();
+    });
+  });
+
+  describe('RSVP', () => {
+    const option = (id: number, st: string) =>
+      row(id)!.querySelector<HTMLButtonElement>(`button[data-rsvp="${st}"]`);
+
+    it('a member answers future scheduled sessions only; optimistic with aria-pressed', async () => {
+      await create(false);
+      expect(option(3, 'going')).not.toBeNull();
+      // Скасована, минула й та, що вже почалась, — без RSVP.
+      expect(row(4)!.querySelector('.rsvp')).toBeNull();
+      expect(row(2)!.querySelector('.rsvp')).toBeNull();
+      expect(row(1)!.querySelector('.rsvp')).toBeNull();
+      expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('false');
+
+      option(3, 'going')!.click();
+      await settle();
+      // Вибір показано ще до відповіді сервера.
+      expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('true');
+      const req = http.expectOne('/api/sessions/3/rsvp');
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ status: 'going' });
+      req.flush({ ...upcoming, myRsvp: 'going' });
+      await settle();
+      expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('true');
+      expect(option(3, 'not_going')!.getAttribute('aria-pressed')).toBe('false');
+      expect(el.querySelector('.message-area')!.textContent).toContain('sessions.rsvp.saved.going');
+    });
+
+    it('rolls back and shows the translated error on failure', async () => {
+      await create(false, true, [{ ...upcoming, myRsvp: 'going' }]);
+      option(3, 'not_going')!.click();
+      await settle();
+      expect(option(3, 'not_going')!.getAttribute('aria-pressed')).toBe('true');
+      http
+        .expectOne('/api/sessions/3/rsvp')
+        .flush(
+          { error: { code: 'SESSION_INVALID_STATE', message: 'x' } },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await settle();
+      expect(option(3, 'going')!.getAttribute('aria-pressed')).toBe('true');
+      expect(option(3, 'not_going')!.getAttribute('aria-pressed')).toBe('false');
+      expect(el.querySelector('.message-area [role="alert"]')!.textContent).toContain(
+        'errors.SESSION_INVALID_STATE',
+      );
+    });
+
+    it('the GM gets no RSVP buttons but a summary with an expandable member list', async () => {
+      const summary = {
+        going: 1,
+        notGoing: 1,
+        members: [
+          { publicId: 'aaaaaaaaaa', nickname: 'Сем', status: 'going' as const },
+          { publicId: 'bbbbbbbbbb', nickname: 'Піпін', status: 'not_going' as const },
+          { publicId: 'cccccccccc', nickname: 'Мері', status: null },
+        ],
+      };
+      await create(true, true, [{ ...upcoming, rsvpSummary: summary }]);
+      expect(row(3)!.querySelector('.rsvp')).toBeNull();
+      const toggle = row(3)!.querySelector<HTMLButtonElement>('.summary-toggle')!;
+      expect(toggle.textContent).toContain('sessions.rsvp.summary');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      const list = row(3)!.querySelector<HTMLElement>('.rsvp-list')!;
+      expect(list.hidden).toBe(true);
+      toggle.click();
+      await settle();
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(list.hidden).toBe(false);
+      const states = [...list.querySelectorAll('li')].map((li) => li.getAttribute('data-rsvp'));
+      expect(states).toEqual(['going', 'not_going', 'none']);
+      expect(list.textContent).toContain('Мері');
+    });
+  });
+
+  describe('badges', () => {
+    it('a member sees «new»/«updated» and the sessions are marked viewed', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        await create(false, true, [
+          { ...upcoming, seen: 'new' },
+          { ...cancelled, seen: 'updated' },
+          { ...done, seen: 'seen' },
+        ]);
+        expect(row(3)!.querySelector('.nri-seen-badge')!.getAttribute('data-seen')).toBe('new');
+        expect(row(4)!.querySelector('.nri-seen-badge')!.getAttribute('data-seen')).toBe('updated');
+        expect(row(1)!.querySelector('.nri-seen-badge')).toBeNull();
+        vi.runOnlyPendingTimers();
+        const req = http.expectOne('/api/me/views');
+        expect(req.request.body).toEqual({ entityType: 'session', ids: [3, 4] });
+        req.flush(null);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('the GM sees no session badges and marks nothing', async () => {
+      await create(true, true, [{ ...upcoming, seen: 'new' }]);
+      expect(el.querySelector('.nri-seen-badge')).toBeNull();
+      await new Promise((r) => setTimeout(r, 1600));
+      http.expectNone('/api/me/views');
+    });
+
+    it('reload(true) highlights sessions that changed', async () => {
+      await create(false, true, [upcoming, cancelled]);
+      const p = fixture.componentInstance.reload(true);
+      http
+        .expectOne('/api/games/3/sessions')
+        .flush([{ ...upcoming, durationMinutes: 240 }, cancelled]);
+      await p;
+      await settle();
+      expect(row(3)!.classList).toContain('nri-flash');
+      expect(row(4)!.classList).not.toContain('nri-flash');
     });
   });
 });

@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -15,6 +25,10 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { ChangeWatcher } from '../../../core/realtime/change-watcher';
+import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
+import { ViewsService } from '../../../core/views/views.service';
+import { UpdateBanner } from '../../../shared/update-banner/update-banner';
 import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import {
   ConfirmDialog,
@@ -39,7 +53,7 @@ interface Group {
  */
 @Component({
   selector: 'nri-my-applications',
-  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [RouterLink, MatButtonModule, MatIconModule, TranslatePipe, UpdateBanner],
   templateUrl: './my-applications.html',
   styleUrl: './my-applications.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,6 +67,14 @@ export class MyApplications {
   protected readonly loadFailed = signal(false);
   protected readonly busyId = signal<number | null>(null);
   protected readonly message = signal<Message | null>(null);
+  protected readonly seen = inject(ViewsService).tracker('application');
+  protected readonly flash = new Highlighter<number>();
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  /** Пінги `applications` в особисту кімнату автора — будь-якої гри. */
+  private readonly watch = inject(ChangeWatcher).open({ scopes: ['applications'] });
+  protected readonly hasUpdates = computed(() => this.watch.pending().size > 0);
+  protected readonly refreshing = signal(false);
 
   /** Непорожні групи в порядку `APPLICATION_STATUSES`; у групі — новіші першими. */
   protected readonly groups = computed<Group[]>(() => {
@@ -67,15 +89,39 @@ export class MyApplications {
 
   constructor() {
     void this.load();
+    inject(DestroyRef).onDestroy(() => {
+      this.watch.stop();
+      this.flash.dispose();
+    });
   }
 
   protected async load(): Promise<void> {
     this.loadFailed.set(false);
     try {
-      this.items.set(await firstValueFrom(this.api.mine()));
+      const items = await firstValueFrom(this.api.mine());
+      this.items.set(items);
+      this.seen.track(items);
     } catch (err) {
       if (toApiError(err).code !== 'UNAUTHENTICATED') this.loadFailed.set(true);
     }
+  }
+
+  /** «Оновити» на банері: перечитати заявки й підсвітити нові та змінені. */
+  protected async refreshUpdates(): Promise<void> {
+    if (this.refreshing()) return;
+    this.watch.take();
+    this.refreshing.set(true);
+    const before = this.items();
+    try {
+      await this.load();
+      const after = this.items();
+      if (after && after !== before) this.flash.flash(changedKeys(before, after, (a) => a.id));
+    } finally {
+      this.refreshing.set(false);
+    }
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('h1')?.focus(), {
+      injector: this.injector,
+    });
   }
 
   /** Повна картка гри або `null` для обмеженої (18+/21+, яку глядач не проходить). */
@@ -107,6 +153,7 @@ export class MyApplications {
     if (!(await firstValueFrom(ref.afterClosed()))) return;
     this.busyId.set(a.id);
     this.message.set(null);
+    this.watch.quiet();
     try {
       const dto = await firstValueFrom(this.api.withdraw(a.id));
       this.items.update((list) =>

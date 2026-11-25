@@ -55,6 +55,27 @@ export class SocketService {
     });
   }
 
+  /**
+   * Надіслати подію з підтвердженням. Без з'єднання socket.io буферизує подію до
+   * підключення; `timeoutMs` — щоб обіцянка не висіла вічно (тоді — `null`).
+   */
+  request<T>(event: string, payload: unknown, timeoutMs = 10_000): Promise<T | null> {
+    const socket = this.ensure();
+    return socket
+      .timeout(timeoutMs)
+      .emitWithAck(event, payload)
+      .then(
+        (ack: T) => ack,
+        () => null,
+      );
+  }
+
+  /** Надіслати подію без підтвердження (лише за наявного з'єднання — інакше немає сенсу). */
+  send(event: string, payload: unknown): void {
+    const socket = this.ensure();
+    if (socket.connected) socket.emit(event, payload);
+  }
+
   private ensure(): Socket {
     if (!this.socket) {
       const socket = this.io({ path: '/socket.io', withCredentials: true, autoConnect: false });

@@ -4,10 +4,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import type { GameCardDto, MyApplicationDto } from '@nri/shared';
 import { MyApplications } from './my-applications';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { SocketService } from '../../../core/realtime/socket.service';
 
 const card: GameCardDto = {
   id: 7,
@@ -81,6 +82,7 @@ describe('MyApplications', () => {
   let http: HttpTestingController;
   let el: HTMLElement;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let pings: Subject<unknown>;
 
   const settle = async () => {
     fixture.detectChanges();
@@ -90,9 +92,22 @@ describe('MyApplications', () => {
 
   async function create(items: MyApplicationDto[] = list) {
     dialogOpen = vi.fn();
+    pings = new Subject();
     await TestBed.configureTestingModule({
       imports: [MyApplications],
       providers: [
+        {
+          provide: SocketService,
+          useValue: {
+            on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
+            connected$: new Subject(),
+            sessionLost$: new Subject(),
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            request: vi.fn(),
+            send: vi.fn(),
+          },
+        },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -188,5 +203,48 @@ describe('MyApplications', () => {
     await create([]);
     expect(el.textContent).toContain('games.applications.my.empty');
     expect(el.querySelector('a[href="/"]')).not.toBeNull();
+  });
+
+  describe('live updates and badges', () => {
+    const banner = () => el.querySelector<HTMLElement>('nri-update-banner .banner');
+
+    it('an applications ping shows the banner; refresh re-reads and highlights changed cards', async () => {
+      await create();
+      expect(banner()).toBeNull();
+      pings.next({ gameId: 7, scope: 'sessions' });
+      await settle();
+      expect(banner()).toBeNull();
+      pings.next({ gameId: 7, scope: 'applications' });
+      await settle();
+      expect(banner()).not.toBeNull();
+      http.expectNone('/api/me/applications');
+      banner()!.querySelector<HTMLButtonElement>('button.refresh')!.click();
+      await settle();
+      http
+        .expectOne('/api/me/applications')
+        .flush(list.map((a) => (a.id === 1 ? { ...a, status: 'rejected' as const } : a)));
+      await settle();
+      await settle();
+      expect(card$(1).classList).toContain('nri-flash');
+      expect(card$(3).classList).not.toContain('nri-flash');
+      expect(banner()).toBeNull();
+    });
+
+    it('shows «updated» badges and marks them viewed', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        await create(list.map((a) => (a.id === 3 ? { ...a, seen: 'updated' as const } : a)));
+        expect(card$(3).querySelector('.nri-seen-badge')!.textContent).toContain(
+          'live.badge.updated',
+        );
+        expect(card$(1).querySelector('.nri-seen-badge')).toBeNull();
+        vi.runOnlyPendingTimers();
+        const req = http.expectOne('/api/me/views');
+        expect(req.request.body).toEqual({ entityType: 'application', ids: [3] });
+        req.flush(null);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

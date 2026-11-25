@@ -1,0 +1,31 @@
+:host {
+  display: contents;
+}
+
+// Фіксована область унизу: вміст сторінки не зсувається.
+.region {
+  position: fixed;
+  left: 50%;
+  bottom: var(--nri-space-lg);
+  transform: translateX(-50%);
+  z-index: 900;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--nri-space-md));
+  pointer-events: none;
+}
+
+.banner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-sm);
+  padding: var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-md);
+  background: var(--nri-surface-raised);
+  border: 1px solid var(--nri-new-highlight-border);
+  border-radius: var(--nri-radius-md);
+  box-shadow: var(--nri-shadow-md);
+}
+
+.text {
+  font-weight: 600;
+}

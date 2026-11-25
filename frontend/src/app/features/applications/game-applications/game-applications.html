@@ -18,7 +18,7 @@
     }
     @case ('ready') {
       <header class="page-header">
-        <h1>{{ 'games.applications.gm.title' | translate }}</h1>
+        <h1 tabindex="-1">{{ 'games.applications.gm.title' | translate }}</h1>
         @if (game(); as g) {
           <p class="game-ref">
             <a class="game-link" [routerLink]="['/games', g.id]">{{ g.title }}</a>
@@ -70,6 +70,7 @@
                 <article
                   class="nri-card application"
                   tabindex="-1"
+                  [class.nri-flash]="flash.keys().has(a.id)"
                   [attr.data-application-id]="a.id"
                   [attr.aria-labelledby]="'applicant-' + a.id"
                 >
@@ -83,6 +84,11 @@
                         {{ 'user.deleted' | translate }}
                       }
                     </h3>
+                    @if (seen.badge(a.id); as b) {
+                      <span class="nri-seen-badge" [attr.data-seen]="b">{{
+                        'live.badge.' + b | translate
+                      }}</span>
+                    }
                     <span class="status" [attr.data-status]="a.status">{{
                       'games.applications.status.' + a.status | translate
                     }}</span>
@@ -248,3 +254,5 @@
     }
   }
 </section>
+
+<nri-update-banner [visible]="hasUpdates()" [busy]="refreshing()" (refresh)="refreshUpdates()" />

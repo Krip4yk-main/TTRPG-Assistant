@@ -9,6 +9,7 @@ import type { MeDto, MyGameCardDto } from '@nri/shared';
 import { MyGames } from './my-games';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { ViewsService } from '../../../core/views/views.service';
 
 const me = {
   id: 1,
@@ -98,14 +99,30 @@ describe('MyGames', () => {
       .flush([
         card(1, 'draft'),
         { ...card(2, 'recruiting'), pendingApplications: 3 },
-        { ...card(3, 'started'), memberCount: 2 },
+        { ...card(3, 'started'), memberCount: 2, seen: 'updated' },
         card(4, 'finished'),
         { ...card(5, 'recruiting'), memberCount: 2 },
       ]);
     await settle();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // Позначення переглянутим — відкладене; надсилаємо чергу, щоб не текло між тестами.
+    TestBed.inject(ViewsService).flush();
+    http.match('/api/me/views').forEach((r) => r.flush(null));
+    http.verify();
+  });
+
+  it('shows the «updated» badge and marks the game viewed', () => {
+    expect(article(3).querySelector('.nri-seen-badge')!.textContent).toContain(
+      'live.badge.updated',
+    );
+    expect(article(2).querySelector('.nri-seen-badge')).toBeNull();
+    TestBed.inject(ViewsService).flush();
+    const req = http.expectOne('/api/me/views');
+    expect(req.request.body).toEqual({ entityType: 'game', ids: [3] });
+    req.flush(null);
+  });
 
   it('renders cards with a status badge and status-specific actions', () => {
     expect(article(1).querySelector('.status')!.textContent).toContain('games.status.draft');

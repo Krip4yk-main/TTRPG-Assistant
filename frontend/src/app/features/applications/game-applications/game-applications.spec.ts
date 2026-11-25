@@ -4,10 +4,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import type { GameApplicationDto, GameDto, MemberDto } from '@nri/shared';
 import { GameApplications } from './game-applications';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { SocketService } from '../../../core/realtime/socket.service';
 
 const game: GameDto = {
   id: 7,
@@ -99,11 +100,29 @@ describe('GameApplications', () => {
     fixture.detectChanges();
   };
 
-  async function create(members: MemberDto[] = [member('m1')]) {
+  let pings: Subject<unknown>;
+
+  async function create(
+    members: MemberDto[] = [member('m1')],
+    items: GameApplicationDto[] = [rejected, pending],
+  ) {
     dialogOpen = vi.fn();
+    pings = new Subject();
     await TestBed.configureTestingModule({
       imports: [GameApplications],
       providers: [
+        {
+          provide: SocketService,
+          useValue: {
+            on: (ev: string) => (ev === 'game.changed' ? pings : new Subject()),
+            connected$: new Subject(),
+            sessionLost$: new Subject(),
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            request: vi.fn(),
+            send: vi.fn(),
+          },
+        },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -117,7 +136,7 @@ describe('GameApplications', () => {
     el = fixture.nativeElement as HTMLElement;
     await settle();
     http.expectOne('/api/games/7').flush(game);
-    http.expectOne('/api/games/7/applications').flush([rejected, pending]);
+    http.expectOne('/api/games/7/applications').flush(items);
     http.expectOne('/api/games/7/members').flush(members);
     await settle();
     await settle();
@@ -335,5 +354,49 @@ describe('GameApplications', () => {
         data: expect.objectContaining({ params: { name: 'user.deleted' } }),
       }),
     );
+  });
+
+  describe('live updates and badges', () => {
+    const banner = () => el.querySelector<HTMLElement>('nri-update-banner .banner');
+    const card = (id: number) => el.querySelector<HTMLElement>(`[data-application-id="${id}"]`)!;
+
+    it('only this game applications pings raise the banner; refresh highlights the changed card', async () => {
+      await create();
+      pings.next({ gameId: 8, scope: 'applications' });
+      await settle();
+      expect(banner()).toBeNull();
+      pings.next({ gameId: 7, scope: 'applications' });
+      await settle();
+      expect(banner()).not.toBeNull();
+      banner()!.querySelector<HTMLButtonElement>('button.refresh')!.click();
+      await settle();
+      http.expectOne('/api/games/7').flush(game);
+      http
+        .expectOne('/api/games/7/applications')
+        .flush([rejected, { ...pending, message: 'Змінено' }]);
+      http.expectOne('/api/games/7/members').flush([member('m1')]);
+      await settle();
+      await settle();
+      expect(card(pending.id).classList).toContain('nri-flash');
+      expect(card(rejected.id).classList).not.toContain('nri-flash');
+      expect(banner()).toBeNull();
+    });
+
+    it('shows «new» on unseen applications and marks them viewed', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        await create([member('m1')], [rejected, { ...pending, seen: 'new' }]);
+        expect(card(pending.id).querySelector('.nri-seen-badge')!.textContent).toContain(
+          'live.badge.new',
+        );
+        expect(card(rejected.id).querySelector('.nri-seen-badge')).toBeNull();
+        vi.runOnlyPendingTimers();
+        const req = http.expectOne('/api/me/views');
+        expect(req.request.body).toEqual({ entityType: 'application', ids: [pending.id] });
+        req.flush(null);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
