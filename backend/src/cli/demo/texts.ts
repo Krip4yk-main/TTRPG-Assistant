@@ -995,3 +995,28 @@ export const SYSTEM_GENRES: Record<string, readonly string[]> = {
   mothership: ['scifi', 'horror'],
   uesrpg: ['fantasy'],
 };
+
+/** Тварини для аватарок демо-користувачів (фото з loremflickr за тегом). */
+export const AVATAR_ANIMALS = [
+  'cat',
+  'dog',
+  'fox',
+  'owl',
+  'raccoon',
+  'rabbit',
+  'hedgehog',
+  'parrot',
+  'otter',
+  'squirrel',
+  'horse',
+  'ferret',
+] as const;
+
+/** Підписи каналів гри (посилання бачать лише учасники). */
+export const CHANNEL_KINDS = [
+  { label: 'Discord', slug: 'discord' },
+  { label: 'Foundry', slug: 'foundry' },
+  { label: 'Telegram-чат', slug: 'telegram' },
+  { label: 'Roll20', slug: 'roll20' },
+  { label: 'Нотатки кампанії', slug: 'notes' },
+] as const;

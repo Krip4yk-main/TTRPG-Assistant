@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     const res = await seedDemo(db, {
       ...args,
       dbHost: dbHostOf(url),
+      publicBaseUrl: process.env.PUBLIC_BASE_URL,
       log: (m) => console.log(`  ${m}`),
     });
     console.log(`\nseed-demo done in ${((Date.now() - started) / 1000).toFixed(1)} s`);

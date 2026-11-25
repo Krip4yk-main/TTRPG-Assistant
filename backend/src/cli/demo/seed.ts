@@ -6,6 +6,7 @@ import {
   FINAL_RATING_WINDOW_DAYS,
   gameInputSchema,
   localDate,
+  meetsAgeRating,
   SESSION_RATING_WINDOW_DAYS,
   SESSION_WINDOW_DAYS,
   toZoned,
@@ -90,6 +91,8 @@ export interface SeedDemoOptions {
    * з `nri_test*` і NODE_ENV=test). CLI цього не передає.
    */
   unsafeSkipTargetGuard?: boolean;
+  /** Адреса фронтенду (PUBLIC_BASE_URL): канали демо-ігор ведуть на її сторінку 404. */
+  publicBaseUrl?: string;
   /** Хост БД з DATABASE_URL (CLI); перевіряється, що він локальний. */
   dbHost?: string;
   /** Явний дозвіл на нелокальний хост (`--allow-remote`). */
@@ -276,6 +279,8 @@ interface DGame {
   customWarnings: string[];
   contentWarningIds: number[];
   showWhenFull: boolean;
+  coverUrl: string | null;
+  channelLinks: { label: string; url: string }[];
   status: GameStatus;
   createdAt: Date;
   publishedAt: Date | null;
@@ -402,6 +407,7 @@ export async function seedDemo(db: Db, options: SeedDemoOptions = {}): Promise<S
       seed: options.seed ?? DEFAULT_SEED,
       now: at((options.now ?? new Date()).getTime()),
       ownerNickname: options.ownerNickname ?? DEFAULT_OWNER_NICKNAME,
+      publicBaseUrl: (options.publicBaseUrl ?? 'http://localhost:4200').replace(/\/+$/, ''),
       log,
       hooks: options.testHooks ?? {},
     });
@@ -439,6 +445,7 @@ class Seeder {
       seed: number;
       now: Date;
       ownerNickname: string;
+      publicBaseUrl: string;
       log: (m: string) => void;
       hooks: NonNullable<SeedDemoOptions['testHooks']>;
     },
@@ -695,6 +702,10 @@ class Seeder {
             status: 'active' as const,
             timezone: p.timezone,
             locale: 'uk',
+            // Більшість — з аваткою-твариною (зовнішнє фото за URL, без завантаження).
+            avatarUrl: r.chance(0.8)
+              ? `https://loremflickr.com/256/256/${r.pick(T.AVATAR_ANIMALS)}?lock=${r.int(1, 99999)}`
+              : null,
             createdAt: p.createdAt,
             updatedAt: p.createdAt,
           })),
@@ -942,7 +953,9 @@ class Seeder {
       experience: g.experience,
       language: g.language,
       requirements: g.requirements,
-      coverUrl: null,
+      coverUrl: g.coverUrl,
+      // Канали — http(s)-посилання на сторінку 404 застосунку (у dev PUBLIC_BASE_URL — http,
+      // схема гри приймає лише https), тож у валідацію не йдуть і пишуться напряму.
       channelLinks: [],
       applicationQuestions: g.applicationQuestions,
       customWarnings: g.customWarnings,
@@ -1096,9 +1109,10 @@ class Seeder {
     ] as const);
     const dark = ['horror', 'dark-fantasy', 'noir'].includes(genre.slug);
     let ageRating: AgeRating = r.weighted([
-      ['none', dark ? 65 : 88],
-      ['18+', dark ? 28 : 10],
-      ['21+', dark ? 7 : 2],
+      ['none', dark ? 56 : 80],
+      ['16+', dark ? 16 : 10],
+      ['18+', dark ? 22 : 8],
+      ['21+', dark ? 6 : 2],
     ] as const);
     if (ageRating === '21+' && this.ageNow(gm) < 21) ageRating = '18+';
     const paid = r.chance(format === 'offline' ? 0.55 : 0.35);
@@ -1320,6 +1334,16 @@ class Seeder {
       customWarnings: r.chance(dark ? 0.3 : 0.08) ? r.sample(T.CUSTOM_WARNINGS, r.int(1, 2)) : [],
       contentWarningIds: warningIds,
       showWhenFull: r.chance(0.35),
+      coverUrl: r.chance(0.65)
+        ? `https://picsum.photos/seed/nri-demo-${r.int(1, 999999)}/800/450`
+        : null,
+      channelLinks:
+        status === 'draft' || !r.chance(0.7)
+          ? []
+          : r.sample(T.CHANNEL_KINDS, r.int(1, 2)).map((c) => ({
+              label: c.label,
+              url: `${this.opts.publicBaseUrl}/demo/${c.slug}/${r.int(1000, 9999)}`,
+            })),
       status,
       createdAt: at(C),
       publishedAt: P === null ? null : at(P),
@@ -1506,8 +1530,7 @@ class Seeder {
   private eligible(g: DGame, u: DUser, when: number): boolean {
     if (u.id === g.gm.id || u.createdAt.getTime() >= when - HOUR) return false;
     if (u.bannedAt && u.bannedAt.getTime() < when) return false;
-    const need = g.ageRating === '18+' ? 18 : g.ageRating === '21+' ? 21 : 0;
-    return ageOn(u.birthDate, localDate(new Date(when), u.timezone)) >= need;
+    return meetsAgeRating(ageOn(u.birthDate, localDate(new Date(when), u.timezone)), g.ageRating);
   }
 
   private weightFor(g: DGame, u: DUser): number {
@@ -1828,6 +1851,8 @@ class Seeder {
           experience: g.experience,
           language: g.language,
           requirements: g.requirements,
+          coverUrl: g.coverUrl,
+          channelLinks: g.channelLinks,
           applicationQuestions: g.applicationQuestions,
           customWarnings: g.customWarnings,
           status: g.status,
@@ -2961,7 +2986,7 @@ class Seeder {
     const minor = this.people.find((p) => this.ageNow(p) < 18);
     if (minor)
       out.push({
-        label: `minor (${this.ageNow(minor)} y.o., 18+ games hidden)`,
+        label: `minor (${this.ageNow(minor)} y.o., ${this.ageNow(minor) >= 16 ? '16+ visible, ' : ''}18+ hidden)`,
         nickname: minor.nickname,
       });
     for (const m of this.moderators) out.push({ label: 'moderator', nickname: m.nickname });

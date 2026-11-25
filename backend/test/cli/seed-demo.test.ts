@@ -155,6 +155,23 @@ describe('seed-demo', () => {
       .from(publishedRatings)
       .where(eq(publishedRatings.userId, owner.id));
     expect(ownerGm.some((r) => r.role === 'gm' && r.overall !== null)).toBe(true);
+    // Медіа й канали: у більшості, але не в усіх; 16+ — у суміші вікових позначок.
+    const demoGames = await db.select().from(games).where(inArray(games.id, first.ownerGameIds));
+    const allGames = await db.select().from(games);
+    expect(allGames.some((g) => g.coverUrl?.startsWith('https://picsum.photos/'))).toBe(true);
+    expect(allGames.some((g) => g.coverUrl === null)).toBe(true);
+    expect(
+      allGames.some((g) =>
+        g.channelLinks.some((l) => l.url.startsWith('http://localhost:4200/demo/')),
+      ),
+    ).toBe(true);
+    expect(demoGames.every((g) => g.status !== 'draft' || g.channelLinks.length === 0)).toBe(true);
+    expect(allGames.some((g) => g.ageRating === '16+')).toBe(true);
+    const demoUsers = await db.select().from(users).where(inArray(users.id, first.demoUserIds));
+    expect(
+      demoUsers.filter((u) => u.avatarUrl?.startsWith('https://loremflickr.com/')).length,
+    ).toBeGreaterThan(demoUsers.length / 2);
+    expect(demoUsers.some((u) => u.avatarUrl === null)).toBe(true);
     const firstSample = await sample();
     expect(firstSample.titles.length).toBe(first.counts.games);
     await expect(seedDemo(db, OPTS)).rejects.toThrow(/already exists/);
