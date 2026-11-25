@@ -60,6 +60,16 @@ export async function createSession(
   return { token, expiresAt };
 }
 
+/** Які з хешів токенів мають надгробок відкликання (`revokeSession`/`revokeTokenHashes`). */
+export async function revokedTokenHashes(
+  { redis }: Pick<Deps, 'redis'>,
+  hashes: string[],
+): Promise<Set<string>> {
+  if (hashes.length === 0) return new Set();
+  const marks = await redis.mget(...hashes.map(revokedKey));
+  return new Set(hashes.filter((_, i) => marks[i] !== null));
+}
+
 export type ResolvedSession = { user: SessionUser; slidTo: Date | null };
 
 /**

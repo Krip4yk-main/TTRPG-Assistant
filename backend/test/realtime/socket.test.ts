@@ -3,14 +3,19 @@ import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from '../../src/app.js';
+import { createServer } from 'node:http';
+import { eq } from 'drizzle-orm';
 import {
   createSession,
+  hashToken,
   revokeAllUserSessions,
   revokeSession,
+  revokeTokenHashes,
 } from '../../src/auth/session.service.js';
+import { sessions, users } from '../../src/db/schema/index.js';
 import { banUser } from '../../src/users/users.service.js';
 import { createHttpServer } from '../../src/http-server.js';
-import type { RealtimeHub } from '../../src/realtime/socket.js';
+import { attachRealtime, type RealtimeHub } from '../../src/realtime/socket.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 let deps: AppDeps;
@@ -188,5 +193,68 @@ describe('realtime', () => {
     await revokeSession(deps, a.token, u.id);
     await gone;
     expect(cb.connected).toBe(true);
+  });
+
+  it('revalidateSockets drops sockets whose session expired, was revoked or whose user is banned/deleted', async () => {
+    const mk = async (patch: Parameters<typeof createUser>[1] = {}) => {
+      const u = await createUser(deps.db, patch);
+      const { token } = await createSession(deps, u.id, {});
+      const c = client({ cookie: `nri_sid=${token}` });
+      await waitFor(c, 'connect');
+      return { u, token, c };
+    };
+    const keep = await mk();
+    const expired = await mk();
+    const revoked = await mk();
+    const banned = await mk();
+    const deleted = await mk();
+    expect(await hub.revalidateSockets()).toBe(0);
+
+    // Природний сплив сесії та зміни напряму в БД (повз revokeSession/banUser — без розриву).
+    await deps.db
+      .update(sessions)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(sessions.userId, expired.u.id));
+    await deps.db.delete(sessions).where(eq(sessions.userId, revoked.u.id));
+    await deps.db.update(users).set({ isBanned: true }).where(eq(users.id, banned.u.id));
+    await deps.db.update(users).set({ status: 'deleted' }).where(eq(users.id, deleted.u.id));
+
+    const dropped = [expired, revoked, banned, deleted];
+    const notices = dropped.map((d) => waitFor(d.c, 'session.revoked'));
+    const gone = dropped.map((d) => waitFor(d.c, 'disconnect'));
+    expect(await hub.revalidateSockets()).toBe(4);
+    await Promise.all([...notices, ...gone]);
+    expect(keep.c.connected).toBe(true);
+    expect(await hub.revalidateSockets()).toBe(0);
+  });
+
+  it('revalidateSockets honours a Redis revocation tombstone', async () => {
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = client({ cookie: `nri_sid=${token}` });
+    await waitFor(c, 'connect');
+    const gone = waitFor(c, 'disconnect');
+    await revokeTokenHashes(deps, [hashToken(token)]); // рядок БД ще є
+    expect(await hub.revalidateSockets()).toBe(1);
+    await gone;
+  });
+
+  it('revalidates on a timer and stops it on close', async () => {
+    const extra = createServer();
+    const fast = attachRealtime(extra, deps, { revalidateEveryMs: 50 });
+    await new Promise<void>((r) => extra.listen(0, '127.0.0.1', r));
+    const u = await createUser(deps.db);
+    const { token } = await createSession(deps, u.id, {});
+    const c = connect(`http://127.0.0.1:${(extra.address() as AddressInfo).port}`, {
+      transports: ['websocket'],
+      reconnection: false,
+      extraHeaders: { cookie: `nri_sid=${token}` },
+    });
+    clients.push(c);
+    await waitFor(c, 'connect');
+    const gone = waitFor(c, 'disconnect');
+    await deps.db.delete(sessions).where(eq(sessions.userId, u.id));
+    await gone; // таймер сам розірвав сокет
+    await fast.close();
   });
 });

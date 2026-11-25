@@ -6,10 +6,12 @@ import {
   json,
   mysqlEnum,
   mysqlTable,
+  smallint,
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
 import type { NotificationCategory, NotificationParams } from '@nri/shared';
+import { gameSessions } from './sessions.js';
 import { users } from './users.js';
 
 // Значення enum-ів — тут (drizzle-kit не вантажить ESM @nri/shared), збіг перевіряє `satisfies`.
@@ -71,3 +73,36 @@ export const notificationPrefs = mysqlTable('notification_prefs', {
     .default(sql`CURRENT_TIMESTAMP`)
     .$onUpdate(() => new Date()),
 });
+
+/**
+ * Журнал надісланих нагадувань (Task 3). UNIQUE(session_id, user_id, offset_min, starts_at):
+ * повторний чи паралельний прогін не дублює нагадування, а перенесена сесія (новий
+ * `starts_at`) отримує свіжі нагадування за новим часом. Старші 30 днів чистить щоденна задача.
+ */
+export const reminderLog = mysqlTable(
+  'reminder_log',
+  {
+    id: id('id').autoincrement().primaryKey(),
+    sessionId: id('session_id')
+      .notNull()
+      .references(() => gameSessions.id, { onDelete: 'cascade' }),
+    userId: id('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    offsetMin: smallint('offset_min').notNull(),
+    startsAt: datetime('starts_at', { fsp: 3 }).notNull(),
+    sentAt: datetime('sent_at', { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [
+    uniqueIndex('reminder_log_session_user_offset_starts_uq').on(
+      t.sessionId,
+      t.userId,
+      t.offsetMin,
+      t.startsAt,
+    ),
+    index('reminder_log_user_id_idx').on(t.userId),
+    index('reminder_log_sent_at_idx').on(t.sentAt),
+  ],
+);

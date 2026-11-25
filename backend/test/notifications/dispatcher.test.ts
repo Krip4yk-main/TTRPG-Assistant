@@ -32,6 +32,7 @@ deps.realtime = {
   toRoom: () => {},
   disconnectUser: () => {},
   disconnectSession: () => {},
+  revalidateSockets: async () => 0,
   close: async () => {},
 } satisfies RealtimeHub;
 
