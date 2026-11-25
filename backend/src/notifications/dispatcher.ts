@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
+import { isTransientDbError } from '../db/errors.js';
 import { events } from '../db/schema/index.js';
 import {
   emitNotificationsNew,
@@ -67,7 +68,8 @@ const errorText = (err: unknown): string =>
 /**
  * Обробляє одну пачку outbox-подій; пінги `notification.new` — після коміту. Якщо пачка
  * падає, ті самі події обробляються поодинці: подія, що падає й сама («отруйна»),
- * позначається обробленою з `dispatch_error` (і логом), щоб не блокувати чергу.
+ * позначається обробленою з `dispatch_error` (і логом), щоб не блокувати чергу. Тимчасові
+ * помилки БД (`isTransientDbError`) не пропускають подій: вони прокидаються, і задача повторить.
  * Повертає кількість оброблених подій.
  */
 export async function dispatchEvents(
@@ -80,7 +82,8 @@ export async function dispatchEvents(
     emitNotificationsNew(deps, r.created);
     return r.taken;
   } catch (err) {
-    if (ids.length === 0) throw err; // збій до вибірки (БД недоступна) — повторить задача
+    // Збій до вибірки або тимчасова помилка БД — події лишаються в черзі, повторить задача.
+    if (ids.length === 0 || isTransientDbError(err)) throw err;
     console.error(
       `notifications dispatch: batch of ${ids.length} failed, retrying one by one`,
       err,
@@ -114,6 +117,8 @@ async function dispatchSingle(deps: AppDeps, id: number, now: Date | undefined):
     emitNotificationsNew(deps, r.created);
     return r.taken;
   } catch (err) {
+    // Тимчасова помилка — не «отрута»: подія лишається необробленою до наступного запуску.
+    if (isTransientDbError(err)) throw err;
     console.error(`notifications dispatch: event ${id} failed, skipping`, err);
     const [res] = await deps.db
       .update(events)

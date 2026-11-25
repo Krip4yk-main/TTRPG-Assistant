@@ -341,6 +341,23 @@ describe('dispatcher', () => {
     vi.restoreAllMocks();
   });
 
+  it('a transient DB error rejects and leaves events queued (no dispatch_error)', async () => {
+    const gm = await userWithAge(30);
+    const gameId = await createGame(gm.cookie, {}, true);
+    await dispatchEvents(deps);
+    await apply(gameId, await userWithAge(25));
+    dispatchHooks.beforePlan = async () => {
+      throw Object.assign(new Error('Deadlock found'), { errno: 1213 });
+    };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(dispatchEvents(deps)).rejects.toThrow('Deadlock found');
+    const [ev] = await db.select().from(events).where(eq(events.type, 'application.created'));
+    expect(ev).toMatchObject({ dispatchedAt: null, dispatchError: null });
+    delete dispatchHooks.beforePlan;
+    await dispatchEvents(deps);
+    expect(await notifiedOf('application.created')).toEqual([gm.id]);
+  });
+
   it('a poison event is retried alone, then skipped with dispatch_error; the rest go through', async () => {
     const gm = await userWithAge(30);
     const gameId = await createGame(gm.cookie, {}, true);
