@@ -37,6 +37,9 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 }
 
 const TABLES = [
+  'rating_reminder_log',
+  'published_ratings',
+  'ratings',
   'entity_views',
   'telegram_outbox',
   'reminder_log',
