@@ -42,6 +42,7 @@
         var link = document.createElement('link');
         link.rel = 'stylesheet';
         link.id = 'nri-theme-style';
+        link.setAttribute('blocking', 'render');
         link.href = 'theme-' + theme[0] + '.css' + (/^[a-z0-9]+$/.test(v) ? '?v=' + v : '');
         document.head.appendChild(link);
       })();

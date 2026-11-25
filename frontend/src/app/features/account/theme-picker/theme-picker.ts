@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { ThemeId } from '@nri/shared';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { toApiError } from '../../../core/api/api-error';
 import { THEME_REGISTRY } from '../../../theming/theme.registry';
 import { ThemeService } from '../../../theming/theme.service';
@@ -19,6 +20,7 @@ import { ThemeService } from '../../../theming/theme.service';
 })
 export class ThemePicker {
   private readonly themes = inject(ThemeService);
+  private readonly auth = inject(AuthStore);
   private readonly registry = inject(THEME_REGISTRY);
 
   /** Дизайн, який зараз зберігається (позначений одразу, до відповіді сервера). */
@@ -42,6 +44,8 @@ export class ThemePicker {
       const { code } = toApiError(err);
       // 401 уже обробив authInterceptor.
       if (code !== 'UNAUTHENTICATED') this.errorKey.set(`errors.${code}`);
+      // Права на дизайн змінилися — оновлюємо користувача, щоб зник недоступний варіант.
+      if (code === 'THEME_NOT_AVAILABLE') await this.auth.load();
     } finally {
       // Успіх — чинний дизайн уже новий; помилка — повертається попередній.
       this.pending.set(null);

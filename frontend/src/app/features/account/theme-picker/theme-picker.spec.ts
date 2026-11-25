@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import type { ThemeId } from '@nri/shared';
 import uk from '../../../../assets/i18n/uk.json';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { ThemeService } from '../../../theming/theme.service';
 import { ThemePicker } from './theme-picker';
 
@@ -19,10 +20,17 @@ function fakeThemes(available: ThemeId[], current: ThemeId = 'quest-board') {
   };
 }
 
-async function render(themes: ReturnType<typeof fakeThemes>) {
+async function render(
+  themes: ReturnType<typeof fakeThemes>,
+  auth = { load: vi.fn(async () => {}) },
+) {
   await TestBed.configureTestingModule({
     imports: [ThemePicker],
-    providers: [provideTranslateService(), { provide: ThemeService, useValue: themes }],
+    providers: [
+      provideTranslateService(),
+      { provide: ThemeService, useValue: themes },
+      { provide: AuthStore, useValue: auth },
+    ],
   }).compileComponents();
   const translate = TestBed.inject(TranslateService);
   translate.setTranslation('uk', uk);
@@ -106,5 +114,20 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(byName(el, 'Класичний').getAttribute('aria-disabled')).toBeNull();
     const alert = el.querySelector('[role="alert"]');
     expect(alert?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
+  });
+
+  it.each([
+    ['THEME_NOT_AVAILABLE', 1],
+    ['FORBIDDEN', 0],
+  ])('помилка %s: оновлення користувача викликів — %i', async (code, calls) => {
+    const themes = fakeThemes(['quest-board', 'classic']);
+    themes.select.mockRejectedValue(
+      new HttpErrorResponse({ status: 403, error: { error: { code } } }),
+    );
+    const auth = { load: vi.fn(async () => {}) };
+    const fixture = await render(themes, auth);
+    byName(fixture.nativeElement, 'Класичний').click();
+    await fixture.whenStable();
+    expect(auth.load).toHaveBeenCalledTimes(calls);
   });
 });
