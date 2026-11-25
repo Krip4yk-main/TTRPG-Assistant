@@ -4,10 +4,10 @@ import type { AppDeps } from '../app.js';
 import { games, users } from '../db/schema/index.js';
 import { listedGamePredicate } from '../games/games.search.js';
 import { getPublicProfileHead } from '../profiles/profiles.service.js';
+import { truncateDescription } from './excerpt.js';
 
 const SITE_NAME = 'НРІ Асистент';
 const NEUTRAL_TITLE = SITE_NAME;
-const MAX_DESCRIPTION = 200;
 const SITEMAP_LIMIT = 50_000;
 const SITEMAP_KEY = 'seo:sitemap';
 const SITEMAP_TTL_SEC = 600;
@@ -23,16 +23,6 @@ const ESCAPES: Record<string, string> = {
 /** Екранування для HTML-тексту й атрибутів (і для XML). */
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
-}
-
-/** Опис ≤ 200 символів; довший обрізається по межі слова з «…». */
-export function truncateDescription(text: string, max = MAX_DESCRIPTION): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  if ([...flat].length <= max) return flat;
-  let cut = [...flat].slice(0, max - 1).join('');
-  const space = cut.lastIndexOf(' ');
-  if (space > 0) cut = cut.slice(0, space);
-  return `${cut.replace(/[\s,.;:!?-]+$/u, '')}…`;
 }
 
 type OgInput = {

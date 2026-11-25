@@ -634,7 +634,7 @@ describe('POST /api/games/search — gm_rating', () => {
     expect(byId.get(short)).toMatchObject({ summary: 'Готичний жах у тумані.' });
     const cut = (byId.get(long) as { summary: string }).summary;
     expect(cut.endsWith('слово…')).toBe(true);
-    expect(cut.length).toBeLessThanOrEqual(201);
+    expect([...cut].length).toBeLessThanOrEqual(200);
     expect(cut).not.toContain('кінець');
     expect(byId.get(empty)).toMatchObject({ summary: null });
     expect(byId.get(adult)).not.toHaveProperty('summary');

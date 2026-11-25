@@ -36,6 +36,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { publishedOverall, round1 } from '../ratings/ratings.aggregate.js';
+import { truncateDescription } from '../seo/excerpt.js';
 import {
   applyAgeRatingRaise,
   cancelPendingForGames,
@@ -309,31 +310,13 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
   };
 }
 
-/** Довжина короткого опису на картці (символів, без «…»). */
-const SUMMARY_MAX = 200;
-
-/**
- * Короткий опис для картки: опис одним рядком (переноси й повтори пробілів — один пробіл),
- * обрізаний до `max` символів по межі слова з «…». Порожній опис — `null`.
- */
-export function cardSummary(description: string, max: number = SUMMARY_MAX): string | null {
-  const flat = description.replace(/\s+/g, ' ').trim();
-  if (!flat) return null;
-  // Рахуємо кодові точки: обрізання не розриває емодзі чи інші сурогатні пари.
-  const chars = Array.from(flat);
-  if (chars.length <= max) return flat;
-  const cut = chars.slice(0, max).join('');
-  const space = cut.lastIndexOf(' ');
-  const head = space > max * 0.6 ? cut.slice(0, space) : cut;
-  return `${head.replace(/[\s.,;:!?–—-]+$/u, '')}…`;
-}
-
 export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
   const r = l.row;
   return {
     id: r.id,
     title: r.title,
-    summary: cardSummary(r.description),
+    // Короткий опис — той самий, що в meta description сторінки гри (≤ 200 символів з «…»).
+    summary: truncateDescription(r.description) || null,
     coverUrl: r.coverUrl,
     system: systemRef(l),
     systemOther: r.systemOther,
