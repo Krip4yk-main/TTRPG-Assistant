@@ -284,38 +284,71 @@ describe('QuestBoardGameCard — клік і відривання', () => {
       expect(navigate).not.toHaveBeenCalled();
     });
 
-    it('Esc чи дотик деінде повертають вкладку під аркуш', async () => {
+    it('клік по місцю вкладки (картинка вже виїхала наперед) лише перемикає її', async () => {
       await mount();
       const f = await create(8, { coverUrl: COVER });
       const host = attachment(f)!;
-      const button = host.querySelector('button')!;
-      click(button);
-      f.detectChanges();
-      button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      f.detectChanges();
-      expect(host.classList).not.toContain('front');
-      click(button);
-      f.detectChanges();
-      click(document.body);
-      f.detectChanges();
-      expect(host.classList).not.toContain('front');
-    });
-
-    it('фокус з клавіатури виносить вкладку наперед, втрата фокуса — повертає', async () => {
-      await mount();
-      const f = await create(8, { coverUrl: COVER });
-      const host = attachment(f)!;
-      const button = host.querySelector('button')!;
-      vi.spyOn(button, 'matches').mockImplementation((sel) => sel === ':focus-visible');
-      button.dispatchEvent(new FocusEvent('focus'));
+      const ev = click(host);
       f.detectChanges();
       expect(host.classList).toContain('front');
-      button.dispatchEvent(new FocusEvent('blur'));
+      expect(ev.defaultPrevented).toBe(false);
+      expect(article(f).classList).not.toContain('qb-tearing');
+      click(host);
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('Esc (фокус деінде) повертає вкладку й скасовує збільшення від наведення', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      click(host.querySelector('button')!);
+      f.detectChanges();
+      const hover = vi.spyOn(host, 'matches').mockImplementation((sel) => sel === ':hover');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      expect(host.classList).toContain('dismissed');
+      hover.mockRestore();
+      host.dispatchEvent(new MouseEvent('mouseleave'));
+      f.detectChanges();
+      expect(host.classList).not.toContain('dismissed');
+    });
+
+    it('дотик деінде повертає вкладку; дотик по ній самій — ні', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      click(button);
+      button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      f.detectChanges();
+      expect(host.classList).toContain('front');
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
       f.detectChanges();
       expect(host.classList).not.toContain('front');
     });
 
-    it('картинка не завантажилась — вкладку сховано', async () => {
+    it('фокус лише показує рамку; Enter / Space (клік кнопки) перемикає, втрата фокуса — повертає', async () => {
+      await mount();
+      const f = await create(8, { coverUrl: COVER });
+      const host = attachment(f)!;
+      const button = host.querySelector('button')!;
+      button.focus();
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+      expect(button.getAttribute('aria-pressed')).toBe('false');
+      click(button); // Enter / Space на кнопці = click
+      f.detectChanges();
+      expect(host.classList).toContain('front');
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      button.blur();
+      f.detectChanges();
+      expect(host.classList).not.toContain('front');
+    });
+
+    it('картинка не завантажилась — вкладку сховано; нова адреса — знову видно', async () => {
       await mount();
       const f = await create(8, { coverUrl: COVER });
       const host = attachment(f)!;
@@ -323,6 +356,15 @@ describe('QuestBoardGameCard — клік і відривання', () => {
       f.detectChanges();
       expect(host.classList).toContain('failed');
       expect(getComputedStyle(host).display).toBe('none');
+      f.componentRef.setInput(
+        'game',
+        toGameCardVm({ ...game, id: 8, coverUrl: 'https://example.com/other.png' }, null, {
+          guest: false,
+          genreKey: () => null,
+        }),
+      );
+      f.detectChanges();
+      expect(host.classList).not.toContain('failed');
     });
   });
 });

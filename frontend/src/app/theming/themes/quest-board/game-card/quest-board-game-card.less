@@ -3,7 +3,8 @@
 :host {
   position: relative;
   display: block;
-  height: 23.75rem;
+  // Та сама висота, від якої рахується клапоть під шпилькою (.qb-tear-stub).
+  height: var(--qb-notice-height);
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
 }
 
@@ -25,7 +26,8 @@ nri-qb-attachment {
 }
 
 // Вміст обрізається по коробці аркуша, а нерівний край пергаменту (шари на 6px назовні) —
-// ні (overflow-clip-margin).
+// ні (overflow-clip-margin). Без нього (Safari) — overflow: hidden, а шари пергаменту
+// всередині коробки (див. .qb-torn у quest-board.less).
 .note {
   position: relative;
   z-index: 1;
@@ -33,44 +35,53 @@ nri-qb-attachment {
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  overflow: clip;
-  overflow-clip-margin: 8px;
+  overflow: hidden;
   padding: 34px 24px 18px;
+  transform: var(--qb-tilt, none);
   transition: transform var(--nri-transition);
+}
+
+@supports (overflow-clip-margin: 8px) {
+  .note {
+    overflow: clip;
+    overflow-clip-margin: 8px;
+  }
 }
 
 // Нахил і невеликий зсув униз з набору — лише на ширших екранах і без prefers-reduced-motion.
 // Найбільший кут (1.5°) зсуває кути аркуша на ~5px; разом з краєм (6px), зсувом (до 10px) і
-// тінню це менше за проміжки сітки дизайну, тож сусіди не перекриваються.
+// тінню це менше за проміжки сітки дизайну, тож сусіди не перекриваються. Нахил — у змінній
+// --qb-tilt (див. .note): з неї ж починається анімація відривання (qb-tear), тож аркуш не
+// «стрибає».
 @media (min-width: 600.02px) and (prefers-reduced-motion: no-preference) {
   .note {
     &[data-tilt='0'] {
-      transform: rotate(-1.4deg);
+      --qb-tilt: rotate(-1.4deg);
     }
 
     &[data-tilt='1'] {
-      transform: rotate(1deg) translateY(10px);
+      --qb-tilt: rotate(1deg) translateY(10px);
     }
 
     &[data-tilt='2'] {
-      transform: rotate(-0.5deg);
+      --qb-tilt: rotate(-0.5deg);
     }
 
     &[data-tilt='3'] {
-      transform: rotate(1.5deg) translateY(4px);
+      --qb-tilt: rotate(1.5deg) translateY(4px);
     }
 
     &[data-tilt='4'] {
-      transform: rotate(-1deg) translateY(7px);
+      --qb-tilt: rotate(-1deg) translateY(7px);
     }
 
     &[data-tilt='5'] {
-      transform: rotate(0.6deg) translateY(2px);
+      --qb-tilt: rotate(0.6deg) translateY(2px);
     }
 
     &:hover,
     &:focus-within {
-      transform: none;
+      --qb-tilt: none;
     }
   }
 }

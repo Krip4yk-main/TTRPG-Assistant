@@ -11,9 +11,7 @@ import type { MyGameItemSlot } from '../../../slots';
 import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 import { LinePipe } from '../../../../core/i18n/line.pipe';
 import { QuestBoardAttachment } from '../attachment/quest-board-attachment';
-
-/** Скільки варіантів рваного обрису пергаменту (`data-paper`, як в оголошенні пошуку). */
-const PAPERS = 6;
+import { paperVariant } from '../paper';
 
 /**
  * Слот `my-game-item` дизайну «Дошка оголошень»: оголошення майстра без повороту — статус
@@ -38,8 +36,8 @@ export class QuestBoardMyGameItem implements MyGameItemSlot {
   readonly item = input.required<MyGameItemVm>();
   readonly busy = input(false);
   readonly action = output<MyGameActionEvent>();
-  /** Обрис пергаменту за id гри — стабільний між перерисовками. */
-  protected readonly paper = computed(() => Math.abs(this.item().id) % PAPERS);
+  /** Обрис пергаменту за id гри (спільне правило з оголошенням пошуку). */
+  protected readonly paper = computed(() => paperVariant(this.item().id));
 
   protected emit(a: MyGameActionVm): void {
     if (a.id !== 'edit') this.action.emit({ action: a.id });

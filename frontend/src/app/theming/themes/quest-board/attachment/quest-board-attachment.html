@@ -1,19 +1,10 @@
+<!-- Клік / Enter / Space по кнопці спливає до хоста, а той перемикає вкладку. -->
 <button
   type="button"
   class="attach"
   [attr.aria-label]="'questBoard.attachment.label' | translate: { title: title() }"
   [attr.aria-pressed]="front()"
-  (click)="toggle()"
-  (focus)="onFocus($event)"
-  (blur)="back()"
-  (keydown.escape)="back()"
-  (mouseleave)="back()"
+  (blur)="onBlur()"
 >
-  <img
-    [src]="src()"
-    alt=""
-    loading="lazy"
-    referrerpolicy="no-referrer"
-    (error)="failed.set(true)"
-  />
+  <img [src]="src()" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="onError()" />
 </button>
