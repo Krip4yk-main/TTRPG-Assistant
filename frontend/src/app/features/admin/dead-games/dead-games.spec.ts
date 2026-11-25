@@ -102,6 +102,9 @@ describe('AdminDeadGames', () => {
     expect(item.textContent).toContain('Гендальф');
     expect(item.textContent).toContain('admin.deadGames.deadAt');
     expect(item.textContent).toContain('games.status.started');
+    for (const b of item.querySelectorAll('.actions button')) {
+      expect(b.getAttribute('aria-label')).toContain('games.actions.aria');
+    }
   });
 
   it('the «suspicious» filter reloads the list', async () => {
@@ -142,6 +145,7 @@ describe('AdminDeadGames', () => {
     expect(req.request.body).toEqual({});
     req.flush({ ...deadGame, status: 'finished' });
     await gone(12);
+    await vi.waitFor(() => expect(document.activeElement).toBe(el.querySelector('.notice-area')));
   });
 
   it('dismissing sends the kind and the note', async () => {

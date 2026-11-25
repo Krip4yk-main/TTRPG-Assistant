@@ -1042,6 +1042,8 @@ export class GameForm {
   protected onUnblocked(): void {
     this.blockedBy.set(null);
     this.unblocked.set(true);
+    // Кнопки останньої гри зникли разом із поясненням — фокус на підказку.
+    this.focusNotice('.unblocked-notice');
   }
 
   /** Пояснення санкції — у live-регіоні; фокус на ньому, щоб його було видно й почуто. */

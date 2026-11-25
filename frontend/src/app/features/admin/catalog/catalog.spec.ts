@@ -241,6 +241,11 @@ describe('AdminCatalog', () => {
     expect(overlay().textContent).toContain('admin.catalog.enableTitle');
     dialogButton('admin.catalog.enable').click();
     await settle();
+    // Поки запит іде — інші дії з системами недоступні.
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(row(2).querySelector<HTMLButtonElement>('button.edit')!.disabled).toBe(true);
+    });
     // Діалог підтвердження закривається з анімацією.
     const req = await vi.waitFor(() => http.expectOne('/api/admin/catalog/systems/2'));
     expect(req.request.body).toEqual({ isActive: true });

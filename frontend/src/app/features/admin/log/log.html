@@ -22,7 +22,10 @@
         @if (e.targetUser) {
           <nri-admin-user-ref [user]="e.targetUser" />
         } @else {
-          {{ 'admin.log.target' | translate: { type: e.targetType, id: e.targetId } }}
+          {{
+            'admin.log.target'
+              | translate: { type: targetTypeLabel(e.targetType) | translate, id: e.targetId }
+          }}
         }
       </span>
       @if (e.reason) {

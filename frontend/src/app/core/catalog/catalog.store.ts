@@ -11,25 +11,38 @@ export class CatalogStore {
   private loading: Promise<void> | null = null;
   /** Каталог змінено в адмінці: наступний `load()` перечитає його (поточні дані лишаються). */
   private stale = false;
+  /** Зростає з кожним `invalidate()`: відповідь запиту, почату раніше, не знімає `stale`. */
+  private generation = 0;
+  private loadingGeneration = -1;
 
   readonly catalog = this.state.asReadonly();
 
   load(): Promise<void> {
     if (this.state() && !this.stale) return Promise.resolve();
-    this.loading ??= firstValueFrom(this.http.get<CatalogDto>('/api/catalog'))
+    if (this.loading && this.loadingGeneration === this.generation) return this.loading;
+    const generation = this.generation;
+    const request: Promise<void> = firstValueFrom(this.http.get<CatalogDto>('/api/catalog'))
       .then((dto) => {
-        this.state.set(dto);
-        this.stale = false;
+        if (generation === this.generation) {
+          this.state.set(dto);
+          this.stale = false;
+        } else if (!this.state()) {
+          // Дані до зміни — краще, ніж нічого; `stale` лишається, наступний load() перечитає.
+          this.state.set(dto);
+        }
       })
       .finally(() => {
-        this.loading = null;
+        if (this.loading === request) this.loading = null;
       });
-    return this.loading;
+    this.loading = request;
+    this.loadingGeneration = generation;
+    return request;
   }
 
   /** Каталог змінено (адмінка): наступний `load()` візьме свіжі дані. */
   invalidate(): void {
     this.stale = true;
+    this.generation++;
   }
 
   systemName(id: number): string | null {

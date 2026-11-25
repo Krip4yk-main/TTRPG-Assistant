@@ -58,6 +58,7 @@
             mat-stroked-button
             type="button"
             class="edit"
+            [disabled]="busyId() !== null"
             [attr.aria-label]="('admin.catalog.edit' | translate) + ': ' + s.name"
             (click)="edit(s)"
           >

@@ -27,6 +27,16 @@ const KNOWN_ACTIONS = new Set([
   'catalog.system_update',
 ]);
 
+/** Типи об'єктів журналу з перекладеною назвою; інші показуються як є. */
+const KNOWN_TARGET_TYPES = new Set([
+  'user',
+  'game',
+  'game_system',
+  'complaint',
+  'appeal',
+  'rating',
+]);
+
 /**
  * Журнал дій адміністрації (адмін і власник): хто, що, над ким/чим, коли й чому; новіші
  * першими, «Завантажити ще» — курсором.
@@ -45,6 +55,11 @@ export class AdminLog {
 
   constructor() {
     void this.list.reload();
+  }
+
+  /** Ключ i18n типу об'єкта; невідомий тип — сам код (переклад його не знайде й покаже як є). */
+  protected targetTypeLabel(type: string): string {
+    return KNOWN_TARGET_TYPES.has(type) ? `admin.log.targetTypes.${type}` : type;
   }
 
   /** Ключ i18n назви дії або `null` (невідома — показати код). */

@@ -300,6 +300,10 @@ describe('GameForm', () => {
       expect(el.querySelector('.unblocked-notice')!.textContent).toContain(
         'games.dead.blocked.unblocked',
       );
+      // Кнопки останньої гри зникли — фокус на підказці.
+      await vi.waitFor(() =>
+        expect(document.activeElement).toBe(el.querySelector('.unblocked-notice')),
+      );
 
       await submit();
       http.expectOne('/api/games').flush(game());

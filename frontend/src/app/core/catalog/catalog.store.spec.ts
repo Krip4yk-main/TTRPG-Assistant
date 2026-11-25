@@ -94,6 +94,22 @@ describe('CatalogStore', () => {
     await store.load();
   });
 
+  it('a load started before invalidate() does not clear the stale mark', async () => {
+    const first = store.load();
+    store.invalidate();
+    const second = store.load();
+    const [old, fresh] = http.match('/api/catalog');
+    old!.flush(catalogFixture);
+    await first;
+    // Дані до зміни показуємо, але свіжий запит ще чекаємо.
+    expect(store.catalog()).toEqual(catalogFixture);
+    const changed = { ...catalogFixture, systems: [] };
+    fresh!.flush(changed);
+    await second;
+    expect(store.catalog()).toEqual(changed);
+    await store.load();
+  });
+
   it('uk.json has a translation for every genre, warning label and hint', () => {
     const t = uk as unknown as {
       genres: Record<string, string>;

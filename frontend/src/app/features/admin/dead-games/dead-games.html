@@ -14,7 +14,7 @@
   </mat-button-toggle-group>
 </div>
 
-<div class="notice-area" aria-live="polite">
+<div class="notice-area" tabindex="-1" aria-live="polite">
   @if (notice(); as key) {
     <p class="nri-notice">{{ key | translate }}</p>
   }
@@ -56,10 +56,28 @@
         </div>
       </dl>
       <div class="actions">
-        <button mat-stroked-button type="button" class="dismiss" (click)="dismiss(g)">
+        <button
+          mat-stroked-button
+          type="button"
+          class="dismiss"
+          [attr.aria-label]="
+            'games.actions.aria'
+              | translate: { action: ('admin.deadGames.dismiss' | translate), title: g.title }
+          "
+          (click)="dismiss(g)"
+        >
           {{ 'admin.deadGames.dismiss' | translate }}
         </button>
-        <button mat-stroked-button type="button" class="close-game danger" (click)="close(g)">
+        <button
+          mat-stroked-button
+          type="button"
+          class="close-game danger"
+          [attr.aria-label]="
+            'games.actions.aria'
+              | translate: { action: ('admin.deadGames.close' | translate), title: g.title }
+          "
+          (click)="close(g)"
+        >
           {{ 'admin.deadGames.close' | translate }}
         </button>
       </div>

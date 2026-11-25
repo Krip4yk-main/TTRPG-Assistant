@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -38,6 +46,8 @@ import { AdminUserRef } from '../user-ref/user-ref';
 export class AdminDeadGames {
   private readonly api = inject(AdminApi);
   private readonly dialog = inject(MatDialog);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly kinds = DEAD_GAME_KINDS;
   protected readonly kind = signal<DeadGameKind>('dead');
@@ -92,5 +102,10 @@ export class AdminDeadGames {
     if (!saved) return;
     this.notice.set(saved instanceof DialogConflict ? `errors.${saved.code}` : null);
     this.list.remove(g);
+    // Кнопка, з якої відкрили діалог, зникла разом із грою — фокус на область повідомлень.
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('.notice-area')?.focus(),
+      { injector: this.injector },
+    );
   }
 }
