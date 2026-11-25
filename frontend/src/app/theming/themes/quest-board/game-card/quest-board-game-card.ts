@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   inject,
   input,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationStart, Router, RouterLink } from '@angular/router';
+import { filter } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { BadgeVm, GameCardVm } from '../../../../core/games/game-card.vm';
@@ -26,6 +29,12 @@ const MAX_STAMPS = 3;
 export const TEAR_MS = 520;
 /** Інтерактивні елементи всередині оголошення мають власну дію — клік по них не відкриває гру. */
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"]';
+
+/**
+ * Оголошення, що зараз відривається (одне на сторінку): клік по іншому, поки триває анімація,
+ * нічого не робить — інакше перейшли б обидва.
+ */
+let activeTear: symbol | null = null;
 
 /**
  * Слот `game-card` дизайну «Дошка оголошень»: оголошення, приколоте шпилькою до стіни.
@@ -71,6 +80,7 @@ export class QuestBoardGameCard implements GameCardSlot {
   });
 
   private readonly router = inject(Router);
+  private readonly host: HTMLElement = inject(ElementRef).nativeElement;
   private readonly themes = inject(ThemeService);
   protected readonly gameUrl = computed(() => `/games/${this.game().id}`);
   /** Анімацію ввімкнено в профілі (гість — так): тоді й текст оголошення не виділяється. */
@@ -78,12 +88,21 @@ export class QuestBoardGameCard implements GameCardSlot {
   protected readonly tearing = signal(false);
   /** Перехід уже почався — повторний клік (подвійний) нічого не робить. */
   private leaving = false;
+  /** Позначка цього оголошення для `activeTear`. */
+  private readonly tearToken = Symbol('tear');
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => {
-      if (this.timer) clearTimeout(this.timer);
-    });
+    inject(DestroyRef).onDestroy(() => this.reset());
+    // Інший перехід (назад, посилання в шапці) під час анімації — скасовуємо свій.
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationStart),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        if (this.timer) this.reset();
+      });
   }
 
   protected onCardClick(event: MouseEvent): void {
@@ -93,14 +112,18 @@ export class QuestBoardGameCard implements GameCardSlot {
     const target = event.target as Element;
     const interactive = target.closest(INTERACTIVE);
     if (interactive && !interactive.classList.contains('open')) return;
-    // Виділення тексту (анімацію вимкнено, щоб копіювати) — не перехід.
-    if (!interactive && document.getSelection()?.toString()) return;
+    // Користувач виділяє текст цього оголошення (лише коли анімацію вимкнено — інакше текст
+    // не виділяється) — не перехід. Виділення деінде на сторінці кліку не заважає.
+    if (!interactive && !this.tearEnabled()) {
+      const sel = document.getSelection();
+      if (sel?.toString() && sel.anchorNode && this.host.contains(sel.anchorNode)) return;
+    }
     event.preventDefault();
     this.open();
   }
 
   private open(): void {
-    if (this.leaving) return;
+    if (this.leaving || activeTear) return;
     this.leaving = true;
     const reduced =
       typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -108,18 +131,29 @@ export class QuestBoardGameCard implements GameCardSlot {
       this.navigate();
       return;
     }
+    activeTear = this.tearToken;
     this.tearing.set(true);
     this.timer = setTimeout(() => this.navigate(), TEAR_MS);
   }
 
   private navigate(): void {
     this.timer = null;
-    void this.router.navigateByUrl(this.gameUrl()).then((ok) => {
-      // Перехід скасовано (guard) — оголошення повертається на місце.
-      if (!ok) {
-        this.leaving = false;
-        this.tearing.set(false);
-      }
-    });
+    // Перехід скасовано (guard) чи впав — оголошення повертається на місце, а не лишається
+    // «відірваним».
+    this.router.navigateByUrl(this.gameUrl()).then(
+      (ok) => {
+        if (!ok) this.reset();
+      },
+      () => this.reset(),
+    );
+  }
+
+  /** Повернути оголошення на місце й звільнити «одне відривання на сторінку». */
+  private reset(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.leaving = false;
+    this.tearing.set(false);
+    if (activeTear === this.tearToken) activeTear = null;
   }
 }

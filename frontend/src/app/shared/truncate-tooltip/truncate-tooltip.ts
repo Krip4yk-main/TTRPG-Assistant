@@ -43,8 +43,11 @@ export class TruncateTooltip {
   private readonly el: HTMLElement = inject(ElementRef).nativeElement;
   private readonly tooltip = inject(MatTooltip);
   private readonly injector = inject(Injector);
-  /** Чи елемент фокусується сам (тоді tabindex не чіпаємо). */
-  private readonly ownFocus = this.el.matches(FOCUSABLE);
+  /**
+   * Чи елемент фокусується сам (тоді tabindex не чіпаємо). Визначається при першій перевірці,
+   * а не в конструкторі: прив'язки (`[attr.href]`) на той момент ще не застосовані.
+   */
+  private ownFocus: boolean | null = null;
 
   constructor() {
     this.tooltip.touchGestures = 'off';
@@ -70,6 +73,7 @@ export class TruncateTooltip {
     const slack = parseFloat(getComputedStyle(this.el).lineHeight) / 2 || 4;
     const truncated = scrollWidth > clientWidth + 1 || scrollHeight > clientHeight + slack;
     this.tooltip.disabled = !truncated;
+    this.ownFocus ??= this.el.matches(FOCUSABLE);
     if (this.ownFocus) return;
     if (truncated) this.el.setAttribute('tabindex', '0');
     else this.el.removeAttribute('tabindex');

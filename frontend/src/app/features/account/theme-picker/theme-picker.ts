@@ -53,6 +53,9 @@ export class ThemePicker {
   protected readonly errorKey = signal<string | null>(null);
 
   protected async setTearAnimation(on: boolean): Promise<void> {
+    // Поки зберігається, перемикач лише «вимкнений» на вигляд (disabledInteractive — фокус
+    // лишається на ньому).
+    if (this.prefsBusy()) return;
     this.errorKey.set(null);
     this.prefsBusy.set(true);
     try {

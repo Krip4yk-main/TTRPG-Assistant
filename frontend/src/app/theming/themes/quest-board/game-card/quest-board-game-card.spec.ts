@@ -36,6 +36,8 @@ const game = {
 describe('QuestBoardGameCard — клік і відривання', () => {
   let navigate: ReturnType<typeof vi.fn<(url: unknown) => Promise<boolean>>>;
   let reducedMotion = false;
+  /** Справжній перехід роутера (до підміни шпигуном). */
+  let realNavigate: (url: string) => Promise<boolean>;
 
   async function mount(prefs: UiPrefsDto = { tearAnimation: true }) {
     await TestBed.configureTestingModule({
@@ -51,14 +53,22 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     t.setTranslation('uk', uk);
     t.use('uk');
     navigate = vi.fn<(url: unknown) => Promise<boolean>>(async () => true);
-    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockImplementation((url) => navigate(url));
+    const router = TestBed.inject(Router);
+    realNavigate = router.navigateByUrl.bind(router);
+    vi.spyOn(router, 'navigateByUrl').mockImplementation((url) => navigate(url));
+    return create();
+  }
+
+  /** Ще одне оголошення на тій самій «сторінці». */
+  async function create(id = game.id) {
     const fixture = TestBed.createComponent(QuestBoardGameCard);
     fixture.componentRef.setInput(
       'game',
-      toGameCardVm(game, null, { guest: false, genreKey: () => null }),
+      toGameCardVm({ ...game, id }, null, { guest: false, genreKey: () => null }),
     );
     fixture.detectChanges();
     await fixture.whenStable();
+    document.body.appendChild(fixture.nativeElement);
     return fixture;
   }
 
@@ -86,7 +96,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('клік по аркушу: спершу анімація відривання, потім перехід на гру', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     click(article(f).querySelector('.sys')!);
     f.detectChanges();
     expect(article(f).classList).toContain('qb-tearing');
@@ -98,7 +108,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('подвійний клік — один перехід', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     click(article(f));
     click(article(f));
     vi.advanceTimersByTime(TEAR_MS * 2);
@@ -107,7 +117,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('назва (і Enter на ній) — та сама анімація замість звичайного переходу посилання', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const link = article(f).querySelector<HTMLAnchorElement>('h2 a')!;
     expect(link.getAttribute('href')).toBe('/games/7');
     const ev = click(link, { detail: 0 });
@@ -159,6 +169,67 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     navigate.mockResolvedValueOnce(false);
     click(article(f));
     await f.whenStable();
+    click(article(f));
+    expect(navigate).toHaveBeenCalledTimes(2);
+  });
+
+  it('виділення тексту деінде на сторінці не блокує клік по оголошенню', async () => {
+    const f = await mount();
+    const outside = document.createElement('p');
+    outside.textContent = 'Заголовок сторінки';
+    document.body.appendChild(outside);
+    document.getSelection()!.selectAllChildren(outside);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    click(article(f));
+    vi.advanceTimersByTime(TEAR_MS);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
+    document.getSelection()!.removeAllRanges();
+    outside.remove();
+  });
+
+  it('анімацію вимкнено й виділено текст цього оголошення — клік не відкриває гру', async () => {
+    const f = await mount({ tearAnimation: false });
+    document.getSelection()!.selectAllChildren(article(f).querySelector('.sys')!);
+    click(article(f).querySelector('.sys')!);
+    expect(navigate).not.toHaveBeenCalled();
+    document.getSelection()!.removeAllRanges();
+  });
+
+  it('два оголошення поспіль під час анімації — перехід лише на перше', async () => {
+    const f = await mount();
+    const other = await create(8);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    click(article(f));
+    click(article(other));
+    vi.advanceTimersByTime(TEAR_MS * 2);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
+    other.detectChanges();
+    expect(article(other).classList).not.toContain('qb-tearing');
+  });
+
+  it('інший перехід під час анімації скасовує відривання й повертає аркуш', async () => {
+    const f = await mount();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    click(article(f));
+    // Справжній перехід деінде (маршрутів у тесті немає — він завершиться помилкою, але
+    // NavigationStart уже прозвучить).
+    await realNavigate('/calendar').catch(() => false);
+    vi.advanceTimersByTime(TEAR_MS);
+    expect(navigate).not.toHaveBeenCalled();
+    f.detectChanges();
+    expect(article(f).classList).not.toContain('qb-tearing');
+    // Можна відкрити знову — блокування «одне відривання» знято.
+    click(article(f));
+    vi.advanceTimersByTime(TEAR_MS);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
+  });
+
+  it('помилка переходу — аркуш повертається на місце, клік працює знову', async () => {
+    const f = await mount({ tearAnimation: false });
+    navigate.mockRejectedValueOnce(new Error('chunk load failed'));
+    click(article(f));
+    await f.whenStable();
+    await Promise.resolve();
     click(article(f));
     expect(navigate).toHaveBeenCalledTimes(2);
   });

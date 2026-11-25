@@ -90,6 +90,33 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(tearSwitch(fixture.nativeElement)?.getAttribute('aria-checked')).toBe('false');
   });
 
+  it('поки налаштування зберігається, перемикач лишається у фокусі (aria-disabled)', async () => {
+    const themes = fakeThemes(['quest-board']);
+    let done!: () => void;
+    themes.saveUiPrefs.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          done = resolve;
+        }),
+    );
+    const fixture = await render(themes);
+    const el: HTMLElement = fixture.nativeElement;
+    document.body.appendChild(el);
+    const sw = tearSwitch(el)!;
+    sw.focus();
+    sw.click();
+    fixture.detectChanges();
+    expect(sw.hasAttribute('disabled')).toBe(false);
+    expect(sw.getAttribute('aria-disabled')).toBe('true');
+    expect(document.activeElement).toBe(sw);
+    // Повторний клік під час збереження нічого не надсилає.
+    sw.click();
+    expect(themes.saveUiPrefs).toHaveBeenCalledTimes(1);
+    done();
+    await fixture.whenStable();
+    el.remove();
+  });
+
   it('помилка збереження анімації — повідомлення й попередній стан перемикача', async () => {
     const themes = fakeThemes(['quest-board']);
     themes.saveUiPrefs.mockRejectedValue(

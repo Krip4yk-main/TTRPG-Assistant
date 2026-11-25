@@ -32,6 +32,7 @@
           #tearToggle
           [checked]="tearAnimation()"
           [disabled]="prefsBusy()"
+          disabledInteractive
           aria-describedby="tear-animation-hint"
           (change)="setTearAnimation($event.checked)"
           >{{ 'account.theme.tearAnimation' | translate }}</mat-slide-toggle
