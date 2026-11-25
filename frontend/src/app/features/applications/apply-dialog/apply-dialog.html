@@ -129,7 +129,7 @@
 
     <div aria-live="assertive">
       @if (sanction(); as details) {
-        <nri-sanction-active-notice [details]="details" />
+        <nri-sanction-active-notice [details]="details" (navigated)="cancel()" />
       } @else if (error(); as key) {
         <p class="nri-alert" role="alert">{{ key | translate }}</p>
       }

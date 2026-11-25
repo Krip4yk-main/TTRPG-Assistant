@@ -6,6 +6,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import type { AppealDto, SanctionAppealStatus } from '@nri/shared';
 import { AdminApi } from '../../../core/moderation/admin.api';
 import { AdminDatePipe } from '../admin-date.pipe';
+import { DialogConflict } from '../dialog-conflict';
 import { openTextDialog } from '../dialogs';
 import { Paged } from '../paged';
 import { AdminPager } from '../pager/pager';
@@ -51,6 +52,8 @@ export class AdminAppeals {
     return this.api.appeals(f === 'all' ? null : f, cursor);
   });
   protected readonly migrated = isMigratedDecision;
+  /** Повідомлення після 409 (апеляцію вже вирішено) — ключ i18n. */
+  protected readonly notice = signal<string | null>(null);
 
   constructor() {
     void this.list.reload();
@@ -59,6 +62,7 @@ export class AdminAppeals {
   protected setFilter(f: Filter): void {
     if (f === this.filter()) return;
     this.filter.set(f);
+    this.notice.set(null);
     void this.list.reload();
   }
 
@@ -72,6 +76,12 @@ export class AdminAppeals {
       danger: !accept,
       submit: (note) => this.api.decideAppeal(a.id, { accept, note }),
     });
-    if (saved) this.list.replace(saved);
+    if (saved instanceof DialogConflict) {
+      this.notice.set(`errors.${saved.code}`);
+      await this.list.reload();
+    } else if (saved) {
+      this.notice.set(null);
+      this.list.replace(saved);
+    }
   }
 }

@@ -14,6 +14,12 @@
   </mat-button-toggle-group>
 </div>
 
+<div class="notice-area" aria-live="polite">
+  @if (notice(); as key) {
+    <p class="nri-notice">{{ key | translate }}</p>
+  }
+</div>
+
 <ul class="list">
   @for (c of items(); track c.id) {
     <li class="nri-card item complaint" [attr.data-complaint]="c.id">
@@ -62,10 +68,12 @@
           <button mat-stroked-button type="button" class="dismiss" (click)="dismiss(c)">
             {{ 'admin.complaints.dismiss' | translate }}
           </button>
-          <button mat-flat-button type="button" class="take-action" (click)="action(c)">
-            <mat-icon aria-hidden="true">gavel</mat-icon>
-            {{ 'admin.complaints.action' | translate }}
-          </button>
+          @if (actionTypes(c) !== null) {
+            <button mat-flat-button type="button" class="take-action" (click)="action(c)">
+              <mat-icon aria-hidden="true">gavel</mat-icon>
+              {{ 'admin.complaints.action' | translate }}
+            </button>
+          }
         </div>
       }
     </li>

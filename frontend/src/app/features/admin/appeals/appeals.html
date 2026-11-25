@@ -14,6 +14,12 @@
   </mat-button-toggle-group>
 </div>
 
+<div class="notice-area" aria-live="polite">
+  @if (notice(); as key) {
+    <p class="nri-notice">{{ key | translate }}</p>
+  }
+</div>
+
 <ul class="list">
   @for (a of list.items(); track a.id) {
     <li class="nri-card item appeal" [attr.data-appeal]="a.id">

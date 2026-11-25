@@ -78,11 +78,11 @@ export class AdminRoles {
     null,
   );
 
-  constructor() {
-    void this.list.reload();
-  }
+  /** Список з'являється після першого пошуку (до того — підказка). */
+  protected readonly searched = signal(false);
 
   protected search(): void {
+    this.searched.set(true);
     this.q.set(this.query.value.trim());
     this.picked.set({});
     this.notice.set(null);

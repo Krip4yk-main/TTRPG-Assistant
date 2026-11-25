@@ -16,6 +16,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { MODERATION_TEXT_MAX } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
+import { DialogConflict } from '../dialog-conflict';
 
 /** Ключі i18n і запит діалогу «дія з приміткою/причиною». */
 export interface TextDialogData {
@@ -86,7 +87,12 @@ export class TextDialog {
     try {
       this.ref.close(await firstValueFrom(this.data.submit(text || undefined)));
     } catch (err) {
-      const { code } = toApiError(err);
+      const { status, code } = toApiError(err);
+      if (status === 409) {
+        // Застарілий стан (уже розглянуто/знято) — закриваємо, сторінка перечитає дані.
+        this.ref.close(new DialogConflict(code));
+        return;
+      }
       if (code !== 'UNAUTHENTICATED') this.error.set(`errors.${code}`);
       this.submitting.set(false);
     }

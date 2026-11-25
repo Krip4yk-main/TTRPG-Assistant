@@ -7,6 +7,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import type { AdminRatingDto, AdminRatingFilter, RatingCriterion } from '@nri/shared';
 import { AdminApi } from '../../../core/moderation/admin.api';
 import { AdminDatePipe } from '../admin-date.pipe';
+import { DialogConflict } from '../dialog-conflict';
 import { openTextDialog } from '../dialogs';
 import { Paged } from '../paged';
 import { AdminPager } from '../pager/pager';
@@ -42,6 +43,9 @@ export class AdminRatings {
     this.api.ratings(this.filter(), cursor),
   );
 
+  /** Повідомлення після 409 (оцінку вже модерував хтось інший) — ключ i18n. */
+  protected readonly notice = signal<string | null>(null);
+
   constructor() {
     void this.list.reload();
   }
@@ -49,6 +53,7 @@ export class AdminRatings {
   protected setFilter(f: AdminRatingFilter): void {
     if (f === this.filter()) return;
     this.filter.set(f);
+    this.notice.set(null);
     void this.list.reload();
   }
 
@@ -69,7 +74,7 @@ export class AdminRatings {
       danger: true,
       submit: (reason) => this.api.hideRatingText(r.id, reason ?? ''),
     });
-    if (saved) this.list.remove(r);
+    this.settle(r, saved);
   }
 
   protected async cancel(r: AdminRatingDto): Promise<void> {
@@ -82,6 +87,13 @@ export class AdminRatings {
       danger: true,
       submit: (reason) => this.api.cancelRating(r.id, reason ?? ''),
     });
-    if (saved) this.list.remove(r);
+    this.settle(r, saved);
+  }
+
+  /** Після дії (чи 409 — уже модеровано) оцінка зникає з черги. */
+  private settle(r: AdminRatingDto, saved: AdminRatingDto | DialogConflict | undefined): void {
+    if (!saved) return;
+    this.notice.set(saved instanceof DialogConflict ? `errors.${saved.code}` : null);
+    this.list.remove(r);
   }
 }

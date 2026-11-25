@@ -7,6 +7,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { TranslatePipe } from '@ngx-translate/core';
 import { AuthStore } from '../../core/auth/auth.store';
+import { isStaff } from '../../core/auth/roles';
 import { type ViewMode, ViewModeStore } from '../../core/view-mode/view-mode.store';
 import { UserName } from '../../shared/user-name/user-name';
 import { NotificationBell } from '../../features/notifications/notification-bell/notification-bell';
@@ -39,10 +40,9 @@ export class Shell {
   protected readonly viewMode = inject(ViewModeStore);
   private readonly router = inject(Router);
   /** Персонал (модератор і вище) бачить у меню «Адмінку». */
-  protected readonly isStaff = computed(() => {
-    const role = this.auth.me()?.role;
-    return this.auth.isActive() && !!role && role !== 'user';
-  });
+  protected readonly isStaff = computed(
+    () => this.auth.isActive() && isStaff(this.auth.me()?.role),
+  );
 
   protected setMode(mode: ViewMode): void {
     this.viewMode.setMode(mode);

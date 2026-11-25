@@ -173,7 +173,7 @@ describe('MySanctions', () => {
     await settle();
     http.expectOne('/api/me/sanctions').flush([{ ...limit, appealStatus: 'pending' }]);
     await settle();
-    expect(el.querySelector('.notice-area')!.textContent).toContain('errors.APPEAL_EXISTS');
+    expect(el.querySelector('.notice-area')!.textContent).toContain('moderation.my.appealExists');
     expect(el.querySelector('form')).toBeNull();
     expect(card(4).querySelector('.appeal-status')!.textContent).toContain(
       'moderation.appealStatus.pending',

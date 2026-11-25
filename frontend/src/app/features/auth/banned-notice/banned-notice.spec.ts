@@ -97,7 +97,9 @@ describe('BannedNotice', () => {
     'shows the appeal status «%s» from the login details',
     async (status) => {
       await create(true, status);
-      expect(stateTitle()).toBe('banned.sent.title');
+      expect(stateTitle()).toBe(
+        status === 'pending' ? 'banned.sent.title' : 'banned.sent.decidedTitle',
+      );
       const line = el.querySelector('.appeal-status')!;
       expect(line.getAttribute('data-status')).toBe(status);
       expect(line.textContent).toContain(`banned.status.${status}`);

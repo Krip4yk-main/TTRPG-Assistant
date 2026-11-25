@@ -47,7 +47,7 @@ describe('ApplyDialog', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService(),
-        provideRouter([]),
+        provideRouter([{ path: '**', children: [] }]),
         { provide: MAT_DIALOG_DATA, useValue: d },
         { provide: MatDialogRef, useValue: { close } },
       ],
@@ -188,8 +188,13 @@ describe('ApplyDialog', () => {
     expect(notice.textContent).toContain('moderation.sanctionActive.no_paid_apply');
     expect(notice.textContent).toContain('moderation.sanctionActive.until');
     expect(notice.textContent).not.toContain('errors.SANCTION_ACTIVE');
-    expect(notice.querySelector('a')!.getAttribute('href')).toBe('/my-sanctions');
+    const link = notice.querySelector<HTMLAnchorElement>('a')!;
+    expect(link.getAttribute('href')).toBe('/my-sanctions');
     expect(close).not.toHaveBeenCalled();
+    // Перехід до подробиць закриває діалог (інакше сторінка відкрилася б під ним).
+    link.click();
+    await settle();
+    expect(close).toHaveBeenCalledWith();
   });
 
   it('409 SANCTION_ACTIVE without an end date says the restriction is permanent', async () => {
@@ -197,14 +202,12 @@ describe('ApplyDialog', () => {
     await accept();
     await type('textarea.answer', 'Багато');
     await submit();
-    http
-      .expectOne('/api/games/7/applications')
-      .flush(
-        {
-          error: { code: 'SANCTION_ACTIVE', details: { type: 'application_limit', endsAt: null } },
-        },
-        { status: 409, statusText: 'Conflict' },
-      );
+    http.expectOne('/api/games/7/applications').flush(
+      {
+        error: { code: 'SANCTION_ACTIVE', details: { type: 'application_limit', endsAt: null } },
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
     await settle();
     const text = el.querySelector('.sanction-active')!.textContent!;
     expect(text).toContain('moderation.sanctionActive.application_limit');

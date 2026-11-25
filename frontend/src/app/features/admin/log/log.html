@@ -1,9 +1,16 @@
 <ul class="list log">
   @for (e of list.items(); track e.id) {
     <li class="nri-card entry" [attr.data-entry]="e.id">
-      <span class="when nri-muted">{{ e.createdAt | adminDate }}</span>
-      <span class="actor"><nri-admin-user-ref [user]="e.actor" /></span>
+      <span class="when nri-muted"
+        ><span class="nri-visually-hidden">{{ 'admin.log.labels.when' | translate }}: </span
+        >{{ e.createdAt | adminDate }}</span
+      >
+      <span class="actor"
+        ><span class="nri-visually-hidden">{{ 'admin.log.labels.actor' | translate }}: </span
+        ><nri-admin-user-ref [user]="e.actor"
+      /></span>
       <span class="action">
+        <span class="nri-visually-hidden">{{ 'admin.log.labels.action' | translate }}: </span>
         @if (actionKey(e.action); as key) {
           {{ key | translate }}
         } @else {
@@ -11,6 +18,7 @@
         }
       </span>
       <span class="target">
+        <span class="nri-visually-hidden">{{ 'admin.log.labels.target' | translate }}: </span>
         @if (e.targetUser) {
           <nri-admin-user-ref [user]="e.targetUser" />
         } @else {
@@ -18,7 +26,10 @@
         }
       </span>
       @if (e.reason) {
-        <p class="reason">{{ e.reason }}</p>
+        <p class="reason">
+          <span class="nri-visually-hidden">{{ 'admin.log.labels.reason' | translate }}: </span
+          >{{ e.reason }}
+        </p>
       }
     </li>
   }

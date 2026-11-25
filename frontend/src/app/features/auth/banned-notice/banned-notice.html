@@ -50,7 +50,10 @@
       @case ('sent') {
         <div class="result sent">
           <h2 class="state-title" #stateTitle tabindex="-1">
-            {{ 'banned.sent.title' | translate }}
+            {{
+              (status() === 'pending' ? 'banned.sent.title' : 'banned.sent.decidedTitle')
+                | translate
+            }}
           </h2>
           <p class="appeal-status" [attr.data-status]="status()">
             {{ 'banned.status.' + status() | translate }}

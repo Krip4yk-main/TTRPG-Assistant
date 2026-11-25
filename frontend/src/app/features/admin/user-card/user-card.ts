@@ -20,6 +20,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { canActOn, roleAtLeast } from '../../../core/auth/roles';
 import { AdminApi } from '../../../core/moderation/admin.api';
 import { AdminDatePipe } from '../admin-date.pipe';
+import { DialogConflict } from '../dialog-conflict';
 import { openSanctionDialog, openTextDialog } from '../dialogs';
 import { AdminUserRef } from '../user-ref/user-ref';
 
@@ -102,7 +103,9 @@ export class AdminUserCard {
       submit: (input) => this.api.impose(u.publicId, input),
     });
     if (!saved) return;
-    this.notice.set('admin.users.imposed');
+    this.notice.set(
+      saved instanceof DialogConflict ? `errors.${saved.code}` : 'admin.users.imposed',
+    );
     await this.load(u.publicId, true);
   }
 
@@ -118,7 +121,9 @@ export class AdminUserCard {
       submit: (note) => this.api.lift(s.id, note),
     });
     if (!saved) return;
-    this.notice.set('admin.users.lifted');
+    this.notice.set(
+      saved instanceof DialogConflict ? `errors.${saved.code}` : 'admin.users.lifted',
+    );
     await this.load(u.publicId, true);
   }
 

@@ -27,9 +27,9 @@
       </a>
       @if (opts.length) {
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="role-field">
-          <mat-label>{{ 'admin.roles.role' | translate }}</mat-label>
           <mat-select
             class="role-select"
+            [aria-label]="'admin.roles.roleFor' | translate: { name: u.nickname || u.publicId }"
             [value]="selected(u)"
             (selectionChange)="pick(u, $event.value)"
           >
@@ -69,4 +69,8 @@
     </li>
   }
 </ul>
-<nri-admin-pager [list]="list" emptyKey="admin.users.empty" />
+@if (searched()) {
+  <nri-admin-pager [list]="list" emptyKey="admin.users.empty" />
+} @else {
+  <p class="nri-muted search-hint">{{ 'admin.roles.searchHint' | translate }}</p>
+}

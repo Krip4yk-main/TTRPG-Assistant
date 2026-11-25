@@ -6,6 +6,8 @@
     {{ 'moderation.sanctionActive.forever' | translate }}
   }
   @if (link()) {
-    <a routerLink="/my-sanctions">{{ 'moderation.sanctionActive.link' | translate }}</a>
+    <a routerLink="/my-sanctions" (click)="navigated.emit()">{{
+      'moderation.sanctionActive.link' | translate
+    }}</a>
   }
 </p>

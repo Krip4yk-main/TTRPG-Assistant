@@ -128,7 +128,7 @@ export class MySanctions {
       const { code } = toApiError(err);
       if (code === 'APPEAL_EXISTS' || code === 'SANCTION_NOT_ACTIVE') {
         this.openId.set(null);
-        this.notice.set(`errors.${code}`);
+        this.notice.set(code === 'APPEAL_EXISTS' ? 'moderation.my.appealExists' : `errors.${code}`);
         await this.store.refresh();
         this.focus('.notice-area');
       } else if (code !== 'UNAUTHENTICATED') {
