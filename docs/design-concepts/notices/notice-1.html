@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><title>Листи — 1 — старий пергамент</title>
+<link href="https://fonts.googleapis.com/css2?family=Kurale&family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{width:1440px;height:760px;overflow:hidden;font:15px/1.5 Literata,serif;color:#2B1E14;background-color:#2A1B10;
+background-image:radial-gradient(ellipse 70% 55% at 50% -5%,rgba(255,190,100,.24),rgba(255,160,70,.08) 45%,transparent 70%),radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(0,0,0,.55) 100%),repeating-linear-gradient(90deg,rgba(0,0,0,.6) 0 2px,rgba(255,210,160,.08) 2px 3px,transparent 3px 140px),repeating-linear-gradient(90deg,rgba(255,200,140,.04) 0 140px,rgba(0,0,0,.12) 140px 280px,transparent 280px 420px),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='1200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.11 0.005' numOctaves='4' stitchTiles='stitch' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.03 0 0 0 0 0.01 0 0 0 1.2 -0.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),linear-gradient(#3A2616,#1E130B)}
+h1{font:44px Kurale;color:#F3E3B5;text-shadow:0 2px 0 #000;padding:36px 60px 6px}
+.tag{position:absolute;right:60px;top:40px;background:#EADFC4;padding:8px 16px;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,.4)}
+.board{display:grid;grid-template-columns:repeat(4,300px);gap:32px;padding:30px 60px;justify-content:center}
+.card{position:relative;height:380px;filter:drop-shadow(0 14px 16px rgba(0,0,0,.5))}
+.card:nth-child(1){transform:rotate(-1.4deg)}.card:nth-child(2){transform:rotate(1deg) translateY(10px)}.card:nth-child(3){transform:rotate(-.5deg)}.card:nth-child(4){transform:rotate(1.5deg) translateY(4px)}
+.paper{position:absolute;inset:0;background:#EADFC4}
+.content{position:relative;height:100%;padding:34px 24px 20px;display:flex;flex-direction:column}
+.pin{position:absolute;top:10px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;z-index:3;background:radial-gradient(circle at 35% 35%,#F7D774,#A57F12 60%,#5D470A);box-shadow:0 3px 3px rgba(0,0,0,.5)}
+.sys{font-weight:700;font-size:13px;color:#4E5B31}
+.card h2{font:26px/1.12 Kurale;margin:6px 0 8px}
+.desc{color:#4A3725;font-size:14px}
+.facts{margin-top:12px;border-top:1px solid rgba(120,90,50,.45);padding-top:8px;font-size:14px}
+.facts span{color:#6F5A3E;display:inline-block;width:56px}
+.foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center}
+.gm{display:flex;gap:10px;align-items:center;font-weight:600}
+.gm i{width:32px;height:32px;border-radius:50%;background:#B9A47A;display:grid;place-items:center;font-style:normal;font-family:Kurale}
+.gm small{display:block;color:#6F5A3E;font-weight:400}
+.seal{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#B5352D,#8E1F1A 60%,#5A110E);color:#F3D9C4;display:grid;place-items:center;text-align:center;font:600 11px/1.1 Literata;transform:rotate(-12deg);box-shadow:0 3px 4px rgba(0,0,0,.4)}
+/* 1. Старий пергамент */
+.paper{clip-path:polygon(0 1.5%,3% 0.4%,7% 1.2%,12% 0,17% 0.9%,23% 0.2%,29% 1.1%,35% 0.3%,41% 1%,47% 0,53% 0.8%,59% 0.1%,65% 1.2%,71% 0.4%,77% 1%,83% 0.1%,89% 0.9%,95% 0.2%,100% 1%,99.6% 20%,100% 40%,99.5% 60%,100% 80%,99.4% 100%,94% 99.2%,88% 100%,80% 99.3%,72% 100%,64% 99.4%,56% 100%,48% 99.2%,40% 100%,32% 99.4%,24% 100%,16% 99.3%,8% 100%,0 99.4%,0.5% 80%,0 60%,0.4% 40%,0 20%);background-color:#E8DABB;background-image:
+ radial-gradient(ellipse 30% 22% at 88% 86%,rgba(140,95,40,.22),transparent 70%),
+ radial-gradient(ellipse 22% 16% at 10% 12%,rgba(140,95,40,.16),transparent 70%),
+ radial-gradient(ellipse at 50% 45%,transparent 58%,rgba(120,75,25,.38) 100%),
+ url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.3' numOctaves='3' stitchTiles='stitch' seed='8'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.38 0 0 0 0 0.2 0 0 0 0.6 -0.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.33 0 0 0 0 0.18 0 0 0 0.55 -0.18'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E")}
+
+</style></head><body><h1>Знайдіть свою гру</h1><span class="tag">1 — старий пергамент</span>
+<div class="board">
+<article class="card"><div class="paper"></div><span class="pin"></span><div class="content"><span class="sys">D&amp;D 5e · кампанія · 16+</span><h2>Прокляття Страда</h2><p class="desc">Готичний жах у туманній Баровії. Повільний темп, багато розмов.</p><div class="facts"><div><span>Коли</span>Пт, 19:00</div><div><span>Де</span>Онлайн, Discord</div><div><span>Місця</span>2 з 5</div></div><div class="foot"><div class="gm"><i>В</i><span>Ворон<small>майстер, ★ 4.8</small></span></div><div class="seal">без<br>плати</div></div></div></article>
+
+<article class="card"><div class="paper"></div><span class="pin"></span><div class="content"><span class="sys">Call of Cthulhu · ваншот</span><h2>Тіні над Подолом</h2><p class="desc">1923 рік, зниклий антиквар і книга, яку не варто відкривати.</p><div class="facts"><div><span>Коли</span>Сб, 14:00</div><div><span>Де</span>Київ</div><div><span>Місця</span>1 з 4</div></div><div class="foot"><div class="gm"><i>Л</i><span>Ліра<small>майстер, ★ 4.6</small></span></div><div class="seal">250<br>грн</div></div></div></article>
+
+<article class="card"><div class="paper"></div><span class="pin"></span><div class="content"><span class="sys">Pathfinder 2e · кампанія</span><h2>Вітер з Карпат</h2><p class="desc">Пісочниця в горах, натхненна гуцульськими легендами.</p><div class="facts"><div><span>Коли</span>Нд, 12:00</div><div><span>Де</span>Львів</div><div><span>Місця</span>3 з 4</div></div><div class="foot"><div class="gm"><i>Т</i><span>Тарас_Друїд<small>майстер, ★ 4.9</small></span></div><div class="seal">без<br>плати</div></div></div></article>
+
+<article class="card"><div class="paper"></div><span class="pin"></span><div class="content"><span class="sys">Mothership · ваншот · 18+</span><h2>Дрейф «Ізоляди»</h2><p class="desc">Вантажник на мертвій орбіті. Сигнал лиха надходить зсередини.</p><div class="facts"><div><span>Коли</span>Сб, 21:00</div><div><span>Де</span>Онлайн, Foundry</div><div><span>Місця</span>2 з 4</div></div><div class="foot"><div class="gm"><i>Д</i><span>Данило<small>майстер, ★ 4.5</small></span></div><div class="seal">150<br>грн</div></div></div></article>
+
+</div></body></html>
