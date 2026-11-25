@@ -165,6 +165,8 @@ async function remindSession(deps: AppDeps, planned: Planned[]): Promise<Notific
     // Членство й статус гри тут свідомо не перевіряються повторно: вихід/виключення чи
     // завершення гри в ці мілісекунди дасть щонайбільше одне зайве нагадування (прийнято;
     // завершення/скасування гри й так скасовує майбутні сесії під X-блокуванням).
+    // Порядок блокувань як у RSVP/затвердженні: гра (FOR SHARE) → сесія.
+    await tx.select({ id: games.id }).from(games).where(eq(games.id, session.gameId)).for('share');
     const [still] = await tx
       .select({ id: gameSessions.id })
       .from(gameSessions)

@@ -182,10 +182,32 @@ describe('SessionDto rsvp fields', () => {
   it('GM actions return the DTO with the summary', async () => {
     const { gm, p, sessionId } = await setup();
     await rsvp(sessionId, p.cookie, 'going');
+    const res = await call('post', `/api/sessions/${sessionId}/cancel`, gm.cookie, {
+      reason: 'Майстер захворів',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.rsvpSummary).toMatchObject({ going: 1, notGoing: 0 });
+  });
+
+  it('reschedule clears the answers (they were for the old time); others stay', async () => {
+    const { gm, p, gameId, sessionId } = await setup();
+    const [other] = await db
+      .select()
+      .from(gameSessions)
+      .where(eq(gameSessions.gameId, gameId))
+      .orderBy(asc(gameSessions.startsAt))
+      .limit(1)
+      .offset(1);
+    await rsvp(sessionId, p.cookie, 'going');
+    await rsvp(other!.id, p.cookie, 'not_going');
     const res = await call('post', `/api/sessions/${sessionId}/reschedule`, gm.cookie, {
       startsAt: kyivAt(5, 18).startsAt,
     });
     expect(res.status).toBe(200);
-    expect(res.body.rsvpSummary).toMatchObject({ going: 1, notGoing: 0 });
+    expect(res.body.rsvpSummary).toMatchObject({ going: 0, notGoing: 0 });
+    const left = await db.select().from(sessionRsvp);
+    expect(left.map((r) => r.sessionId)).toEqual([other!.id]);
+    const mine = await call('get', `/api/games/${gameId}/sessions`, p.cookie);
+    expect((mine.body as SessionDto[]).find((x) => x.id === sessionId)!.myRsvp).toBeNull();
   });
 });

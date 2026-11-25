@@ -9,7 +9,13 @@ import {
 } from '@nri/shared';
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
-import { authIdentities, notificationPrefs, telegramOutbox, users } from '../db/schema/index.js';
+import {
+  authIdentities,
+  games,
+  notificationPrefs,
+  telegramOutbox,
+  users,
+} from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 
 type DbLike = Db | Tx;
@@ -37,8 +43,14 @@ const PURGE_BATCH = 1000;
 export const outboxBackoffMs = (attempts: number): number =>
   OUTBOX_BACKOFF_BASE_MS * 2 ** (attempts - 1);
 
-/** Кнопки за типом сповіщення: заявка — майстру «Затвердити/Відхилити»; нагадування — RSVP. */
-export function buttonsFor(n: Pick<OutboxSource, 'type' | 'payload'>): TelegramButton[] | null {
+/**
+ * Кнопки за типом сповіщення: заявка — майстру «Затвердити/Відхилити»; нагадування — RSVP
+ * (лише учасникам: майстер на власну сесію не відповідає, `recipientIsGm` — без кнопок).
+ */
+export function buttonsFor(
+  n: Pick<OutboxSource, 'type' | 'payload'>,
+  recipientIsGm = false,
+): TelegramButton[] | null {
   const p = n.payload;
   if (n.type === 'application.created' && p.applicationId !== undefined) {
     return [
@@ -46,7 +58,7 @@ export function buttonsFor(n: Pick<OutboxSource, 'type' | 'payload'>): TelegramB
       { action: 'reject', applicationId: p.applicationId },
     ];
   }
-  if (n.type === 'session.reminder' && p.sessionId !== undefined) {
+  if (n.type === 'session.reminder' && p.sessionId !== undefined && !recipientIsGm) {
     return [
       { action: 'rsvp', sessionId: p.sessionId, value: 'going' },
       { action: 'rsvp', sessionId: p.sessionId, value: 'not_going' },
@@ -82,6 +94,22 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
     .where(inArray(notificationPrefs.userId, [...chatOf.keys()]));
   const defaults = defaultNotificationPrefs().telegram;
   const prefsOf = new Map(prefRows.map((p) => [p.userId, { ...defaults, ...p.telegram }]));
+  // Майстри ігор нагадувань: їм — без RSVP-кнопок.
+  const reminderGameIds = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.type === 'session.reminder' && r.payload.gameId !== undefined ? [r.payload.gameId] : [],
+      ),
+    ),
+  ];
+  const gmOf = new Map<number, number>();
+  if (reminderGameIds.length > 0) {
+    const gameRows = await tx
+      .select({ id: games.id, gmUserId: games.gmUserId })
+      .from(games)
+      .where(inArray(games.id, reminderGameIds));
+    for (const g of gameRows) gmOf.set(g.id, g.gmUserId);
+  }
   const values = rows.flatMap((r) => {
     const chatId = chatOf.get(r.userId);
     if (chatId === undefined) return [];
@@ -93,7 +121,10 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
         chatId,
         kind: r.type,
         params: r.payload,
-        buttons: buttonsFor(r),
+        buttons: buttonsFor(
+          r,
+          r.payload.gameId !== undefined && gmOf.get(r.payload.gameId) === r.userId,
+        ),
         timeZone: zoneOf.get(r.userId) ?? null,
       },
     ];
@@ -121,7 +152,8 @@ const toItem = (r: typeof telegramOutbox.$inferSelect): TelegramOutboxItem => ({
  * зокрема й ті, чий лок прострочено, бо бот «упав»), і ставить `locked_until = now + 2 хв`.
  * Видача рахується спробою (`attempts + 1`): рядок, на якому бот щоразу падає без звіту, не
  * крутиться вічно — після 5 видач він `failed 'lock expired'`. Не надіслане за добу —
- * `failed 'stale'`. Коротка транзакція READ COMMITTED з `FOR UPDATE SKIP LOCKED`: паралельні
+ * `failed 'stale'`. Рядок, чий `chat_id` уже не є Telegram-ідентичністю користувача, —
+ * `failed 'unlinked'` (не видається). Коротка транзакція READ COMMITTED з `FOR UPDATE SKIP LOCKED`: паралельні
  * виклики не отримують той самий рядок.
  */
 export async function claimOutbox(
@@ -174,16 +206,42 @@ export async function claimOutbox(
         .limit(limit)
         .for('update', { skipLocked: true });
       if (rows.length === 0) return [];
+      // Чат має досі належати користувачу (Telegram відв'язано/перев'язано на інший акаунт —
+      // повідомлення не для цього чату) → `failed 'unlinked'`, не видаємо.
+      const idents = await tx
+        .select({ userId: authIdentities.userId, subject: authIdentities.subject })
+        .from(authIdentities)
+        .where(
+          and(
+            eq(authIdentities.provider, 'telegram'),
+            inArray(authIdentities.userId, [...new Set(rows.map((r) => r.userId))]),
+          ),
+        );
+      const chatOf = new Map(idents.map((i) => [i.userId, i.subject]));
+      const live = rows.filter((r) => chatOf.get(r.userId) === r.chatId);
+      const orphaned = rows.filter((r) => chatOf.get(r.userId) !== r.chatId);
+      if (orphaned.length > 0) {
+        await tx
+          .update(telegramOutbox)
+          .set({ status: 'failed', lockedUntil: null, lastError: 'unlinked' })
+          .where(
+            inArray(
+              telegramOutbox.id,
+              orphaned.map((r) => r.id),
+            ),
+          );
+      }
+      if (live.length === 0) return [];
       await tx
         .update(telegramOutbox)
         .set({ lockedUntil, attempts: sql`${telegramOutbox.attempts} + 1` })
         .where(
           inArray(
             telegramOutbox.id,
-            rows.map((r) => r.id),
+            live.map((r) => r.id),
           ),
         );
-      return rows.map((r) => toItem({ ...r, attempts: r.attempts + 1 }));
+      return live.map((r) => toItem({ ...r, attempts: r.attempts + 1 }));
     },
     { isolationLevel: 'read committed' },
   );

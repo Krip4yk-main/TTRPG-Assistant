@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
   authIdentities,
@@ -151,6 +151,23 @@ describe('enqueue (Review Focus 5)', () => {
     expect(await outbox()).toHaveLength(1);
   });
 
+  it('session.reminder to the game GM carries no RSVP buttons', async () => {
+    const gm = await userWithAge(30);
+    const gameId = await createGame(gm.cookie, {}, true);
+    await linkTelegram(gm.id, '7006');
+    await db.transaction((tx) =>
+      createNotification(deps, tx, {
+        userId: gm.id,
+        type: 'session.reminder',
+        category: 'reminders',
+        params: { gameId, gameTitle: 'Гра', sessionId: 9, startsAt: new Date().toISOString() },
+        entityType: 'session',
+        entityId: 9,
+      }),
+    );
+    expect((await outbox())[0]!.buttons).toBeNull();
+  });
+
   it('other types carry no buttons', async () => {
     const u = await createUser(db);
     await linkTelegram(u.id, '7005');
@@ -175,11 +192,23 @@ describe('enqueue (Review Focus 5)', () => {
   });
 });
 
-/** N рядків outbox для різних користувачів (чат = `chat`). */
+/** Власник чату (прив'язаний Telegram `chat`); створюється за потреби. */
+async function chatOwner(chat: string): Promise<number> {
+  const [ident] = await db
+    .select({ userId: authIdentities.userId })
+    .from(authIdentities)
+    .where(and(eq(authIdentities.provider, 'telegram'), eq(authIdentities.subject, chat)));
+  if (ident) return ident.userId;
+  const u = await createUser(db);
+  await linkTelegram(u.id, chat);
+  return u.id;
+}
+
+/** N рядків outbox власника чату `chat` (його Telegram прив'язано). */
 async function seed(n: number, chat = '900') {
   const ids: number[] = [];
   for (let i = 0; i < n; i++) {
-    const u = await createUser(db);
+    const u = { id: await chatOwner(chat) };
     const [res] = await db
       .insert(notifications)
       .values({
@@ -247,6 +276,27 @@ describe('claim', () => {
     expect(await claimOutbox(deps, {}, new Date(now.getTime() + 119 * SEC))).toEqual([]);
     const again = await claimOutbox(deps, {}, new Date(now.getTime() + 121 * SEC));
     expect(again.map((i) => i.id)).toEqual([id]);
+  });
+
+  it('rows whose chat is no longer the user Telegram are failed "unlinked", not claimed', async () => {
+    const [kept, relinked, gone] = [
+      ...(await seed(1, '910')),
+      ...(await seed(1, '911')),
+      ...(await seed(1, '912')),
+    ];
+    // Перев'язано на інший чат / відв'язано без скасування черги.
+    const owner = async (id: number) => (await row(id)).userId;
+    await db
+      .update(authIdentities)
+      .set({ subject: '919' })
+      .where(eq(authIdentities.userId, await owner(relinked!)));
+    await db.delete(authIdentities).where(eq(authIdentities.userId, await owner(gone!)));
+    const items = await claimOutbox(deps, {});
+    expect(items.map((i) => i.id)).toEqual([kept]);
+    for (const id of [relinked!, gone!]) {
+      expect(await row(id)).toMatchObject({ status: 'failed', lastError: 'unlinked', attempts: 0 });
+    }
+    expect((await row(kept!)).attempts).toBe(1);
   });
 
   it('sent rows are not claimed again', async () => {

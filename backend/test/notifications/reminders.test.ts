@@ -2,12 +2,14 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import {
+  authIdentities,
   games,
   gameSessions,
   jobs,
   notificationPrefs,
   notifications,
   reminderLog,
+  telegramOutbox,
   users,
 } from '../../src/db/schema/index.js';
 import { registerJobs } from '../../src/jobs/index.js';
@@ -128,6 +130,22 @@ describe('session reminders', () => {
     expect(emitted.map((e) => e.userId).sort((a, b) => a - b)).toEqual(ids(gm, p1, p2));
     expect(emitted.every((e) => e.event === 'notification.new')).toBe(true);
     expect(await db.select().from(reminderLog)).toHaveLength(3);
+  });
+
+  it('Telegram: members get RSVP buttons, the GM does not', async () => {
+    const { gm, p1, sessionId } = await party();
+    await db.insert(authIdentities).values([
+      { userId: gm.id, provider: 'telegram', subject: '8101' },
+      { userId: p1.id, provider: 'telegram', subject: '8102' },
+    ]);
+    await sendReminders(deps, runFor(T, 60));
+    const rows = await db.select().from(telegramOutbox);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.userId === gm.id)!.buttons).toBeNull();
+    expect(rows.find((r) => r.userId === p1.id)!.buttons).toEqual([
+      { action: 'rsvp', sessionId, value: 'going' },
+      { action: 'rsvp', sessionId, value: 'not_going' },
+    ]);
   });
 
   it('a moment outside the window sends nothing (default offsets 1440 and 60 only)', async () => {

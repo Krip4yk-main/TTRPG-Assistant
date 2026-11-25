@@ -91,7 +91,18 @@ describe('renderNotification', () => {
     const r = render('application.created', { gameId: 1 });
     expect(r.text).toContain(uk.notify.unknownGame);
     expect(render('session.cancelled', { gameId: 1 }).text).toContain(uk.notify.unknownTime);
-    expect(render('member.left', { gameId: 1 }).text).toContain(uk.notify.someone);
+  });
+
+  it('withdrawn / left without an actor use the _noactor variants', () => {
+    const w = render('application.withdrawn', { gameId: 1, gameTitle: 'Гра' });
+    expect(w.text.split('\n')[0]).toBe('↩️ Заявку на гру «Гра» відкликано.');
+    const l = render('member.left', { gameId: 1, gameTitle: 'Гра' });
+    expect(l.text.split('\n')[0]).toBe('🚪 Гравець покидає гру «Гра».');
+    expect(w.text + l.text).not.toContain(uk.notify.someone);
+    // Причина account_deleted має перевагу над _noactor.
+    expect(
+      render('member.left', { gameId: 1, gameTitle: 'Гра', reason: 'account_deleted' }).text,
+    ).toContain('акаунт видалено');
   });
 
   it('application.created without an actor drops "від …"', () => {

@@ -8,7 +8,14 @@ import {
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import type { Tx } from '../applications/applications.rules.js';
-import { gameMembers, games, gameSessions, sessionAttendance, users } from '../db/schema/index.js';
+import {
+  gameMembers,
+  games,
+  gameSessions,
+  sessionAttendance,
+  sessionRsvp,
+  users,
+} from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
@@ -187,6 +194,8 @@ export async function rescheduleSession(
         ...(input.durationMinutes !== undefined ? { durationMinutes: input.durationMinutes } : {}),
       })
       .where(eq(gameSessions.id, sessionId));
+    // RSVP відповідали на старий час — після перенесення учасники відповідають наново.
+    await tx.delete(sessionRsvp).where(eq(sessionRsvp.sessionId, sessionId));
     return session;
   });
   await logEvent(deps.db, {
