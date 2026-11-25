@@ -1,0 +1,75 @@
+<section class="shared-notes" aria-labelledby="shared-notes-title">
+  <div class="title-row">
+    <h3 id="shared-notes-title">{{ 'notes.shared.title' | translate }}</h3>
+    @if (state() === 'ready') {
+      <button
+        mat-button
+        type="button"
+        class="refresh"
+        [disabled]="refreshing()"
+        (click)="refresh()"
+      >
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+        {{ 'notes.shared.refresh' | translate }}
+      </button>
+    }
+  </div>
+  <p class="nri-muted hint">{{ 'notes.shared.hint' | translate }}</p>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'notes.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (mine(); as page) {
+        <nri-note-editor
+          class="my-page"
+          label="notes.shared.mine"
+          [source]="source()"
+          [initial]="page"
+        />
+      }
+
+      <div aria-live="polite">
+        @if (refreshFailed()) {
+          <p class="nri-alert" role="alert">{{ 'notes.shared.refreshError' | translate }}</p>
+        }
+      </div>
+
+      @if (others().length) {
+        <ul class="pages">
+          @for (p of others(); track p.author.publicId) {
+            <li class="other-page">
+              <details>
+                <summary>
+                  <span class="author">{{
+                    p.author.nickname ?? ('user.deleted' | translate)
+                  }}</span>
+                  @if (p.formerMember) {
+                    <span class="former">{{ 'notes.shared.former' | translate }}</span>
+                  }
+                  @if (p.updatedAt) {
+                    <span class="nri-muted updated">{{
+                      'notes.shared.updated' | translate: { date: updated(p) }
+                    }}</span>
+                  }
+                </summary>
+                <p class="text">{{ p.body }}</p>
+              </details>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="nri-muted">{{ 'notes.shared.noOthers' | translate }}</p>
+      }
+    }
+  }
+</section>

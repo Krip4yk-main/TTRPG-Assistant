@@ -143,6 +143,15 @@ describe('GameDetails', () => {
     await settle();
   }
   const expectGame = () => http.expectOne('/api/games/7');
+  /** Учаснику й майстру сторінка підвантажує нотатки й налаштування календаря. */
+  const flushNotesAndCalendar = (gm: boolean, autoBusy = true) => {
+    http.expectOne('/api/me/settings').flush({ calendarAutoBusy: autoBusy });
+    http
+      .expectOne('/api/games/7/notes/private')
+      .flush({ body: 'Моє приватне', version: 2, updatedAt: '2026-11-20T10:00:00.000Z' });
+    if (gm) http.expectNone('/api/games/7/notes/shared');
+    else http.expectOne('/api/games/7/notes/shared').flush({ pages: [] });
+  };
 
   afterEach(() => http.verify());
 
@@ -236,6 +245,7 @@ describe('GameDetails', () => {
       http.expectOne('/api/games/7/members').flush([]);
       http.expectOne('/api/games/7/sessions').flush([]);
       http.expectOne('/api/me/applications').flush([]);
+      flushNotesAndCalendar(false);
       await settle();
       expect(el().querySelector('nri-sessions-list')).not.toBeNull();
       expect(el().querySelector('nri-members-panel')).not.toBeNull();
@@ -281,6 +291,7 @@ describe('GameDetails', () => {
         { publicId: 'pppppppppp', nickname: 'Sam', avatarUrl: null, joinedAt: game.createdAt },
       ]);
     http.expectOne('/api/games/7/sessions').flush([]);
+    flushNotesAndCalendar(true);
     await settle();
     expect(el().querySelector('[data-member-id="pppppppppp"] button.member-menu')).not.toBeNull();
     // Майстер не подає заявок — власні заявки не запитуються; кнопки виходу немає.
@@ -294,6 +305,7 @@ describe('GameDetails', () => {
       http.expectOne('/api/games/7/members').flush([]);
       http.expectOne('/api/games/7/sessions').flush([]);
       http.expectOne('/api/me/applications').flush(applications);
+      flushNotesAndCalendar(false);
       await settle();
     };
 
@@ -347,6 +359,45 @@ describe('GameDetails', () => {
       expect(document.activeElement).toBe(el().querySelector('.notice-area'));
     });
 
+    it('a member sees the private and the shared notes', async () => {
+      await open(me, (r) => r.flush(asMember));
+      await flushMemberExtras();
+      const notes = el().querySelector<HTMLElement>('.notes')!;
+      expect(notes.querySelector<HTMLTextAreaElement>('nri-note-editor textarea')!.value).toBe(
+        'Моє приватне',
+      );
+      expect(notes.querySelector('nri-shared-player-notes')).not.toBeNull();
+    });
+
+    it('the GM does not see the shared players note', async () => {
+      await open(me, (r) => r.flush({ ...game, gm: { ...game.gm, publicId: me.publicId } }));
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      flushNotesAndCalendar(true);
+      await settle();
+      expect(el().querySelector('.notes nri-note-editor')).not.toBeNull();
+      expect(el().querySelector('nri-shared-player-notes')).toBeNull();
+    });
+
+    it('manual calendar mode: «add to my calendar» toggle pins the game', async () => {
+      await open(me, (r) => r.flush(asMember));
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      http.expectOne('/api/me/applications').flush([]);
+      flushNotesAndCalendar(false, false);
+      await settle();
+      http.expectOne('/api/me/calendar/pinned-games').flush({ gameIds: [] });
+      await settle();
+      const toggle = el().querySelector<HTMLButtonElement>('nri-calendar-pin button[role=switch]')!;
+      expect(toggle.getAttribute('aria-checked')).toBe('false');
+      toggle.click();
+      await settle();
+      const post = http.expectOne('/api/me/calendar/pinned-games/7');
+      expect(post.request.method).toBe('POST');
+      post.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+    });
+
     it('a member of a finished game cannot leave', async () => {
       await open(me, (r) => r.flush({ ...asMember, status: 'finished' }));
       await flushMemberExtras();
@@ -358,6 +409,7 @@ describe('GameDetails', () => {
       await open(me, (r) => r.flush({ ...own, gm: { ...game.gm, publicId: me.publicId } }));
       http.expectOne('/api/games/7/members').flush([]);
       http.expectOne('/api/games/7/sessions').flush([]);
+      flushNotesAndCalendar(true);
       await settle();
       expect(el().querySelector('button.change-schedule')).toBeNull();
       nextDialog({ ...own, kind: 'campaign' });

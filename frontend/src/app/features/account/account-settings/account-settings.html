@@ -30,6 +30,36 @@
     </div>
   </section>
 
+  <!-- Календар: автозайнятість від ігор -->
+  <section class="nri-card auto-busy" aria-labelledby="auto-busy-title">
+    <h2 id="auto-busy-title">{{ 'account.calendar.title' | translate }}</h2>
+    @if (autoBusy() !== null) {
+      <mat-slide-toggle
+        [checked]="!!autoBusy()"
+        [disabled]="autoBusyBusy()"
+        aria-describedby="auto-busy-hint"
+        (change)="setAutoBusy($event.checked)"
+        >{{ 'account.calendar.autoBusy' | translate }}</mat-slide-toggle
+      >
+      <p id="auto-busy-hint" class="nri-muted hint">
+        {{ 'account.calendar.autoBusyHint' | translate }}
+      </p>
+    } @else if (!autoBusyMessage()) {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    <div aria-live="polite">
+      @if (autoBusyMessage(); as msg) {
+        <p
+          [class.nri-alert]="msg.kind === 'error'"
+          [class.nri-notice]="msg.kind === 'info'"
+          [attr.role]="msg.kind === 'error' ? 'alert' : null"
+        >
+          {{ msg.key | translate }}
+        </p>
+      }
+    </div>
+  </section>
+
   <!-- Способи входу -->
   <section class="nri-card" aria-labelledby="identities-title">
     <h2 id="identities-title">{{ 'account.identities.title' | translate }}</h2>

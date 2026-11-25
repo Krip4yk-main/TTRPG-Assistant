@@ -75,24 +75,43 @@
         <span class="label">{{ 'sessions.summary' | translate }}:</span> {{ s.summary }}
       </p>
     }
-    @if (actions(s); as list) {
-      @if (list.length) {
-        <div class="actions">
-          @for (a of list; track a) {
-            <button
-              mat-stroked-button
-              type="button"
-              [attr.data-action]="a"
-              [class.danger]="a === 'cancel'"
-              [disabled]="busy()"
-              [attr.aria-label]="'sessions.actionsAria.' + a | translate: { when: when(s) }"
-              (click)="run(s, a)"
-            >
-              {{ 'sessions.actions.' + a | translate }}
-            </button>
-          }
-        </div>
+    @let noteOpen = openNotes().has(s.id);
+    <div class="actions">
+      <button
+        mat-button
+        type="button"
+        class="note-toggle"
+        [attr.aria-expanded]="noteOpen"
+        [attr.aria-controls]="'session-note-' + s.id"
+        [attr.aria-label]="'notes.session.toggleAria' | translate: { when: when(s) }"
+        (click)="toggleNote(s)"
+      >
+        <mat-icon aria-hidden="true">{{ noteOpen ? 'expand_less' : 'edit_note' }}</mat-icon>
+        {{ 'notes.session.toggle' | translate }}
+      </button>
+      @for (a of actions(s); track a) {
+        <button
+          mat-stroked-button
+          type="button"
+          [attr.data-action]="a"
+          [class.danger]="a === 'cancel'"
+          [disabled]="busy()"
+          [attr.aria-label]="'sessions.actionsAria.' + a | translate: { when: when(s) }"
+          (click)="run(s, a)"
+        >
+          {{ 'sessions.actions.' + a | translate }}
+        </button>
       }
-    }
+    </div>
+    <div class="note-panel" [id]="'session-note-' + s.id">
+      @if (noteOpen) {
+        <nri-note-editor
+          label="notes.session.label"
+          hint="notes.session.hint"
+          [rows]="4"
+          [source]="noteSource(s)"
+        />
+      }
+    </div>
   </li>
 </ng-template>

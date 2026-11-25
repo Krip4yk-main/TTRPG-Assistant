@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { io, type Socket } from 'socket.io-client';
 
@@ -9,8 +9,18 @@ import { io, type Socket } from 'socket.io-client';
  */
 export type SessionLostReason = 'revoked' | 'server-disconnect' | 'auth-error';
 
+/**
+ * Фабрика клієнта Socket.IO. Токен — щоб тести підміняли клієнт через DI: `vi.mock` модуля
+ * ненадійний, коли Vitest виконує файли специфікацій без ізоляції (спільний кеш модулів).
+ */
+export const SOCKET_IO = new InjectionToken<typeof io>('SOCKET_IO', {
+  providedIn: 'root',
+  factory: () => io,
+});
+
 @Injectable({ providedIn: 'root' })
 export class SocketService {
+  private readonly io = inject(SOCKET_IO);
   private socket: Socket | null = null;
   private readonly lost = new Subject<SessionLostReason>();
 
@@ -40,7 +50,7 @@ export class SocketService {
 
   private ensure(): Socket {
     if (!this.socket) {
-      const socket = io({ path: '/socket.io', withCredentials: true, autoConnect: false });
+      const socket = this.io({ path: '/socket.io', withCredentials: true, autoConnect: false });
       // Дзеркало SESSION_REVOKED_EVENT з @nri/shared (фронтенд не тягне shared заради рядка).
       socket.on('session.revoked', () => this.lost.next('revoked'));
       // Сервер сам розірвав з'єднання (disconnectSockets) — це не мережа.

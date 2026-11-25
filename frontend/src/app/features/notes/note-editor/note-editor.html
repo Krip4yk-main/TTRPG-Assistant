@@ -1,0 +1,76 @@
+@let st = status();
+<div class="head">
+  <label class="label" [for]="uid">{{ label() | translate }}</label>
+  <div class="status-area" aria-live="polite">
+    @if (st === 'saving' || st === 'saved' || st === 'conflict' || st === 'error') {
+      <span class="status" [attr.data-status]="st">{{ 'notes.status.' + st | translate }}</span>
+    }
+  </div>
+</div>
+@if (hint(); as h) {
+  <p class="nri-muted hint" [id]="uid + '-hint'">{{ h | translate }}</p>
+}
+
+@if (st === 'loading') {
+  <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+} @else if (st === 'loadError') {
+  <div class="nri-alert load-error" role="alert">
+    <span>{{ 'notes.loadError' | translate }}</span>
+    <button mat-stroked-button type="button" (click)="load()">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+} @else {
+  <textarea
+    class="body"
+    [id]="uid"
+    [rows]="rows()"
+    [maxLength]="max"
+    [value]="body()"
+    [attr.aria-describedby]="hint() ? uid + '-hint' : null"
+    [attr.aria-invalid]="st === 'conflict' || st === 'error' ? true : null"
+    spellcheck="true"
+    (input)="onInput($any($event.target).value)"
+    (blur)="onBlur()"
+  ></textarea>
+  <div class="foot">
+    @if (st === 'error') {
+      <button mat-button type="button" class="retry" (click)="retry()">
+        {{ 'notes.retrySave' | translate }}
+      </button>
+    }
+    @if (showCounter()) {
+      <span class="counter" aria-live="polite">{{
+        'notes.counter' | translate: { count: body().length, max: max }
+      }}</span>
+    }
+  </div>
+
+  @if (conflict(); as server) {
+    <section class="conflict" role="alert" [attr.aria-labelledby]="uid + '-conflict'">
+      <h3 [id]="uid + '-conflict'">
+        <mat-icon aria-hidden="true">merge_type</mat-icon>
+        {{ 'notes.conflict.title' | translate }}
+      </h3>
+      <p>{{ 'notes.conflict.text' | translate }}</p>
+      <div class="versions">
+        <figure class="version mine">
+          <figcaption>{{ 'notes.conflict.mine' | translate }}</figcaption>
+          <pre tabindex="0">{{ body() }}</pre>
+        </figure>
+        <figure class="version theirs">
+          <figcaption>{{ 'notes.conflict.theirs' | translate }}</figcaption>
+          <pre tabindex="0">{{ server.body }}</pre>
+        </figure>
+      </div>
+      <div class="actions">
+        <button mat-flat-button type="button" class="keep-mine" (click)="keepMine()">
+          {{ 'notes.conflict.keepMine' | translate }}
+        </button>
+        <button mat-stroked-button type="button" class="take-theirs" (click)="takeTheirs()">
+          {{ 'notes.conflict.takeTheirs' | translate }}
+        </button>
+      </div>
+    </section>
+  }
+}

@@ -67,6 +67,8 @@
                   role="gridcell"
                   class="cell"
                   [class.on]="display()[i]"
+                  [class.game-busy]="gameBusy()[i].length > 0"
+                  [attr.title]="gameBusy()[i].length ? gameBusy()[i].join(', ') : null"
                   [attr.data-day]="d"
                   [attr.data-cell]="c"
                   [attr.aria-selected]="display()[i]"
@@ -85,6 +87,18 @@
       <p class="nri-muted count" aria-live="polite">
         {{ 'calendar.selected' | translate: { hours: selectedCount() / 2 } }}
       </p>
+      @if (!custom) {
+        <ul class="legend">
+          <li>
+            <span class="swatch on" aria-hidden="true"></span>
+            {{ 'calendar.legendFree' | translate }}
+          </li>
+          <li>
+            <span class="swatch game-busy" aria-hidden="true"></span>
+            {{ 'calendar.gameBusy.legend' | translate }}
+          </li>
+        </ul>
+      }
     </section>
 
     <section class="busy" [attr.aria-labelledby]="uid + '-busy'">

@@ -199,4 +199,54 @@ describe('SessionsList', () => {
     await settle();
     expect(el.textContent).toContain('sessions.done.cancel');
   });
+  describe('a live clock', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('moves a session to the past once it starts and lets the GM finish it', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(new Date('2027-03-02T16:59:30.000Z'));
+      await create(true);
+      expect(row(3)!.closest('.upcoming')).not.toBeNull();
+      expect(buttons(3)).toEqual(['reschedule', 'cancel']);
+
+      vi.advanceTimersByTime(60_000);
+      await settle();
+      expect(row(3)!.closest('.past')).not.toBeNull();
+      expect(row(3)!.querySelector('.status')!.textContent).toContain('sessions.status.awaiting');
+      expect(buttons(3)).toEqual(['reschedule', 'cancel', 'finish']);
+    });
+
+    it('stops the clock when destroyed', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      await create(false);
+      expect(vi.getTimerCount()).toBe(1);
+      fixture.destroy();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('session note', () => {
+    const toggle = (id: number) => row(id)!.querySelector<HTMLButtonElement>('button.note-toggle')!;
+
+    it('expands inline, loads the private note and collapses again', async () => {
+      await create(false);
+      expect(toggle(3).getAttribute('aria-expanded')).toBe('false');
+      expect(row(3)!.querySelector('nri-note-editor')).toBeNull();
+
+      toggle(3).click();
+      await settle();
+      expect(toggle(3).getAttribute('aria-expanded')).toBe('true');
+      const panelId = toggle(3).getAttribute('aria-controls')!;
+      expect(row(3)!.querySelector(`#${panelId} nri-note-editor`)).not.toBeNull();
+      http
+        .expectOne('/api/sessions/3/notes/private')
+        .flush({ body: 'Взяти кості', version: 1, updatedAt: '2026-11-20T10:00:00.000Z' });
+      await settle();
+      expect(row(3)!.querySelector('textarea')!.value).toBe('Взяти кості');
+
+      toggle(3).click();
+      await settle();
+      expect(row(3)!.querySelector('nri-note-editor')).toBeNull();
+    });
+  });
 });

@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
-import type { AvailabilityDto, MeDto } from '@nri/shared';
+import type { AvailabilityDto, GameBusyDto, MeDto } from '@nri/shared';
 import { AvailabilityEditor } from './availability-editor';
 import { cellsToSlots, slotsToCells } from './availability-grid';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -57,7 +57,20 @@ describe('AvailabilityEditor', () => {
     target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, shiftKey }));
   const button = (cls: string) => el().querySelector<HTMLButtonElement>(`button.${cls}`)!;
 
-  async function setup(mode: 'save' | 'custom', initial: AvailabilityDto | null = null) {
+  const gameBusyUrl = '/api/me/calendar/game-busy';
+  /** Зайнятість від ігор запитується лише в режимі `save`, після завантаження календаря. */
+  let busyParams: { from: string | null; to: string | null } | null = null;
+  const flushGameBusy = (busy: GameBusyDto[] = []) => {
+    const req = http.expectOne((r) => r.method === 'GET' && r.url === gameBusyUrl);
+    busyParams = { from: req.request.params.get('from'), to: req.request.params.get('to') };
+    req.flush(busy);
+  };
+
+  async function setup(
+    mode: 'save' | 'custom',
+    initial: AvailabilityDto | null = null,
+    busy: GameBusyDto[] = [],
+  ) {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -86,6 +99,12 @@ describe('AvailabilityEditor', () => {
     if (!initial) {
       http.expectOne((r) => r.method === 'GET' && r.url === '/api/me/availability').flush(empty);
       await settle();
+    }
+    if (mode === 'save') {
+      flushGameBusy(busy);
+      await settle();
+    } else {
+      http.expectNone(gameBusyUrl);
     }
   }
 
@@ -213,11 +232,55 @@ describe('AvailabilityEditor', () => {
       .expectOne((r) => r.method === 'GET' && r.url === '/api/me/availability')
       .flush({ ...empty, timezone: 'America/New_York' });
     await settle();
+    flushGameBusy();
+    await settle();
     const tz = el().querySelector<HTMLElement>('.tz')!;
     expect(tz.textContent).toContain('calendar.accountTimezone');
     expect(tz.querySelector('a[href="/account"]')).not.toBeNull();
     expect(el().querySelector('.use-browser-tz')).toBeNull();
     expect(el().textContent).not.toContain('calendar.useBrowserTz');
     expect(el().textContent).not.toContain('calendar.timezoneHint');
+  });
+
+  describe('game sessions', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // Середа, 12:00 за Києвом (UTC+2).
+      vi.setSystemTime(new Date('2026-11-25T10:00:00.000Z'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const session: GameBusyDto = {
+      gameId: 3,
+      gameTitle: 'Туман над Дніпром',
+      sessionId: 12,
+      // Чт 26.11, 19:00–22:00 за Києвом.
+      start: '2026-11-26T17:00:00.000Z',
+      end: '2026-11-26T20:00:00.000Z',
+    };
+
+    it('requests the next 7 days from the start of today in the account zone', async () => {
+      await setup('save');
+      expect(busyParams).toEqual({
+        from: '2026-11-24T22:00:00.000Z',
+        to: '2026-12-01T22:00:00.000Z',
+      });
+      expect(el().querySelector('.legend')!.textContent).toContain('calendar.gameBusy.legend');
+    });
+
+    it('busy cells are hatched, labelled with the game title and keep free time editable', async () => {
+      await setup('save', null, [session]);
+      const busy = cell(3, 38);
+      expect(busy.classList).toContain('game-busy');
+      expect(busy.getAttribute('aria-label')).toContain('Туман над Дніпром');
+      expect(busy.getAttribute('title')).toContain('Туман над Дніпром');
+      expect(cell(3, 43).classList).toContain('game-busy');
+      expect(cell(3, 44).classList).not.toContain('game-busy');
+      expect(cell(3, 37).classList).not.toContain('game-busy');
+      expect(cell(3, 44).getAttribute('aria-label')).not.toContain('Туман');
+      // Сесія — не вільний час: позначка не змінює слотів.
+      expect(busy.getAttribute('aria-selected')).toBe('false');
+      expect(el().querySelector('.legend .swatch.game-busy')).not.toBeNull();
+    });
   });
 });

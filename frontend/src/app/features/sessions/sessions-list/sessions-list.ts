@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -21,8 +22,10 @@ import type { SessionDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { NotesApi, type NoteSource } from '../../../core/notes/notes.api';
 import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { SessionsApi } from '../../../core/sessions/sessions.api';
+import { NoteEditor } from '../../notes/note-editor/note-editor';
 import {
   FinishSessionDialog,
   type FinishSessionDialogData,
@@ -41,6 +44,9 @@ interface Message {
   key: string;
 }
 
+/** Як часто оновлюється «зараз» (межа майбутніх і минулих, «очікує завершення»), мс. */
+const CLOCK_MS = 60_000;
+
 const DIALOG_OPTIONS = {
   autoFocus: 'first-tabbable',
   restoreFocus: true,
@@ -56,7 +62,7 @@ const DIALOG_OPTIONS = {
  */
 @Component({
   selector: 'nri-sessions-list',
-  imports: [NgTemplateOutlet, MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [NgTemplateOutlet, MatButtonModule, MatIconModule, TranslatePipe, NoteEditor],
   templateUrl: './sessions-list.html',
   styleUrl: './sessions-list.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,6 +73,7 @@ export class SessionsList {
   private readonly dialog = inject(MatDialog);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly notes = inject(NotesApi);
 
   readonly gameId = input.required<number>();
   /** IANA-пояс гри. */
@@ -81,8 +88,14 @@ export class SessionsList {
   protected readonly loadFailed = signal(false);
   protected readonly busy = signal(false);
   protected readonly message = signal<Message | null>(null);
-  /** «Зараз» на момент завантаження — межа між майбутніми й минулими. */
+  /**
+   * «Зараз» — єдина межа між майбутніми й минулими для списку, статусу й дій майстра;
+   * оновлюється щохвилини й після кожного завантаження.
+   */
   private readonly now = signal(Date.now());
+  /** Сесії з розгорнутою приватною нотаткою. */
+  protected readonly openNotes = signal<ReadonlySet<number>>(new Set());
+  private readonly noteSources = new Map<number, NoteSource>();
 
   private readonly viewerZone = computed(() => viewerTimeZone(this.auth.me()));
   private readonly showZone = computed(() => differentZones(this.viewerZone(), this.timezone()));
@@ -100,6 +113,27 @@ export class SessionsList {
       const id = this.gameId();
       untracked(() => void this.load(id));
     });
+    const clock = setInterval(() => this.now.set(Date.now()), CLOCK_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(clock));
+  }
+
+  /** Розгорнути/згорнути приватну нотатку сесії (лише учасникам і майстру — як і сам список). */
+  protected toggleNote(s: SessionDto): void {
+    this.openNotes.update((open) => {
+      const next = new Set(open);
+      if (!next.delete(s.id)) next.add(s.id);
+      return next;
+    });
+  }
+
+  /** Джерело нотатки сесії — одне на сесію, щоб редактор не перечитував її. */
+  protected noteSource(s: SessionDto): NoteSource {
+    let source = this.noteSources.get(s.id);
+    if (!source) {
+      source = this.notes.sessionPrivate(s.id);
+      this.noteSources.set(s.id, source);
+    }
+    return source;
   }
 
   /** Перезавантажити (після зміни правила розкладу на сторінці). */
@@ -119,7 +153,7 @@ export class SessionsList {
   protected actions(s: SessionDto): SessionAction[] {
     if (!this.isGm() || !this.manageable() || s.status !== 'scheduled') return [];
     const list: SessionAction[] = ['reschedule', 'cancel'];
-    if (Date.parse(s.startsAt) <= Date.now()) list.push('finish');
+    if (Date.parse(s.startsAt) <= this.now()) list.push('finish');
     return list;
   }
 

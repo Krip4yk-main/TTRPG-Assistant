@@ -17,6 +17,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -30,6 +31,7 @@ import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { CalendarApi } from '../../../core/calendar/calendar.api';
 import {
   browserTimeZone,
   differentZones,
@@ -84,6 +86,7 @@ interface Message {
     MatIconModule,
     MatAutocompleteModule,
     MatInputModule,
+    MatSlideToggleModule,
     MatTooltipModule,
     TranslatePipe,
     UserName,
@@ -99,6 +102,7 @@ export class AccountSettings {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly translate = inject(TranslateService);
+  private readonly calendarApi = inject(CalendarApi);
 
   /** `?error=CODE` після невдалої прив'язки Google. */
   readonly error = input<string>();
@@ -129,6 +133,10 @@ export class AccountSettings {
   protected readonly dangerMessage = signal<Message | null>(null);
   protected readonly timezoneMessage = signal<Message | null>(null);
   protected readonly timezoneSaved = signal(false);
+  /** Сесії ігор автоматично займають календар; `null` — налаштування ще не завантажено. */
+  protected readonly autoBusy = signal<boolean | null>(null);
+  protected readonly autoBusyBusy = signal(false);
+  protected readonly autoBusyMessage = signal<Message | null>(null);
   protected readonly queryErrorKey = computed(() => {
     const code = this.error();
     if (!code) return null;
@@ -173,6 +181,7 @@ export class AccountSettings {
   );
 
   constructor() {
+    void this.loadCalendarSettings();
     this.nickname.setValue(this.me()?.nickname ?? '');
     const current = this.me()?.birthDate;
     if (current) this.birthDate.setValue(fromIsoDate(current));
@@ -289,6 +298,41 @@ export class AccountSettings {
       this.timezone.setValue(me.timezone);
       this.timezoneSaved.set(true);
     });
+  }
+
+  /** Перемикач автозайнятості: оптимістично, з поверненням стану при помилці. */
+  protected async setAutoBusy(value: boolean): Promise<void> {
+    if (this.autoBusyBusy()) return;
+    this.autoBusyBusy.set(true);
+    this.autoBusyMessage.set(null);
+    this.autoBusy.set(value);
+    try {
+      const saved = await firstValueFrom(
+        this.calendarApi.updateSettings({ calendarAutoBusy: value }),
+      );
+      this.autoBusy.set(saved.calendarAutoBusy);
+      this.autoBusyMessage.set({ kind: 'info', key: 'account.calendar.saved' });
+    } catch (err) {
+      this.autoBusy.set(!value);
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') {
+        this.autoBusyMessage.set({ kind: 'error', key: `errors.${code}` });
+      }
+    } finally {
+      this.autoBusyBusy.set(false);
+    }
+  }
+
+  private async loadCalendarSettings(): Promise<void> {
+    try {
+      const { calendarAutoBusy } = await firstValueFrom(this.calendarApi.settings());
+      this.autoBusy.set(calendarAutoBusy);
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') {
+        this.autoBusyMessage.set({ kind: 'error', key: 'account.calendar.loadError' });
+      }
+    }
   }
 
   protected async logoutAll(): Promise<void> {

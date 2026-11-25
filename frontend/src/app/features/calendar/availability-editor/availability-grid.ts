@@ -1,4 +1,13 @@
-import { normalizeSlots, type AvailabilityDto, type Weekday } from '@nri/shared';
+import {
+  dayNumber,
+  fromDayNumber,
+  normalizeSlots,
+  toZoned,
+  zonedToUtc,
+  type AvailabilityDto,
+  type GameBusyDto,
+  type Weekday,
+} from '@nri/shared';
 
 export type Slot = AvailabilityDto['slots'][number];
 
@@ -47,4 +56,34 @@ export function cellsToSlots(cells: readonly boolean[]): Slot[] {
     }
   }
   return normalizeSlots(slots);
+}
+
+/** Скільки днів зайнятості від ігор накладається на тижневу сітку. */
+export const GAME_BUSY_DAYS = 7;
+
+/**
+ * Вікно зайнятості від ігор: від початку сьогоднішньої доби в поясі `tz` на 7 діб уперед —
+ * кожен день тижня сітки відповідає рівно одній даті.
+ */
+export function gameBusyWindow(now: Date, tz: string): { from: Date; to: Date } {
+  const z = toZoned(now, tz);
+  const start = dayNumber(z.year, z.month, z.day);
+  const midnight = (n: number) => zonedToUtc({ ...fromDayNumber(n), hour: 0, minute: 0 }, tz);
+  return { from: midnight(start), to: midnight(start + GAME_BUSY_DAYS) };
+}
+
+/** Інтервали сесій → назви ігор у кожній клітинці сітки (у поясі `tz`). */
+export function gameBusyCells(busy: readonly GameBusyDto[], tz: string): string[][] {
+  const out = Array.from({ length: DAYS * CELLS_PER_DAY }, () => [] as string[]);
+  const step = CELL_MINUTES * 60_000;
+  for (const b of busy) {
+    const end = Date.parse(b.end);
+    for (let t = Math.floor(Date.parse(b.start) / step) * step; t < end; t += step) {
+      const z = toZoned(new Date(t), tz);
+      const cell = Math.floor((z.hour * 60 + z.minute) / CELL_MINUTES);
+      const titles = out[cellIndex(z.weekday, cell)]!;
+      if (!titles.includes(b.gameTitle)) titles.push(b.gameTitle);
+    }
+  }
+  return out;
 }

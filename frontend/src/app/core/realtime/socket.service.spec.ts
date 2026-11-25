@@ -1,18 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import type { Mock } from 'vitest';
-import { SocketService } from './socket.service';
+import type { io } from 'socket.io-client';
+import { SOCKET_IO, SocketService } from './socket.service';
 
 type Handler = (...args: unknown[]) => void;
 const handlers = new Map<string, Handler>();
-vi.mock('socket.io-client', () => ({
-  io: () => ({
-    connected: false,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    on: (ev: string, h: Handler) => handlers.set(ev, h),
-    off: vi.fn(),
-  }),
-}));
+const fakeIo = () => ({
+  connected: false,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  on: (ev: string, h: Handler) => handlers.set(ev, h),
+  off: vi.fn(),
+});
 
 describe('SocketService sessionLost$', () => {
   let service: SocketService;
@@ -20,6 +19,9 @@ describe('SocketService sessionLost$', () => {
 
   beforeEach(() => {
     handlers.clear();
+    TestBed.configureTestingModule({
+      providers: [{ provide: SOCKET_IO, useValue: fakeIo as unknown as typeof io }],
+    });
     service = TestBed.inject(SocketService);
     lost = vi.fn();
     service.sessionLost$.subscribe(() => lost());

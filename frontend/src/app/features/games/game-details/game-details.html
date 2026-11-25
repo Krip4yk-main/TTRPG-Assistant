@@ -291,6 +291,7 @@
           </dl>
 
           @if (showMembers()) {
+            <nri-calendar-pin class="calendar-pin" [gameId]="g.id" />
             <nri-sessions-list
               class="nri-card sessions"
               [gameId]="g.id"
@@ -306,6 +307,19 @@
               [manageable]="manageable()"
               (changed)="membersChanged()"
             />
+            <section class="nri-card notes" aria-labelledby="notes-title">
+              <h2 id="notes-title">{{ 'notes.title' | translate }}</h2>
+              @if (privateNote(); as source) {
+                <nri-note-editor
+                  label="notes.private.game"
+                  hint="notes.private.gameHint"
+                  [source]="source"
+                />
+              }
+              @if (!isGm()) {
+                <nri-shared-player-notes [gameId]="g.id" />
+              }
+            </section>
           }
 
           @if (myConstraints(); as list) {

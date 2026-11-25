@@ -63,6 +63,8 @@ describe('AccountSettings nickname', () => {
     http = TestBed.inject(HttpTestingController);
     el = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
+    http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
+    await fixture.whenStable();
   });
 
   afterEach(() => {
@@ -140,6 +142,38 @@ describe('AccountSettings nickname', () => {
     expect(el.textContent).toContain('profile.errors.BIRTH_DATE_COOLDOWN');
   });
 
+  describe('calendar auto busy', () => {
+    const toggle = () => el.querySelector<HTMLButtonElement>('.auto-busy button[role=switch]')!;
+
+    it('shows the setting (on by default) and PATCHes on change', async () => {
+      fixture.detectChanges();
+      expect(toggle().getAttribute('aria-checked')).toBe('true');
+      toggle().click();
+      fixture.detectChanges();
+      const req = http.expectOne('/api/me/settings');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ calendarAutoBusy: false });
+      req.flush({ calendarAutoBusy: false });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+      expect(el.querySelector('.auto-busy')!.textContent).toContain('account.calendar.saved');
+    });
+
+    it('a failed PATCH reverts the toggle and shows the error', async () => {
+      fixture.detectChanges();
+      toggle().click();
+      fixture.detectChanges();
+      http
+        .expectOne('/api/me/settings')
+        .flush({ error: { code: 'INTERNAL' } }, { status: 500, statusText: 'Server Error' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(toggle().getAttribute('aria-checked')).toBe('true');
+      expect(el.querySelector('.auto-busy [role=alert]')!.textContent).toContain('errors.INTERNAL');
+    });
+  });
+
   describe('time zone', () => {
     const tzInput = () =>
       el.querySelector<HTMLInputElement>('form.timezone input[name="timezone"]')!;
@@ -185,6 +219,8 @@ describe('AccountSettings nickname', () => {
       fixture = TestBed.createComponent(AccountSettings);
       el = fixture.nativeElement as HTMLElement;
       fixture.detectChanges();
+      await fixture.whenStable();
+      http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
       await fixture.whenStable();
     };
 

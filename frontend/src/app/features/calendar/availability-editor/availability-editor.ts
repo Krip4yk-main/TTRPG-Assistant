@@ -22,6 +22,7 @@ import type { AvailabilityDto } from '@nri/shared';
 import { firstValueFrom, map } from 'rxjs';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { AvailabilityApi } from '../../../core/availability/availability.api';
+import { CalendarApi } from '../../../core/calendar/calendar.api';
 import { browserTimeZone, fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import {
   CELLS_PER_DAY,
@@ -30,6 +31,8 @@ import {
   cellIndex,
   cellsToSlots,
   formatMinutes,
+  gameBusyCells,
+  gameBusyWindow,
   slotsToCells,
 } from './availability-grid';
 
@@ -96,6 +99,7 @@ function inRect(d: Drag, day: number, cell: number): boolean {
 })
 export class AvailabilityEditor {
   private readonly api = inject(AvailabilityApi);
+  private readonly calendarApi = inject(CalendarApi);
   private readonly auth = inject(AuthStore);
   private readonly translate = inject(TranslateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -128,6 +132,13 @@ export class AvailabilityEditor {
   private readonly snapshot = signal('');
   /** Значення, яке Shift+стрілка «протягує» далі. */
   private paintValue = true;
+  /**
+   * `save`: назви ігор, сесії яких припадають на клітинку в найближчі 7 днів. Лише показ —
+   * вільний час вони не змінюють і не редагуються.
+   */
+  protected readonly gameBusy = signal<string[][]>(gameBusyCells([], 'UTC'));
+  /** Пояс, для якого зайнятість уже запитано. */
+  private gameBusyZone: string | null = null;
 
   private readonly weekdayNames = toSignal(
     this.translate
@@ -145,11 +156,21 @@ export class AvailabilityEditor {
       inRect(d, Math.floor(i / CELLS_PER_DAY), i % CELLS_PER_DAY) ? d.value : on,
     );
   });
-  /** Підписи клітинок для читачів екрана: «Вівторок, 19:00–19:30». */
+  private readonly busyPrefix = toSignal(
+    this.translate.stream('calendar.gameBusy.cell').pipe(map(String)),
+    { initialValue: '' },
+  );
+  /** Підписи клітинок для читачів екрана: «Вівторок, 19:00–19:30. Сесія гри: …». */
   protected readonly labels = computed(() => {
     const names = this.weekdayNames();
+    const busy = this.gameBusy();
+    const prefix = this.busyPrefix();
     return this.days.map((d) =>
-      this.rows.map((c) => `${names[d]}, ${this.times[c]}–${this.times[c + 1]}`),
+      this.rows.map((c) => {
+        const base = `${names[d]}, ${this.times[c]}–${this.times[c + 1]}`;
+        const games = busy[cellIndex(d, c)]!;
+        return games.length ? `${base}. ${prefix}: ${games.join(', ')}` : base;
+      }),
     );
   });
   protected readonly selectedCount = computed(() => this.cells().filter(Boolean).length);
@@ -181,6 +202,21 @@ export class AvailabilityEditor {
     this.timezone.set(a.timezone || this.auth.me()?.timezone || browserTimeZone());
     this.snapshot.set(this.serialize());
     this.state.set('ready');
+    if (this.mode() === 'save' && this.gameBusyZone !== this.timezone()) {
+      void this.loadGameBusy(this.timezone());
+    }
+  }
+
+  /** Сесії ігор найближчих 7 днів у поясі акаунта; без них редактор працює як раніше. */
+  private async loadGameBusy(tz: string): Promise<void> {
+    this.gameBusyZone = tz;
+    const { from, to } = gameBusyWindow(new Date(), tz);
+    try {
+      const busy = await firstValueFrom(this.calendarApi.gameBusy(from, to));
+      if (this.gameBusyZone === tz) this.gameBusy.set(gameBusyCells(busy, tz));
+    } catch {
+      if (this.gameBusyZone === tz) this.gameBusyZone = null;
+    }
   }
 
   /** Поточний стан редактора як `AvailabilityDto`. */

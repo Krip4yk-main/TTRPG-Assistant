@@ -58,6 +58,10 @@ import {
   type ScheduleRuleDialogData,
 } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { SessionsList } from '../../sessions/sessions-list/sessions-list';
+import { CalendarPin } from '../../calendar/calendar-pin/calendar-pin';
+import { NoteEditor } from '../../notes/note-editor/note-editor';
+import { SharedPlayerNotes } from '../../notes/shared-player-notes/shared-player-notes';
+import { NotesApi } from '../../../core/notes/notes.api';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
@@ -87,6 +91,9 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
     WarningChip,
     MembersPanel,
     SessionsList,
+    CalendarPin,
+    NoteEditor,
+    SharedPlayerNotes,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
@@ -101,6 +108,7 @@ export class GameDetails {
   private readonly dialog = inject(MatDialog);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly notes = inject(NotesApi);
   private readonly sessionsList = viewChild(SessionsList);
 
   /** `:id` з маршруту. */
@@ -140,6 +148,11 @@ export class GameDetails {
     const g = this.game();
     if (!g) return false;
     return this.isGm() ? g.status !== 'draft' : this.relation() === 'member';
+  });
+  /** Приватна нотатка на гру (майстру й учасникам). */
+  protected readonly privateNote = computed(() => {
+    const id = this.game()?.id;
+    return id ? this.notes.gamePrivate(id) : null;
   });
   /** Відповіді майстра на обмеження з моєї затвердженої заявки (лише учаснику). */
   protected readonly myConstraints = signal<ApplicationConstraintDto[] | null>(null);

@@ -1,0 +1,24 @@
+@switch (mode()) {
+  @case ('auto') {
+    <p class="nri-muted auto">
+      {{ 'calendarPin.auto' | translate }}
+      <a routerLink="/calendar">{{ 'calendarPin.calendarLink' | translate }}</a>
+    </p>
+  }
+  @case ('manual') {
+    <mat-slide-toggle
+      class="pin"
+      [checked]="pinned()"
+      [disabled]="busy()"
+      aria-describedby="calendar-pin-hint"
+      (change)="toggle($event.checked)"
+      >{{ 'calendarPin.label' | translate }}</mat-slide-toggle
+    >
+    <p id="calendar-pin-hint" class="nri-muted hint">{{ 'calendarPin.hint' | translate }}</p>
+  }
+}
+<div aria-live="polite">
+  @if (error(); as key) {
+    <p class="nri-alert" role="alert">{{ key | translate }}</p>
+  }
+</div>

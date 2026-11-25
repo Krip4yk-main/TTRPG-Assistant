@@ -36,4 +36,12 @@
   --nri-backdrop: rgba(2, 6, 23, 0.72);
   /* Межа спливних поверхонь (діалоги, меню, списки) — відділяє їх від затемненого фону. */
   --nri-overlay-border: #334155;
+  /* Сесії ігор у календарі: штриховка поверх клітинки, відмінна від вільного часу. */
+  --nri-game-busy-stripe: rgba(251, 191, 36, 0.6);
+  --nri-game-busy-edge: #fbbf24;
+  --nri-game-busy-hatch: repeating-linear-gradient(
+    -45deg,
+    var(--nri-game-busy-stripe) 0 3px,
+    transparent 3px 7px
+  );
 }
