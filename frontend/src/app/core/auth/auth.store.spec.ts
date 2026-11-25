@@ -20,6 +20,7 @@ const me = (over: Partial<MeDto> = {}): MeDto => ({
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
   identities: [{ provider: 'dev', displayName: 'Gandalf' }],
   ...over,
 });

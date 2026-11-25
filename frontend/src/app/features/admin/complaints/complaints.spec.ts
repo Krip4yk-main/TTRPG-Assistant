@@ -21,6 +21,7 @@ const me = (role: UserRole): MeDto => ({
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
   identities: [],
 });
 

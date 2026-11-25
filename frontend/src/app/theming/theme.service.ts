@@ -3,10 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   DEFAULT_THEME,
+  DEFAULT_UI_PREFS,
   THEME_IDS,
   resolveTheme,
   type MeDto,
   type ThemeId,
+  type UiPrefsDto,
   type UpdateThemeRequest,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
@@ -51,6 +53,9 @@ export class ThemeService {
     return me ? me.availableThemes : [DEFAULT_THEME];
   });
 
+  /** Налаштування вигляду з профілю; гість — за замовчуванням (анімації ввімкнені). */
+  readonly uiPrefs = computed<UiPrefsDto>(() => this.auth.me()?.uiPrefs ?? DEFAULT_UI_PREFS);
+
   private readonly effective = computed<ThemeId>(() => effectiveTheme(this.auth.me()));
 
   constructor() {
@@ -73,6 +78,12 @@ export class ThemeService {
     const me = await firstValueFrom(this.http.patch<MeDto>('/api/me/theme', body));
     this.auth.setMe(me);
     await this.apply(effectiveTheme(me));
+  }
+
+  /** Зберегти налаштування вигляду в профілі (усі пристрої). */
+  async saveUiPrefs(prefs: UiPrefsDto): Promise<void> {
+    const me = await firstValueFrom(this.http.patch<MeDto>('/api/me/ui-prefs', prefs));
+    this.auth.setMe(me);
   }
 
   private apply(id: ThemeId): Promise<void> {

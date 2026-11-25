@@ -204,6 +204,13 @@
       "when": 1795630637951,
       "tag": "0028_plan8_ui_theme",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1795642733502,
+      "tag": "0029_board_tear_animation",
+      "breakpoints": true
     }
   ]
 }

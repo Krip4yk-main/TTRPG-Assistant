@@ -29,6 +29,7 @@ const me = (telegram: boolean): MeDto => ({
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
   identities: telegram
     ? [{ provider: 'telegram', displayName: '@gandalf' }]
     : [{ provider: 'dev', displayName: 'G' }],

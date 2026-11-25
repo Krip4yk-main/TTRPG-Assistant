@@ -29,6 +29,8 @@ export const users = mysqlTable('users', {
   locale: varchar('locale', { length: 8 }).notNull().default('uk'),
   /** Обраний дизайн сайту (`ThemeId`); NULL — дефолт. Ефективне значення — `resolveTheme`. */
   uiTheme: varchar('ui_theme', { length: 32 }),
+  /** Налаштування вигляду дизайну «Дошка»: анімація відривання оголошення (за замовчуванням — так). */
+  qbTearAnimation: boolean('qb_tear_animation').notNull().default(true),
   privacy: json('privacy')
     .$type<Record<string, unknown>>()
     .notNull()

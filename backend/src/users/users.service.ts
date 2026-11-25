@@ -8,6 +8,7 @@ import {
   type CompleteProfileInput,
   type MeDto,
   type ThemeId,
+  type UpdateUiPrefsInput,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
@@ -81,6 +82,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     identities,
     uiTheme: resolveTheme(u.uiTheme, u.role),
     availableThemes: availableThemes(u.role),
+    uiPrefs: { tearAnimation: u.qbTearAnimation },
   };
 }
 
@@ -191,6 +193,19 @@ export async function changeTheme(deps: AppDeps, userId: number, theme: ThemeId)
     if (!availableThemes(u.role).includes(theme)) throw new AppError(403, 'THEME_NOT_AVAILABLE');
     await tx.update(users).set({ uiTheme: theme }).where(eq(users.id, userId));
   });
+  return getMe(deps, userId);
+}
+
+/** Зберігає налаштування вигляду (`PATCH /api/me/ui-prefs`). */
+export async function changeUiPrefs(
+  deps: AppDeps,
+  userId: number,
+  prefs: UpdateUiPrefsInput,
+): Promise<MeDto> {
+  await deps.db
+    .update(users)
+    .set({ qbTearAnimation: prefs.tearAnimation })
+    .where(eq(users.id, userId));
   return getMe(deps, userId);
 }
 

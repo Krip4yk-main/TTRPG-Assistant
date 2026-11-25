@@ -6,6 +6,7 @@ import {
   changeTimezoneSchema,
   completeProfileSchema,
   updateThemeSchema,
+  updateUiPrefsSchema,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { requireActive, requireAuth } from '../auth/session.middleware.js';
@@ -17,6 +18,7 @@ import {
   changeBirthDate,
   changeNickname,
   changeTheme,
+  changeUiPrefs,
   changeTimezone,
   completeProfile,
   deleteAccount,
@@ -68,6 +70,11 @@ export function usersRouter(deps: AppDeps): Router {
   router.patch('/theme', auth, requireActive, async (req, res) => {
     const { theme } = updateThemeSchema.parse(req.body);
     res.json(await changeTheme(deps, req.user!.userId, theme));
+  });
+
+  router.patch('/ui-prefs', auth, requireActive, async (req, res) => {
+    const prefs = updateUiPrefsSchema.parse(req.body);
+    res.json(await changeUiPrefs(deps, req.user!.userId, prefs));
   });
 
   router.post('/telegram-link-token', auth, requireActive, async (req, res) => {

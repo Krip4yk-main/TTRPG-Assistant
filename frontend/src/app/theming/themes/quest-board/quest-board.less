@@ -351,6 +351,76 @@
     }
   }
 
+  // ---- Відривання оголошення (клік → сторінка гри) ----
+  // Поки анімацію ввімкнено, оголошення — одна велика кнопка: текст не виділяється.
+  .qb-tearable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  // Аркуш відривається від шпильки: угорі по центру лишається рваний виріз (клапоть —
+  // .qb-tear-stub), сам аркуш хитається, падає з поворотом і зникає. Тривалість — TEAR_MS у
+  // quest-board-game-card.ts.
+  .qb-tearing {
+    clip-path: polygon(
+      0 2%,
+      4% 0,
+      38% 0.5%,
+      40% 6%,
+      43% 3.5%,
+      46% 8.5%,
+      49% 5%,
+      52% 9%,
+      55% 4.5%,
+      58% 7.5%,
+      61% 0.5%,
+      80% 1.5%,
+      100% 0,
+      99% 30%,
+      100% 60%,
+      98.5% 100%,
+      70% 98.5%,
+      40% 100%,
+      12% 98.8%,
+      0 100%,
+      1% 60%
+    );
+    transform-origin: 35% 0;
+    animation: qb-tear 520ms cubic-bezier(0.55, 0, 0.8, 0.4) forwards;
+    pointer-events: none;
+
+    .qb-pin {
+      visibility: hidden;
+    }
+  }
+
+  .qb-tear-stub {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 2;
+    width: 26%;
+    height: 9.5%;
+    transform: translateX(-50%);
+    background-color: var(--qb-parchment);
+    box-shadow: inset 0 0 12px rgba(120, 80, 30, 0.25);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% 8%,
+      88% 80%,
+      77% 45%,
+      65% 95%,
+      54% 55%,
+      42% 100%,
+      31% 50%,
+      19% 85%,
+      8% 35%,
+      0 70%
+    );
+    pointer-events: none;
+  }
+
   // Стрічка-закладка (мох).
   .qb-ribbon {
     display: inline-flex;
@@ -421,6 +491,29 @@
   .mat-datepicker-content.mat-datepicker-content {
     outline: 1px solid var(--nri-overlay-border);
     outline-offset: -1px;
+  }
+}
+
+@keyframes qb-tear {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+
+  20% {
+    transform: translateY(5px) rotate(-3deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-24px, 260px) rotate(-16deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @{qb} .qb-tearing {
+    animation: none;
   }
 }
 

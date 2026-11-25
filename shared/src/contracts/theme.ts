@@ -31,3 +31,15 @@ export function resolveTheme(stored: string | null, role: UserRole): ThemeId {
 export interface UpdateThemeRequest {
   theme: ThemeId;
 }
+
+/** Налаштування вигляду дизайнів (зберігаються в профілі, `MeDto.uiPrefs`). */
+export interface UiPrefsDto {
+  /** «Дошка»: оголошення відривається від шпильки перед переходом на сторінку гри. */
+  tearAnimation: boolean;
+}
+
+/** Налаштування вигляду для гостя (і до завантаження профілю). */
+export const DEFAULT_UI_PREFS: UiPrefsDto = { tearAnimation: true };
+
+/** `PATCH /api/me/ui-prefs` → `MeDto` (схема — `theme-schema.ts`). */
+export type UpdateUiPrefsRequest = UiPrefsDto;

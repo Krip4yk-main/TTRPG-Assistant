@@ -1,7 +1,13 @@
 @let g = game();
+<!-- Клапоть під шпилькою, що лишається на стіні, коли оголошення відривається. -->
+@if (tearing()) {
+  <span class="qb-tear-stub" aria-hidden="true"><span class="qb-pin"></span></span>
+}
 @if (g.restricted) {
   <article
     class="note qb-paper qb-torn restricted"
+    [class.qb-tearable]="tearEnabled()"
+    [class.qb-tearing]="tearing()"
     [attr.data-game-id]="g.id"
     [attr.data-tilt]="tilt()"
   >
@@ -23,7 +29,7 @@
       }
     </div>
     <h2 class="title">
-      <a [routerLink]="['/games', g.id]" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
+      <a #open class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
     </h2>
     <p class="restricted-text">{{ g.restrictedKey | translate }}</p>
     @if (g.loginReturnTo; as returnTo) {
@@ -34,7 +40,13 @@
     <footer class="foot gm"><nri-qb-gm-signature [gm]="g.gm" /></footer>
   </article>
 } @else {
-  <article class="note qb-paper qb-torn" [attr.data-game-id]="g.id" [attr.data-tilt]="tilt()">
+  <article
+    class="note qb-paper qb-torn"
+    [class.qb-tearable]="tearEnabled()"
+    [class.qb-tearing]="tearing()"
+    [attr.data-game-id]="g.id"
+    [attr.data-tilt]="tilt()"
+  >
     <span class="qb-pin" aria-hidden="true"></span>
     @if (ribbon(); as r) {
       <span class="ribbon"><nri-qb-badge [badge]="r" /></span>
@@ -61,7 +73,7 @@
       </div>
     }
     <h2 class="title">
-      <a [routerLink]="['/games', g.id]" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
+      <a #open class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
     </h2>
     <dl class="facts">
       @if (g.showSchedule) {

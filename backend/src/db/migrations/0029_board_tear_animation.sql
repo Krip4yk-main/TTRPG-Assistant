@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `qb_tear_animation` boolean DEFAULT true NOT NULL;

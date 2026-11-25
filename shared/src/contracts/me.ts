@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ianaTimezone } from '../schemas/common.js';
-import type { ThemeId } from './theme.js';
+import type { ThemeId, UiPrefsDto } from './theme.js';
 
 export type UserStatus = 'pending' | 'active' | 'deleted';
 export type UserRole = 'owner' | 'admin' | 'moderator' | 'user';
@@ -28,6 +28,8 @@ export interface MeDto {
   uiTheme: ThemeId;
   /** Дизайни, доступні ролі користувача. */
   availableThemes: ThemeId[];
+  /** Налаштування вигляду, що зберігаються в профілі (для всіх пристроїв). */
+  uiPrefs: UiPrefsDto;
 }
 
 /**

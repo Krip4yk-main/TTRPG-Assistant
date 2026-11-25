@@ -1,9 +1,15 @@
 // Тінь — через filter на хості: clip-path «рваного» краю обрізав би box-shadow аркуша.
 // Розмір оголошення сталий (ширину задає сітка, висота — тут): довгі рядки обрізаються.
 :host {
+  position: relative;
   display: block;
   height: 23.75rem;
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
+}
+
+// Аркуш, що відривається й падає, — над сусідніми оголошеннями.
+:host(.leaving) {
+  z-index: 5;
 }
 
 .note {

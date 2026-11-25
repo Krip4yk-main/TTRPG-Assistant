@@ -1,5 +1,5 @@
 import { InjectionToken } from '@angular/core';
-import type { ThemeId } from '@nri/shared';
+import type { ThemeId, UiPrefsDto } from '@nri/shared';
 import { runtimeConfig } from '../../environments/runtime-config';
 import type { ThemeSlots } from './slots';
 
@@ -15,6 +15,8 @@ export interface ThemeDefinition {
   styleHref: string;
   /** Лінивий чанк компонентів слотів дизайну. */
   loadSlots: () => Promise<ThemeSlots>;
+  /** Власні налаштування дизайну в розділі «Вигляд» (ключі `UiPrefsDto`). */
+  options?: (keyof UiPrefsDto)[];
 }
 
 /**
@@ -34,6 +36,7 @@ function theme(
   id: ThemeId,
   colorScheme: ThemeDefinition['colorScheme'],
   loadSlots: ThemeDefinition['loadSlots'],
+  options: ThemeDefinition['options'] = [],
 ): ThemeDefinition {
   return {
     id,
@@ -42,6 +45,7 @@ function theme(
     colorScheme,
     styleHref: themeStyleHref(id),
     loadSlots,
+    options,
   };
 }
 
@@ -52,8 +56,12 @@ function theme(
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
   // «Дошка оголошень»: дерев'яна стіна, але текст і поля — на пергаменті (чорнило на світлому),
   // тож нативні контроли (select, скролбари панелей, календарі) — світлі.
-  'quest-board': theme('quest-board', 'light', () =>
-    import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
+  // Власне налаштування — анімація відривання оголошення.
+  'quest-board': theme(
+    'quest-board',
+    'light',
+    () => import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
+    ['tearAnimation'],
   ),
   classic: theme('classic', 'dark', () =>
     import('./themes/classic/slots').then((m) => m.CLASSIC_SLOTS),

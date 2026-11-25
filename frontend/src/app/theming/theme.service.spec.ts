@@ -32,12 +32,14 @@ const user: MeDto = {
   role: 'user',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
 };
 const owner: MeDto = {
   ...base,
   role: 'owner',
   uiTheme: 'classic',
   availableThemes: ['quest-board', 'classic'],
+  uiPrefs: { tearAnimation: true },
 };
 
 // Окремі «бандли» для кожного дизайну (тест не тягне справжні чанки дизайнів).

@@ -1,29 +1,46 @@
 @if (visible()) {
   <section class="nri-card" aria-labelledby="theme-picker-title">
     <h2 id="theme-picker-title">{{ 'account.theme.title' | translate }}</h2>
-    <p class="nri-muted hint">{{ 'account.theme.hint' | translate }}</p>
-    <ul class="options">
-      @for (option of options(); track option.id) {
-        <li>
-          <button
-            type="button"
-            class="option"
-            [class.selected]="option.id === selected()"
-            [attr.aria-pressed]="option.id === selected()"
-            [attr.aria-disabled]="busy() || null"
-            (click)="choose(option.id)"
-          >
-            <img [src]="option.preview" alt="" width="240" height="150" loading="lazy" />
-            <span class="name">
-              {{ option.labelKey | translate }}
-              @if (option.id === selected()) {
-                <span class="current">{{ 'account.theme.current' | translate }}</span>
-              }
-            </span>
-          </button>
-        </li>
-      }
-    </ul>
+    @if (picker()) {
+      <p class="nri-muted hint">{{ 'account.theme.hint' | translate }}</p>
+      <ul class="options">
+        @for (option of options(); track option.id) {
+          <li>
+            <button
+              type="button"
+              class="option"
+              [class.selected]="option.id === selected()"
+              [attr.aria-pressed]="option.id === selected()"
+              [attr.aria-disabled]="busy() || null"
+              (click)="choose(option.id)"
+            >
+              <img [src]="option.preview" alt="" width="240" height="150" loading="lazy" />
+              <span class="name">
+                {{ option.labelKey | translate }}
+                @if (option.id === selected()) {
+                  <span class="current">{{ 'account.theme.current' | translate }}</span>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+    @if (designOptions().includes('tearAnimation')) {
+      <div class="design-option">
+        <mat-slide-toggle
+          #tearToggle
+          [checked]="tearAnimation()"
+          [disabled]="prefsBusy()"
+          aria-describedby="tear-animation-hint"
+          (change)="setTearAnimation($event.checked)"
+          >{{ 'account.theme.tearAnimation' | translate }}</mat-slide-toggle
+        >
+        <p id="tear-animation-hint" class="nri-muted option-hint">
+          {{ 'account.theme.tearAnimationHint' | translate }}
+        </p>
+      </div>
+    }
     <div aria-live="polite">
       @if (errorKey(); as key) {
         <p class="nri-alert" role="alert">{{ key | translate }}</p>

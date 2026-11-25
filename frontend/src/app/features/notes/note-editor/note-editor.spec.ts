@@ -21,6 +21,7 @@ const me = {
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
   identities: [],
 } satisfies MeDto;
 const DRAFT_KEY = noteDraftKey(5, 'game_private.7');

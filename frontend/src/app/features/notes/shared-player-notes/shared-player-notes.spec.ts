@@ -20,6 +20,7 @@ const me = {
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
+  uiPrefs: { tearAnimation: true },
   identities: [],
 } satisfies MeDto;
 

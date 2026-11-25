@@ -99,6 +99,7 @@ describe('GET /api/me', () => {
       identities: [{ provider: 'google', displayName: 'G' }],
       uiTheme: 'quest-board',
       availableThemes: ['quest-board'],
+      uiPrefs: { tearAnimation: true },
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
   });
@@ -309,6 +310,44 @@ describe('PATCH /api/me/timezone', () => {
     expect(guest.status).toBe(401);
     const p = await createUser(db, { status: 'pending' });
     const res = await call('patch', '/api/me/timezone', await login(p.id), { timezone: 'UTC' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/me/ui-prefs', () => {
+  it('saves tearAnimation; /api/me returns it (default true)', async () => {
+    const u = await createUser(db, { nickname: 'Prefs' });
+    const cookie = await login(u.id);
+    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({ tearAnimation: true });
+    const res = await call('patch', '/api/me/ui-prefs', cookie, { tearAnimation: false });
+    expect(res.status).toBe(200);
+    expect(res.body.uiPrefs).toEqual({ tearAnimation: false });
+    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({ tearAnimation: false });
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.qbTearAnimation).toBe(false);
+  });
+
+  it('strict body: missing, non-boolean or extra keys → 400', async () => {
+    const u = await createUser(db, { nickname: 'Prefs2' });
+    const cookie = await login(u.id);
+    for (const body of [{}, { tearAnimation: 'no' }, { tearAnimation: true, extra: 1 }]) {
+      const bad = await call('patch', '/api/me/ui-prefs', cookie, body);
+      expect(bad.status).toBe(400);
+      expect(bad.body.error.code).toBe('VALIDATION');
+    }
+  });
+
+  it('guest: 401; pending account: 403', async () => {
+    const guest = await request(app)
+      .patch('/api/me/ui-prefs')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ tearAnimation: false });
+    expect(guest.status).toBe(401);
+    const p = await createUser(db, { status: 'pending' });
+    const res = await call('patch', '/api/me/ui-prefs', await login(p.id), {
+      tearAnimation: false,
+    });
     expect(res.status).toBe(403);
   });
 });
