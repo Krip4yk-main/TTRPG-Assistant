@@ -43,7 +43,7 @@ const user: MeDto = {
   role: 'user',
   uiTheme: 'night-city',
   availableThemes: ALL,
-  uiPrefs: { tearAnimation: true },
+  uiPrefs: { tearAnimation: true, sendAnimation: true },
 };
 
 // Окремі «чанки» дизайнів (тест не тягне справжні чанки): «Дошка» і кібер-родина.
@@ -447,13 +447,13 @@ describe('ThemeService', () => {
       setup();
       auth.setMe(user);
       await service.init();
-      expect(service.uiPrefs()).toEqual({ tearAnimation: true });
+      expect(service.uiPrefs()).toEqual({ tearAnimation: true, sendAnimation: true });
 
       meChanged.next({ scope: 'appearance' });
       http()
         .expectOne('/api/me')
-        .flush({ ...user, uiPrefs: { tearAnimation: false } });
-      expect(service.uiPrefs()).toEqual({ tearAnimation: false });
+        .flush({ ...user, uiPrefs: { tearAnimation: false, sendAnimation: true } });
+      expect(service.uiPrefs()).toEqual({ tearAnimation: false, sendAnimation: true });
       http().verify();
     });
 

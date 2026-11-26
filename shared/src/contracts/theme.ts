@@ -55,10 +55,15 @@ export interface UpdateThemeRequest {
 export interface UiPrefsDto {
   /** «Дошка»: оголошення відривається від шпильки перед переходом на сторінку гри. */
   tearAnimation: boolean;
+  /** «Магіпанк»: надіслана заявка складається в конверт, запечатується й відлітає. */
+  sendAnimation: boolean;
 }
 
 /** Налаштування вигляду для гостя (і до завантаження профілю). */
-export const DEFAULT_UI_PREFS: UiPrefsDto = { tearAnimation: true };
+export const DEFAULT_UI_PREFS: UiPrefsDto = { tearAnimation: true, sendAnimation: true };
 
-/** `PATCH /api/me/ui-prefs` → `MeDto` (схема — `theme-schema.ts`). */
-export type UpdateUiPrefsRequest = UiPrefsDto;
+/**
+ * `PATCH /api/me/ui-prefs` → `MeDto` (схема — `theme-schema.ts`): лише змінені налаштування
+ * (хоч одне); решта лишаються як були.
+ */
+export type UpdateUiPrefsRequest = Partial<UiPrefsDto>;

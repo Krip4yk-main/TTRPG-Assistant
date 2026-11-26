@@ -97,7 +97,7 @@ describe('CompleteProfile', () => {
       locale: 'uk',
       uiTheme: 'quest-board',
       availableThemes: ['quest-board'],
-      uiPrefs: { tearAnimation: true },
+      uiPrefs: { tearAnimation: true, sendAnimation: true },
       identities: [{ provider: 'dev', displayName: 'kid' }],
     });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

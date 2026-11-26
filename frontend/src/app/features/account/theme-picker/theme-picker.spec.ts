@@ -15,7 +15,7 @@ import { ThemePicker } from './theme-picker';
  */
 function fakeThemes(available: ThemeId[], current: ThemeId = 'quest-board') {
   const theme = signal<ThemeId>(current);
-  const uiPrefs = signal<UiPrefsDto>({ tearAnimation: true });
+  const uiPrefs = signal<UiPrefsDto>({ tearAnimation: true, sendAnimation: true });
   return {
     theme,
     available: signal(available),

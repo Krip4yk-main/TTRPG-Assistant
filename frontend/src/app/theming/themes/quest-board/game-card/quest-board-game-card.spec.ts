@@ -39,7 +39,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   /** Справжній перехід роутера (до підміни шпигуном). */
   let realNavigate: (url: string) => Promise<boolean>;
 
-  async function mount(prefs: UiPrefsDto = { tearAnimation: true }) {
+  async function mount(prefs: UiPrefsDto = { tearAnimation: true, sendAnimation: true }) {
     await TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -127,7 +127,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   });
 
   it('анімацію вимкнено в профілі — перехід одразу, текст можна виділяти', async () => {
-    const f = await mount({ tearAnimation: false });
+    const f = await mount({ tearAnimation: false, sendAnimation: true });
     expect(article(f).classList).not.toContain('qb-tearable');
     click(article(f));
     expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
@@ -165,7 +165,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   });
 
   it('скасований перехід повертає аркуш на місце', async () => {
-    const f = await mount({ tearAnimation: false });
+    const f = await mount({ tearAnimation: false, sendAnimation: true });
     navigate.mockResolvedValueOnce(false);
     click(article(f));
     await f.whenStable();
@@ -188,7 +188,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   });
 
   it('анімацію вимкнено й виділено текст цього оголошення — клік не відкриває гру', async () => {
-    const f = await mount({ tearAnimation: false });
+    const f = await mount({ tearAnimation: false, sendAnimation: true });
     document.getSelection()!.selectAllChildren(article(f).querySelector('.sys')!);
     click(article(f).querySelector('.sys')!);
     expect(navigate).not.toHaveBeenCalled();
@@ -225,7 +225,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   });
 
   it('помилка переходу — аркуш повертається на місце, клік працює знову', async () => {
-    const f = await mount({ tearAnimation: false });
+    const f = await mount({ tearAnimation: false, sendAnimation: true });
     navigate.mockRejectedValueOnce(new Error('chunk load failed'));
     click(article(f));
     await f.whenStable();

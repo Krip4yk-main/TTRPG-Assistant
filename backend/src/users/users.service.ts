@@ -85,7 +85,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     identities,
     uiTheme: resolveTheme(u.uiTheme, u.role),
     availableThemes: availableThemes(u.role),
-    uiPrefs: { tearAnimation: u.qbTearAnimation },
+    uiPrefs: { tearAnimation: u.qbTearAnimation, sendAnimation: u.uiSendAnimation },
   };
 }
 
@@ -200,7 +200,7 @@ export async function changeTheme(deps: AppDeps, userId: number, theme: ThemeId)
   return getMe(deps, userId);
 }
 
-/** Зберігає налаштування вигляду (`PATCH /api/me/ui-prefs`). */
+/** Зберігає налаштування вигляду (`PATCH /api/me/ui-prefs`): лише передані, решта — як були. */
 export async function changeUiPrefs(
   deps: AppDeps,
   userId: number,
@@ -208,7 +208,7 @@ export async function changeUiPrefs(
 ): Promise<MeDto> {
   await deps.db
     .update(users)
-    .set({ qbTearAnimation: prefs.tearAnimation })
+    .set({ qbTearAnimation: prefs.tearAnimation, uiSendAnimation: prefs.sendAnimation })
     .where(eq(users.id, userId));
   pingMeChanged(deps, userId, 'appearance');
   return getMe(deps, userId);

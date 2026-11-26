@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `ui_send_animation` boolean DEFAULT true NOT NULL;

@@ -31,6 +31,8 @@ export const users = mysqlTable('users', {
   uiTheme: varchar('ui_theme', { length: 32 }),
   /** Налаштування вигляду дизайну «Дошка»: анімація відривання оголошення (за замовчуванням — так). */
   qbTearAnimation: boolean('qb_tear_animation').notNull().default(true),
+  /** Налаштування вигляду дизайну «Магіпанк»: заявка відлітає в конверті (за замовчуванням — так). */
+  uiSendAnimation: boolean('ui_send_animation').notNull().default(true),
   privacy: json('privacy')
     .$type<Record<string, unknown>>()
     .notNull()

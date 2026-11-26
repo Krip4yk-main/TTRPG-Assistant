@@ -108,7 +108,7 @@ describe('GET /api/me', () => {
         'magicpunk',
         'brass-steam',
       ],
-      uiPrefs: { tearAnimation: true },
+      uiPrefs: { tearAnimation: true, sendAnimation: true },
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
   });
@@ -346,19 +346,49 @@ describe('PATCH /api/me/ui-prefs', () => {
   it('saves tearAnimation; /api/me returns it (default true)', async () => {
     const u = await createUser(db, { nickname: 'Prefs' });
     const cookie = await login(u.id);
-    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({ tearAnimation: true });
+    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({
+      tearAnimation: true,
+      sendAnimation: true,
+    });
     const res = await call('patch', '/api/me/ui-prefs', cookie, { tearAnimation: false });
     expect(res.status).toBe(200);
-    expect(res.body.uiPrefs).toEqual({ tearAnimation: false });
-    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({ tearAnimation: false });
+    expect(res.body.uiPrefs).toEqual({ tearAnimation: false, sendAnimation: true });
+    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({
+      tearAnimation: false,
+      sendAnimation: true,
+    });
     const [row] = await db.select().from(users).where(eq(users.id, u.id));
     expect(row!.qbTearAnimation).toBe(false);
   });
 
-  it('strict body: missing, non-boolean or extra keys → 400', async () => {
+  it('saves sendAnimation alone, keeping tearAnimation; both at once', async () => {
+    const u = await createUser(db, { nickname: 'PrefsSend' });
+    const cookie = await login(u.id);
+    const res = await call('patch', '/api/me/ui-prefs', cookie, { sendAnimation: false });
+    expect(res.status).toBe(200);
+    expect(res.body.uiPrefs).toEqual({ tearAnimation: true, sendAnimation: false });
+    expect((await call('get', '/api/me', cookie)).body.uiPrefs).toEqual({
+      tearAnimation: true,
+      sendAnimation: false,
+    });
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.uiSendAnimation).toBe(false);
+    const both = await call('patch', '/api/me/ui-prefs', cookie, {
+      tearAnimation: false,
+      sendAnimation: true,
+    });
+    expect(both.body.uiPrefs).toEqual({ tearAnimation: false, sendAnimation: true });
+  });
+
+  it('strict body: empty, non-boolean or extra keys → 400', async () => {
     const u = await createUser(db, { nickname: 'Prefs2' });
     const cookie = await login(u.id);
-    for (const body of [{}, { tearAnimation: 'no' }, { tearAnimation: true, extra: 1 }]) {
+    for (const body of [
+      {},
+      { tearAnimation: 'no' },
+      { sendAnimation: 1 },
+      { tearAnimation: true, extra: 1 },
+    ]) {
       const bad = await call('patch', '/api/me/ui-prefs', cookie, body);
       expect(bad.status).toBe(400);
       expect(bad.body.error.code).toBe('VALIDATION');

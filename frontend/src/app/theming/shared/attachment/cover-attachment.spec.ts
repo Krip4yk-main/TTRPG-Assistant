@@ -80,7 +80,7 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
         provideRouter([]),
         provideTranslateService(),
         // «Дошка»: анімацію відривання вимкнено — клік по аркушу перейшов би одразу.
-        { provide: ThemeService, useValue: { uiPrefs: signal({ tearAnimation: false }) } },
+        { provide: ThemeService, useValue: { uiPrefs: signal({ tearAnimation: false, sendAnimation: true }) } },
       ],
     }).compileComponents();
     const router = TestBed.inject(Router);

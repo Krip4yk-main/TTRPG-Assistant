@@ -232,6 +232,13 @@
       "when": 1795684527486,
       "tag": "0032_normalize_timezones",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1795702689982,
+      "tag": "0033_ui_send_animation",
+      "breakpoints": true
     }
   ]
 }

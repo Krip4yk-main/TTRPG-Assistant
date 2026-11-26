@@ -22,7 +22,7 @@ const me: MeDto = {
   locale: 'uk',
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
-  uiPrefs: { tearAnimation: true },
+  uiPrefs: { tearAnimation: true, sendAnimation: true },
   identities: [{ provider: 'dev', displayName: 'G' }],
 };
 
