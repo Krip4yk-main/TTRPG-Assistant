@@ -1,11 +1,14 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   BIRTH_DATE_CHANGE_COOLDOWN_DAYS,
+  ME_CHANGED_EVENT,
   availableThemes,
   canRegister,
   localDate,
   resolveTheme,
   type CompleteProfileInput,
+  type MeChangeScope,
+  type MeChangedPing,
   type MeDto,
   type ThemeId,
   type UpdateUiPrefsInput,
@@ -193,6 +196,7 @@ export async function changeTheme(deps: AppDeps, userId: number, theme: ThemeId)
     if (!availableThemes(u.role).includes(theme)) throw new AppError(403, 'THEME_NOT_AVAILABLE');
     await tx.update(users).set({ uiTheme: theme }).where(eq(users.id, userId));
   });
+  pingMeChanged(deps, userId, 'appearance');
   return getMe(deps, userId);
 }
 
@@ -206,7 +210,24 @@ export async function changeUiPrefs(
     .update(users)
     .set({ qbTearAnimation: prefs.tearAnimation })
     .where(eq(users.id, userId));
+  pingMeChanged(deps, userId, 'appearance');
   return getMe(deps, userId);
+}
+
+/**
+ * Пінг `me.changed {scope}` в особисту кімнату — інші сесії користувача перезапитають
+ * `/api/me`. Лише після коміту; збій емісії не валить запит; без realtime — нічого.
+ */
+function pingMeChanged(
+  deps: Pick<Partial<AppDeps>, 'realtime'>,
+  userId: number,
+  scope: MeChangeScope,
+): void {
+  try {
+    deps.realtime?.toUser(userId, ME_CHANGED_EVENT, { scope } satisfies MeChangedPing);
+  } catch (err) {
+    console.error('[realtime] me.changed emit failed', err);
+  }
 }
 
 export async function changeBirthDate(

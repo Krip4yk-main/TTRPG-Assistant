@@ -107,8 +107,10 @@ function bootFromCache(id: string, href: string): void {
 describe('ThemeService', () => {
   let service: ThemeService;
   let auth: AuthStore;
+  let meChanged: Subject<unknown>;
 
   const setup = (reg = registry()) => {
+    meChanged = new Subject();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -116,7 +118,12 @@ describe('ThemeService', () => {
         { provide: THEME_REGISTRY, useValue: reg },
         {
           provide: SocketService,
-          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject() },
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            sessionLost$: new Subject(),
+            on: (event: string) => (event === 'me.changed' ? meChanged : new Subject()),
+          },
         },
       ],
     });
@@ -395,5 +402,82 @@ describe('ThemeService', () => {
     expect(document.documentElement.style.colorScheme).toBe('light');
     expect(meta.content).toBe('light');
     meta.remove();
+  });
+  describe('me.changed ping (design changed in another session)', () => {
+    const http = () => TestBed.inject(HttpTestingController);
+
+    it('a different server design is applied (data-theme + link) without a PATCH', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      expect(theme()).toBe('night-city');
+
+      meChanged.next({ scope: 'appearance' });
+      http().expectOne({ method: 'GET', url: '/api/me' }).flush({ ...user, uiTheme: 'dungeon' });
+      await settleWhenAdded('theme-dungeon.css?v=1');
+      await vi.waitFor(() => expect(theme()).toBe('dungeon'));
+      expect(links()).toEqual(['theme-dungeon.css?v=1']);
+      expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dungeon');
+      http().expectNone('/api/me/theme');
+      http().verify();
+    });
+
+    it('the same design is a no-op (link untouched)', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      const link = document.head.querySelector(`link#${THEME_LINK_ID}`);
+
+      meChanged.next({ scope: 'appearance' });
+      http().expectOne('/api/me').flush({ ...user });
+      await Promise.resolve();
+      expect(theme()).toBe('night-city');
+      expect(document.head.querySelector(`link#${THEME_LINK_ID}`)).toBe(link);
+      expect(links()).toEqual(['theme-night-city.css?v=1']);
+      http().verify();
+    });
+
+    it('updated ui-prefs are applied', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      expect(service.uiPrefs()).toEqual({ tearAnimation: true });
+
+      meChanged.next({ scope: 'appearance' });
+      http()
+        .expectOne('/api/me')
+        .flush({ ...user, uiPrefs: { tearAnimation: false } });
+      expect(service.uiPrefs()).toEqual({ tearAnimation: false });
+      http().verify();
+    });
+
+    it('a ping during an own select() does not refetch until the PATCH settles (no fight)', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+
+      const done = service.select('quest-board');
+      const patch = http().expectOne('/api/me/theme');
+      meChanged.next({ scope: 'appearance' }); // власний пінг прийшов раніше за відповідь
+      http().expectNone({ method: 'GET', url: '/api/me' });
+      patch.flush({ ...user, uiTheme: 'quest-board' });
+      await settleWhenAdded('theme-quest-board.css?v=1');
+      await done;
+      expect(theme()).toBe('quest-board');
+      // Після PATCH — одне перечитування; те саме значення нічого не змінює.
+      http().expectOne('/api/me').flush({ ...user, uiTheme: 'quest-board' });
+      await Promise.resolve();
+      expect(theme()).toBe('quest-board');
+      expect(links()).toEqual(['theme-quest-board.css?v=1']);
+      http().verify();
+    });
+
+    it('guests ignore the ping', async () => {
+      setup();
+      auth.setMe(null);
+      await service.init();
+      meChanged.next({ scope: 'appearance' });
+      http().expectNone('/api/me');
+    });
   });
 });

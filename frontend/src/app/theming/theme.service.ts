@@ -1,19 +1,23 @@
 import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   DEFAULT_THEME,
   DEFAULT_UI_PREFS,
+  ME_CHANGED_EVENT,
   THEME_IDS,
   resolveTheme,
+  type MeChangedPing,
   type MeDto,
   type ThemeId,
   type UiPrefsDto,
   type UpdateThemeRequest,
 } from '@nri/shared';
-import { firstValueFrom } from 'rxjs';
+import { EMPTY, Subject, catchError, filter, firstValueFrom, switchMap, type Observable } from 'rxjs';
 import { runtimeConfig } from '../../environments/runtime-config';
 import { AuthStore } from '../core/auth/auth.store';
+import { SocketService } from '../core/realtime/socket.service';
 import type { ThemeSlots } from './slots';
 import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
 
@@ -48,6 +52,13 @@ export class ThemeService {
   private target: ThemeId | null = null;
   private applying: Promise<void> = Promise.resolve();
   private initialized = false;
+  /** Власні PATCH вигляду, що ще тривають (їхня відповідь сама оновить стан). */
+  private localWrites = 0;
+  /** Лічильник завершених власних PATCH — щоб відкинути `/api/me`, запитаний до них. */
+  private localWritesDone = 0;
+  /** Пінг прийшов під час власного PATCH — перечитати `/api/me`, коли той завершиться. */
+  private deferredRefresh = false;
+  private readonly refresh$ = new Subject<void>();
   /**
    * Чанки слотів за завантажувачем: дизайни однієї родини (кібер-дизайни) мають спільний
    * `loadSlots`, тож перемикання між ними не вантажить чанк знову. Невдале завантаження з кешу
@@ -75,6 +86,36 @@ export class ThemeService {
       const id = this.effective();
       if (this.initialized) untracked(() => void this.apply(id));
     });
+
+    // Дизайн чи вигляд змінили в іншій сесії (вкладка, пристрій): пінг без даних — перечитуємо
+    // `/api/me`, далі ефект вище застосовує дизайн, а `uiPrefs` оновлюються з профілю.
+    inject(SocketService)
+      .on<MeChangedPing>(ME_CHANGED_EVENT)
+      .pipe(
+        filter((p) => p?.scope === 'appearance'),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.refresh$.next());
+    this.refresh$
+      .pipe(
+        filter(() => this.auth.isActive()),
+        switchMap(() => {
+          if (this.localWrites > 0) {
+            this.deferredRefresh = true; // власна зміна в дорозі — не боремося з нею
+            return EMPTY;
+          }
+          const since = this.localWritesDone;
+          return this.http.get<MeDto>('/api/me').pipe(
+            catchError(() => EMPTY), // втрату сесії обробляє AuthStore
+            // Тим часом почався чи завершився власний PATCH — ця відповідь уже застаріла.
+            filter(() => this.localWrites === 0 && since === this.localWritesDone),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((me) => {
+        if (this.auth.isActive()) this.auth.setMe(me);
+      });
   }
 
   /** Ініціалізатор застосунку (після `AuthStore.load()`): дизайн і слоти — до першого рендера. */
@@ -86,15 +127,33 @@ export class ThemeService {
   /** Обрати дизайн: зберігає в профілі й застосовує без перезавантаження. */
   async select(id: ThemeId): Promise<void> {
     const body: UpdateThemeRequest = { theme: id };
-    const me = await firstValueFrom(this.http.patch<MeDto>('/api/me/theme', body));
-    this.auth.setMe(me);
+    const me = await this.write(this.http.patch<MeDto>('/api/me/theme', body));
     await this.apply(effectiveTheme(me));
   }
 
   /** Зберегти налаштування вигляду в профілі (усі пристрої). */
   async saveUiPrefs(prefs: UiPrefsDto): Promise<void> {
-    const me = await firstValueFrom(this.http.patch<MeDto>('/api/me/ui-prefs', prefs));
-    this.auth.setMe(me);
+    await this.write(this.http.patch<MeDto>('/api/me/ui-prefs', prefs));
+  }
+
+  /**
+   * Власний PATCH вигляду: поки він триває, пінги `me.changed` (і свій, і чужі) не перечитують
+   * `/api/me` — стан оновить його відповідь; пінг, що прийшов тим часом, перечитається після.
+   */
+  private async write(req: Observable<MeDto>): Promise<MeDto> {
+    this.localWrites++;
+    try {
+      const me = await firstValueFrom(req);
+      this.auth.setMe(me);
+      return me;
+    } finally {
+      this.localWrites--;
+      this.localWritesDone++;
+      if (this.localWrites === 0 && this.deferredRefresh) {
+        this.deferredRefresh = false;
+        this.refresh$.next();
+      }
+    }
   }
 
   private apply(id: ThemeId): Promise<void> {

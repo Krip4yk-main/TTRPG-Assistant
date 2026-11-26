@@ -28,3 +28,17 @@ export interface GameWatchInput {
 }
 /** `members: true` — підписано й на приватні пінги (`sessions`, `members`). */
 export type GameWatchAck = { ok: true; members: boolean } | { ok: false };
+
+/**
+ * Пінг «ваш профіль змінився — перезапитайте `/api/me`». Рівно `{scope}`, без даних
+ * профілю; лише в особисту кімнату `user:<id>` (усі сесії/вкладки/пристрої користувача,
+ * зокрема й ту, що ініціювала зміну, — там це no-op). Гостям не надсилається.
+ * - `appearance` — дизайн (`PATCH /api/me/theme`) або налаштування вигляду
+ *   (`PATCH /api/me/ui-prefs`).
+ */
+export const ME_CHANGED_EVENT = 'me.changed';
+export const ME_CHANGE_SCOPES = ['appearance'] as const;
+export type MeChangeScope = (typeof ME_CHANGE_SCOPES)[number];
+export interface MeChangedPing {
+  scope: MeChangeScope;
+}

@@ -466,6 +466,48 @@ describe('PATCH /api/me/theme', () => {
   });
 });
 
+describe('me.changed ping on appearance PATCH', () => {
+  const emitted: { userId: number; event: string; payload: unknown }[] = [];
+  beforeEach(() => {
+    emitted.length = 0;
+    deps.realtime = {
+      toUser: (userId, event, payload) => void emitted.push({ userId, event, payload }),
+      toRoom: () => {},
+      disconnectUser: () => {},
+      disconnectSession: () => {},
+      joinRoom: () => {},
+      leaveRoom: () => {},
+      closeRoom: () => {},
+    } as unknown as NonNullable<typeof deps.realtime>;
+  });
+  afterEach(() => {
+    deps.realtime = undefined;
+  });
+
+  it('theme and ui-prefs PATCH ping only that user room with {scope: appearance}', async () => {
+    const u = await createUser(db, { nickname: 'Pinged' });
+    const other = await createUser(db, { nickname: 'Quiet' });
+    await login(other.id);
+    const cookie = await login(u.id);
+    expect((await call('patch', '/api/me/theme', cookie, { theme: 'dungeon' })).status).toBe(200);
+    expect((await call('patch', '/api/me/ui-prefs', cookie, { tearAnimation: false })).status).toBe(
+      200,
+    );
+    expect(emitted).toEqual([
+      { userId: u.id, event: 'me.changed', payload: { scope: 'appearance' } },
+      { userId: u.id, event: 'me.changed', payload: { scope: 'appearance' } },
+    ]);
+  });
+
+  it('rejected PATCH does not ping', async () => {
+    const u = await createUser(db, { nickname: 'NoPing' });
+    const cookie = await login(u.id);
+    expect((await call('patch', '/api/me/theme', cookie, { theme: 'bogus' })).status).toBe(400);
+    expect((await call('patch', '/api/me/ui-prefs', cookie, {})).status).toBe(400);
+    expect(emitted).toEqual([]);
+  });
+});
+
 describe('DELETE /api/me/identities/:provider', () => {
   it('last identity: 409 LAST_IDENTITY; with two: 200', async () => {
     const u = await createUser(db, { nickname: 'Hero' });

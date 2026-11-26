@@ -72,7 +72,12 @@ describe('nri-slot', () => {
         { provide: THEME_REGISTRY, useValue: registry(load) },
         {
           provide: SocketService,
-          useValue: { connect: vi.fn(), disconnect: vi.fn(), sessionLost$: new Subject() },
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            sessionLost$: new Subject(),
+            on: () => new Subject(),
+          },
         },
       ],
     }).compileComponents();
