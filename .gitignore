@@ -15,3 +15,6 @@ backend/.env
 frontend/.env
 bot/.env
 .claude/launch.json
+
+# Скріншоти, макети й інші медіа для показу/рецензій — не в репозиторії
+.media/

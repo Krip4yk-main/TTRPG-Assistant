@@ -1,8 +1,0 @@
-/* B. Горизонтальні дошки зі зміщеними стиками й сучками */
-.wall{height:828px;background-color:#4A3220;
-background-image:
- url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='960' height='220'%3E%3Cg fill='none'%3E%3Cpath d='M0 109h960M0 219h960' stroke='%23140C06' stroke-width='4' stroke-opacity='.7'/%3E%3Cpath d='M0 112h960M0 2h960' stroke='%23FFDDAA' stroke-opacity='.08' stroke-width='2'/%3E%3Cpath d='M300 0v108M780 0v108M120 110v110M560 110v110' stroke='%23140C06' stroke-width='3' stroke-opacity='.6'/%3E%3C/g%3E%3Cg fill='%23140C06' fill-opacity='.35'%3E%3Cellipse cx='470' cy='55' rx='14' ry='6'/%3E%3Cellipse cx='830' cy='168' rx='10' ry='5'/%3E%3Cellipse cx='210' cy='150' rx='8' ry='4'/%3E%3C/g%3E%3Cg fill='%23B49460'%3E%3Ccircle cx='312' cy='30' r='3'/%3E%3Ccircle cx='312' cy='80' r='3'/%3E%3Ccircle cx='132' cy='140' r='3'/%3E%3Ccircle cx='132' cy='190' r='3'/%3E%3Ccircle cx='572' cy='140' r='3'/%3E%3Ccircle cx='572' cy='190' r='3'/%3E%3C/g%3E%3C/svg%3E"),
- repeating-linear-gradient(180deg,rgba(255,200,140,.05) 0 110px,rgba(0,0,0,.12) 110px 220px,rgba(0,0,0,.02) 220px 330px),
- url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='330'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.005 0.11' numOctaves='4' stitchTiles='stitch' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.10 0 0 0 0 0.06 0 0 0 0 0.02 0 0 0 1.1 -0.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
- linear-gradient(#56392A,#33221A)}
-.hdr{background:linear-gradient(#6A4A2E,#4E3420)}
