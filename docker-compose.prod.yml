@@ -104,6 +104,36 @@ services:
     ports:
       - '127.0.0.1:8080:8080'
 
+  # Зашифровані бекапи БД: щодня 03:30 UTC, перевірка відновлення щонеділі 04:30 UTC.
+  # Разово: docker compose -f docker-compose.prod.yml run --rm backup backup|restore-check
+  # Див. docs/ops/backups.md (користувач MySQL `backup`, R2/B2, ручне відновлення).
+  backup:
+    <<: *restart
+    image: ttrpg-backup
+    build:
+      context: .
+      dockerfile: scripts/ops/Dockerfile.backup
+    init: true
+    environment:
+      BACKUP_DB_HOST: mysql
+      BACKUP_DB_USER: ${BACKUP_DB_USER:-backup}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+    volumes:
+      - backups:/backups
+    # Option-файл з паролем MySQL живе лише в пам'яті
+    tmpfs:
+      - /tmp:size=16m
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql_data:
   redis_data:
+  backups:

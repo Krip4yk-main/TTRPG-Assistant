@@ -1,0 +1,21 @@
+# Образ сервісу backup (docker-compose.prod.yml). Збірка з кореня репозиторію:
+#   docker build -f scripts/ops/Dockerfile.backup -t ttrpg-backup .
+# База — той самий mysql:8.4, що й БД: mysqldump/mysql точно тієї ж версії, що й сервер
+# (в alpine `mysql-client` — це MariaDB-клієнт, не гарантовано сумісний з MySQL 8.4), а шари образу вже є на хості. openssl і gzip у ньому є; rclone — статичний бінарник
+# з офіційного образу rclone.
+FROM rclone/rclone:1.69 AS rclone
+
+FROM mysql:8.4
+COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
+COPY scripts/ops/backup-lib.sh scripts/ops/backup.sh scripts/ops/restore-check.sh scripts/ops/backup-entrypoint.sh /opt/backup/
+# Знімаємо можливі CRLF (checkout на Windows) і робимо скрипти виконуваними.
+RUN sed -i 's/\r$//' /opt/backup/*.sh \
+  && chmod 0755 /opt/backup/*.sh \
+  && mkdir -p /backups/weekly \
+  && chown -R mysql:mysql /backups \
+  && chmod 0700 /backups
+USER mysql
+ENV BACKUP_DIR=/backups TMPDIR=/tmp
+VOLUME ["/backups"]
+ENTRYPOINT ["/opt/backup/backup-entrypoint.sh"]
+CMD ["schedule"]

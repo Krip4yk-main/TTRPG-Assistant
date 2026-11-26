@@ -1,6 +1,6 @@
 # Розгортання (production)
 
-Стек описано в `docker-compose.prod.yml`: `mysql`, `redis`, `migrate` (одноразово), `backend` (API + воркер джобів), `bot`, `frontend`.
+Стек описано в `docker-compose.prod.yml`: `mysql`, `redis`, `migrate` (одноразово), `backend` (API + воркер джобів), `bot`, `frontend`, `backup` (зашифровані бекапи БД, див. [backups.md](backups.md)).
 Порти `backend` (3000) і `frontend` (8080) відкриті лише на `127.0.0.1` — `/api`, `/socket.io` і статику публікує зовнішній reverse proxy. `mysql` і `redis` назовні не публікуються.
 
 ## Підготовка
@@ -9,6 +9,7 @@
 2. У кореневому `.env` задайте `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD` (пароль без символів, що ламають URL: `@ : / ? #`).
 3. `DATABASE_URL`, `REDIS_URL` і `BACKEND_INTERNAL_URL` у compose перевизначаються на адреси сервісів — у `.env` їх можна не задавати.
 4. Налаштування фронтенду (`NG_APP_*`) — build-аргументи, див. `frontend/Dockerfile`.
+5. Бекапи: створіть MySQL-користувача `backup` і задайте `BACKUP_*` у кореневому `.env` — див. [backups.md](backups.md). Без `BACKUP_PASSPHRASE` сервіс `backup` не працює (fail closed).
 
 ## Збірка і запуск
 
