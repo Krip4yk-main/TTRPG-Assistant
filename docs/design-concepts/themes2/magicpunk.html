@@ -1,0 +1,343 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><title>Магіпанк — Зоряна канцелярія</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Unicase:wght@600;700&family=Cormorant+SC:wght@600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Spectral+SC:wght@500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.top{position:sticky;top:0;z-index:20;height:68px;display:flex;align-items:center;gap:40px;padding:0 32px}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none;white-space:nowrap}
+.top nav{display:flex;gap:6px}
+.top nav a{text-decoration:none;padding:8px 14px}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:18px}
+.bell{position:relative;background:none;border:0;display:grid;place-items:center;width:40px;height:40px;cursor:pointer}
+.bell .cnt{position:absolute;top:2px;right:0;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;line-height:18px;font-weight:700;text-align:center}
+.ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:700}
+.hero{position:relative;z-index:2}
+.layout{position:relative;z-index:2;display:grid;grid-template-columns:300px 1fr;gap:32px;padding:0 32px 72px}
+.filters{position:relative;align-self:start;display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.input{position:relative;height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;white-space:nowrap;overflow:hidden}
+.input.select::after{content:"";position:absolute;right:15px;top:15px;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);opacity:.75}
+.input.date svg{margin-left:auto;flex:none}
+.range{position:relative;height:30px;margin-top:2px}
+.range .track{position:absolute;left:8px;right:8px;top:13px;height:4px;border-radius:2px}
+.range .fill{position:absolute;left:8px;width:62%;top:13px;height:4px;border-radius:2px}
+.range .knob{position:absolute;top:6px;width:18px;height:18px}
+.range .k1{left:0}.range .k2{left:calc(8px + 62% - 9px)}
+.range-vals{display:flex;justify-content:space-between}
+.checks{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.chk{display:flex;align-items:center;gap:10px;cursor:pointer}
+.chk i{flex:none;width:18px;height:18px;position:relative}
+.reset{height:42px;cursor:pointer;margin-top:6px}
+.bar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:44px;min-height:52px}
+.sort{display:flex;flex-direction:column;gap:5px;width:240px}
+.grid{position:relative;display:grid;grid-template-columns:repeat(3,332px);gap:48px 24px;justify-content:start}
+.card{position:relative;width:332px;height:380px}
+.panel{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
+.sysrow{display:flex;align-items:center;gap:8px;min-height:20px}
+.sys{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;gap:6px;flex:none}
+.card h2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.facts{display:flex;flex-direction:column}
+.facts>div{display:flex;align-items:center;gap:8px;min-width:0}
+.facts dt{flex:none}
+.facts dd{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gm{display:flex;align-items:center;gap:10px;min-width:0}
+.gm i{flex:none;font-style:normal;width:34px;height:34px;border-radius:50%;display:grid;place-items:center}
+.gm>span{display:flex;flex-direction:column;min-width:0}
+.gm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.price{flex:none;white-space:nowrap}
+.att{position:absolute;z-index:1;margin:0;transition:transform .45s cubic-bezier(.2,.8,.2,1),filter .45s}
+.card.is-hover .att,.card:hover .att{z-index:5}
+
+/* ================= МАГІПАНК ================= */
+:root{
+ --night:#0e1230;--night2:#1a1f4d;--indigo:#262c66;
+ --candle:#f0c36a;--candle-d:#b98a33;--gild1:#f7dc9a;--gild2:#c8963f;--gild3:#7a5520;
+ --glow:#6fe6d2;--glow-d:#1f7f74;--violet:#9b84ff;
+ --parch:#f4e9cf;--parch2:#e8d7b0;--ink:#2b1f17;--ink2:#4a3727;--muted:#6b5338;
+ --wax:#6a2550;--wax-free:#1d5e63;
+}
+html{background:var(--night)}
+body{font:15px/1.5 "Lora",serif;color:var(--ink);background:var(--night);min-height:1720px}
+.acc-violet{--n:#5b3a9c}.acc-pink{--n:#8c2a5b}.acc-cyan{--n:#1d6870}.acc-amber{--n:#8a5a12}.acc-lime{--n:#476a1e}.acc-red{--n:#8f2f22}
+
+/* ceiling of night sky */
+.bg{background:
+ radial-gradient(ellipse 760px 420px at 74% 6%,rgba(111,230,210,.10),transparent 70%),
+ radial-gradient(ellipse 900px 600px at 20% 10%,rgba(155,132,255,.12),transparent 70%),
+ radial-gradient(ellipse 1100px 700px at 50% 110%,rgba(240,195,106,.08),transparent 70%),
+ linear-gradient(180deg,#101538 0%,#141a44 30%,#11163a 70%,#0c1030 100%)}
+.bg svg{position:absolute;left:0;top:0}
+.vault{position:absolute;left:0;right:0;top:0;height:1720px;opacity:.5}
+
+/* header: dark wood beam with a rune-etched brass rail */
+.top{background:linear-gradient(180deg,#1c1530 0%,#150f26 100%);border-bottom:1px solid #000;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.top::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:6px;
+ background:linear-gradient(180deg,var(--gild1),var(--gild2) 45%,var(--gild3));
+ -webkit-mask:linear-gradient(#000,#000);box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.top::before{content:"";position:absolute;left:0;right:0;bottom:-6px;height:6px;z-index:2;
+ background:radial-gradient(circle at 50% 50%,#bff7ee 0 1px,rgba(111,230,210,.9) 1.6px,transparent 3px) 0 0/72px 6px repeat-x,
+ repeating-linear-gradient(90deg,transparent 0 18px,rgba(60,35,8,.55) 18px 19px,transparent 19px 36px)}
+.logo .mark{color:var(--candle);filter:drop-shadow(0 0 6px rgba(240,195,106,.45))}
+.logo b{font:700 24px "Cormorant Unicase";color:#f6e3b4;letter-spacing:.02em}
+.top nav a{font:600 16px "Lora";color:#cfc6e8;border-bottom:2px solid transparent}
+.top nav a.on{color:#fff3d6;border-bottom-color:var(--glow);text-shadow:0 0 12px rgba(111,230,210,.55)}
+.bell{color:#e8dcc0}.bell .cnt{background:var(--wax);color:#fde9f2;border:1.5px solid #150f26;font-family:"Lora"}
+.ava{background:radial-gradient(circle at 35% 30%,#4b3d8f,#2a2160 70%);color:#f6e3b4;border:2px solid var(--gild2);box-shadow:0 0 0 2px #150f26,0 0 10px rgba(240,195,106,.35);font:700 17px "Cormorant SC"}
+
+/* hero */
+.hero{padding:44px 32px 34px;display:flex;align-items:center;gap:40px;height:230px}
+.hero .ttl{position:relative}
+.hero .eyebrow{font:600 13px "Spectral SC";letter-spacing:.24em;color:var(--glow);text-shadow:0 0 10px rgba(111,230,210,.4)}
+.hero h1{margin-top:4px;font:700 62px/1.0 "Cormorant Unicase";letter-spacing:.01em;
+ background:linear-gradient(180deg,#fff2c9 10%,#f0c36a 55%,#c38b35 95%);-webkit-background-clip:text;background-clip:text;color:transparent;
+ filter:drop-shadow(0 2px 0 rgba(10,8,30,.6)) drop-shadow(0 0 22px rgba(240,195,106,.25))}
+.hero .sub{margin-top:10px;font:400 17px "Lora";color:#d8d1ee;max-width:520px}
+.hero .sub em{color:#f6e3b4;font-style:italic}
+.astro{position:absolute;right:96px;top:6px;width:200px;height:200px}
+
+/* spellbook page: filters + cards */
+.paper{background:
+ url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .40 0 0 0 0 .18 0 0 0 .55 -.32'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"),
+ radial-gradient(ellipse 120% 95% at 50% 35%,#f8efd9 50%,#ead8af 100%)}
+.filters{padding:26px 22px 24px;border-radius:3px;
+ box-shadow:inset 0 0 0 1px #b48d4a,inset 0 0 0 5px #f4e9cf,inset 0 0 0 6px rgba(180,141,74,.6),0 0 0 1px rgba(0,0,0,.5),0 18px 36px rgba(2,4,20,.6),0 0 60px rgba(240,195,106,.06)}
+.corner{position:absolute;width:30px;height:30px;color:#a87a33;pointer-events:none}
+.corner.tl{left:4px;top:4px}.corner.tr{right:4px;top:4px;transform:scaleX(-1)}.corner.bl{left:4px;bottom:4px;transform:scaleY(-1)}.corner.br{right:4px;bottom:4px;transform:scale(-1)}
+.filters h3{font:700 26px/1 "Cormorant SC";color:#2b1f17;display:flex;align-items:center;gap:10px}
+.filters h3::after{content:"";flex:1;height:7px;background:radial-gradient(circle,#a87a33 0 2px,transparent 2.5px) center/9px 7px no-repeat,linear-gradient(#a87a33,#a87a33) center/100% 1px no-repeat}
+.field label,.sort label{font:600 12.5px "Spectral SC";letter-spacing:.12em;color:#6b5338}
+.sort label{color:#bdb3e0}
+.input{background:#fffaf0;border:1px solid #9c7b4c;border-radius:3px;color:var(--ink);font-size:15px;box-shadow:inset 0 1px 3px rgba(90,60,20,.16)}
+.input .ph{color:#7a654b}.input svg{color:#7a654b}
+.input.search{border-color:var(--glow-d);box-shadow:inset 0 1px 3px rgba(90,60,20,.16),0 0 0 3px rgba(31,127,116,.22)}
+.range .track{background:#cdb58a;height:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.25)}
+.range .fill{background:linear-gradient(90deg,#1f7f74,#3fb7a6)}
+.range .knob{transform:rotate(45deg) scale(.82);border-radius:3px;background:radial-gradient(circle at 35% 30%,#e6fffa,#6fe6d2 45%,#1f7f74);border:1.5px solid #5a3f15;box-shadow:0 0 0 2px #e7c77d,0 0 10px rgba(111,230,210,.8)}
+.range-vals{font:600 12.5px "Spectral SC";letter-spacing:.06em;color:#6b5338}
+.chk{font-size:15px;color:#2e2218}
+.chk i{border:1.5px solid #8a6a3c;background:#fffaf0;border-radius:2px;transform:rotate(45deg) scale(.82)}
+.chk.on i{background:radial-gradient(circle at 40% 40%,#9ff3e6,#2f9e90 60%,#1d6a62);border-color:#164f49;box-shadow:0 0 8px rgba(47,158,144,.55)}
+.chk.on i::after{content:"";position:absolute;inset:5px;background:#f8fffd;border-radius:1px}
+.reset{background:linear-gradient(180deg,#2a2160,#1a1545);border:1px solid #0d0a25;border-radius:3px;color:#f6e3b4;font:700 17px "Cormorant SC";letter-spacing:.08em;
+ box-shadow:inset 0 0 0 1px rgba(240,195,106,.55),inset 0 1px 0 rgba(255,255,255,.12),0 2px 0 #0a0820}
+.count{color:#d8d1ee;font-size:16px}.count b{color:#fff3d6}
+.sort .input{background:#f6ecd6}
+
+/* card = enchanted invitation letter */
+.panel{padding:15px 20px 14px;border-radius:3px;
+ box-shadow:inset 0 0 0 1px #b48d4a,inset 0 0 0 4px #f6eddb,inset 0 0 0 5px rgba(180,141,74,.45),0 0 0 1px rgba(0,0,0,.55),0 16px 30px rgba(2,4,20,.6);
+ transition:box-shadow .45s,transform .45s}
+.panel .corner{width:22px;height:22px;color:#b38a45}
+.tg{display:flex;justify-content:space-between;align-items:center;font:600 12px "Spectral SC";letter-spacing:.14em;color:#7a5f3f;padding-bottom:6px;margin-bottom:7px;
+ background:linear-gradient(#b48d4a,#b48d4a) bottom/100% 1px no-repeat}
+.tg span{display:flex;align-items:center;gap:7px}
+.tg .bird{color:#7a5f3f;flex:none}
+.tg b{font:400 11px "Lora";letter-spacing:.3em;color:var(--n)}
+.sys{font:600 12.5px "Spectral SC";letter-spacing:.06em;color:var(--n)}
+.b-age{font:700 11px/1 "Lora";color:#8f2f22;width:30px;height:22px;display:grid;place-items:center;border:1.5px solid #8f2f22;border-radius:50%;transform:rotate(-6deg)}
+.b-new{font:600 12px/1 "Spectral SC";letter-spacing:.06em;color:#3b2a08;padding:4px 8px 4px;background:linear-gradient(180deg,#f7dc9a,#d5a24b);border-radius:2px 10px 2px 10px;box-shadow:inset 0 0 0 1px rgba(122,85,32,.6)}
+.card h2{margin:6px 0 4px;font:700 19.5px/1.22 "Lora";color:#1f150d}
+.desc{font-size:14.5px;line-height:1.38;color:#3d2d20}
+.facts{margin-top:8px;font-size:14.5px}
+.facts>div{border-bottom:1px solid rgba(160,125,75,.38);padding:2px 0 1px;min-height:26px}
+.facts dt{width:52px;font:600 12px "Spectral SC";letter-spacing:.08em;color:#6b5338}
+.vials{display:inline-flex;gap:2px;margin-right:4px;vertical-align:middle;flex:none}
+.seats{display:flex;align-items:center;gap:6px}
+.fit{align-self:flex-start;margin-top:8px;display:flex;align-items:center;gap:7px;padding:3px 10px 3px 8px;font:600 12.5px "Spectral SC";letter-spacing:.06em;color:#165a53;
+ background:linear-gradient(90deg,rgba(111,230,210,.22),rgba(111,230,210,.06));border:1px solid rgba(22,90,83,.45);border-radius:20px}
+.gm i{background:radial-gradient(circle at 35% 30%,#4b3d8f,#2a2160 70%);color:#f6e3b4;box-shadow:0 0 0 1.5px #c8963f,0 0 0 3px #f6eddb,0 0 0 4px rgba(180,141,74,.6);font:700 16px "Cormorant SC"}
+.gm b{font-size:15.5px;font-weight:700;line-height:1.25;color:#24180f}
+.gm small{font-size:13px;color:#5d4831}
+.star{color:#9a6a12}
+
+/* wax seal price */
+.price{position:relative;width:66px;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;margin:-8px -4px -6px 0;color:#fbe9f1}
+.price::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:52% 48% 46% 54% / 55% 46% 54% 45%;
+ background:radial-gradient(circle at 34% 28%,#b2527f 0,#7d2c5e 32%,#5a1c44 70%,#3f1230 100%);
+ box-shadow:0 3px 5px rgba(40,10,30,.45),inset 0 -2px 4px rgba(0,0,0,.35)}
+.price::after{content:"";position:absolute;z-index:-1;left:9px;top:8px;width:48px;height:46px;border-radius:50%;
+ border:1.5px solid rgba(255,210,235,.38);box-shadow:inset 0 0 0 4px rgba(0,0,0,.08),inset 0 2px 3px rgba(0,0,0,.35)}
+.price b{font:700 22px "Cormorant SC";text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.price small{font:600 11px "Spectral SC";letter-spacing:.1em;margin-top:1px}
+.price.free{color:#e6fbf7}
+.price.free::before{background:radial-gradient(circle at 34% 28%,#4aa3a0 0,#22706f 34%,#164e50 72%,#0e3538 100%);box-shadow:0 3px 5px rgba(5,30,30,.45),inset 0 -2px 4px rgba(0,0,0,.35)}
+.price.free::after{border-color:rgba(200,255,245,.38)}
+.price.free b{font:700 15px "Cormorant SC"}
+.price.free small{font-size:11px}
+
+/* attachment: the sleeping portrait in a gilt oval frame */
+.att{top:-40px;right:-14px;width:112px;height:138px;transform:rotate(5deg)}
+.att img{filter:grayscale(.6) sepia(.6) brightness(.78) contrast(.9);transition:filter .45s}
+.card.is-hover .att img,.card:hover .att img{filter:none}
+.att .hook{position:absolute;left:50%;top:-12px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2.5px solid #c8963f;box-shadow:0 1px 2px rgba(0,0,0,.6)}
+.att .frame{position:absolute;inset:0;border-radius:50%;padding:8px;
+ background:conic-gradient(from 20deg,#7a5520,#f7dc9a,#c8963f,#7a5520,#f2d088,#a87a33,#f7dc9a,#7a5520);
+ box-shadow:0 8px 16px rgba(0,0,0,.55),inset 0 0 0 1.5px #4d3410}
+.att .frame::before{content:"";position:absolute;inset:4px;border-radius:50%;border:1px dashed rgba(77,52,16,.7)}
+.att .pic{position:relative;width:100%;height:100%;border-radius:50%;overflow:hidden;box-shadow:inset 0 0 0 2px #4d3410,inset 0 0 14px rgba(0,0,0,.6)}
+.att img{display:block;width:100%;height:100%;object-fit:cover}
+.att .pic::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse at 50% 30%,transparent 40%,rgba(10,8,30,.55))}
+.att .gem{position:absolute;left:50%;bottom:-7px;width:14px;height:14px;margin-left:-7px;transform:rotate(45deg);background:radial-gradient(circle at 35% 30%,#e6fffa,#6fe6d2 45%,#1f7f74);border:1.5px solid #4d3410}
+.att figcaption{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);white-space:nowrap;opacity:0;font:600 11px "Spectral SC";letter-spacing:.14em;color:#3b2a08;
+ padding:3px 10px;background:linear-gradient(#f7dc9a,#d5a24b);border-radius:2px;box-shadow:0 2px 4px rgba(0,0,0,.45)}
+.att .spark{position:absolute;opacity:0;color:#bff7ee;filter:drop-shadow(0 0 4px #6fe6d2)}
+.att .s1{left:-14px;top:22px}.att .s2{right:-16px;top:58px}.att .s3{left:-6px;bottom:6px}
+.card.is-hover .att,.card:hover .att{transform:translate(-54px,22px) rotate(-1deg) scale(1.16)}
+.card.is-hover .att .frame,.card:hover .att .frame{box-shadow:0 0 0 1px rgba(191,247,238,.6),0 0 26px 4px rgba(111,230,210,.55),0 18px 30px rgba(0,0,0,.55),inset 0 0 0 1.5px #4d3410}
+.card.is-hover .att figcaption,.card:hover .att figcaption,.card.is-hover .att .spark,.card:hover .att .spark{opacity:1}
+.card.is-hover .panel,.card:hover .panel{transform:translateY(-3px);
+ box-shadow:inset 0 0 0 1px #b48d4a,inset 0 0 0 4px #f6eddb,inset 0 0 0 5px rgba(180,141,74,.45),0 0 0 1px rgba(0,0,0,.55),0 0 0 3px rgba(111,230,210,.45),0 0 34px rgba(111,230,210,.22),0 22px 38px rgba(2,4,20,.7)}
+@keyframes breathe{0%,100%{filter:none}50%{filter:brightness(1.08) saturate(1.1)}}
+.card:hover .att .pic img{animation:breathe 3.2s ease-in-out infinite}
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <linearGradient id="potion" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a6ff"/><stop offset="1" stop-color="#5b3a9c"/></linearGradient>
+ <symbol id="vial-full" viewBox="0 0 12 22"><rect x="4" y="0.5" width="4" height="3" rx=".6" fill="#8a5a2b"/><path d="M4.4 3.5h3.2v4.2l3.1 4.6a5 5 0 1 1-9.4 0l3.1-4.6Z" fill="#fff8ea" stroke="#5a4326" stroke-width="1"/><path d="M2.1 13.2a4.4 4.4 0 1 0 7.8 0Z" fill="url(#potion)"/><circle cx="4.3" cy="15.2" r=".9" fill="#efe9ff" opacity=".9"/></symbol>
+ <symbol id="vial-empty" viewBox="0 0 12 22"><rect x="4" y="0.5" width="4" height="3" rx=".6" fill="#8a5a2b" opacity=".6"/><path d="M4.4 3.5h3.2v4.2l3.1 4.6a5 5 0 1 1-9.4 0l3.1-4.6Z" fill="#fffdf6" stroke="#8a7354" stroke-width="1" stroke-dasharray="0"/><path d="M3 12.6l1.4-2" stroke="#b7a385" stroke-width=".8" stroke-linecap="round"/></symbol>
+ <symbol id="corner" viewBox="0 0 30 30"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 28V8a6 6 0 0 1 6-6h20"/><path d="M6 24V11a5 5 0 0 1 5-5h13"/><path d="M10 10c3 0 5 2 5 5"/></g><circle cx="10" cy="10" r="1.8" fill="currentColor"/></symbol>
+ <symbol id="bird" viewBox="0 0 22 14"><path d="M1 8 9 6 21 1 13 7 16 13 10 8Z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 6l1 2" stroke="currentColor" stroke-width="1.1"/></symbol>
+ <symbol id="spark" viewBox="0 0 16 16"><path d="M8 0c.6 4.6 2.8 7 8 8-5.2 1-7.4 3.4-8 8-.6-4.6-2.8-7-8-8 5.2-1 7.4-3.4 8-8Z" fill="currentColor"/></symbol>
+ <radialGradient id="flame" cx=".5" cy=".65" r=".55"><stop offset="0" stop-color="#fffbe6"/><stop offset=".45" stop-color="#ffd27a"/><stop offset="1" stop-color="#f08a2a" stop-opacity="0"/></radialGradient>
+ <radialGradient id="halo"><stop offset="0" stop-color="#ffcf73" stop-opacity=".42"/><stop offset=".4" stop-color="#ffb84d" stop-opacity=".12"/><stop offset="1" stop-color="#ffb84d" stop-opacity="0"/></radialGradient>
+ <linearGradient id="wax" x1="0" x2="1"><stop offset="0" stop-color="#d9ccb0"/><stop offset=".35" stop-color="#fbf3df"/><stop offset="1" stop-color="#bfae8c"/></linearGradient>
+ <symbol id="candle" viewBox="0 0 40 150" style="overflow:visible"><circle cx="20" cy="20" r="46" fill="url(#halo)"/><path d="M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z" fill="url(#flame)"/><path d="M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z" fill="#fff"/><path d="M20 24v4" stroke="#3a2a1a" stroke-width="1"/><path d="M13 30q7-3 14 0v118H13Z" fill="url(#wax)"/><path d="M15 31q1 10 0 18q-1 4 1 6v-24Z" fill="#fffaf0" opacity=".8"/></symbol>
+</defs></svg>
+
+<div class="bg">
+ <svg class="vault" width="1440" height="1720" viewBox="0 0 1440 1720" aria-hidden="true">
+  <g fill="none" stroke="rgba(214,190,140,.18)" stroke-width="1">
+   <path d="M-40 520 Q720 -140 1480 520"/><path d="M-40 560 Q720 -90 1480 560"/>
+   <path d="M360 0 Q720 260 1080 0" stroke-dasharray="2 6"/>
+  </g>
+  <g id="stars"></g>
+  <g fill="none" stroke="rgba(191,247,238,.22)" stroke-width=".8"><path id="constel" d="M1040 96 1092 70 1160 84 1196 128 1270 118"/><path d="M118 300 160 262 214 276 232 330"/></g>
+ </svg>
+ <svg width="1440" height="1720" viewBox="0 0 1440 1720" aria-hidden="true">
+  <use href="#candle" x="610" y="96" width="30" height="112" opacity="1"/>
+  <use href="#candle" x="718" y="156" width="22" height="82" opacity="0.85"/>
+  <use href="#candle" x="802" y="78" width="38" height="142" opacity="1"/>
+  <use href="#candle" x="902" y="166" width="22" height="82" opacity="0.8"/>
+  <use href="#candle" x="992" y="108" width="28" height="105" opacity="0.95"/>
+  <use href="#candle" x="70" y="1190" width="30" height="112" opacity="0.85"/>
+  <use href="#candle" x="196" y="1380" width="22" height="82" opacity="0.7"/>
+  <use href="#candle" x="120" y="1560" width="26" height="98" opacity="0.6"/>
+ </svg>
+</div>
+
+<header class="top"><a class="logo" href="#"><span class="mark"><svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 2 28.5 9.2v13.6L16 30 3.5 22.8V9.2Z"/><path d="M16 2 9 13h14Z M9 13l7 12 7-12 M3.5 9.2 9 13 3.5 22.8 16 25 28.5 22.8 23 13 28.5 9.2 M16 25v5"/><circle cx="16" cy="17" r="2.2" fill="#6fe6d2" stroke="none"/></svg></span><b>НРІ Асистент</b></a>
+ <nav><a class="on" href="#">Пошук ігор</a><a href="#">Мої ігри</a></nav>
+ <div class="right"><button class="bell" aria-label="Сповіщення"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="cnt">3</span></button><span class="ava">Л</span></div></header>
+
+<section class="hero">
+ <div class="ttl">
+  <div class="eyebrow">Зоряна канцелярія пригод</div>
+  <h1>Знайдіть свою гру</h1>
+  <p class="sub">Свіжі запрошення від майстрів — онлайн і наживо. <em>Паперові ластівки вже в дорозі.</em></p>
+ </div>
+ <!-- magitech: rune astrolabe with a sigil-crystal core -->
+ <svg class="astro" viewBox="0 0 250 250" aria-hidden="true">
+  <defs>
+   <radialGradient id="core" cx=".42" cy=".38"><stop offset="0" stop-color="#f2fffc"/><stop offset=".35" stop-color="#8ff0e0"/><stop offset=".8" stop-color="#1f7f74"/><stop offset="1" stop-color="#0f4a45"/></radialGradient>
+   <radialGradient id="aura"><stop offset="0" stop-color="#6fe6d2" stop-opacity=".45"/><stop offset="1" stop-color="#6fe6d2" stop-opacity="0"/></radialGradient>
+   <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7dc9a"/><stop offset=".5" stop-color="#c8963f"/><stop offset="1" stop-color="#7a5520"/></linearGradient>
+  </defs>
+  <circle cx="125" cy="125" r="70" fill="url(#aura)"/>
+  <circle cx="125" cy="125" r="112" fill="none" stroke="url(#brass)" stroke-width="3"/>
+  <circle cx="125" cy="125" r="104" fill="none" stroke="rgba(247,220,154,.5)" stroke-width="1"/>
+  <g stroke="#f0c36a" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".9" id="runering"></g>
+  <ellipse cx="125" cy="125" rx="88" ry="32" fill="none" stroke="url(#brass)" stroke-width="2.4" transform="rotate(-28 125 125)"/>
+  <ellipse cx="125" cy="125" rx="88" ry="32" fill="none" stroke="url(#brass)" stroke-width="2.4" transform="rotate(38 125 125)"/>
+  <circle cx="125" cy="125" r="58" fill="none" stroke="rgba(111,230,210,.6)" stroke-width="1" stroke-dasharray="1 5"/>
+  <circle cx="201" cy="84" r="6" fill="#9b84ff" stroke="#f7dc9a" stroke-width="1.5"/>
+  <circle cx="56" cy="160" r="4.5" fill="#f0c36a" stroke="#7a5520" stroke-width="1"/>
+  <path d="M125 92 146 125 125 158 104 125Z" fill="url(#core)" stroke="#d9fff8" stroke-width="1"/>
+  <path d="M125 92v66M104 125h42" stroke="rgba(255,255,255,.55)" stroke-width=".8"/>
+  <path d="M125 6v20M125 224v20M6 125h20M224 125h20" stroke="#f0c36a" stroke-width="2"/>
+ </svg>
+</section>
+
+<main class="layout">
+<aside class="filters paper">
+ <svg class="corner tl"><use href="#corner"/></svg><svg class="corner tr"><use href="#corner"/></svg><svg class="corner bl"><use href="#corner"/></svg><svg class="corner br"><use href="#corner"/></svg>
+ <h3>Фільтри</h3>
+ <div class="field"><label>Пошук</label><div class="input search"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="ph">Назва, система, майстер…</span></div></div>
+ <div class="field"><label>Система</label><div class="input select">Усі системи</div></div>
+ <div class="field"><label>Жанр</label><div class="input select">Будь-який</div></div>
+ <div class="field"><label>Формат</label><div class="input select">Онлайн і наживо</div></div>
+ <div class="field"><label>Дата від</label><div class="input date">26.11.2026 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Дата до</label><div class="input date"><span class="ph">дд.мм.рррр</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Ціна за сесію</label><div class="range"><span class="track"></span><span class="fill"></span><span class="knob k1"></span><span class="knob k2"></span></div><div class="range-vals"><span>0 грн</span><span>до 300 грн</span></div></div>
+ <div class="checks">
+  <label class="chk on"><i></i>Лише з вільними місцями</label>
+  <label class="chk on"><i></i>Підходить моєму розкладу</label>
+  <label class="chk"><i></i>Лише без плати</label>
+  <label class="chk"><i></i>Новачкам ласкаво просимо</label>
+ </div>
+ <button class="reset">Скинути</button>
+</aside>
+
+<section class="results">
+<div class="bar"><div class="count">Знайдено <b>24 гри</b> · показано 9</div><div class="sort"><label>Сортування</label><div class="input select">Спершу найближчі</div></div></div>
+<div class="grid" id="grid"></div>
+</section>
+</main>
+
+<script>
+// deterministic star field + rune ring (decorative only)
+(function(){
+ let s=7;const r=()=>(s=(s*16807)%2147483647)/2147483647;
+ const g=document.getElementById('stars');let h='';
+ for(let i=0;i<190;i++){const x=r()*1440,y=r()*1720*(r()<.6?.35:1),z=r();
+  const op=(y<600?.75:.35)*(.35+z*.65);
+  h+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(.5+z*1.1).toFixed(2)}" fill="${z>.9?'#bff7ee':'#f3ead2'}" opacity="${op.toFixed(2)}"/>`;}
+ [[1040,96],[1092,70],[1160,84],[1196,128],[1270,118],[118,300],[160,262],[214,276],[232,330]].forEach(([x,y])=>h+=`<circle cx="${x}" cy="${y}" r="1.9" fill="#e6fffa"/><circle cx="${x}" cy="${y}" r="5" fill="#6fe6d2" opacity=".18"/>`);
+ g.innerHTML=h;
+ const rr=document.getElementById('runering');let p='';
+ const glyphs=['M-3 -5v10M-3 -5l5 3-5 3','M0 -5v10M-4 -1l4-4 4 4','M-3 -5l6 10M3 -5l-6 10','M0 -5v10M0 -1l4-3','M-4 5V-5l4 5 4-5v10','M-3 -5h6M0 -5v10','M-4 -5 4 5M-4 5l4-4','M0 -5 4 0 0 5-4 0Z'];
+ for(let i=0;i<24;i++){const a=i/24*Math.PI*2,x=125+Math.cos(a)*96,y=125+Math.sin(a)*96;
+  p+=`<path d="${glyphs[i%glyphs.length]}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(a*180/Math.PI+90).toFixed(0)}) scale(.95)"/>`;}
+ rr.innerHTML=p;
+})();
+
+// cards
+const C=[
+ {acc:'violet',n:'0240',sys:'Dungeon World · Кампанія · Фентезі',age:'16+',t:'Підземелля, яке ми вигадаємо разом',d:'PbtA-фентезі: ходи, ускладнення, світ малюємо на ходу. Кожна сесія — нова кімната, нова пастка і нова причина не відступати.',when:'2 груд. 2026 р., 19:00',where:'Онлайн · Discord',free:1,tot:4,fit:1,gm:'Лицар37',r:'4.2',price:0},
+ {acc:'pink',n:'0241',hover:1,img:1031,sys:'Cyberpunk RED · Ваншот · Нуар',age:'18+',t:'Неонові борги Нічного міста',d:'Ваш фіксер зник, лишивши борг перед корпорацією і ключ від сховища на Троєщині. Одна ніч, щоб усе виправити.',when:'6 груд. 2026 р., 21:00',where:'Наживо · Київ · клуб «Сигнал»',free:2,tot:4,fit:1,gm:'Ліра',r:'4.6',price:250},
+ {acc:'amber',n:'0242',img:1040,sys:'Pathfinder 2e · Кампанія · Темне фентезі',t:'Pathfinder для тих, хто любить тактику',d:'Ви — члени гільдії, яка розшукує небезпечні артефакти до того, як їх знайдуть культисти.',when:'29 лист. 2026 р., 16:00',where:'Онлайн · Foundry VTT',free:3,tot:5,gm:'dungeon_odesa',r:'4.9',price:100},
+ {acc:'cyan',n:'0243',sys:'D&amp;D 5e (2024) · Кампанія · Фентезі',nw:1,t:'Шлях до Смарагдової вежі',d:'Привіт усім! Спробуємо оновлені правила D&amp;D: нові передісторії, переглянуті класи, усе поясню на першій сесії.',when:'5 груд. 2026 р., 11:00',where:'Наживо · Тернопіль · антикафе «Портал»',free:3,tot:5,gm:'ihor.tkachenko',r:null,price:0},
+ {acc:'lime',n:'0244',img:1067,sys:'Mothership · Кампанія · Наукова фантастика',age:'18+',t:'Дрейф «Ізоляди»',d:'Вантажник на мертвій орбіті. Сигнал лиха надходить зсередини, а кисню лишилося на дев’ять годин.',when:'3 груд. 2026 р., 20:30',where:'Онлайн · Discord',free:2,tot:4,gm:'Данило',r:'4.5',price:150},
+ {acc:'red',n:'0245',sys:'Call of Cthulhu · Ваншот · Жахи',age:'16+',nw:1,t:'Тіні над Подолом',d:'1923 рік, зниклий антиквар і книга, яку не варто відкривати. Розслідування з високою смертністю персонажів.',when:'7 груд. 2026 р., 14:00',where:'Наживо · Київ · антикафе «Куб»',free:1,tot:4,gm:'ПанЛавкрафт',r:'4.8',price:200},
+ {acc:'cyan',n:'0246',img:1044,sys:'Pathfinder 2e · Кампанія · Пісочниця',t:'Вітер з Карпат',d:'Пісочниця в горах, натхненна гуцульськими легендами: мольфари, чугайстри і перевал, який не відпускає.',when:'8 груд. 2026 р., 12:00',where:'Наживо · Львів',free:3,tot:4,fit:1,gm:'Тарас_Друїд',r:'4.9',price:0},
+ {acc:'violet',n:'0247',sys:'Blades in the Dark · Кампанія · Гайст',age:'16+',t:'Банда з Дусквола шукає злодія з чистою репутацією і холодною головою',d:'Тиха робота, гучні наслідки. Шукаємо третього в команду — досвід не обов’язковий, головне — не боятися ризикувати.',when:'10 груд. 2026 р., 19:30',where:'Онлайн · Roll20 + голосовий канал у Discord',free:1,tot:3,gm:'Скрипаль',r:'4.7',price:120},
+ {acc:'amber',n:'0248',sys:'D&amp;D 5e (2014) · Ваншот · Фентезі',nw:1,t:'Таверна на краю мапи',d:'Легкий ваншот для новачків: заблукалий караван, загадкова господиня і зовсім не підозрілий підвал.',when:'13 груд. 2026 р., 17:00',where:'Онлайн · Discord',free:4,tot:5,gm:'Мавка_ГМ',r:'4.4',price:0},
+];
+window.renderCard=function(c){
+ const taken=c.tot-c.free;let v='';
+ for(let i=0;i<c.tot;i++)v+=`<svg width="11" height="20"><use href="#${i<taken?'vial-full':'vial-empty'}"/></svg>`;
+ const att=c.img?`<figure class="att"><span class="hook"></span><div class="frame"><div class="pic"><img src="https://picsum.photos/id/${c.img}/300/360" alt=""></div></div><span class="gem"></span><svg class="spark s1" width="14" height="14"><use href="#spark"/></svg><svg class="spark s2" width="11" height="11"><use href="#spark"/></svg><svg class="spark s3" width="9" height="9"><use href="#spark"/></svg><figcaption>Обкладинка</figcaption></figure>`:'';
+ const corners=['tl','tr','bl','br'].map(k=>`<svg class="corner ${k}"><use href="#corner"/></svg>`).join('');
+ return `<article class="card acc-${c.acc}${c.hover?' is-hover':''}">${att}
+ <div class="panel paper">${corners}<div class="tg"><span><svg class="bird" width="18" height="12"><use href="#bird"/></svg>Запрошення № ${c.n}</span><b>✦✦✦</b></div>
+  <div class="sysrow"><span class="sys">${c.sys}</span><span class="badges">${c.age?`<span class="b-age">${c.age}</span>`:''}${c.nw?'<span class="b-new">Нове</span>':''}</span></div>
+  <h2>${c.t}</h2>
+  <p class="desc">${c.d}</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>${c.when}</dd></div>
+   <div><dt>Де</dt><dd>${c.where}</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="vials">${v}</span>вільних місць: ${c.free} з ${c.tot}</dd></div>
+  </dl>
+  ${c.fit?'<div class="fit"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M11 1.5a6.5 6.5 0 1 0 3.5 11.8A6 6 0 0 1 11 1.5Z" fill="#165a53"/></svg>Підходить вашому розкладу</div>':''}
+  <div class="foot"><div class="gm"><i>${c.gm[0].toUpperCase()}</i><span><b>${c.gm}</b><small>майстер · ${c.r?`<span class="star">★</span> ${c.r}`:'ще немає рейтингу'}</small></span></div>${c.price?`<div class="price"><b>${c.price}</b><small>грн</small></div>`:'<div class="price free"><b>без</b><small>плати</small></div>'}</div>
+ </div></article>`;
+};
+window.CARDS=C;
+const grid=document.getElementById('grid');
+if(grid)grid.innerHTML=C.map(renderCard).join('');
+</script>
+</body></html>

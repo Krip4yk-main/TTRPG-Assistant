@@ -1,0 +1,378 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><title>Готичний морок — пошук ігор</title>
+<!-- Готичний морок: собор із чорненої сталі, сусальне золото, свічки, кров і кістка, зелений дата-планшет.
+     Шрифти (усі з кирилицею, у продакшені — @fontsource): Cormorant SC (заголовки), Alegreya (текст), IBM Plex Mono (дані).
+     Режим крупного плану картки: grimdark-gothic.html#card -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@500;600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+ --void:#0b0a0c;--steel:#1b1a1e;--steel2:#26242a;--rivet:#3a363c;
+ --gold:#c9a14a;--gold-hi:#f1d58a;--gold-lo:#7a5a1c;
+ --blood:#8e1b1b;--wax:#a3201f;--wax-hi:#d2463a;
+ --bone:#ece2cc;--bone2:#bdb196;--green:#7dffa0;--green2:#4fc874;--slate:#060f09;
+}
+html{background:var(--void)}
+body{width:1440px;min-height:1700px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+ font:15px/1.5 Alegreya,serif;color:var(--bone);background:var(--void)}
+
+/* ── nave: lancet windows, buttresses and riveted girders ── */
+.bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bg svg.nave{position:absolute;left:0;top:0}
+.bg::after{content:"";position:absolute;inset:0;background:
+ radial-gradient(ellipse 520px 380px at 1210px 210px,rgba(255,170,70,.16),transparent 70%),
+ radial-gradient(ellipse 700px 420px at 160px 1650px,rgba(255,150,60,.10),transparent 70%),
+ radial-gradient(ellipse 900px 600px at 900px 900px,transparent 40%,rgba(0,0,0,.55)),
+ linear-gradient(180deg,rgba(0,0,0,.35),transparent 18%,transparent 80%,rgba(0,0,0,.6))}
+
+/* ── header ── */
+.top{position:sticky;top:0;z-index:20;height:68px;display:flex;align-items:center;gap:40px;padding:0 32px;
+ background:linear-gradient(#1f1d22,#141317);border-bottom:1px solid #000;box-shadow:0 1px 0 var(--gold-lo),0 2px 0 rgba(0,0,0,.8),0 8px 18px rgba(0,0,0,.6)}
+.top::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:3px;background:linear-gradient(90deg,transparent,var(--blood) 15%,var(--blood) 85%,transparent);opacity:.8}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none;white-space:nowrap}
+.logo svg{color:var(--gold);filter:drop-shadow(0 0 4px rgba(241,213,138,.25))}
+.logo b{font:700 23px/1 "Cormorant SC";color:var(--bone);letter-spacing:.02em}
+.top nav{display:flex;gap:4px}
+.top nav a{text-decoration:none;padding:8px 14px;font:600 17px "Cormorant SC";color:var(--bone2);letter-spacing:.02em}
+.top nav a.on{color:var(--gold-hi);box-shadow:inset 0 -2px 0 var(--gold)}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:18px}
+.bell{position:relative;background:none;border:0;display:grid;place-items:center;width:40px;height:40px;color:var(--bone2)}
+.bell .cnt{position:absolute;top:2px;right:0;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font:600 11px/18px "IBM Plex Mono";text-align:center;background:var(--wax);color:#fff;box-shadow:0 0 0 2px #141317}
+.ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:700 18px "Cormorant SC";color:var(--gold-hi);
+ background:radial-gradient(circle at 40% 35%,#2c2a30,#121114);border:2px solid var(--gold);box-shadow:0 0 0 3px #141317,0 0 0 4px var(--gold-lo)}
+
+/* ── hero: illuminated capital ── */
+.hero{position:relative;z-index:2;padding:40px 32px 26px;display:flex;align-items:flex-end;gap:22px}
+.illum{position:relative;flex:none;width:96px;height:96px;display:grid;place-items:center;
+ background:radial-gradient(circle at 50% 45%,#b72a22,#6e1212 70%,#3e0909);
+ border:3px solid var(--gold);box-shadow:0 0 0 2px #0b0a0c,0 0 0 4px var(--gold-lo),0 14px 26px rgba(0,0,0,.7),inset 0 0 18px rgba(0,0,0,.6)}
+.illum b{position:relative;z-index:2;font:700 82px/1 "Cormorant SC";margin-top:-6px;
+ background:linear-gradient(170deg,#fff3c4 10%,#e7bf5c 45%,#a5741f 75%,#f1d58a);-webkit-background-clip:text;background-clip:text;color:transparent;
+ filter:drop-shadow(0 2px 0 rgba(0,0,0,.6))}
+.illum svg{position:absolute;inset:4px;z-index:1;color:rgba(241,213,138,.5)}
+.hero h1{font:600 62px/1 "Cormorant SC";color:var(--bone);letter-spacing:.01em;text-shadow:0 2px 0 #000,0 0 30px rgba(255,170,70,.12)}
+.hero .sub{display:block;margin-top:10px;font:500 12.5px "IBM Plex Mono";letter-spacing:.16em;text-transform:uppercase;color:var(--green);text-shadow:0 0 8px rgba(125,255,160,.35)}
+.hero .sub::before{content:"▌ ";animation:none}
+.hero p{margin:0 0 30px;color:var(--bone2);font-size:18px;font-style:italic}
+.candles{position:absolute;right:58px;top:28px;width:150px;height:110px}
+.candle{position:absolute;bottom:0;border-radius:3px 3px 1px 1px;background:linear-gradient(90deg,#b9ab8c,#efe5cb 40%,#cfc19f 70%,#8f8268)}
+.candle::before{content:"";position:absolute;left:50%;top:-22px;width:10px;height:22px;margin-left:-5px;border-radius:50% 50% 45% 45%/60% 60% 40% 40%;
+ background:radial-gradient(ellipse at 50% 75%,#fff 0 18%,#ffe08a 35%,#ff9a2a 65%,transparent 72%);filter:blur(.3px)}
+.candle::after{content:"";position:absolute;left:50%;top:-60px;width:90px;height:90px;margin-left:-45px;border-radius:50%;background:radial-gradient(circle,rgba(255,190,90,.28),transparent 65%)}
+.candle i{position:absolute;left:30%;top:6px;width:4px;height:18px;border-radius:2px;background:#f6edd6;opacity:.8}
+
+/* ── layout ── */
+.layout{position:relative;z-index:2;display:grid;grid-template-columns:300px 1fr;gap:32px;padding:0 32px 72px}
+
+/* filters: lectern of blackened steel */
+.filters{position:sticky;top:88px;align-self:start;display:flex;flex-direction:column;gap:14px;padding:30px 20px 22px;
+ background:linear-gradient(180deg,#1c1a1f,#131215);border:1px solid #000;
+ box-shadow:inset 0 0 0 5px #17161a,inset 0 0 0 6px rgba(201,161,74,.55),0 22px 40px rgba(0,0,0,.6)}
+.filters::before{content:"";position:absolute;left:50%;top:-15px;width:46px;height:24px;margin-left:-23px;
+ background:linear-gradient(180deg,var(--gold-hi),var(--gold) 50%,var(--gold-lo));clip-path:path("M0 24 Q4 8 23 0 Q42 8 46 24 Z")}
+.filters::after{content:"";position:absolute;left:50%;top:-6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ff7a6a,var(--wax) 60%,#4a0808)}
+.filters h3{font:700 22px/1 "Cormorant SC";color:var(--gold-hi);text-align:center;letter-spacing:.04em;display:flex;align-items:center;gap:10px;justify-content:center}
+.filters h3::before,.filters h3::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
+.filters h3::after{transform:scaleX(-1)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.sort label{font:600 11px "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--bone2)}
+.input{position:relative;height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;white-space:nowrap;overflow:hidden;
+ background:#0d0c0f;border:1px solid #3e3832;color:var(--bone);font-size:15px;box-shadow:inset 0 2px 6px rgba(0,0,0,.6)}
+.input .ph{color:#948a77;font-style:italic}.input svg{color:#a2967d;flex:none}
+.input.select::after{content:"";position:absolute;right:15px;top:15px;width:7px;height:7px;border-right:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:rotate(45deg)}
+.input.date svg{margin-left:auto}
+.input.search{border-color:var(--gold);box-shadow:inset 0 2px 6px rgba(0,0,0,.6),0 0 0 3px rgba(201,161,74,.16)}
+.range{position:relative;height:30px;margin-top:2px}
+.range .track{position:absolute;left:8px;right:8px;top:13px;height:4px;background:#2d2a2e;box-shadow:inset 0 1px 2px #000}
+.range .fill{position:absolute;left:8px;width:62%;top:13px;height:4px;background:linear-gradient(90deg,#6e1212,var(--wax-hi))}
+.range .knob{position:absolute;top:5px;width:20px;height:20px;transform:rotate(45deg);background:linear-gradient(135deg,var(--gold-hi),var(--gold) 50%,var(--gold-lo));border:1px solid #000;box-shadow:0 2px 4px rgba(0,0,0,.7)}
+.range .k1{left:0}.range .k2{left:calc(8px + 62% - 10px)}
+.range-vals{display:flex;justify-content:space-between;font:500 12px "IBM Plex Mono";color:var(--bone2)}
+.checks{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.chk{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--bone)}
+.chk i{flex:none;width:18px;height:18px;position:relative;border:1.5px solid #6a5f52;background:#0d0c0f}
+.chk.on i{background:radial-gradient(circle at 40% 35%,var(--wax-hi),var(--wax) 55%,#5a0d0d);border-color:var(--gold);color:#fff4dc}
+.chk.on i::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+.reset{height:44px;margin-top:6px;font:700 17px "Cormorant SC";letter-spacing:.04em;color:var(--gold-hi);
+ background:linear-gradient(#2a272d,#18161a);border:1px solid var(--gold);box-shadow:inset 0 0 0 3px #18161a,inset 0 0 0 4px rgba(201,161,74,.35)}
+
+/* bar */
+.bar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:46px;min-height:52px}
+.count{font-size:16px;color:var(--bone2);font-style:italic}.count b{color:var(--bone);font-style:normal}
+.sort{display:flex;flex-direction:column;gap:5px;width:240px}
+
+/* ── grid & cards ── */
+.grid{position:relative;display:grid;grid-template-columns:repeat(3,332px);gap:44px 24px;justify-content:start}
+.card{position:relative;width:332px;height:380px}
+.panel{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;overflow:hidden;padding:30px 24px 20px;
+ background:
+  radial-gradient(ellipse 120% 60% at 50% 0%,rgba(255,180,90,.07),transparent 60%),
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .58 0 0 0 0 .62 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E"),
+  linear-gradient(180deg,#1e1c21,#141316);
+ border:1px solid #000;
+ box-shadow:inset 0 0 0 5px #19171b,inset 0 0 0 6px rgba(201,161,74,.5),inset 0 1px 0 rgba(255,255,255,.05),0 22px 36px rgba(0,0,0,.65);
+ transition:box-shadow .3s}
+/* gold corner pieces */
+.panel .co{position:absolute;width:16px;height:16px;border-color:var(--gold);border-style:solid;border-width:0}
+.co.tl{left:9px;top:9px;border-left-width:2px;border-top-width:2px}.co.tr{right:9px;top:9px;border-right-width:2px;border-top-width:2px}
+.co.bl{left:9px;bottom:9px;border-left-width:2px;border-bottom-width:2px}.co.br{right:9px;bottom:9px;border-right-width:2px;border-bottom-width:2px}
+/* gable crest on the top edge */
+.crest{position:absolute;z-index:3;pointer-events:none;left:50%;top:-13px;width:38px;height:20px;margin-left:-19px;
+ background:linear-gradient(180deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));clip-path:path("M0 20 Q3 7 19 0 Q35 7 38 20 Z");filter:drop-shadow(0 2px 2px #000)}
+.crest::after{content:"";position:absolute;left:14px;top:8px;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ff8a7a,var(--wax) 60%,#3e0707)}
+
+.sysrow{display:flex;align-items:center;gap:8px;min-height:22px}
+.sys{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:700 14px "Cormorant SC";letter-spacing:.03em;color:var(--gold)}
+.badges{display:flex;gap:6px;flex:none}
+.b-age,.b-new{font:600 11px/1 "IBM Plex Mono";padding:4px 6px}
+.b-age{color:#ffc9bf;border:1px solid var(--wax-hi);background:rgba(163,32,31,.22)}
+.b-new{color:#1a1206;background:linear-gradient(var(--gold-hi),var(--gold))}
+.card h2{margin:8px 0 7px;font:700 21px/1.18 "Cormorant SC";color:var(--bone);letter-spacing:.005em;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desc{font-size:14.5px;line-height:1.42;color:#cfc5ad;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* data-slate */
+.facts{margin-top:12px;padding:8px 10px 8px;display:flex;flex-direction:column;gap:2px;position:relative;
+ background:linear-gradient(180deg,#07130b,#040b06);border:1px solid #2a3b2e;box-shadow:inset 0 0 14px rgba(0,0,0,.8),0 0 0 2px #0f0e11,0 0 0 3px #3b342b;
+ font:500 12px/1.6 "IBM Plex Mono";color:var(--green)}
+.facts::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(125,255,160,.035) 0 1px,transparent 1px 3px)}
+.facts>div{display:flex;align-items:baseline;gap:8px;min-width:0}
+.facts dt{flex:none;width:44px;color:var(--green2);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.facts dd{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 6px rgba(125,255,160,.25)}
+.seats{display:flex;align-items:center;gap:8px}
+.pips{display:flex;gap:3px}
+.pips b{width:7px;height:10px;border:1px solid #3c7a4e}
+.pips b.f{background:var(--green);border-color:var(--green);box-shadow:0 0 4px rgba(125,255,160,.6)}
+
+.fit{align-self:flex-start;margin-top:10px;display:flex;align-items:center;gap:8px;padding:3px 12px 3px 9px;
+ font:500 14px Alegreya;font-style:italic;color:var(--gold-hi);border:1px solid rgba(201,161,74,.6);background:rgba(201,161,74,.08)}
+.fit::before{content:"";width:6px;height:11px;border-radius:50% 50% 45% 45%/60% 60% 40% 40%;background:radial-gradient(ellipse at 50% 70%,#fff 0 20%,#ffd36a 45%,#ff8a1e 80%);box-shadow:0 0 6px rgba(255,180,60,.9)}
+
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gm{display:flex;align-items:center;gap:10px;min-width:0}
+.gm i{flex:none;font-style:normal;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 17px "Cormorant SC";color:var(--gold-hi);
+ background:radial-gradient(circle at 40% 35%,#2c2a30,#0f0e11);border:1.5px solid var(--gold);box-shadow:0 0 0 2px #141316,0 0 0 3px var(--gold-lo)}
+.gm>span{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.gm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;font-weight:700;color:var(--bone)}
+.gm small{font-size:13px;color:var(--bone2)}
+.star{color:var(--gold-hi)}
+.price{flex:none;white-space:nowrap;padding:6px 13px 7px;font:700 16px/1 "Cormorant SC";letter-spacing:.02em;color:#1d1406;
+ background:linear-gradient(170deg,#fbe9b0,#e2b85a 40%,#b6872c 70%,#efd18a);border:1px solid #5a3f10;box-shadow:0 2px 0 #000,inset 0 1px 0 rgba(255,255,255,.5)}
+.price.free{color:var(--bone);background:linear-gradient(#2c2a30,#1a181c);border:1px solid var(--gold);box-shadow:0 2px 0 #000,inset 0 0 0 2px #1a181c,inset 0 0 0 3px rgba(201,161,74,.4)}
+
+/* ── memorable element: wax seal with parchment strips ── */
+.seal{position:absolute;z-index:4;left:-27px;top:-24px;width:52px;height:120px;pointer-events:none;transform:rotate(-8deg);transform-origin:26px 26px}
+.seal .strip{position:absolute;top:24px;width:15px;background:
+ url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.08 .4' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .35 0 0 0 0 .2 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='60' height='60' filter='url(%23p)'/%3E%3C/svg%3E"),
+ linear-gradient(90deg,#cdbb92,#eadcb6 50%,#c8b48a);
+ box-shadow:1px 2px 3px rgba(0,0,0,.6);clip-path:polygon(0 0,100% 0,100% 100%,70% 94%,40% 100%,0 95%)}
+.seal .strip span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(90deg);white-space:nowrap;font:italic 600 9px/1 Alegreya;color:#4a2410;letter-spacing:.04em}
+.seal .s1{left:12px;height:96px;transform:rotate(4deg)}
+.seal .s2{left:27px;height:74px;transform:rotate(-7deg)}
+.seal .wax{position:absolute;left:0;top:0;width:52px;height:52px;border-radius:47% 53% 50% 50%/52% 48% 52% 48%;
+ background:radial-gradient(circle at 36% 30%,#e1584a,var(--wax) 42%,#6a1010 80%,#3a0606);
+ box-shadow:0 3px 6px rgba(0,0,0,.7),inset 0 -2px 4px rgba(0,0,0,.4),inset 0 2px 2px rgba(255,190,170,.25)}
+.seal .wax::before{content:"";position:absolute;inset:8px;border-radius:50%;box-shadow:inset 0 1px 2px rgba(0,0,0,.55),0 1px 0 rgba(255,170,150,.25)}
+.seal .wax svg{position:absolute;left:13px;top:13px;color:#5d0c0c;filter:drop-shadow(0 1px 0 rgba(255,160,140,.35))}
+
+/* ── attachment: lancet-arch pict window behind the card ── */
+.att{position:absolute;z-index:1;top:-34px;right:-20px;width:120px;height:158px;transform:rotate(7deg);
+ filter:drop-shadow(0 10px 12px rgba(0,0,0,.7)) brightness(.8);
+ transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s}
+.att .frame{position:absolute;inset:0;background:linear-gradient(160deg,var(--gold-hi),var(--gold) 40%,var(--gold-lo) 80%,var(--gold));
+ clip-path:path("M0 158 V58 Q0 16 60 0 Q120 16 120 58 V158 Z")}
+.att .win{position:absolute;left:5px;top:5px;width:110px;height:148px;overflow:hidden;background:#000;
+ clip-path:path("M0 148 V54 Q0 15 55 0 Q110 15 110 54 V148 Z")}
+.att img,.att .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.55) saturate(.3) sepia(.45);transition:filter .35s}
+.card.is-hover .att img,.card.is-hover .att .art,.card:hover .att img,.card:hover .att .art{filter:none}
+.att .win::after{content:"";position:absolute;inset:0;background:linear-gradient(200deg,rgba(255,230,180,.22),transparent 45%),linear-gradient(0deg,rgba(0,0,0,.55),transparent 40%)}
+.att .lbl{position:absolute;z-index:2;left:0;right:0;bottom:8px;text-align:center;font:600 8.5px "IBM Plex Mono";letter-spacing:.12em;color:var(--gold-hi)}
+.card.is-hover .att,.card:hover .att{z-index:5;transform:translate(-50px,34px) rotate(-2deg) scale(1.22);
+ filter:drop-shadow(0 18px 18px rgba(0,0,0,.75)) drop-shadow(0 0 14px rgba(255,180,80,.35))}
+.card.is-hover .panel,.card:hover .panel{box-shadow:inset 0 0 0 5px #19171b,inset 0 0 0 6px var(--gold-hi),inset 0 0 40px rgba(255,170,70,.07),0 26px 44px rgba(0,0,0,.7),0 0 0 1px var(--gold-lo),0 0 30px rgba(255,170,70,.12)}
+
+.art-forge{background:
+ radial-gradient(ellipse 40% 26% at 50% 88%,#ffcf6a,#ff7a1a 40%,transparent 72%),
+ repeating-linear-gradient(90deg,transparent 0 14px,rgba(0,0,0,.55) 14px 18px),
+ linear-gradient(180deg,#120b0a,#3a1408 60%,#8a2e0c)}
+.art-forge::before{content:"";position:absolute;left:22%;right:22%;top:18%;bottom:30%;background:#0a0606;clip-path:path("M0 110 V40 Q0 10 30 0 Q60 10 60 40 V110 Z");opacity:.9}
+
+/* ── close-up mode (#card) ── */
+html.cu body{width:860px;height:560px;min-height:0;overflow:hidden}
+html.cu .top,html.cu .hero,html.cu .lede,html.cu .layout{display:none}
+.closeup{position:relative;z-index:2;padding:104px 60px 0 84px}
+.closeup .grid{grid-template-columns:repeat(2,332px);gap:44px 56px}
+.closeup .cap{position:absolute;top:34px;left:84px;right:60px;display:flex;justify-content:space-between}
+.closeup .cap span{width:332px;font:500 11px "IBM Plex Mono";letter-spacing:.12em;text-transform:uppercase;color:var(--green)}
+</style></head><body>
+<div class="bg">
+<svg class="nave" width="1440" height="1760" aria-hidden="true">
+ <defs>
+  <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a1414" stop-opacity=".55"/><stop offset=".45" stop-color="#2a0c10" stop-opacity=".35"/><stop offset="1" stop-color="#0b0a0c" stop-opacity="0"/></linearGradient>
+  <linearGradient id="col" x1="0" x2="1"><stop offset="0" stop-color="#0c0b0e"/><stop offset=".45" stop-color="#232127"/><stop offset="1" stop-color="#0c0b0e"/></linearGradient>
+  <linearGradient id="gird" y1="0" y2="1" x1="0" x2="0"><stop offset="0" stop-color="#2b292f"/><stop offset=".5" stop-color="#1a191d"/><stop offset="1" stop-color="#0b0a0c"/></linearGradient>
+  <pattern id="nv" width="240" height="600" patternUnits="userSpaceOnUse">
+   <path d="M44 600V250Q44 120 120 62Q196 120 196 250V600Z" fill="url(#glass)" stroke="#29252b" stroke-width="5"/>
+   <path d="M44 600V250Q44 120 120 62Q196 120 196 250V600" fill="none" stroke="#000" stroke-width="1.5" transform="translate(0 4)"/>
+   <path d="M120 172V600M62 300H178M62 420H178" stroke="#1f1c21" stroke-width="4"/>
+   <path d="M64 600V290Q64 220 116 186M176 600V290Q176 220 124 186" fill="none" stroke="#1f1c21" stroke-width="3"/>
+   <circle cx="120" cy="134" r="26" fill="none" stroke="#29252b" stroke-width="4"/>
+   <path d="M120 108v52M94 134h52M102 116l36 36M138 116l-36 36" stroke="#29252b" stroke-width="2"/>
+   <rect x="0" y="0" width="16" height="600" fill="url(#col)"/>
+   <rect x="224" y="0" width="16" height="600" fill="url(#col)"/>
+   <rect x="0" y="566" width="240" height="22" fill="url(#gird)"/>
+   <g fill="#3a363c"><circle cx="20" cy="577" r="3"/><circle cx="80" cy="577" r="3"/><circle cx="140" cy="577" r="3"/><circle cx="200" cy="577" r="3"/></g>
+  </pattern>
+ </defs>
+ <rect width="1440" height="1760" fill="#0e0d10"/>
+ <rect width="1440" height="1760" fill="url(#nv)" opacity=".85"/>
+</svg>
+</div>
+
+<header class="top">
+ <a class="logo" href="#"><svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="16" r="14"/><circle cx="16" cy="16" r="5"/><path d="M16 2v9M16 21v9M2 16h9M21 16h9M6.1 6.1l6.4 6.4M19.5 19.5l6.4 6.4M25.9 6.1l-6.4 6.4M12.5 19.5l-6.4 6.4"/><circle cx="16" cy="16" r="10" stroke-dasharray="2 3"/></svg><b>НРІ Асистент</b></a>
+ <nav><a class="on" href="#">Пошук ігор</a><a href="#">Мої ігри</a></nav>
+ <div class="right"><button class="bell" aria-label="Сповіщення"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="cnt">3</span></button><span class="ava">Л</span></div>
+</header>
+
+<section class="hero">
+ <div class="illum" aria-hidden="true"><svg viewBox="0 0 88 88" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 82C14 60 8 40 18 26S40 8 44 6M82 6C74 28 80 48 70 62S48 80 44 82"/><circle cx="18" cy="26" r="3"/><circle cx="70" cy="62" r="3"/><path d="M10 50c6-2 9 2 8 6M78 38c-6 2-9-2-8-6"/></svg><b>З</b></div>
+ <div><h1>найдіть свою гру</h1><span class="sub">скрипторій набору · 24 записи на планшеті</span></div>
+ <div class="candles" aria-hidden="true"><span class="candle" style="left:18px;width:16px;height:58px"><i></i></span><span class="candle" style="left:52px;width:20px;height:86px"><i></i></span><span class="candle" style="left:92px;width:14px;height:40px"><i></i></span></div>
+</section>
+<p class="lede" style="position:relative;z-index:2;margin:-14px 0 30px 32px;color:var(--bone2);font-size:18px;font-style:italic">Ігри, що набирають гравців: онлайн і наживо.</p>
+
+<main class="layout">
+<aside class="filters">
+ <h3>Фільтри</h3>
+ <div class="field"><label>Пошук</label><div class="input search"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="ph">Назва, система, майстер…</span></div></div>
+ <div class="field"><label>Система</label><div class="input select">Усі системи</div></div>
+ <div class="field"><label>Жанр</label><div class="input select">Будь-який</div></div>
+ <div class="field"><label>Формат</label><div class="input select">Онлайн і наживо</div></div>
+ <div class="field"><label>Дата від</label><div class="input date">26.11.2026 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Дата до</label><div class="input date"><span class="ph">дд.мм.рррр</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Ціна за сесію</label><div class="range"><span class="track"></span><span class="fill"></span><span class="knob k1"></span><span class="knob k2"></span></div><div class="range-vals"><span>0 грн</span><span>до 300 грн</span></div></div>
+ <div class="checks">
+  <label class="chk on"><i></i>Лише з вільними місцями</label>
+  <label class="chk on"><i></i>Підходить моєму розкладу</label>
+  <label class="chk"><i></i>Лише без плати</label>
+  <label class="chk"><i></i>Новачкам ласкаво просимо</label>
+ </div>
+ <button class="reset">Скинути</button>
+</aside>
+
+<section class="results">
+<div class="bar"><div class="count">Знайдено <b>24 гри</b> · показано 9</div><div class="sort"><label>Сортування</label><div class="input select">Спершу найближчі</div></div></div>
+<div class="grid" id="grid">
+
+<article class="card">
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Dungeon World · Кампанія · Фентезі</span><span class="badges"><span class="b-age">16+</span></span></div>
+  <h2>Підземелля, яке ми вигадаємо разом</h2>
+  <p class="desc">PbtA-фентезі: ходи, ускладнення, світ малюємо на ходу. Кожна сесія — нова кімната, нова пастка і нова причина не відступати.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>2 груд. 2026 р., 19:00</dd></div><div><dt>Де</dt><dd>Онлайн · Discord</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b><b></b></span>вільних місць: 1 з 4</dd></div></dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  <div class="foot"><div class="gm"><i>Л</i><span><b>Лицар37</b><small>майстер · <span class="star">★</span> 4.2</small></span></div><div class="price free">без плати</div></div>
+ </div>
+</article>
+
+<article class="card is-hover" id="c-hover"><figure class="att"><div class="frame"></div><div class="win"><div class="art art-forge"></div></div><span class="lbl">ОБКЛАДИНКА</span></figure>
+ <div class="seal" aria-hidden="true"><span class="strip s1"><span>Набір відкрито</span></span><span class="strip s2"><span>Клятву дано</span></span><span class="wax"><svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13" cy="13" r="11"/><circle cx="13" cy="13" r="3.5"/><path d="M13 2v7.5M13 16.5V24M2 13h7.5M16.5 13H24"/></svg></span></div>
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Mörk Borg · Ваншот · Темне фентезі</span><span class="badges"><span class="b-age">18+</span></span></div>
+  <h2>Кузня під згаслим собором</h2>
+  <p class="desc">Ковалі-послушники зникли один за одним, а дзвони б'ють самі опівночі. Одна ніч, щоб дізнатися, що вони кують унизу.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>6 груд. 2026 р., 21:00</dd></div><div><dt>Де</dt><dd>Наживо · Київ · клуб «Сигнал»</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 2 з 4</dd></div></dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  <div class="foot"><div class="gm"><i>Л</i><span><b>Ліра</b><small>майстер · <span class="star">★</span> 4.6</small></span></div><div class="price">250 грн</div></div>
+ </div>
+</article>
+
+<article class="card" id="c-rest"><figure class="att"><div class="frame"></div><div class="win"><img src="https://picsum.photos/id/1040/300/400" alt=""></div><span class="lbl">ОБКЛАДИНКА</span></figure>
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Pathfinder 2e · Кампанія · Темне фентезі</span><span class="badges"></span></div>
+  <h2>Pathfinder для тих, хто любить тактику</h2>
+  <p class="desc">Ви — члени гільдії, яка розшукує небезпечні артефакти до того, як їх знайдуть культисти.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>29 лист. 2026 р., 16:00</dd></div><div><dt>Де</dt><dd>Онлайн · Foundry VTT</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 3 з 5</dd></div></dl>
+  <div class="foot"><div class="gm"><i>D</i><span><b>dungeon_odesa</b><small>майстер · <span class="star">★</span> 4.9</small></span></div><div class="price">100 грн</div></div>
+ </div>
+</article>
+
+<article class="card">
+ <div class="seal" aria-hidden="true"><span class="strip s1"><span>Новий запис</span></span><span class="strip s2"><span>Для новачків</span></span><span class="wax"><svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13" cy="13" r="11"/><circle cx="13" cy="13" r="3.5"/><path d="M13 2v7.5M13 16.5V24M2 13h7.5M16.5 13H24"/></svg></span></div>
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">D&amp;D 5e (2024) · Кампанія · Фентезі</span><span class="badges"><span class="b-new">Нове</span></span></div>
+  <h2>Шлях до Смарагдової вежі</h2>
+  <p class="desc">Привіт усім! Спробуємо оновлені правила D&amp;D: нові передісторії, переглянуті класи, усе поясню на першій сесії.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>5 груд. 2026 р., 11:00</dd></div><div><dt>Де</dt><dd>Наживо · Тернопіль · антикафе «Портал»</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 3 з 5</dd></div></dl>
+  <div class="foot"><div class="gm"><i>I</i><span><b>ihor.tkachenko</b><small>майстер · ще немає рейтингу</small></span></div><div class="price free">без плати</div></div>
+ </div>
+</article>
+
+<article class="card"><figure class="att"><div class="frame"></div><div class="win"><img src="https://picsum.photos/id/1031/300/400" alt=""></div><span class="lbl">ОБКЛАДИНКА</span></figure>
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Mothership · Кампанія · Наукова фантастика</span><span class="badges"><span class="b-age">18+</span></span></div>
+  <h2>Дрейф «Ізоляди»</h2>
+  <p class="desc">Вантажник на мертвій орбіті. Сигнал лиха надходить зсередини, а кисню лишилося на дев'ять годин.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>3 груд. 2026 р., 20:30</dd></div><div><dt>Де</dt><dd>Онлайн · Discord</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 2 з 4</dd></div></dl>
+  <div class="foot"><div class="gm"><i>Д</i><span><b>Данило</b><small>майстер · <span class="star">★</span> 4.5</small></span></div><div class="price">150 грн</div></div>
+ </div>
+</article>
+
+<article class="card">
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Call of Cthulhu · Ваншот · Жахи</span><span class="badges"><span class="b-age">16+</span><span class="b-new">Нове</span></span></div>
+  <h2>Тіні над Подолом</h2>
+  <p class="desc">1923 рік, зниклий антиквар і книга, яку не варто відкривати. Розслідування з високою смертністю персонажів.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>7 груд. 2026 р., 14:00</dd></div><div><dt>Де</dt><dd>Наживо · Київ · антикафе «Куб»</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b><b></b></span>вільних місць: 1 з 4</dd></div></dl>
+  <div class="foot"><div class="gm"><i>П</i><span><b>ПанЛавкрафт</b><small>майстер · <span class="star">★</span> 4.8</small></span></div><div class="price">200 грн</div></div>
+ </div>
+</article>
+
+<article class="card"><figure class="att"><div class="frame"></div><div class="win"><img src="https://picsum.photos/id/1044/300/400" alt=""></div><span class="lbl">ОБКЛАДИНКА</span></figure>
+ <div class="seal" aria-hidden="true"><span class="strip s1"><span>Набір відкрито</span></span><span class="strip s2"><span>Без плати</span></span><span class="wax"><svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13" cy="13" r="11"/><circle cx="13" cy="13" r="3.5"/><path d="M13 2v7.5M13 16.5V24M2 13h7.5M16.5 13H24"/></svg></span></div>
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Pathfinder 2e · Кампанія · Пісочниця</span><span class="badges"></span></div>
+  <h2>Вітер з Карпат</h2>
+  <p class="desc">Пісочниця в горах, натхненна гуцульськими легендами: мольфари, чугайстри і перевал, який не відпускає.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>8 груд. 2026 р., 12:00</dd></div><div><dt>Де</dt><dd>Наживо · Львів</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b></span>вільних місць: 3 з 4</dd></div></dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  <div class="foot"><div class="gm"><i>Т</i><span><b>Тарас_Друїд</b><small>майстер · <span class="star">★</span> 4.9</small></span></div><div class="price free">без плати</div></div>
+ </div>
+</article>
+
+<article class="card">
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">Blades in the Dark · Кампанія · Гайст</span><span class="badges"><span class="b-age">16+</span></span></div>
+  <h2>Банда з Дусквола шукає злодія з чистою репутацією і холодною головою</h2>
+  <p class="desc">Тиха робота, гучні наслідки. Шукаємо третього в команду — досвід не обов'язковий, головне — не боятися ризикувати.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>10 груд. 2026 р., 19:30</dd></div><div><dt>Де</dt><dd>Онлайн · Roll20 + голосовий канал у Discord</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b></span>вільних місць: 1 з 3</dd></div></dl>
+  <div class="foot"><div class="gm"><i>С</i><span><b>Скрипаль</b><small>майстер · <span class="star">★</span> 4.7</small></span></div><div class="price">120 грн</div></div>
+ </div>
+</article>
+
+<article class="card">
+ <span class="crest"></span><div class="panel"><span class="co tl"></span><span class="co tr"></span><span class="co bl"></span><span class="co br"></span>
+  <div class="sysrow"><span class="sys">D&amp;D 5e (2014) · Ваншот · Фентезі</span><span class="badges"><span class="b-new">Нове</span></span></div>
+  <h2>Таверна на краю мапи</h2>
+  <p class="desc">Легкий ваншот для новачків: заблукалий караван, загадкова господиня і зовсім не підозрілий підвал.</p>
+  <dl class="facts"><div><dt>Коли</dt><dd>13 груд. 2026 р., 17:00</dd></div><div><dt>Де</dt><dd>Онлайн · Discord</dd></div><div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b class="f"></b><b></b></span>вільних місць: 4 з 5</dd></div></dl>
+  <div class="foot"><div class="gm"><i>М</i><span><b>Мавка_ГМ</b><small>майстер · <span class="star">★</span> 4.4</small></span></div><div class="price free">без плати</div></div>
+ </div>
+</article>
+
+</div>
+</section>
+</main>
+<script>
+if(location.hash==='#card'){
+ document.documentElement.classList.add('cu');
+ const rest=document.getElementById('c-rest'),hov=document.getElementById('c-hover');
+ rest.classList.remove('is-hover');
+ const cu=document.createElement('div');cu.className='closeup';
+ cu.innerHTML='<div class="cap"><span>▌ у спокої</span><span>▌ наведення — вітраж виходить уперед</span></div><div class="grid"></div>';
+ cu.querySelector('.grid').append(rest,hov);
+ document.body.append(cu);
+}
+</script>
+</body></html>

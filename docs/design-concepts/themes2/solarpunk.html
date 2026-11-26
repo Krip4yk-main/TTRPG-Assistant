@@ -1,0 +1,324 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><title>Сонячний сад</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Alice&family=Literata:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.top{position:sticky;top:0;z-index:20;height:68px;display:flex;align-items:center;gap:40px;padding:0 32px}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none;white-space:nowrap}
+.top nav{display:flex;gap:6px}
+.top nav a{text-decoration:none;padding:8px 14px;border-radius:6px}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:18px}
+.bell{position:relative;background:none;border:0;display:grid;place-items:center;width:40px;height:40px;cursor:pointer}
+.bell .cnt{position:absolute;top:2px;right:0;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;line-height:18px;font-weight:700;text-align:center}
+.ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:700}
+.hero{position:relative;z-index:2;padding:34px 32px 28px}
+.layout{position:relative;z-index:2;display:grid;grid-template-columns:300px 1fr;gap:32px;padding:0 32px 72px}
+.filters{position:relative;align-self:start;display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.input{position:relative;height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;white-space:nowrap;overflow:hidden}
+.input.select::after{content:"";position:absolute;right:15px;top:16px;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);opacity:.75}
+.input.date svg{margin-left:auto;flex:none}
+.range{position:relative;height:30px;margin-top:2px}
+.range .track{position:absolute;left:8px;right:8px;top:13px;height:4px;border-radius:2px}
+.range .fill{position:absolute;left:8px;width:62%;top:13px;height:4px;border-radius:2px}
+.range .knob{position:absolute;top:6px;width:18px;height:18px;border-radius:50%}
+.range .k1{left:0}.range .k2{left:calc(8px + 62% - 9px)}
+.range-vals{display:flex;justify-content:space-between}
+.checks{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.chk{display:flex;align-items:center;gap:10px;cursor:pointer}
+.chk i{flex:none;width:18px;height:18px;border-radius:4px;position:relative}
+.chk.on i::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+.reset{height:42px;cursor:pointer;margin-top:6px}
+.bar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;min-height:52px}
+.sort{display:flex;flex-direction:column;gap:5px;width:240px}
+.grid{position:relative;display:grid;grid-template-columns:repeat(3,332px);gap:44px 24px;justify-content:start}
+.card{position:relative;width:332px;height:380px}
+.panel{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.sysrow{display:flex;align-items:center;gap:8px;min-height:20px}
+.sys{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;gap:6px;flex:none}
+.card h2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.facts{display:flex;flex-direction:column;gap:3px}
+.facts>div{display:flex;align-items:center;gap:8px;min-width:0}
+.facts dt{flex:none}
+.facts dd{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seats{display:flex;align-items:center;gap:8px}
+.pips{display:flex;gap:4px}
+.pips b{width:9px;height:9px;border-radius:50%}
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gm{display:flex;align-items:center;gap:10px;min-width:0}
+.gm i{flex:none;font-style:normal;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700}
+.gm>span{display:flex;flex-direction:column;min-width:0}
+.gm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.price{flex:none;white-space:nowrap}
+.att{position:absolute;z-index:1;margin:0;transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s,opacity .35s}
+.att img{display:block;width:100%;height:100%;object-fit:cover}
+.card.is-hover .att,.card:hover .att{z-index:5}
+.closeup{position:relative;z-index:2;padding:96px 60px 0 84px}
+.closeup .grid{grid-template-columns:repeat(2,332px);gap:44px 56px}
+.closeup .cap{position:absolute;top:30px;left:84px;right:60px;display:flex;justify-content:space-between;z-index:3}
+.closeup .cap span{width:332px}
+
+
+:root{--ink:#1d2e24;--mute:#55654e;--leaf:#2f6b3c;--sun:#f4c242;--clay:#b9532f}
+html{background:#f6f1e4}
+body{font:15px/1.5 Manrope,sans-serif;color:var(--ink);background:#f6f1e4;min-height:1720px}
+.acc-violet{--d:#5b3f8a;--s:#efe8f7}.acc-pink{--d:#9a2f5c;--s:#fbe8ef}.acc-cyan{--d:#1f6278;--s:#e2f2f6}
+.acc-amber{--d:#7d5306;--s:#fdf1d2}.acc-lime{--d:#3b6b1f;--s:#e9f4dc}.acc-red{--d:#9c3a1d;--s:#fbe7df}
+.bg{background:
+ conic-gradient(from 200deg at 1300px -60px,transparent 0 8deg,rgba(255,214,110,.16) 8deg 12deg,transparent 12deg 20deg,rgba(255,214,110,.14) 20deg 25deg,transparent 25deg 34deg,rgba(255,214,110,.12) 34deg 38deg,transparent 38deg),
+ radial-gradient(ellipse 700px 460px at 1320px 0,rgba(255,226,140,.55),transparent 70%),
+ linear-gradient(180deg,#d9eef0 0,#eef4ea 300px,#f6f1e4 560px)}
+.vine{position:absolute;top:300px;opacity:.75}.vine.l{left:-14px}
+.top{background:#fffdf8;border-bottom:1px solid #e2d9c4;box-shadow:0 6px 20px rgba(60,80,40,.08)}
+.top::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:
+ repeating-linear-gradient(90deg,transparent 0 22px,#d6b45a 22px 24px),linear-gradient(90deg,#2d6f8f,#4f9fb8 30%,#3f8a6a 60%,#2d6f8f)}
+.logo .mark{color:var(--leaf)}
+.logo b{font:400 25px Alice;color:#1d3a28}
+.top nav a{font:600 15px Manrope;color:#3c5446;border-radius:999px}
+.top nav a.on{color:#183f24;background:#e1eed6;box-shadow:inset 0 0 0 1px #b9d3a8}
+.bell{color:#2f4a38}.bell .cnt{background:var(--clay);color:#fff}
+.ava{background:#f4c242;color:#3d2b00;border:2px solid #fffdf8;box-shadow:0 0 0 1.5px #c99a1e;font-family:Alice;font-weight:400}
+
+.hero{height:280px;padding:44px 32px 0}
+.hero .kicker{display:inline-flex;align-items:center;gap:8px;font:700 12px Manrope;letter-spacing:.16em;text-transform:uppercase;color:#3b6b1f}
+.hero .kicker::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--sun);box-shadow:0 0 0 3px rgba(244,194,66,.3)}
+.hero h1{margin-top:10px;font:400 60px/1.05 Alice;color:#183522;letter-spacing:-.005em}
+.hero p{margin-top:16px;font-size:18px;color:#3c5446;max-width:560px}
+.hero .arch{position:absolute;right:120px;top:26px}
+
+.filters{background:#fffdf8;border:1px solid #e0d6bf;border-radius:150px 150px 18px 18px/44px 44px 18px 18px;padding:38px 22px 22px;box-shadow:0 14px 30px rgba(70,90,40,.10)}
+.filters h3{font:600 20px Literata;color:#1d3a28;text-align:center}
+.field label,.sort label{font:700 11px Manrope;letter-spacing:.12em;text-transform:uppercase;color:#55654e}
+.input{background:#fbf8f0;border:1.5px solid #d4cab1;border-radius:12px;color:var(--ink);font-size:15px}
+.input .ph{color:#646f5c}.input svg{color:#646f5c}
+.input.search{border-color:var(--leaf);box-shadow:0 0 0 4px rgba(47,107,60,.14)}
+.range .track{background:#e4dccb}
+.range .fill{background:linear-gradient(90deg,#8cc084,#2f6b3c)}
+.range .knob{background:#fffdf8;border:2.5px solid var(--leaf);box-shadow:0 2px 4px rgba(40,60,30,.2)}
+.range-vals{font:600 12.5px Manrope;color:var(--mute)}
+.chk{font-size:15px;color:#24382c}
+.chk i{border:1.5px solid #a9b59c;background:#fffdf8;border-radius:6px}
+.chk.on i{background:var(--leaf);border-color:var(--leaf);color:#fff}
+.reset{background:transparent;border:1.5px solid var(--leaf);color:#1f4d2b;border-radius:999px;font:700 14px Manrope}
+.count{color:#4a5a4f;font-size:15.5px}.count b{color:var(--ink)}
+.sort .input{background:#fffdf8}
+
+/* seed-packet card */
+.panel{background:#fffdf8;border:1px solid #e0d6bf;border-radius:166px 166px 16px 16px/38px 38px 16px 16px;padding:0;box-shadow:0 10px 24px rgba(70,90,40,.10),0 1px 0 #fff inset}
+.panel .crown{padding:22px 22px 10px;background:linear-gradient(180deg,var(--s),#fffdf8)}
+.panel .body{padding:0 22px;display:flex;flex-direction:column;flex:1;min-height:0}
+.sysrow{justify-content:center;text-align:center}
+.sys{flex:0 1 auto;font:700 11.5px Manrope;letter-spacing:.08em;text-transform:uppercase;color:var(--d)}
+.b-age,.b-new{font:700 11px/1 Manrope;padding:4px 7px;border-radius:999px}
+.b-age{color:#8f3517;background:#fbe7df;box-shadow:inset 0 0 0 1.2px #d77a56}
+.b-new{color:#fff;background:var(--leaf)}
+.card h2{margin:4px 0 6px;font:600 19.5px/1.25 Literata;color:#182a1f}
+.desc{font-size:14px;line-height:1.45;color:#3f4f45}
+.facts{margin-top:10px;font-size:14px;gap:2px}
+.facts dt{width:52px;font:700 10.5px Manrope;text-transform:uppercase;letter-spacing:.1em;color:#5b6b54}
+.pips{gap:5px}
+.pips b{width:12px;height:12px;border-radius:0 100% 0 100%;border:1.5px solid #9fb092;transform:rotate(0deg)}
+.pips b.f{background:#4c8a3f;border-color:#2f6b3c}
+.fit{align-self:flex-start;margin-top:8px;display:flex;align-items:center;gap:7px;padding:3px 12px 3px 8px;border-radius:999px;background:#fff1c4;box-shadow:inset 0 0 0 1px #e7c25a;font-size:13px;font-weight:700;color:#5e4204}
+.fit::before{content:"";width:9px;height:9px;border-radius:50%;background:#f2b51e;box-shadow:0 0 0 2.5px rgba(242,181,30,.35)}
+.stub{position:relative;margin-top:auto;padding:10px 22px 12px;background:#f5efe0;border-top:2px dashed #d3c6a6}
+.stub::before,.stub::after{content:"";position:absolute;top:-9px;width:16px;height:16px;border-radius:50%;background:#f6f1e4;box-shadow:inset 0 0 0 1px #e0d6bf}
+.stub::before{left:-9px}.stub::after{right:-9px}
+.foot{margin-top:0}
+.gm i{background:var(--s);color:var(--d);box-shadow:inset 0 0 0 1.5px currentColor;font:600 14px Literata}
+.gm b{font-size:14.5px;font-weight:700}
+.gm small{font-size:12.5px;color:#55654e}
+.star{color:#c08a00}
+.price{position:relative;font:700 14px Manrope;padding:7px 14px 7px 22px;color:#2b1a0c;
+ background:linear-gradient(90deg,rgba(120,80,40,.10),transparent 40%),repeating-linear-gradient(178deg,#d7ae78 0 3px,#cfa36c 3px 5px,#dab27d 5px 9px);
+ clip-path:polygon(12px 0,100% 0,100% 100%,12px 100%,0 50%);border-radius:0 8px 8px 0}
+.price::before{content:"";position:absolute;left:9px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:#f5efe0;box-shadow:inset 0 0 0 1px #8a5d32}
+.price.free{background:#f4c242;color:#3d2b00}
+
+/* attachment: botanical print in a ceramic frame */
+.att{top:-34px;right:-22px;width:146px;height:118px;padding:6px 6px 20px;background:#fffdf8;border-radius:6px;transform:rotate(7deg);filter:saturate(.55) brightness(1.02);box-shadow:0 4px 10px rgba(60,80,40,.18);opacity:.95}
+.att .pic{width:100%;height:100%;overflow:hidden;border-radius:3px}
+.att figcaption{position:absolute;left:0;right:0;bottom:4px;text-align:center;font:700 9px Manrope;letter-spacing:.14em;color:#55654e}
+.att .twig{position:absolute;z-index:3;left:-10px;top:-8px;width:30px;height:16px}
+.card.is-hover .att,.card:hover .att{transform:translate(-46px,24px) rotate(-3deg) scale(1.16);filter:none;opacity:1;box-shadow:0 20px 34px rgba(50,70,30,.28)}
+.card.is-hover .panel,.card:hover .panel{box-shadow:0 18px 36px rgba(70,90,40,.18),0 0 0 2px #8cc084}
+
+</style></head><body>
+<div class="bg"><svg class="vine l" viewBox="0 0 90 1400" width="90" height="1400" aria-hidden="true"><path d="M40 0C70 160 10 300 44 460S20 760 50 920 18 1200 40 1400" fill="none" stroke="#7fae6a" stroke-width="3"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(40 40) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(57 102) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(49 164) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(28 226) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(24 288) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(44 350) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(58 412) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(46 474) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(25 536) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(26 598) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(48 660) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(58 722) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(42 784) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(23 846) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(29 908) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(51 970) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(57 1032) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(38 1094) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(22 1156) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(32 1218) rotate(-30)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#9cc98a" transform="translate(54 1280) rotate(210)"/><path d="M0 0C6 -9 18 -9 24 0C18 9 6 9 0 0Z" fill="#7fb46b" transform="translate(55 1342) rotate(-30)"/></svg></div>
+<header class="top"><a class="logo" href="#"><span class="mark"><svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M16 2 28.5 9.2v13.6L16 30 3.5 22.8V9.2Z"/><path d="M16 2 9 13h14Z M9 13l7 12 7-12 M3.5 9.2 9 13 3.5 22.8 16 25 28.5 22.8 23 13 28.5 9.2 M16 25v5"/></svg></span><b>НРІ Асистент</b></a>
+ <nav><a class="on" href="#">Пошук ігор</a><a href="#">Мої ігри</a></nav>
+ <div class="right"><button class="bell" aria-label="Сповіщення"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="cnt">3</span></button><span class="ava">Л</span></div></header>
+<section class="hero"><div class="kicker">Сонячний сад · дошка кооперативу гравців</div><h1>Знайдіть свою гру</h1><p>Ігри, що набирають гравців: онлайн і наживо. Посійте вечір — зберіть історію.</p><svg class="arch" viewBox="0 0 470 236" width="470" height="236" aria-hidden="true">
+<defs>
+<linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd0e8"/><stop offset=".6" stop-color="#d4eef2"/><stop offset="1" stop-color="#fff3cf"/></linearGradient>
+<linearGradient id="cell" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2d6f8f"/><stop offset=".5" stop-color="#4f9fb8"/><stop offset="1" stop-color="#2a5f7c"/></linearGradient>
+<clipPath id="ac"><path d="M14 236V108C14 44 120 10 235 10C350 10 456 44 456 108V236Z"/></clipPath>
+</defs>
+<g clip-path="url(#ac)">
+<rect width="470" height="236" fill="url(#skyg)"/>
+<circle cx="235" cy="214" r="62" fill="#ffd45a"/><circle cx="235" cy="214" r="84" fill="#ffd45a" opacity=".25"/>
+<rect x="20" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="46" y="18" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="72" y="18" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="98" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="124" y="18" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="150" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="176" y="18" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="202" y="18" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="228" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="254" y="18" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="280" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="306" y="18" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="332" y="18" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="358" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="384" y="18" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="410" y="18" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="436" y="18" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="20" y="35" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="46" y="35" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="72" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="98" y="35" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="124" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="150" y="35" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="176" y="35" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="202" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="228" y="35" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="254" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="280" y="35" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="306" y="35" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="332" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="358" y="35" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="384" y="35" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="410" y="35" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="436" y="35" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="20" y="52" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="46" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="72" y="52" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="98" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="124" y="52" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="150" y="52" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="176" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="202" y="52" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="228" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="254" y="52" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="280" y="52" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="306" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="332" y="52" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="358" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="384" y="52" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="410" y="52" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="436" y="52" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="20" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="46" y="69" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="72" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="98" y="69" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="124" y="69" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="150" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="176" y="69" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="202" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="228" y="69" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="254" y="69" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="280" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="306" y="69" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="332" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="358" y="69" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="384" y="69" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="410" y="69" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="436" y="69" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="20" y="86" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="46" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="72" y="86" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="98" y="86" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="124" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="150" y="86" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="176" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="202" y="86" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="228" y="86" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="254" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="280" y="86" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="306" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="332" y="86" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="358" y="86" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="384" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="410" y="86" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="436" y="86" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="20" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="46" y="103" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="72" y="103" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="98" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="124" y="103" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="150" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="176" y="103" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="202" y="103" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="228" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="254" y="103" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="280" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="306" y="103" width="24" height="15" fill="url(#cell)" opacity="0.55"/><rect x="332" y="103" width="24" height="15" fill="url(#cell)" opacity="0.7166666666666667"/><rect x="358" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8833333333333333"/><rect x="384" y="103" width="24" height="15" fill="url(#cell)" opacity="0.6333333333333334"/><rect x="410" y="103" width="24" height="15" fill="url(#cell)" opacity="0.8"/><rect x="436" y="103" width="24" height="15" fill="url(#cell)" opacity="0.55"/>
+<path d="M0 206C80 176 150 196 236 186C330 176 390 160 470 184V236H0Z" fill="#8cc084"/>
+<path d="M0 222C100 204 180 222 260 212C350 202 410 208 470 200V236H0Z" fill="#5d9a49"/>
+<path d="M235 104V236M235 214C205 180 125 170 105 104M235 214C265 180 345 170 365 104M235 168C221 150 185 140 175 104M235 168C249 150 285 140 295 104" fill="none" stroke="#2d4a35" stroke-width="3" stroke-linecap="round"/>
+<path d="M14 104H456" stroke="#2d4a35" stroke-width="3"/>
+</g>
+<path d="M14 236V108C14 44 120 10 235 10C350 10 456 44 456 108V236Z" fill="none" stroke="#a8754a" stroke-width="9"/>
+<path d="M14 236V108C14 44 120 10 235 10C350 10 456 44 456 108V236Z" fill="none" stroke="#fffdf8" stroke-width="2.5"/>
+<path d="M14 236H456" stroke="#7a5230" stroke-width="6"/>
+<path d="M0 0C6 -10 18 -10 24 0C18 10 6 10 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(8 200) rotate(-70)"/><path d="M0 0C5.4 -9 16.2 -9 21.6 0C16.2 9 5.4 9 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(2 168) rotate(-100)"/><path d="M0 0C4.800000000000001 -8 14.4 -8 19.200000000000003 0C14.4 8 4.800000000000001 8 0 0Z" fill="#6da84f" stroke="#24502c" stroke-width="1.2" transform="translate(10 136) rotate(-60)"/><path d="M0 0C5.4 -9 16.2 -9 21.6 0C16.2 9 5.4 9 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(24 96) rotate(-120)"/><path d="M0 0C4.800000000000001 -8 14.4 -8 19.200000000000003 0C14.4 8 4.800000000000001 8 0 0Z" fill="#6da84f" stroke="#24502c" stroke-width="1.2" transform="translate(44 64) rotate(-40)"/><path d="M0 0C6 -10 18 -10 24 0C18 10 6 10 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(462 196) rotate(-110)"/><path d="M0 0C5.4 -9 16.2 -9 21.6 0C16.2 9 5.4 9 0 0Z" fill="#6da84f" stroke="#24502c" stroke-width="1.2" transform="translate(466 160) rotate(-80)"/><path d="M0 0C5.1 -8.5 15.299999999999999 -8.5 20.4 0C15.299999999999999 8.5 5.1 8.5 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(456 124) rotate(-125)"/><path d="M0 0C4.800000000000001 -8 14.4 -8 19.200000000000003 0C14.4 8 4.800000000000001 8 0 0Z" fill="#4c8a3f" stroke="#24502c" stroke-width="1.2" transform="translate(440 86) rotate(-60)"/><path d="M0 0C4.5 -7.5 13.5 -7.5 18 0C13.5 7.5 4.5 7.5 0 0Z" fill="#6da84f" stroke="#24502c" stroke-width="1.2" transform="translate(418 56) rotate(-140)"/>
+</svg></section>
+<main class="layout">
+<aside class="filters">
+ <h3>Фільтри</h3>
+ <div class="field"><label>Пошук</label><div class="input search"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="ph">Назва, система, майстер…</span></div></div>
+ <div class="field"><label>Система</label><div class="input select">Усі системи</div></div>
+ <div class="field"><label>Жанр</label><div class="input select">Будь-який</div></div>
+ <div class="field"><label>Формат</label><div class="input select">Онлайн і наживо</div></div>
+ <div class="field"><label>Дата від</label><div class="input date">26.11.2026 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Дата до</label><div class="input date"><span class="ph">дд.мм.рррр</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div></div>
+ <div class="field"><label>Ціна за сесію</label><div class="range"><span class="track"></span><span class="fill"></span><span class="knob k1"></span><span class="knob k2"></span></div><div class="range-vals"><span>0 грн</span><span>до 300 грн</span></div></div>
+ <div class="checks">
+  <label class="chk on"><i></i>Лише з вільними місцями</label>
+  <label class="chk on"><i></i>Підходить моєму розкладу</label>
+  <label class="chk"><i></i>Лише без плати</label>
+  <label class="chk"><i></i>Новачкам ласкаво просимо</label>
+ </div>
+ <button class="reset">Скинути</button>
+</aside>
+<section class="results">
+<div class="bar"><div class="count">Знайдено <b>24 гри</b> · показано 9</div><div class="sort"><label>Сортування</label><div class="input select">Спершу найближчі</div></div></div>
+<div class="grid">
+<article class="card acc-violet">
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Dungeon World · Кампанія · Фентезі</span><span class="badges"><span class="b-age">16+</span></span></div></div><div class="body">
+  <h2>Підземелля, яке ми вигадаємо разом</h2>
+  <p class="desc">PbtA-фентезі: ходи, ускладнення, світ малюємо на ходу. Кожна сесія — нова кімната, нова пастка і нова причина не відступати.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>2 груд. 2026 р., 19:00</dd></div>
+   <div><dt>Де</dt><dd>Онлайн · Discord</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b><b></b></span>вільних місць: 1 з 4</dd></div>
+  </dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  </div><div class="stub"><div class="foot"><div class="gm"><i>Л</i><span><b>Лицар37</b><small>майстер · <span class="star">★</span> 4.2</small></span></div><div class="price free">без плати</div></div></div>
+ </div>
+</article>
+<article class="card acc-pink is-hover"><figure class="att"><svg class="twig" viewBox="0 0 30 16"><path d="M2 14C8 9 16 6 28 4" stroke="#5d8a3a" stroke-width="1.6" fill="none"/><path d="M12 9C12 3 18 1 22 1C21 6 17 9 12 9Z" fill="#6da84f" stroke="#2f6b3c" stroke-width=".8"/><path d="M6 12C3 7 5 4 8 3C10 7 9 10 6 12Z" fill="#8cc084" stroke="#2f6b3c" stroke-width=".8"/></svg><div class="pic"><img src="https://picsum.photos/id/106/400/300" alt=""></div><figcaption>ОБКЛАДИНКА</figcaption></figure>
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Cyberpunk RED · Ваншот · Нуар</span><span class="badges"><span class="b-age">18+</span></span></div></div><div class="body">
+  <h2>Неонові борги Нічного міста</h2>
+  <p class="desc">Ваш фіксер зник, лишивши борг перед корпорацією і ключ від сховища на Троєщині. Одна ніч, щоб усе виправити.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>6 груд. 2026 р., 21:00</dd></div>
+   <div><dt>Де</dt><dd>Наживо · Київ · клуб «Сигнал»</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 2 з 4</dd></div>
+  </dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  </div><div class="stub"><div class="foot"><div class="gm"><i>Л</i><span><b>Ліра</b><small>майстер · <span class="star">★</span> 4.6</small></span></div><div class="price">250 грн</div></div></div>
+ </div>
+</article>
+<article class="card acc-amber"><figure class="att"><svg class="twig" viewBox="0 0 30 16"><path d="M2 14C8 9 16 6 28 4" stroke="#5d8a3a" stroke-width="1.6" fill="none"/><path d="M12 9C12 3 18 1 22 1C21 6 17 9 12 9Z" fill="#6da84f" stroke="#2f6b3c" stroke-width=".8"/><path d="M6 12C3 7 5 4 8 3C10 7 9 10 6 12Z" fill="#8cc084" stroke="#2f6b3c" stroke-width=".8"/></svg><div class="pic"><img src="https://picsum.photos/id/28/400/300" alt=""></div><figcaption>ОБКЛАДИНКА</figcaption></figure>
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Pathfinder 2e · Кампанія · Темне фентезі</span><span class="badges"></span></div></div><div class="body">
+  <h2>Pathfinder для тих, хто любить тактику</h2>
+  <p class="desc">Ви — члени гільдії, яка розшукує небезпечні артефакти до того, як їх знайдуть культисти.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>29 лист. 2026 р., 16:00</dd></div>
+   <div><dt>Де</dt><dd>Онлайн · Foundry VTT</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 3 з 5</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>D</i><span><b>dungeon_odesa</b><small>майстер · <span class="star">★</span> 4.9</small></span></div><div class="price">100 грн</div></div></div>
+ </div>
+</article>
+<article class="card acc-cyan">
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">D&amp;D 5e (2024) · Кампанія · Фентезі</span><span class="badges"><span class="b-new">Нове</span></span></div></div><div class="body">
+  <h2>Шлях до Смарагдової вежі</h2>
+  <p class="desc">Привіт усім! Спробуємо оновлені правила D&amp;D: нові передісторії, переглянуті класи, усе поясню на першій сесії.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>5 груд. 2026 р., 11:00</dd></div>
+   <div><dt>Де</dt><dd>Наживо · Тернопіль · антикафе «Портал»</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 3 з 5</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>I</i><span><b>ihor.tkachenko</b><small>майстер · ще немає рейтингу</small></span></div><div class="price free">без плати</div></div></div>
+ </div>
+</article>
+<article class="card acc-lime"><figure class="att"><svg class="twig" viewBox="0 0 30 16"><path d="M2 14C8 9 16 6 28 4" stroke="#5d8a3a" stroke-width="1.6" fill="none"/><path d="M12 9C12 3 18 1 22 1C21 6 17 9 12 9Z" fill="#6da84f" stroke="#2f6b3c" stroke-width=".8"/><path d="M6 12C3 7 5 4 8 3C10 7 9 10 6 12Z" fill="#8cc084" stroke="#2f6b3c" stroke-width=".8"/></svg><div class="pic"><img src="https://picsum.photos/id/1018/400/300" alt=""></div><figcaption>ОБКЛАДИНКА</figcaption></figure>
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Mothership · Кампанія · Наукова фантастика</span><span class="badges"><span class="b-age">18+</span></span></div></div><div class="body">
+  <h2>Дрейф «Ізоляди»</h2>
+  <p class="desc">Вантажник на мертвій орбіті. Сигнал лиха надходить зсередини, а кисню лишилося на дев&#x27;ять годин.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>3 груд. 2026 р., 20:30</dd></div>
+   <div><dt>Де</dt><dd>Онлайн · Discord</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b></b><b></b></span>вільних місць: 2 з 4</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>Д</i><span><b>Данило</b><small>майстер · <span class="star">★</span> 4.5</small></span></div><div class="price">150 грн</div></div></div>
+ </div>
+</article>
+<article class="card acc-red">
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Call of Cthulhu · Ваншот · Жахи</span><span class="badges"><span class="b-age">16+</span><span class="b-new">Нове</span></span></div></div><div class="body">
+  <h2>Тіні над Подолом</h2>
+  <p class="desc">1923 рік, зниклий антиквар і книга, яку не варто відкривати. Розслідування з високою смертністю персонажів.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>7 груд. 2026 р., 14:00</dd></div>
+   <div><dt>Де</dt><dd>Наживо · Київ · антикафе «Куб»</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b><b></b></span>вільних місць: 1 з 4</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>П</i><span><b>ПанЛавкрафт</b><small>майстер · <span class="star">★</span> 4.8</small></span></div><div class="price">200 грн</div></div></div>
+ </div>
+</article>
+<article class="card acc-cyan"><figure class="att"><svg class="twig" viewBox="0 0 30 16"><path d="M2 14C8 9 16 6 28 4" stroke="#5d8a3a" stroke-width="1.6" fill="none"/><path d="M12 9C12 3 18 1 22 1C21 6 17 9 12 9Z" fill="#6da84f" stroke="#2f6b3c" stroke-width=".8"/><path d="M6 12C3 7 5 4 8 3C10 7 9 10 6 12Z" fill="#8cc084" stroke="#2f6b3c" stroke-width=".8"/></svg><div class="pic"><img src="https://picsum.photos/id/15/400/300" alt=""></div><figcaption>ОБКЛАДИНКА</figcaption></figure>
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Pathfinder 2e · Кампанія · Пісочниця</span><span class="badges"></span></div></div><div class="body">
+  <h2>Вітер з Карпат</h2>
+  <p class="desc">Пісочниця в горах, натхненна гуцульськими легендами: мольфари, чугайстри і перевал, який не відпускає.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>8 груд. 2026 р., 12:00</dd></div>
+   <div><dt>Де</dt><dd>Наживо · Львів</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b></b></span>вільних місць: 3 з 4</dd></div>
+  </dl>
+  <div class="fit">Підходить вашому розкладу</div>
+  </div><div class="stub"><div class="foot"><div class="gm"><i>Т</i><span><b>Тарас_Друїд</b><small>майстер · <span class="star">★</span> 4.9</small></span></div><div class="price free">без плати</div></div></div>
+ </div>
+</article>
+<article class="card acc-violet">
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">Blades in the Dark · Кампанія · Гайст</span><span class="badges"><span class="b-age">16+</span></span></div></div><div class="body">
+  <h2>Банда з Дусквола шукає злодія з чистою репутацією і холодною головою</h2>
+  <p class="desc">Тиха робота, гучні наслідки. Шукаємо третього в команду — досвід не обов&#x27;язковий, головне — не боятися ризикувати.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>10 груд. 2026 р., 19:30</dd></div>
+   <div><dt>Де</dt><dd>Онлайн · Roll20 + голосовий канал у Discord</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b></b><b></b></span>вільних місць: 1 з 3</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>С</i><span><b>Скрипаль</b><small>майстер · <span class="star">★</span> 4.7</small></span></div><div class="price">120 грн</div></div></div>
+ </div>
+</article>
+<article class="card acc-amber">
+ <div class="panel"><div class="crown">
+  <div class="sysrow"><span class="sys">D&amp;D 5e (2014) · Ваншот · Фентезі</span><span class="badges"><span class="b-new">Нове</span></span></div></div><div class="body">
+  <h2>Таверна на краю мапи</h2>
+  <p class="desc">Легкий ваншот для новачків: заблукалий караван, загадкова господиня і зовсім не підозрілий підвал.</p>
+  <dl class="facts">
+   <div><dt>Коли</dt><dd>13 груд. 2026 р., 17:00</dd></div>
+   <div><dt>Де</dt><dd>Онлайн · Discord</dd></div>
+   <div><dt>Місця</dt><dd class="seats"><span class="pips"><b class="f"></b><b class="f"></b><b class="f"></b><b class="f"></b><b></b></span>вільних місць: 4 з 5</dd></div>
+  </dl>
+  
+  </div><div class="stub"><div class="foot"><div class="gm"><i>М</i><span><b>Мавка_ГМ</b><small>майстер · <span class="star">★</span> 4.4</small></span></div><div class="price free">без плати</div></div></div>
+ </div>
+</article>
+</div>
+</section>
+</main>
+</body></html>
