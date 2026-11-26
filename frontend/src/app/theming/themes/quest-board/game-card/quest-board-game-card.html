@@ -11,7 +11,8 @@
     [class.qb-tearable]="tearEnabled()"
     [class.qb-tearing]="tearing()"
     [attr.data-game-id]="g.id"
-    [attr.data-tilt]="tilt()"
+    [style.--qb-angle]="tilt().angle + 'deg'"
+    [style.--qb-shift]="tilt().shift + 'px'"
     [attr.data-paper]="paper()"
   >
     <span class="qb-pin" aria-hidden="true"></span>
@@ -53,7 +54,8 @@
     [class.qb-tearable]="tearEnabled()"
     [class.qb-tearing]="tearing()"
     [attr.data-game-id]="g.id"
-    [attr.data-tilt]="tilt()"
+    [style.--qb-angle]="tilt().angle + 'deg'"
+    [style.--qb-shift]="tilt().shift + 'px'"
     [attr.data-paper]="paper()"
   >
     <span class="qb-pin" aria-hidden="true"></span>

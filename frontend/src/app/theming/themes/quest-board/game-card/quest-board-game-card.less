@@ -48,36 +48,15 @@ nri-qb-attachment {
   }
 }
 
-// Нахил і невеликий зсув униз з набору — лише на ширших екранах і без prefers-reduced-motion.
-// Найбільший кут (1.5°) зсуває кути аркуша на ~5px; разом з краєм (6px), зсувом (до 10px) і
-// тінню це менше за проміжки сітки дизайну, тож сусіди не перекриваються. Нахил — у змінній
-// --qb-tilt (див. .note): з неї ж починається анімація відривання (qb-tear), тож аркуш не
-// «стрибає».
+// Нахил і невеликий зсув униз — «випадкові» за id гри (noticeTilt у paper.ts, змінні
+// --qb-angle / --qb-shift на аркуші), лише на ширших екранах і без prefers-reduced-motion.
+// Найбільший кут (3.5°) зсуває кути аркуша на ~12px; разом з краєм (6px), зсувом (до 8px),
+// тінню й вкладкою це менше за проміжки сітки дизайну (--nri-card-grid-gap), тож сусіди не
+// перекриваються. Нахил — у змінній --qb-tilt (див. .note): з неї ж починається анімація
+// відривання (qb-tear), тож аркуш не «стрибає». При наведенні аркуш вирівнюється.
 @media (min-width: 600.02px) and (prefers-reduced-motion: no-preference) {
   .note {
-    &[data-tilt='0'] {
-      --qb-tilt: rotate(-1.4deg);
-    }
-
-    &[data-tilt='1'] {
-      --qb-tilt: rotate(1deg) translateY(10px);
-    }
-
-    &[data-tilt='2'] {
-      --qb-tilt: rotate(-0.5deg);
-    }
-
-    &[data-tilt='3'] {
-      --qb-tilt: rotate(1.5deg) translateY(4px);
-    }
-
-    &[data-tilt='4'] {
-      --qb-tilt: rotate(-1deg) translateY(7px);
-    }
-
-    &[data-tilt='5'] {
-      --qb-tilt: rotate(0.6deg) translateY(2px);
-    }
+    --qb-tilt: rotate(var(--qb-angle, 0deg)) translateY(var(--qb-shift, 0px));
 
     &:hover,
     &:focus-within {

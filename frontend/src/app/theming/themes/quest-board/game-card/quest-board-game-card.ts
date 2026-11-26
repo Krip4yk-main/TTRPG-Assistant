@@ -21,10 +21,8 @@ import { QuestBoardAttachment } from '../attachment/quest-board-attachment';
 import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 import { LinePipe } from '../../../../core/i18n/line.pipe';
 import { ThemeService } from '../../../theme.service';
-import { paperVariant } from '../paper';
+import { noticeTilt, paperVariant } from '../paper';
 
-/** Скільки різних нахилів має дошка (набір кутів і зсувів — у стилях, `data-tilt`). */
-const TILTS = 6;
 /** Скільки бейджів-штампів видно в рядку (решта — «+N»): рядок не переноситься. */
 const MAX_STAMPS = 3;
 /** Тривалість анімації відривання (як у `qb-tear` з quest-board.less), мс. */
@@ -75,8 +73,8 @@ export class QuestBoardGameCard implements GameCardSlot {
   readonly game = input.required<GameCardVm>();
   protected readonly maxStamps = MAX_STAMPS;
 
-  /** Нахил з набору за id гри: стабільний між перерисовками й сторінками. */
-  protected readonly tilt = computed(() => Math.abs(this.game().id) % TILTS);
+  /** «Випадковий» нахил і зсув за id гри: стабільні між перерисовками й сторінками. */
+  protected readonly tilt = computed(() => noticeTilt(this.game().id));
   /** Обрис пергаменту за id гри (спільне правило з «Моїми іграми»). */
   protected readonly paper = computed(() => paperVariant(this.game().id));
   /** Перший збіг з розкладом — стрічкою вгорі; решта бейджів — штампами під системою. */
