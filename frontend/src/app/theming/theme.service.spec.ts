@@ -9,6 +9,7 @@ import { FALLBACK_SLOTS } from './fallback/fallback-slots';
 import type { ThemeSlots } from './slots';
 import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
 import {
+  STYLE_WAIT_MS,
   THEME_LINK_ID,
   THEME_STORAGE_KEY,
   THEME_VERSION_STORAGE_KEY,
@@ -64,11 +65,17 @@ function registry(
   };
 }
 
-/** Останній (новий) `<link>` бандла «завантажився» (`load`) чи впав (`error`). */
-const settleNewest = (type: 'load' | 'error' = 'load') => {
-  const all = document.head.querySelectorAll(`link#${THEME_LINK_ID}`);
-  all[all.length - 1]!.dispatchEvent(new Event(type));
-};
+/** Дочекатися, доки сервіс підключить `<link>` бандла `href`, і «завантажити» (чи зламати) його. */
+async function settleWhenAdded(href: string, type: 'load' | 'error' = 'load'): Promise<void> {
+  const find = () =>
+    Array.from(document.head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`)).find(
+      (l) => l.getAttribute('href') === href,
+    );
+  await vi.waitFor(() => expect(find()).toBeTruthy());
+  find()!.dispatchEvent(new Event(type));
+}
+
+const theme = () => document.documentElement.getAttribute('data-theme');
 
 const links = () =>
   Array.from(document.head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`)).map((l) =>
@@ -132,9 +139,13 @@ describe('ThemeService', () => {
     setup();
     bootFromCache('night-city', 'theme-night-city.css?v=1');
     auth.setMe(null);
-    await service.init();
-    expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
-    settleNewest();
+    const done = service.init();
+    // Кешований бандл «Нічного міста» стилізує сторінку, доки не завантажився бандл «Дошки».
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    expect(theme()).toBe('night-city');
+    await settleWhenAdded('theme-quest-board.css?v=1');
+    await done;
+    expect(theme()).toBe('quest-board');
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
   });
 
@@ -171,11 +182,11 @@ describe('ThemeService', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ theme: 'quest-board' });
     req.flush({ ...user, uiTheme: 'quest-board' });
+    await settleWhenAdded('theme-quest-board.css?v=1');
     await done;
 
     expect(service.theme()).toBe('quest-board');
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
-    settleNewest();
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
     expect(service.slots()).toBe(QB_SLOTS);
     expect(auth.me()!.uiTheme).toBe('quest-board');
@@ -192,43 +203,106 @@ describe('ThemeService', () => {
     TestBed.inject(HttpTestingController)
       .expectOne('/api/me/theme')
       .flush({ ...user, uiTheme: 'neon-signs' });
+    await settleWhenAdded('theme-neon-signs.css?v=1');
     await done;
 
     expect(service.theme()).toBe('neon-signs');
     expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
-    // Старий бандл знято, щойно новий завантажився, — стилі «Нічного міста» не лишаються.
-    settleNewest();
+    // Старий бандл знято разом із перемиканням — стилі «Нічного міста» не лишаються.
     expect(links()).toEqual(['theme-neon-signs.css?v=1']);
     expect(service.slots()).toBe(CY_SLOTS);
     expect(cyber).toHaveBeenCalledTimes(1);
   });
 
-  it('switching designs keeps the old bundle until the new one loads (no unstyled flash)', async () => {
+  /** Обрати дизайн (відповідь PATCH — одразу). */
+  const choose = (id: ThemeId) => {
+    const done = service.select(id);
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...user, uiTheme: id });
+    return done;
+  };
+
+  it('a design switch keeps the old data-theme, slots and bundle until the new bundle loads (no unstyled frame)', async () => {
     setup();
     auth.setMe(user);
     await service.init();
-    settleNewest();
 
-    const done = service.select('neon-signs');
-    TestBed.inject(HttpTestingController)
-      .expectOne('/api/me/theme')
-      .flush({ ...user, uiTheme: 'neon-signs' });
+    const done = choose('quest-board');
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    // Новий бандл ще вантажиться: показано старий дизайн цілком.
+    expect(theme()).toBe('night-city');
+    expect(service.theme()).toBe('night-city');
+    expect(service.slots()).toBe(CY_SLOTS);
+    expect(links()).toEqual(['theme-night-city.css?v=1', 'theme-quest-board.css?v=1']);
+
+    await settleWhenAdded('theme-quest-board.css?v=1');
     await done;
-    // data-theme уже новий, а старий бандл ще підключений, доки новий вантажиться.
-    expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
-    expect(links()).toEqual(['theme-night-city.css?v=1', 'theme-neon-signs.css?v=1']);
-    settleNewest();
-    expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+    expect(theme()).toBe('quest-board');
+    expect(service.slots()).toBe(QB_SLOTS);
+    expect(links()).toEqual(['theme-quest-board.css?v=1']);
+  });
 
-    // Новий бандл не завантажився — старий однаково знімається (не лишається назавжди).
-    const back = service.select('holo-market');
-    TestBed.inject(HttpTestingController)
-      .expectOne('/api/me/theme')
-      .flush({ ...user, uiTheme: 'holo-market' });
-    await back;
-    expect(links()).toEqual(['theme-neon-signs.css?v=1', 'theme-holo-market.css?v=1']);
-    settleNewest('error');
+  it('a new bundle that fails to load still switches the design', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    const done = choose('holo-market');
+    await settleWhenAdded('theme-holo-market.css?v=1', 'error');
+    await done;
+    expect(theme()).toBe('holo-market');
     expect(links()).toEqual(['theme-holo-market.css?v=1']);
+  });
+
+  it('a hanging bundle switches the design after the timeout', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const done = choose('neon-signs');
+      // Без vi.waitFor: з фальшивими таймерами він сам просуває час.
+      for (let i = 0; i < 50 && links().length < 2; i++) await Promise.resolve();
+      expect(links()).toHaveLength(2);
+      vi.advanceTimersByTime(STYLE_WAIT_MS - 1);
+      expect(theme()).toBe('night-city');
+      vi.advanceTimersByTime(1);
+      await done;
+      expect(theme()).toBe('neon-signs');
+      expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a fast A to B to C switch ends on C with only the C bundle (B never applies)', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    const toB = choose('neon-signs');
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    const toC = choose('holo-market');
+    await vi.waitFor(() => expect(links()).toHaveLength(3));
+    // B завантажився першим — але його вже замінив C: лишається старий дизайн.
+    await settleWhenAdded('theme-neon-signs.css?v=1');
+    await toB;
+    expect(theme()).toBe('night-city');
+    await settleWhenAdded('theme-holo-market.css?v=1');
+    await toC;
+    expect(theme()).toBe('holo-market');
+    expect(service.theme()).toBe('holo-market');
+    expect(links()).toEqual(['theme-holo-market.css?v=1']);
+  });
+
+  it('switching back to the shown design before the new bundle loads keeps it and drops the pending bundle', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    void choose('neon-signs');
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    await choose('night-city');
+    expect(theme()).toBe('night-city');
+    expect(links()).toEqual(['theme-night-city.css?v=1']);
   });
 
   it('logging out returns to the default design', async () => {
@@ -237,6 +311,7 @@ describe('ThemeService', () => {
     await service.init();
     auth.setMe(null);
     TestBed.tick();
+    await settleWhenAdded('theme-quest-board.css?v=1');
     await vi.waitFor(() => expect(service.theme()).toBe('quest-board'));
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
   });
@@ -289,6 +364,10 @@ describe('ThemeService', () => {
 
     auth.setMe(user);
     TestBed.tick();
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    // Ранній фон знімається лише разом із перемиканням (коли новий бандл завантажився).
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(58, 39, 24)');
+    await settleWhenAdded('theme-night-city.css?v=1');
     await vi.waitFor(() => expect(service.theme()).toBe('night-city'));
     expect(document.documentElement.style.backgroundColor).toBe('');
   });

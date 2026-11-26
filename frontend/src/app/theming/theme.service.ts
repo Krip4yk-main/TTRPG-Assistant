@@ -23,6 +23,11 @@ export const THEME_STORAGE_KEY = 'nri.theme';
 export const THEME_VERSION_STORAGE_KEY = 'nri.theme.v';
 /** `<link>` бандла стилів дизайну (його ж створює інлайн-скрипт). */
 export const THEME_LINK_ID = 'nri-theme-style';
+/**
+ * Скільки чекати бандл стилів нового дизайну, перш ніж перемкнути дизайн без нього (мережа
+ * «зависла»): довше старий дизайн лишатися не повинен.
+ */
+export const STYLE_WAIT_MS = 3000;
 
 /**
  * Чинний дизайн: вибір користувача, якщо він дозволений ролі (`MeDto.uiTheme` уже враховує
@@ -102,10 +107,10 @@ export class ThemeService {
       // щоб наступний apply/select того самого дизайну спробував завантажити чанк знову.
       // Але браузер кешує невдалий динамічний import(): для не-власників реальний повтор — перезавантаження
       // сторінки; скидання допомагає лише при подальшому перемиканні дизайну.
-      () => {
-        this.commit(id, null);
-        if (this.target === id) this.target = null;
-      },
+      () =>
+        Promise.resolve(this.commit(id, null)).then(() => {
+          if (this.target === id) this.target = null;
+        }),
     );
     return this.applying;
   }
@@ -120,19 +125,56 @@ export class ThemeService {
     return chunk;
   }
 
-  /** Застосування до DOM — разом зі слотами, щоб дизайн змінювався цілком. */
-  private commit(id: ThemeId, slots: ThemeSlots | null): void {
+  /**
+   * Застосування до DOM — разом зі слотами, щоб дизайн змінювався цілком. Той самий дизайн (чи
+   * сторінка ще без стилів дизайну) — одразу. Інший дизайн, коли сторінку вже стилізує бандл
+   * попереднього, — лише коли новий бандл завантажився (`load`), упав (`error`) чи минув
+   * `STYLE_WAIT_MS`: до того лишаються старі `data-theme`, слоти й бандл, тож між дизайнами
+   * немає кадру без стилів. Якщо тим часом обрано інший дизайн — цей не застосовується.
+   */
+  private commit(id: ThemeId, slots: ThemeSlots | null): Promise<void> | void {
     if (id !== this.target) return; // тим часом обрано інший дизайн
+    const href = this.registry[id].styleHref;
+    const shown = this.doc.documentElement.getAttribute('data-theme');
+    if (shown === id || !this.hasThemeStyles()) {
+      this.applyDom(id, slots);
+      this.setStyle(href, true);
+      return;
+    }
+    const { link, created } = this.setStyle(href, false);
+    return new Promise<void>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const finish = () => {
+        if (timer === null) return; // уже застосовано (load + error / тайм-аут)
+        clearTimeout(timer);
+        timer = null;
+        if (id === this.target) {
+          this.applyDom(id, slots);
+          this.removeLinksExcept(link);
+        }
+        resolve();
+      };
+      timer = setTimeout(finish, STYLE_WAIT_MS);
+      if (!created) {
+        finish(); // бандл цього дизайну вже підключено
+        return;
+      }
+      link.addEventListener('load', finish, { once: true });
+      link.addEventListener('error', finish, { once: true });
+    });
+  }
+
+  /** `data-theme`, color-scheme, ранній фон, слоти й підказка в сховищі. */
+  private applyDom(id: ThemeId, slots: ThemeSlots | null): void {
     const def = this.registry[id];
     const root = this.doc.documentElement;
     const themeChanged = root.getAttribute('data-theme') !== id;
     root.setAttribute('data-theme', id);
     root.style.colorScheme = def.colorScheme;
-    // Ранній фон з інлайн-скрипту index.html — колір дизайну з кешу; інший дизайн — знімаємо,
-    // щоб поки вантажиться новий бандл не було видно кольору попереднього.
+    // Ранній фон з інлайн-скрипту index.html — колір дизайну з кешу; інший дизайн — знімаємо:
+    // бандл нового дизайну вже завантажено, він малює власний фон.
     if (themeChanged) root.style.removeProperty('background-color');
     this.doc.querySelector('meta[name="color-scheme"]')?.setAttribute('content', def.colorScheme);
-    this.setStyle(def.styleHref);
     this.current.set(id);
     this.loaded.set(slots);
     try {
@@ -143,31 +185,51 @@ export class ThemeService {
     }
   }
 
-  /**
-   * Один `<link>` бандла дизайну. Новий бандл (інший дизайн чи та сама тема з іншою версією)
-   * додається поруч, а старий знімається, щойно новий завантажився (або впав), — сторінка не
-   * лишається без стилів на час завантаження. Обидва одночасно — безпечно: токени й стилі
-   * кожного бандла обмежені `:root[data-theme='<id>']`, а `data-theme` уже новий. Посилання на
-   * бандл, якого немає в реєстрі (кеш давно прибраного дизайну, напр. `classic`), знімається
-   * одразу — інакше його 404 тримав би старий `<link>` до завантаження нового.
-   */
-  private setStyle(href: string): void {
-    const head = this.doc.head;
-    const old = Array.from(head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`));
-    if (old.length === 1 && old[0]!.getAttribute('href') === href) return;
+  private themeLinks(): HTMLLinkElement[] {
+    return Array.from(this.doc.head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`));
+  }
+
+  /** Сторінку вже стилізує бандл якогось дизайну з реєстру (є що показувати до перемикання). */
+  private hasThemeStyles(): boolean {
     const known = new Set(Object.values(this.registry).map((d) => bundlePath(d.styleHref)));
-    const [stale, previous] = partition(old, (l) => !known.has(bundlePath(l.getAttribute('href'))));
+    return this.themeLinks().some((l) => known.has(bundlePath(l.getAttribute('href'))));
+  }
+
+  private removeLinksExcept(keep: HTMLLinkElement): void {
+    this.themeLinks().forEach((l) => l !== keep && l.remove());
+  }
+
+  /**
+   * `<link>` бандла `href`: наявний з тією самою адресою або новий (додається поруч зі
+   * старими). Посилання на бандл, якого немає в реєстрі (кеш давно прибраного дизайну, напр.
+   * `classic`), знімається одразу. `dropOld` — для дизайну, що вже показаний (та сама тема з
+   * іншою версією): старі посилання знімаються, щойно новий бандл завантажився чи впав (а якщо
+   * потрібний уже підключено — одразу). Інакше старі лишаються: їх знімає `commit`, коли
+   * перемикає `data-theme` на новий дизайн.
+   */
+  private setStyle(href: string, dropOld: boolean): { link: HTMLLinkElement; created: boolean } {
+    const known = new Set(Object.values(this.registry).map((d) => bundlePath(d.styleHref)));
+    const [stale, old] = partition(
+      this.themeLinks(),
+      (l) => !known.has(bundlePath(l.getAttribute('href'))),
+    );
     stale.forEach((l) => l.remove());
+    const same = old.find((l) => l.getAttribute('href') === href);
+    if (same) {
+      if (dropOld) this.removeLinksExcept(same);
+      return { link: same, created: false };
+    }
     const link = this.doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
     link.id = THEME_LINK_ID;
-    if (previous.length > 0) {
-      const drop = () => previous.forEach((l) => l.remove());
+    if (dropOld && old.length > 0) {
+      const drop = () => old.forEach((l) => l.remove());
       link.addEventListener('load', drop, { once: true });
       link.addEventListener('error', drop, { once: true });
     }
-    head.appendChild(link);
+    this.doc.head.appendChild(link);
+    return { link, created: true };
   }
 }
 

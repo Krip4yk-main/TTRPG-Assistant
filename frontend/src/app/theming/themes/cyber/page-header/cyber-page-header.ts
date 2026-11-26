@@ -31,7 +31,7 @@ export function signParts(text: string): SignParts {
   const i = chars.length - 3;
   return {
     before: chars.slice(0, i).join(''),
-    dead: chars[i],
+    dead: chars[i] ?? '',
     after: chars.slice(i + 1).join(''),
     rest,
   };
