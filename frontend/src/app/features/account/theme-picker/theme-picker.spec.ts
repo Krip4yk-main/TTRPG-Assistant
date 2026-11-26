@@ -131,40 +131,48 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(el.querySelector('[role="alert"]')?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
   });
 
-  it('у «Класичного» власних налаштувань немає — лише картки', async () => {
-    const fixture = await render(fakeThemes(['quest-board', 'classic'], 'classic'));
+  it('у «Нічного міста» власних налаштувань немає — лише картки', async () => {
+    const fixture = await render(fakeThemes(['quest-board', 'night-city'], 'night-city'));
     const el: HTMLElement = fixture.nativeElement;
     expect(optionButtons(el)).toHaveLength(2);
     expect(tearSwitch(el)).toBeNull();
   });
 
-  it('видимий власнику: картки з мініатюрою й назвою, чинний позначений', async () => {
-    const fixture = await render(fakeThemes(['quest-board', 'classic']));
+  it('чотири дизайни: картки з мініатюрою й назвою, чинний позначений', async () => {
+    const fixture = await render(
+      fakeThemes(['quest-board', 'neon-signs', 'holo-market', 'night-city']),
+    );
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('h2')?.textContent).toContain('Вигляд');
+    expect(optionButtons(el).map((b) => b.querySelector('.name')!.textContent!.trim())).toEqual([
+      'Дошка оголошень Обрано',
+      'Неонові вивіски',
+      'Голо-ринок',
+      'Нічне місто',
+    ]);
     const board = byName(el, 'Дошка оголошень');
-    const classic = byName(el, 'Класичний');
+    const city = byName(el, 'Нічне місто');
     expect(board.querySelector('img')?.getAttribute('src')).toBe('themes/quest-board.png');
-    expect(classic.querySelector('img')?.getAttribute('src')).toBe('themes/classic.png');
+    expect(city.querySelector('img')?.getAttribute('src')).toBe('themes/night-city.png');
     expect(board.getAttribute('aria-pressed')).toBe('true');
-    expect(classic.getAttribute('aria-pressed')).toBe('false');
+    expect(city.getAttribute('aria-pressed')).toBe('false');
     expect(board.textContent).toContain('Обрано');
   });
 
   it('клік обирає дизайн через ThemeService.select і позначає його', async () => {
-    const themes = fakeThemes(['quest-board', 'classic']);
+    const themes = fakeThemes(['quest-board', 'night-city']);
     const fixture = await render(themes);
     const el: HTMLElement = fixture.nativeElement;
-    byName(el, 'Класичний').click();
+    byName(el, 'Нічне місто').click();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(themes.select).toHaveBeenCalledWith('classic');
-    expect(byName(el, 'Класичний').getAttribute('aria-pressed')).toBe('true');
+    expect(themes.select).toHaveBeenCalledWith('night-city');
+    expect(byName(el, 'Нічне місто').getAttribute('aria-pressed')).toBe('true');
     expect(byName(el, 'Дошка оголошень').getAttribute('aria-pressed')).toBe('false');
   });
 
   it('повторний клік по чинному дизайну нічого не зберігає', async () => {
-    const themes = fakeThemes(['quest-board', 'classic']);
+    const themes = fakeThemes(['quest-board', 'night-city']);
     const fixture = await render(themes);
     byName(fixture.nativeElement, 'Дошка оголошень').click();
     await fixture.whenStable();
@@ -172,7 +180,7 @@ describe('ThemePicker («Вигляд»)', () => {
   });
 
   it('помилка збереження — повідомлення й повернення попереднього вибору', async () => {
-    const themes = fakeThemes(['quest-board', 'classic']);
+    const themes = fakeThemes(['quest-board', 'night-city']);
     let fail!: (err: unknown) => void;
     themes.select.mockImplementation(
       () =>
@@ -182,10 +190,10 @@ describe('ThemePicker («Вигляд»)', () => {
     );
     const fixture = await render(themes);
     const el: HTMLElement = fixture.nativeElement;
-    byName(el, 'Класичний').click();
+    byName(el, 'Нічне місто').click();
     fixture.detectChanges();
     // Поки зберігається — вибір позначено одразу, картки заблоковані.
-    expect(byName(el, 'Класичний').getAttribute('aria-pressed')).toBe('true');
+    expect(byName(el, 'Нічне місто').getAttribute('aria-pressed')).toBe('true');
     expect(byName(el, 'Дошка оголошень').getAttribute('aria-disabled')).toBe('true');
     // Повторний клік під час збереження нічого не робить.
     byName(el, 'Дошка оголошень').click();
@@ -195,8 +203,8 @@ describe('ThemePicker («Вигляд»)', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(byName(el, 'Дошка оголошень').getAttribute('aria-pressed')).toBe('true');
-    expect(byName(el, 'Класичний').getAttribute('aria-pressed')).toBe('false');
-    expect(byName(el, 'Класичний').getAttribute('aria-disabled')).toBeNull();
+    expect(byName(el, 'Нічне місто').getAttribute('aria-pressed')).toBe('false');
+    expect(byName(el, 'Нічне місто').getAttribute('aria-disabled')).toBeNull();
     const alert = el.querySelector('[role="alert"]');
     expect(alert?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
   });
@@ -205,13 +213,13 @@ describe('ThemePicker («Вигляд»)', () => {
     ['THEME_NOT_AVAILABLE', 1],
     ['FORBIDDEN', 0],
   ])('помилка %s: оновлення користувача викликів — %i', async (code, calls) => {
-    const themes = fakeThemes(['quest-board', 'classic']);
+    const themes = fakeThemes(['quest-board', 'night-city']);
     themes.select.mockRejectedValue(
       new HttpErrorResponse({ status: 403, error: { error: { code } } }),
     );
     const auth = { load: vi.fn(async () => {}) };
     const fixture = await render(themes, auth);
-    byName(fixture.nativeElement, 'Класичний').click();
+    byName(fixture.nativeElement, 'Нічне місто').click();
     await fixture.whenStable();
     expect(auth.load).toHaveBeenCalledTimes(calls);
   });

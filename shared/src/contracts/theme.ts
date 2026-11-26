@@ -1,7 +1,10 @@
 import type { UserRole } from './me.js';
 
-/** Дизайни сайту, які може обрати користувач (План 8). */
-export const THEME_IDS = ['quest-board', 'classic'] as const;
+/**
+ * Дизайни сайту, які може обрати користувач (План 8; кібер-дизайни — План 9). Невідомий id
+ * (напр. прибраний «classic», збережений у БД) дає дизайн за замовчуванням (`resolveTheme`).
+ */
+export const THEME_IDS = ['quest-board', 'neon-signs', 'holo-market', 'night-city'] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 /** Дизайн за замовчуванням (і запасний, якщо збережений недоступний ролі). */
@@ -10,7 +13,9 @@ export const DEFAULT_THEME: ThemeId = 'quest-board';
 /** Кому доступний дизайн: усім чи лише власнику платформи. */
 export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   'quest-board': 'everyone',
-  classic: 'owner',
+  'neon-signs': 'everyone',
+  'holo-market': 'everyone',
+  'night-city': 'everyone',
 };
 
 /** Дизайни, доступні ролі. */

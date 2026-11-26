@@ -1,0 +1,33 @@
+<header class="page-header">
+  <div class="heading">
+    <!-- Вивіска: заголовок на пластині (вигляд пластини й неону — у бандлі дизайну). -->
+    <div class="sign cy-sign">
+      <span class="cy-screw" aria-hidden="true"></span>
+      <h1 class="cy-sign-title">{{ titleKey() | translate }}</h1>
+    </div>
+    @if (leadKey(); as lead) {
+      <p class="lead">{{ lead | translate }}</p>
+    }
+  </div>
+  @if (actions().length > 0) {
+    <div class="header-actions">
+      @for (a of actions(); track a.id) {
+        @if (a.primary) {
+          <a mat-flat-button [routerLink]="a.link" [attr.data-action]="a.id">
+            @if (a.icon) {
+              <mat-icon aria-hidden="true">{{ a.icon }}</mat-icon>
+            }
+            {{ a.labelKey | translate }}
+          </a>
+        } @else {
+          <a mat-stroked-button [routerLink]="a.link" [attr.data-action]="a.id">
+            @if (a.icon) {
+              <mat-icon aria-hidden="true">{{ a.icon }}</mat-icon>
+            }
+            {{ a.labelKey | translate }}
+          </a>
+        }
+      }
+    </div>
+  }
+</header>

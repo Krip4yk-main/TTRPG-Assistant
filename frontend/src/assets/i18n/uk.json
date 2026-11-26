@@ -60,7 +60,19 @@
   "theme": {
     "names": {
       "quest-board": "Дошка оголошень",
-      "classic": "Класичний"
+      "neon-signs": "Неонові вивіски",
+      "holo-market": "Голо-ринок",
+      "night-city": "Нічне місто"
+    }
+  },
+  "cyber": {
+    "gm": "майстер",
+    "card": {
+      "when": "Коли",
+      "where": "Де"
+    },
+    "shell": {
+      "navMenu": "Навігація"
     }
   },
   "questBoard": {

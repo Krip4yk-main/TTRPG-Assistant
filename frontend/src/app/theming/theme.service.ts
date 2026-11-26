@@ -15,7 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import { runtimeConfig } from '../../environments/runtime-config';
 import { AuthStore } from '../core/auth/auth.store';
 import type { ThemeSlots } from './slots';
-import { THEME_REGISTRY } from './theme.registry';
+import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
 
 /** Кеш останнього чинного дизайну (лише підказка для інлайн-скрипту index.html). */
 export const THEME_STORAGE_KEY = 'nri.theme';
@@ -43,6 +43,12 @@ export class ThemeService {
   private target: ThemeId | null = null;
   private applying: Promise<void> = Promise.resolve();
   private initialized = false;
+  /**
+   * Чанки слотів за завантажувачем: дизайни однієї родини (кібер-дизайни) мають спільний
+   * `loadSlots`, тож перемикання між ними не вантажить чанк знову. Невдале завантаження з кешу
+   * прибирається — наступний apply пробує ще раз.
+   */
+  private readonly chunks = new Map<ThemeDefinition['loadSlots'], Promise<ThemeSlots>>();
 
   readonly theme = this.current.asReadonly();
   /** Компоненти слотів чинного дизайну; `null` — ще вантажаться або чанк не завантажився. */
@@ -89,7 +95,7 @@ export class ThemeService {
   private apply(id: ThemeId): Promise<void> {
     if (id === this.target) return this.applying;
     this.target = id;
-    this.applying = this.registry[id].loadSlots().then(
+    this.applying = this.loadSlots(this.registry[id]).then(
       (slots) => this.commit(id, slots),
       // Чанк дизайну не завантажився (мережа): токени й стилі дизайну все одно ставимо,
       // а слоти малюють резервні компоненти — сторінка лишається робочою. `target` скидаємо,
@@ -102,6 +108,16 @@ export class ThemeService {
       },
     );
     return this.applying;
+  }
+
+  private loadSlots(def: ThemeDefinition): Promise<ThemeSlots> {
+    let chunk = this.chunks.get(def.loadSlots);
+    if (!chunk) {
+      chunk = def.loadSlots();
+      this.chunks.set(def.loadSlots, chunk);
+      chunk.catch(() => this.chunks.delete(def.loadSlots));
+    }
+    return chunk;
   }
 
   /** Застосування до DOM — разом зі слотами, щоб дизайн змінювався цілком. */

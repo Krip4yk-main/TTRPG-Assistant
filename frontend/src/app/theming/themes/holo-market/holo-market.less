@@ -1,0 +1,67 @@
+// Дизайн «Голо-ринок» (кібер-родина, макет docs/design-concepts/cyberpunk/cyber-c-holo.html):
+// окремий бандл `theme-holo-market.css` (`inject: false` в angular.json). Поки що — основа:
+// палітра макета (токени --cy-*) на спільних темних поверхнях кібер-родини
+// (../cyber/cyber-base.less), без власного декору й заголовкового шрифту (Jura — разом із
+// виглядом варіанта: розмитий нічний ринок, голо-панелі зі зрізаними кутами, проєктори).
+// Material — holo-market-material.scss.
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини.
+@import (css) '@fontsource/golos-text/cyrillic-400.css';
+@import (css) '@fontsource/golos-text/latin-400.css';
+@import (css) '@fontsource/golos-text/cyrillic-500.css';
+@import (css) '@fontsource/golos-text/latin-500.css';
+@import (css) '@fontsource/golos-text/cyrillic-600.css';
+@import (css) '@fontsource/golos-text/latin-600.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-500.css';
+@import (css) '@fontsource/jetbrains-mono/latin-500.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-700.css';
+@import (css) '@fontsource/jetbrains-mono/latin-700.css';
+@import '../cyber/cyber-base.less';
+
+@hm: ~":root[data-theme='holo-market']";
+
+// Контраст (WCAG): скло панелі #0B1220, оверлей #101A2A, стіна #070914.
+//   Текст #EAF7FA — 17.1 на склі; #CFE6EC (описи) — 14.4; #9DBFCB (підписи) — 9.6 / 8.9 /
+//   10.2 на стіні. Межа полів #4F7584 — 3.8 / 3.5 (≥ 3:1).
+//   Ціан #5EF2FF — 13.9 на склі; #04161B на ціані — 13.8. Рожевий текст #FF9CCF — 9.7;
+//   #1A0610 на #FF9CCF — 10.1. Стани й неони карток — типові (.cy-neon-tokens()), ≥ 6.9 на склі.
+
+@{hm} {
+  --cy-font-display: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+
+  --cy-wall: #070914;
+  --cy-wall-deep: #070914;
+  --cy-bar: rgba(6, 10, 20, 0.92);
+  --cy-bar-line: rgba(94, 242, 255, 0.42);
+
+  --cy-panel: #0b1220;
+  --cy-glass: linear-gradient(rgba(11, 18, 32, 0.94), rgba(7, 12, 22, 0.96));
+  --cy-glass-line: rgba(94, 242, 255, 0.3);
+  --cy-panel-raised: #142033;
+  --cy-overlay: #101a2a;
+  --cy-overlay-line: rgba(94, 242, 255, 0.42);
+  --cy-field: #060b14;
+  --cy-backdrop: rgba(2, 3, 8, 0.75);
+  --cy-blur-overlay: rgba(7, 9, 20, 0.72);
+
+  --cy-ink: #eaf7fa;
+  --cy-ink-soft: #cfe6ec;
+  --cy-ink-muted: #9dbfcb;
+  --cy-line: rgba(94, 242, 255, 0.16);
+  --cy-outline: #4f7584;
+
+  --cy-neon-a: #ff9ccf;
+  --cy-neon-a-core: #ffe0f0;
+  --cy-neon-a-text: #ff9ccf;
+  --cy-on-neon-a: #1a0610;
+  --cy-neon-b: #5ef2ff;
+  --cy-neon-b-core: #d8fcff;
+  --cy-neon-b-text: #5ef2ff;
+  --cy-neon-b-glow: rgba(94, 242, 255, 0.45);
+  --cy-on-neon-b: #04161b;
+  --cy-mark: #5ef2ff;
+  --cy-mark-glow: rgba(94, 242, 255, 0.8);
+
+  .cy-neon-tokens();
+  .cy-base();
+}

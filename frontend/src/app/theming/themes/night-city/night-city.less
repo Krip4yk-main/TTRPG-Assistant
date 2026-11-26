@@ -1,0 +1,281 @@
+// Дизайн «Нічне місто» (кібер-родина, макет docs/design-concepts/cyberpunk/cyber-ac-hybrid.html):
+// окремий бандл `theme-night-city.css` (`inject: false` в angular.json), який підключає
+// ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — заголовковий шрифт
+// (Unbounded, @fontsource: лише кирилиця й латиниця), токени --cy-* і вигляд варіанта:
+// бетонна стіна з неоновими відсвітами й дощем, шапка з рожевою неоновою лінією,
+// вивіска-пластина з гвинтами, скляні панелі з неоновою трубкою на затискачах із діодами.
+// Спільні темні поверхні сайту — ../cyber/cyber-base.less; Material — night-city-material.scss.
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини.
+@import (css) '@fontsource/golos-text/cyrillic-400.css';
+@import (css) '@fontsource/golos-text/latin-400.css';
+@import (css) '@fontsource/golos-text/cyrillic-500.css';
+@import (css) '@fontsource/golos-text/latin-500.css';
+@import (css) '@fontsource/golos-text/cyrillic-600.css';
+@import (css) '@fontsource/golos-text/latin-600.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-500.css';
+@import (css) '@fontsource/jetbrains-mono/latin-500.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-700.css';
+@import (css) '@fontsource/jetbrains-mono/latin-700.css';
+@import (css) '@fontsource/unbounded/cyrillic-400.css';
+@import (css) '@fontsource/unbounded/latin-400.css';
+@import (css) '@fontsource/unbounded/cyrillic-500.css';
+@import (css) '@fontsource/unbounded/latin-500.css';
+@import (css) '@fontsource/unbounded/cyrillic-600.css';
+@import (css) '@fontsource/unbounded/latin-600.css';
+@import '../cyber/cyber-base.less';
+
+@nc: ~":root[data-theme='night-city']";
+
+// Контраст (WCAG, відносна яскравість). Поверхні: стіна #15171D, найсвітліше місце стіни під
+// текстом — рожевий відсвіт угорі ліворуч (≈ #52213A), ціановий праворуч (≈ #1A323A); скло
+// панелі ≈ #161821 (з неоновим відтінком угорі картки ≈ #341D2F), оверлей #1D2029, картка в
+// панелі #222532, поле #0D0E13, смуга шапки #0C0D12.
+//   Текст #EEF0F6 — 15.5 на склі / 14.3 оверлей / 17.0 смуга / 11.8 ціановий відсвіт;
+//   #D0D4DF (описи, підзаголовок) — 11.9 скло / 12.1 стіна / 8.7 рожевий відсвіт;
+//   #A3A9BA (підписи) — 7.5 скло / 6.9 оверлей / 6.5 картка / 8.2 поле / 5.5 рожевий відсвіт.
+//   Заголовок-вивіска #FFE2EF — 14.8 на стіні, 10.0 на найсвітлішому відсвіті.
+//   Межа полів #6B7080 — 3.6 скло / 3.3 оверлей / 3.9 поле (≥ 3:1 для контурів).
+//   Ціан #3FE3FF (посилання, фокус) — 11.5 скло / 10.6 оверлей / 8.3 рожевий відсвіт;
+//     #04161B на ціані — 12.0 (filled-кнопки, прапорці, виділення).
+//   Рожевий текст #FF6AA6 — 6.6 скло / 6.1 оверлей; #1A0610 на #FF3D8B — 5.8.
+//   Червоний текст #FFA3AD — 9.4 скло / 8.6 оверлей / 10.3 смуга; #1A0408 на #FF4A5C — 6.0.
+//   Лайм #E2FFC9 на заливці rgba(157,255,77,.09) — 13.2; бурштин #FFD49A на rgba(255,173,61,.1)
+//     — 10.6; #1D1204 на #FFAD3D («Нове») — 9.9; зірка #FFAD3D — 9.5 (іконка).
+//   Текст системи кольором неону картки (світліший відтінок, 62% неону + білий): рожевий
+//     #FF87B7 — 7.9 скло / 6.9 з відтінком; ціан #85EEFF — 13.2; фіолет #C5A9FF — 8.8 / 7.4;
+//     бурштин #FFCC87 — 12.0; лайм #C2FF91 — 15.2; червоний #FF8F9A — 8.1.
+//   Неонові трубки, діоди, світіння — декор, не текст.
+
+@{nc} {
+  --cy-font-display: 'Unbounded', 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+
+  --cy-wall: #15171d;
+  --cy-wall-deep: #15171d;
+  --cy-bar: #0c0d12;
+  --cy-bar-line: #23262f;
+
+  --cy-panel: #161821;
+  --cy-glass: linear-gradient(180deg, rgba(22, 24, 33, 0.94), rgba(14, 15, 21, 0.96));
+  --cy-glass-line: rgba(255, 255, 255, 0.09);
+  --cy-panel-raised: #222532;
+  --cy-overlay: #1d2029;
+  --cy-overlay-line: #3a3e4c;
+  --cy-field: #0d0e13;
+  --cy-backdrop: rgba(3, 3, 6, 0.75);
+  --cy-blur-overlay: rgba(12, 13, 18, 0.72);
+
+  --cy-ink: #eef0f6;
+  --cy-ink-soft: #d0d4df;
+  --cy-ink-muted: #a3a9ba;
+  --cy-line: rgba(255, 255, 255, 0.1);
+  --cy-outline: #6b7080;
+
+  // Перший неон — рожевий (вивіска, лінія шапки, CTA), другий — ціан (фокус, посилання).
+  --cy-neon-a: #ff3d8b;
+  --cy-neon-a-core: #ffd3e5;
+  --cy-neon-a-text: #ff6aa6;
+  --cy-on-neon-a: #1a0610;
+  --cy-neon-b: #3fe3ff;
+  --cy-neon-b-core: #d3f8ff;
+  --cy-neon-b-text: #3fe3ff;
+  --cy-neon-b-glow: rgba(63, 227, 255, 0.45);
+  --cy-on-neon-b: #04161b;
+  --cy-mark: #ff6aa6;
+  --cy-mark-glow: rgba(255, 61, 139, 0.8);
+
+  // Стани й шість неонів картки — типові значення кібер-родини.
+  .cy-neon-tokens();
+
+  .cy-base();
+
+  // ---- Бетонна стіна (лише CSS, без файлів зображень) ----
+  // Неонові відсвіти (рожевий угорі ліворуч, ціан праворуч), затемнення згори й знизу,
+  // потьоки на бетоні (шум feTurbulence, витягнутий по вертикалі) і бетонні плити 480×360 з
+  // анкерами й швами (data-URI SVG). Відсвіти — фіксованого розміру вгорі стіни: на довгій
+  // сторінці не розтягуються. Дощ — окремий фіксований шар на розмір вікна (::before).
+  .cy-wall {
+    background-color: var(--cy-wall);
+    background-image:
+      radial-gradient(
+        ellipse 820px 420px at 300px 150px,
+        rgba(255, 61, 139, 0.26),
+        transparent 70%
+      ),
+      radial-gradient(ellipse 600px 900px at 100% 600px, rgba(63, 227, 255, 0.13), transparent 70%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 30%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='900'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03 0.0015' numOctaves='3' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.5 -0.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='360'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.52 0 0 0 0 0.58 0 0 0 0.9 -0.35'/%3E%3C/filter%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.02' numOctaves='3' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.02 0 0 0 0 0.02 0 0 0 0 0.03 0 0 0 1.4 -0.45'/%3E%3C/filter%3E%3Crect width='480' height='360' filter='url(%23b)'/%3E%3Crect width='480' height='360' filter='url(%23n)' opacity='.12'/%3E%3Cg fill='%230c0d11'%3E%3Ccircle cx='60' cy='60' r='5'/%3E%3Ccircle cx='240' cy='60' r='5'/%3E%3Ccircle cx='420' cy='60' r='5'/%3E%3Ccircle cx='60' cy='300' r='5'/%3E%3Ccircle cx='240' cy='300' r='5'/%3E%3Ccircle cx='420' cy='300' r='5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23262a33' stroke-width='1'%3E%3Ccircle cx='60' cy='60' r='7'/%3E%3Ccircle cx='240' cy='60' r='7'/%3E%3Ccircle cx='420' cy='60' r='7'/%3E%3Ccircle cx='60' cy='300' r='7'/%3E%3Ccircle cx='240' cy='300' r='7'/%3E%3Ccircle cx='420' cy='300' r='7'/%3E%3C/g%3E%3Cpath d='M0 359.5H480M479.5 0V360' stroke='%2305060a' stroke-width='2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat;
+    background-size:
+      100% 900px,
+      100% 1500px,
+      100% 1200px,
+      720px 900px,
+      480px 360px;
+
+    // Дощ: рідкі косі риски, перервані маскою (статичні — без руху).
+    &::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        repeating-linear-gradient(
+          103deg,
+          transparent 0 58px,
+          rgba(210, 225, 255, 0.04) 58px 59px,
+          transparent 59px 121px
+        ),
+        repeating-linear-gradient(
+          100deg,
+          transparent 0 89px,
+          rgba(210, 225, 255, 0.03) 89px 90px,
+          transparent 90px 187px
+        );
+      mask-image: repeating-linear-gradient(
+        0deg,
+        #000 0 44px,
+        transparent 44px 80px,
+        #000 80px 96px,
+        transparent 96px 140px
+      );
+      pointer-events: none;
+    }
+  }
+
+  // Шапка: рожева неонова лінія під смугою.
+  .top.cy-bar {
+    box-shadow:
+      0 1px 0 rgba(255, 61, 139, 0.45),
+      0 2px 14px rgba(255, 61, 139, 0.18);
+  }
+
+  // ---- Вивіска (заголовок сторінки): неонові літери на акриловій пластині з гвинтами ----
+  .cy-sign {
+    flex-direction: column;
+    padding: 22px 34px 24px;
+    margin-left: -6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  .cy-screw {
+    display: contents;
+  }
+
+  // Чотири гвинти: верхні — псевдоелементи .cy-screw, нижні — самої пластини.
+  .cy-screw::before,
+  .cy-screw::after,
+  .cy-sign::before,
+  .cy-sign::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #d6d8de, #6c707a 50%, #2c2f36);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  }
+
+  .cy-screw::before {
+    top: 10px;
+    left: 10px;
+  }
+
+  .cy-screw::after {
+    top: 10px;
+    right: 10px;
+  }
+
+  .cy-sign::before {
+    bottom: 10px;
+    left: 10px;
+  }
+
+  .cy-sign::after {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .cy-sign-title {
+    color: #ffe2ef;
+    font-weight: 500;
+    text-shadow:
+      0 0 2px #fff,
+      0 0 8px #ff3d8b,
+      0 0 22px #ff3d8b,
+      0 0 46px rgba(255, 61, 139, 0.55);
+  }
+
+  // ---- Скляні панелі карток: неоновий відтінок угорі, трубка між затискачами ----
+  [data-neon] > .cy-glass {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--cy-n) 13%, transparent), transparent 140px),
+      var(--cy-glass);
+    transition:
+      border-color var(--nri-transition),
+      box-shadow var(--nri-transition);
+
+    .cy-tube {
+      left: 84px;
+      right: 84px;
+    }
+  }
+
+  [data-neon]:is(:hover, :focus-within) > .cy-glass {
+    border-color: color-mix(in srgb, var(--cy-n) 45%, transparent);
+    box-shadow:
+      0 28px 44px rgba(0, 0, 0, 0.6),
+      0 0 0 1px color-mix(in srgb, var(--cy-n) 25%, transparent),
+      0 0 30px color-mix(in srgb, var(--cy-n) 18%, transparent);
+  }
+
+  // Затискачі, якими панель висить на шині, з діодом кольору неону картки.
+  .cy-clamp {
+    position: absolute;
+    top: -13px;
+    z-index: 4;
+    display: block;
+    width: 26px;
+    height: 22px;
+    border-radius: 4px;
+    background: linear-gradient(#5a5f6c, #2a2d35);
+    box-shadow:
+      0 3px 5px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      margin-left: -3px;
+      border-radius: 50%;
+      background: var(--cy-n-core, var(--cy-neon-b-core));
+      box-shadow:
+        0 0 5px var(--cy-n, var(--cy-neon-b)),
+        0 0 12px var(--cy-n, var(--cy-neon-b));
+    }
+  }
+
+  .cy-clamp-l {
+    left: 44px;
+  }
+
+  .cy-clamp-r {
+    right: 44px;
+  }
+}
+
+@media (max-width: 599.98px) {
+  @{nc} .cy-sign {
+    padding: 18px 22px 20px;
+    margin-left: 0;
+  }
+}

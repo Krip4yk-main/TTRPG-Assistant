@@ -1,0 +1,44 @@
+:host {
+  display: block;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--nri-space-md);
+  margin-bottom: var(--nri-space-xl);
+}
+
+.heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// Пластина — за шириною заголовка (не ширша за рядок).
+.sign {
+  position: relative;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.6vw, 3.1rem);
+  line-height: 1.1;
+  overflow-wrap: break-word;
+}
+
+.lead {
+  margin: var(--nri-space-md) 0 0;
+  color: var(--cy-ink-soft);
+  font-size: 1.0625rem;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}

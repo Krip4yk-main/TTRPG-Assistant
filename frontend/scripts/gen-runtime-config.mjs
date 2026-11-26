@@ -56,10 +56,13 @@ function themeStyleVersion() {
   const require = createRequire(new URL('package.json', root));
   for (const pkg of [
     '@angular/material',
-    '@fontsource/cormorant-garamond',
+    '@fontsource/golos-text',
+    '@fontsource/jetbrains-mono',
+    '@fontsource/jura',
     '@fontsource/kurale',
     '@fontsource/literata',
-    '@fontsource/lora',
+    '@fontsource/m-plus-rounded-1c',
+    '@fontsource/unbounded',
     '@material-symbols/font-400',
   ]) {
     try {

@@ -1,0 +1,7 @@
+// Material для дизайну «Нічне місто» (бандл `theme-night-city`): спільний темний Material
+// кібер-родини (../cyber/cyber-material.scss) з заголовковим шрифтом дизайну.
+@use '../cyber/cyber-material' as cy;
+
+:root[data-theme='night-city'] {
+  @include cy.material("'Unbounded', 'Golos Text', 'Segoe UI', system-ui, sans-serif");
+}

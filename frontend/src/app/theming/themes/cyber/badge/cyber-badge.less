@@ -1,0 +1,71 @@
+// Хост не створює блоку: бейдж — пряма дитина рядка бейджів.
+:host {
+  display: contents;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  color: var(--cy-ink);
+  font: 700 0.6875rem/1.2 var(--cy-font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+}
+
+// Збіг з розкладом: «пігулка» з діодом.
+.fit {
+  padding: 4px 12px 4px 10px;
+  border-color: var(--cy-lime-line);
+  border-radius: 999px;
+  background: var(--cy-lime-fill);
+  color: var(--cy-lime-text);
+  font: 600 0.8125rem/1.2 var(--nri-font-body);
+  letter-spacing: 0;
+
+  &::before {
+    content: '';
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cy-lime-text);
+    box-shadow: 0 0 5px var(--cy-lime);
+  }
+
+  // Значок Material (якщо є) замінює діод.
+  &:has(mat-icon)::before {
+    display: none;
+  }
+}
+
+.fit[data-fit='partial'] {
+  border-color: var(--cy-amber-line);
+  background: var(--cy-amber-fill);
+  color: var(--cy-amber-text);
+
+  &::before {
+    background: var(--cy-amber-text);
+    box-shadow: 0 0 5px var(--cy-amber);
+  }
+}
+
+.age,
+.status[data-status='cancelled'] {
+  border-color: var(--cy-red);
+  background: var(--cy-red-fill);
+  color: var(--cy-red-text);
+}
+
+.status[data-status='finished'] {
+  color: var(--cy-ink-muted);
+}

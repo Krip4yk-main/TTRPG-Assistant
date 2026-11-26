@@ -9,7 +9,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type { MyGameCardDto, SearchGameCardDto } from '@nri/shared';
 import uk from '../../assets/i18n/uk.json';
 import type { ThemeSlots } from './slots';
-import { CLASSIC_SLOTS } from './themes/classic/slots';
+import { CYBER_SLOTS } from './themes/cyber/slots';
 import { QUEST_BOARD_SLOTS } from './themes/quest-board/slots';
 import {
   toGameCardVm,
@@ -30,8 +30,8 @@ import { browserZone } from '../core/i18n/dates';
  * Перевірки — за видимим текстом і посиланнями, а не за класами конкретного дизайну.
  */
 const DESIGNS: [string, ThemeSlots][] = [
-  ['classic', CLASSIC_SLOTS],
   ['quest-board', QUEST_BOARD_SLOTS],
+  ['night-city', CYBER_SLOTS],
 ];
 
 const game: SearchGameCardDto = {

@@ -1,0 +1,67 @@
+// Дизайн «Неонові вивіски» (кібер-родина, макет docs/design-concepts/cyberpunk/cyber-a-neon.html):
+// окремий бандл `theme-neon-signs.css` (`inject: false` в angular.json). Поки що — основа:
+// палітра макета (токени --cy-*) на спільних темних поверхнях кібер-родини
+// (../cyber/cyber-base.less), без власного декору й заголовкового шрифту (M PLUS Rounded 1c
+// — разом із виглядом варіанта: мокра цегляна стіна, світлові короби, неонові таблички).
+// Material — neon-signs-material.scss.
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини.
+@import (css) '@fontsource/golos-text/cyrillic-400.css';
+@import (css) '@fontsource/golos-text/latin-400.css';
+@import (css) '@fontsource/golos-text/cyrillic-500.css';
+@import (css) '@fontsource/golos-text/latin-500.css';
+@import (css) '@fontsource/golos-text/cyrillic-600.css';
+@import (css) '@fontsource/golos-text/latin-600.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-500.css';
+@import (css) '@fontsource/jetbrains-mono/latin-500.css';
+@import (css) '@fontsource/jetbrains-mono/cyrillic-700.css';
+@import (css) '@fontsource/jetbrains-mono/latin-700.css';
+@import '../cyber/cyber-base.less';
+
+@ns: ~":root[data-theme='neon-signs']";
+
+// Контраст (WCAG): скло панелі #17131F, оверлей #201A2B, стіна #0B0910.
+//   Текст #EEE8F7 — 15.2 / 14.1; #D6CFE3 (описи) — 12.1 на склі; #ABA1C0 (підписи) — 7.5 /
+//   6.9 / 8.1 на стіні. Межа полів #6F6684 — 3.4 / 3.1 (≥ 3:1).
+//   Ціан #25DCFF — 11.1 на склі; #04161B на ціані — 11.2. Рожевий текст #FF6AB8 — 7.0;
+//   #1A0610 на #FF3FA4 — 6.0. Стани й неони карток — типові (.cy-neon-tokens()), ≥ 6.9 на склі.
+
+@{ns} {
+  --cy-font-display: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+
+  --cy-wall: #0b0910;
+  --cy-wall-deep: #0b0910;
+  --cy-bar: #0a0810;
+  --cy-bar-line: #241d30;
+
+  --cy-panel: #17131f;
+  --cy-glass: linear-gradient(#17131f, #120f18);
+  --cy-glass-line: #2b2437;
+  --cy-panel-raised: #251f31;
+  --cy-overlay: #201a2b;
+  --cy-overlay-line: #3a3149;
+  --cy-field: #0e0b13;
+  --cy-backdrop: rgba(3, 2, 6, 0.75);
+  --cy-blur-overlay: rgba(11, 9, 16, 0.72);
+
+  --cy-ink: #eee8f7;
+  --cy-ink-soft: #d6cfe3;
+  --cy-ink-muted: #aba1c0;
+  --cy-line: rgba(255, 255, 255, 0.1);
+  --cy-outline: #6f6684;
+
+  --cy-neon-a: #ff3fa4;
+  --cy-neon-a-core: #ffe3f3;
+  --cy-neon-a-text: #ff6ab8;
+  --cy-on-neon-a: #1a0610;
+  --cy-neon-b: #25dcff;
+  --cy-neon-b-core: #d6f9ff;
+  --cy-neon-b-text: #25dcff;
+  --cy-neon-b-glow: rgba(37, 220, 255, 0.45);
+  --cy-on-neon-b: #04161b;
+  --cy-mark: #25dcff;
+  --cy-mark-glow: rgba(37, 220, 255, 0.8);
+
+  .cy-neon-tokens();
+  .cy-base();
+}

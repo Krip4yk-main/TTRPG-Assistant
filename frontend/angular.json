@@ -38,16 +38,6 @@
             "styles": [
               "src/styles.less",
               {
-                "input": "src/app/theming/themes/classic/classic.less",
-                "bundleName": "theme-classic",
-                "inject": false
-              },
-              {
-                "input": "src/app/theming/themes/classic/classic-material.scss",
-                "bundleName": "theme-classic",
-                "inject": false
-              },
-              {
                 "input": "src/app/theming/themes/quest-board/quest-board.less",
                 "bundleName": "theme-quest-board",
                 "inject": false
@@ -55,6 +45,36 @@
               {
                 "input": "src/app/theming/themes/quest-board/quest-board-material.scss",
                 "bundleName": "theme-quest-board",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/neon-signs/neon-signs.less",
+                "bundleName": "theme-neon-signs",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/neon-signs/neon-signs-material.scss",
+                "bundleName": "theme-neon-signs",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/holo-market/holo-market.less",
+                "bundleName": "theme-holo-market",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/holo-market/holo-market-material.scss",
+                "bundleName": "theme-holo-market",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/night-city/night-city.less",
+                "bundleName": "theme-night-city",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/night-city/night-city-material.scss",
+                "bundleName": "theme-night-city",
                 "inject": false
               }
             ]

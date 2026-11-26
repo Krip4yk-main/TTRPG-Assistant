@@ -49,6 +49,9 @@ function theme(
   };
 }
 
+/** Слоти кібер-родини (спільний лінивий чанк трьох кібер-дизайнів). */
+const loadCyberSlots = () => import('./themes/cyber/slots').then((m) => m.CYBER_SLOTS);
+
 /**
  * Усі дизайни. Мапа «дизайн → [бандл, color-scheme, ранній фон]» продубльована в інлайн-скрипті
  * `src/index.html` — змінюйте обидва місця разом.
@@ -63,9 +66,11 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     () => import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
     ['tearAnimation'],
   ),
-  classic: theme('classic', 'dark', () =>
-    import('./themes/classic/slots').then((m) => m.CLASSIC_SLOTS),
-  ),
+  // Кібер-родина: три окремі дизайни з одним лінивим чанком слотів (той самий import —
+  // вантажиться один раз) і власним бандлом стилів кожен. Текст світлий на темному склі.
+  'neon-signs': theme('neon-signs', 'dark', loadCyberSlots),
+  'holo-market': theme('holo-market', 'dark', loadCyberSlots),
+  'night-city': theme('night-city', 'dark', loadCyberSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

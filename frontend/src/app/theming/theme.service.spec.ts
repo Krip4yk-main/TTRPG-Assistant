@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import type { MeDto, ThemeId } from '@nri/shared';
 import { AuthStore } from '../core/auth/auth.store';
 import { SocketService } from '../core/realtime/socket.service';
-import { CLASSIC_SLOTS } from './themes/classic/slots';
+import { FALLBACK_SLOTS } from './fallback/fallback-slots';
 import type { ThemeSlots } from './slots';
 import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
 import {
@@ -27,45 +27,40 @@ const base = {
   identities: [] as MeDto['identities'],
 } satisfies Partial<MeDto>;
 
+const ALL: ThemeId[] = ['quest-board', 'neon-signs', 'holo-market', 'night-city'];
 const user: MeDto = {
   ...base,
   role: 'user',
-  uiTheme: 'quest-board',
-  availableThemes: ['quest-board'],
-  uiPrefs: { tearAnimation: true },
-};
-const owner: MeDto = {
-  ...base,
-  role: 'owner',
-  uiTheme: 'classic',
-  availableThemes: ['quest-board', 'classic'],
+  uiTheme: 'night-city',
+  availableThemes: ALL,
   uiPrefs: { tearAnimation: true },
 };
 
-// Окремі «бандли» для кожного дизайну (тест не тягне справжні чанки дизайнів).
-const QB_SLOTS = { ...CLASSIC_SLOTS } as ThemeSlots;
-const CL_SLOTS = { ...CLASSIC_SLOTS } as ThemeSlots;
+// Окремі «чанки» дизайнів (тест не тягне справжні чанки): «Дошка» і кібер-родина.
+const QB_SLOTS = { ...FALLBACK_SLOTS } as ThemeSlots;
+const CY_SLOTS = { ...FALLBACK_SLOTS } as ThemeSlots;
 
-function registry(
-  load: Partial<Record<ThemeId, () => Promise<ThemeSlots>>> = {},
-): Record<ThemeId, ThemeDefinition> {
+function def(id: ThemeId, loadSlots: () => Promise<ThemeSlots>): ThemeDefinition {
   return {
-    'quest-board': {
-      id: 'quest-board',
-      labelKey: 'theme.names.quest-board',
-      preview: 'themes/quest-board.png',
-      colorScheme: 'dark',
-      styleHref: 'theme-quest-board.css?v=1',
-      loadSlots: load['quest-board'] ?? (() => Promise.resolve(QB_SLOTS)),
-    },
-    classic: {
-      id: 'classic',
-      labelKey: 'theme.names.classic',
-      preview: 'themes/classic.png',
-      colorScheme: 'dark',
-      styleHref: 'theme-classic.css?v=1',
-      loadSlots: load.classic ?? (() => Promise.resolve(CL_SLOTS)),
-    },
+    id,
+    labelKey: `theme.names.${id}`,
+    preview: `themes/${id}.png`,
+    colorScheme: 'dark',
+    styleHref: `theme-${id}.css?v=1`,
+    loadSlots,
+  };
+}
+
+/** Як справжній реєстр: три кібер-дизайни мають один спільний завантажувач слотів. */
+function registry(
+  load: { qb?: () => Promise<ThemeSlots>; cyber?: () => Promise<ThemeSlots> } = {},
+): Record<ThemeId, ThemeDefinition> {
+  const cyber = load.cyber ?? (() => Promise.resolve(CY_SLOTS));
+  return {
+    'quest-board': def('quest-board', load.qb ?? (() => Promise.resolve(QB_SLOTS))),
+    'neon-signs': def('neon-signs', cyber),
+    'holo-market': def('holo-market', cyber),
+    'night-city': def('night-city', cyber),
   };
 }
 
@@ -112,15 +107,16 @@ describe('ThemeService', () => {
     localStorage.clear();
   });
 
-  it('a non-owner with a cached «classic» gets the default design and the classic link is gone (RF 2)', async () => {
+  it('a cached legacy «classic» boots the default design; no classic link is left (RF 1)', async () => {
     setup();
     bootFromCache('classic', 'theme-classic.css?v=1');
-    // Навіть якщо /me (підмінений) повернув classic — права ролі перевіряються ще раз.
-    auth.setMe({ ...user, uiTheme: 'classic' });
+    // Навіть якщо /me (підмінений чи старий) повернув classic — він невідомий: дефолт.
+    auth.setMe({ ...user, uiTheme: 'classic' as ThemeId });
     await service.init();
     expect(service.theme()).toBe('quest-board');
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
+    expect(document.head.querySelector('link[href^="theme-classic"]')).toBeNull();
     expect(service.slots()).toBe(QB_SLOTS);
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('quest-board');
     expect(localStorage.getItem(THEME_VERSION_STORAGE_KEY)).toMatch(/^[a-z0-9]+$/);
@@ -128,45 +124,46 @@ describe('ThemeService', () => {
 
   it('a guest always gets the default design', async () => {
     setup();
-    bootFromCache('classic', 'theme-classic.css?v=1');
+    bootFromCache('night-city', 'theme-night-city.css?v=1');
     auth.setMe(null);
     await service.init();
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
   });
 
-  it('the owner keeps «classic»; the cached link is reused', async () => {
+  it('a regular user keeps «night-city»; the cached link is reused', async () => {
     setup();
-    bootFromCache('classic', 'theme-classic.css?v=1');
+    bootFromCache('night-city', 'theme-night-city.css?v=1');
     const cached = document.head.querySelector(`link#${THEME_LINK_ID}`);
-    auth.setMe(owner);
+    auth.setMe(user);
     await service.init();
-    expect(service.theme()).toBe('classic');
-    expect(service.available()).toEqual(['quest-board', 'classic']);
+    expect(service.theme()).toBe('night-city');
+    expect(service.available()).toEqual(ALL);
+    expect(service.slots()).toBe(CY_SLOTS);
     expect(document.head.querySelector(`link#${THEME_LINK_ID}`)).toBe(cached);
   });
 
   it('same design with a stale version swaps the link only after the new one loads', async () => {
     setup();
-    bootFromCache('classic', 'theme-classic.css?v=old');
-    auth.setMe(owner);
+    bootFromCache('night-city', 'theme-night-city.css?v=old');
+    auth.setMe(user);
     await service.init();
-    expect(links()).toEqual(['theme-classic.css?v=old', 'theme-classic.css?v=1']);
+    expect(links()).toEqual(['theme-night-city.css?v=old', 'theme-night-city.css?v=1']);
     document.head.querySelectorAll(`link#${THEME_LINK_ID}`)[1]!.dispatchEvent(new Event('load'));
-    expect(links()).toEqual(['theme-classic.css?v=1']);
+    expect(links()).toEqual(['theme-night-city.css?v=1']);
   });
 
   it('select() saves the choice and switches data-theme, link and slots without a reload', async () => {
     setup();
-    auth.setMe(owner);
+    auth.setMe(user);
     await service.init();
-    expect(document.documentElement.getAttribute('data-theme')).toBe('classic');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('night-city');
 
     const done = service.select('quest-board');
     const req = TestBed.inject(HttpTestingController).expectOne('/api/me/theme');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ theme: 'quest-board' });
-    req.flush({ ...owner, uiTheme: 'quest-board' });
+    req.flush({ ...user, uiTheme: 'quest-board' });
     await done;
 
     expect(service.theme()).toBe('quest-board');
@@ -176,9 +173,30 @@ describe('ThemeService', () => {
     expect(auth.me()!.uiTheme).toBe('quest-board');
   });
 
+  it('switching between cyber designs swaps data-theme and the bundle link but loads the shared slot chunk once (RF 2)', async () => {
+    const cyber = vi.fn(() => Promise.resolve(CY_SLOTS));
+    setup(registry({ cyber }));
+    auth.setMe(user);
+    await service.init();
+    expect(links()).toEqual(['theme-night-city.css?v=1']);
+
+    const done = service.select('neon-signs');
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...user, uiTheme: 'neon-signs' });
+    await done;
+
+    expect(service.theme()).toBe('neon-signs');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
+    // Старий бандл знято одразу — стилі «Нічного міста» не лишаються підключеними.
+    expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+    expect(service.slots()).toBe(CY_SLOTS);
+    expect(cyber).toHaveBeenCalledTimes(1);
+  });
+
   it('logging out returns to the default design', async () => {
     setup();
-    auth.setMe(owner);
+    auth.setMe(user);
     await service.init();
     auth.setMe(null);
     TestBed.tick();
@@ -187,8 +205,8 @@ describe('ThemeService', () => {
   });
 
   it('a failed design chunk still applies the design and leaves slots to the fallback (RF 3)', async () => {
-    setup(registry({ 'quest-board': () => Promise.reject(new Error('ChunkLoadError')) }));
-    auth.setMe(user);
+    setup(registry({ qb: () => Promise.reject(new Error('ChunkLoadError')) }));
+    auth.setMe({ ...user, uiTheme: 'quest-board' });
     await expect(service.init()).resolves.toBeUndefined();
     expect(service.slots()).toBeNull();
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
@@ -200,16 +218,16 @@ describe('ThemeService', () => {
       .fn<() => Promise<ThemeSlots>>()
       .mockRejectedValueOnce(new Error('ChunkLoadError'))
       .mockResolvedValue(QB_SLOTS);
-    setup(registry({ 'quest-board': load }));
-    auth.setMe(owner);
+    setup(registry({ qb: load }));
+    auth.setMe(user);
     await service.init();
-    expect(service.slots()).toBe(CL_SLOTS);
+    expect(service.slots()).toBe(CY_SLOTS);
 
     // Перехід на «Дошку» — чанк не завантажився: резервні слоти.
     let done = service.select('quest-board');
     TestBed.inject(HttpTestingController)
       .expectOne('/api/me/theme')
-      .flush({ ...owner, uiTheme: 'quest-board' });
+      .flush({ ...user, uiTheme: 'quest-board' });
     await done;
     expect(service.slots()).toBeNull();
 
@@ -217,7 +235,7 @@ describe('ThemeService', () => {
     done = service.select('quest-board');
     TestBed.inject(HttpTestingController)
       .expectOne('/api/me/theme')
-      .flush({ ...owner, uiTheme: 'quest-board' });
+      .flush({ ...user, uiTheme: 'quest-board' });
     await done;
     expect(load).toHaveBeenCalledTimes(2);
     expect(service.slots()).toBe(QB_SLOTS);
@@ -227,14 +245,14 @@ describe('ThemeService', () => {
     setup();
     bootFromCache('quest-board', 'theme-quest-board.css?v=1');
     document.documentElement.style.backgroundColor = 'rgb(58, 39, 24)';
-    auth.setMe({ ...owner, uiTheme: 'quest-board' });
+    auth.setMe({ ...user, uiTheme: 'quest-board' });
     await service.init();
     // Кеш збігся з чинним — підказка лишається (бандл дає той самий колір).
     expect(document.documentElement.style.backgroundColor).toBe('rgb(58, 39, 24)');
 
-    auth.setMe(owner);
+    auth.setMe(user);
     TestBed.tick();
-    await vi.waitFor(() => expect(service.theme()).toBe('classic'));
+    await vi.waitFor(() => expect(service.theme()).toBe('night-city'));
     expect(document.documentElement.style.backgroundColor).toBe('');
   });
 

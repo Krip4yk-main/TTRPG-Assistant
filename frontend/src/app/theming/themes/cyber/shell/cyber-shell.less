@@ -1,0 +1,239 @@
+// Розкладка шапки й підвалу кібер-родини. Кольори — лише токени --cy-* / --nri-*; фон смуг,
+// неонова лінія під шапкою й стіна — у бандлі дизайну (.cy-bar, .cy-wall).
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--nri-space-md);
+  top: -100px;
+  z-index: 1000;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  background: var(--nri-primary);
+  color: var(--nri-on-primary);
+  border-radius: var(--nri-radius-sm);
+  text-decoration: none;
+  font-weight: 600;
+
+  &:focus {
+    top: var(--nri-space-sm);
+  }
+}
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-md);
+  min-height: 68px;
+  padding: var(--nri-space-xs) clamp(var(--nri-space-md), 2.5vw, var(--nri-space-xl));
+}
+
+.brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  color: var(--cy-ink);
+  font: 600 1.2rem/1 var(--cy-font-display);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--cy-ink);
+  }
+}
+
+.mark {
+  flex: none;
+  color: var(--cy-mark);
+  filter: drop-shadow(0 0 4px var(--cy-mark-glow));
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: var(--nri-space-lg);
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  color: var(--cy-ink-muted);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+
+  &:hover {
+    color: var(--cy-ink);
+  }
+
+  &.active {
+    color: var(--cy-ink);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 -2px 0 var(--cy-neon-a);
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.view-mode {
+  flex: none;
+
+  .short {
+    display: none;
+  }
+}
+
+.bell-placeholder {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+
+.nav-menu-button {
+  display: none;
+}
+
+// Акаунт — темний кружок з літерою ніку й неоновим обідком.
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1.5px solid var(--cy-neon-b);
+  border-radius: 50%;
+  background: var(--cy-overlay);
+  color: var(--cy-ink);
+  font: 600 1rem/1 var(--cy-font-display);
+  box-shadow: 0 0 8px var(--cy-neon-b-glow);
+}
+
+.login-link {
+  flex: none;
+}
+
+.menu-header {
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  font-weight: 600;
+  border-bottom: 1px solid var(--nri-border);
+}
+
+.main {
+  flex: 1 0 auto;
+  outline: none;
+  // Якір пропуску навігації не ховається під липкою шапкою.
+  scroll-margin-top: 76px;
+}
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--nri-space-lg);
+  padding: var(--nri-space-lg) var(--nri-space-md);
+}
+
+.connection-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nri-space-md);
+  margin: var(--nri-space-md) auto 0;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border-left: 3px solid var(--nri-danger);
+}
+
+// Середня ширина: навігація — у меню.
+@media (max-width: 959.98px) {
+  .nav {
+    display: none;
+  }
+
+  .nav-menu-button {
+    display: inline-flex;
+  }
+}
+
+// Вузький екран: перемикач виду — короткі підписи, назва — дрібніша.
+@media (max-width: 639.98px) {
+  .top {
+    gap: var(--nri-space-xs);
+    min-height: 60px;
+    padding: var(--nri-space-xs) var(--nri-space-sm);
+  }
+
+  .brand {
+    gap: 8px;
+    font-size: 1rem;
+  }
+
+  .view-mode {
+    font-size: 0.8rem;
+
+    .long {
+      display: none;
+    }
+
+    .short {
+      display: inline;
+    }
+  }
+}
+
+// Дуже вузький екран із перемикачем виду: лише знак (назва лишається для читачів екрана);
+// щільніші кнопки, щоб усе вміщалось у 360px, а на ще вужчому — переносилось.
+@media (max-width: 479.98px) {
+  .top {
+    flex-wrap: wrap;
+    gap: 2px;
+    padding-inline: var(--nri-space-xs);
+    --mat-button-text-horizontal-padding: 4px;
+    --mat-button-text-with-icon-horizontal-padding: 4px;
+    --mat-icon-button-state-layer-size: 36px;
+  }
+
+  .view-mode {
+    --mat-button-toggle-label-text-size: 0.75rem;
+
+    .short {
+      margin-inline: -6px;
+    }
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .top:has(.view-mode) .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
