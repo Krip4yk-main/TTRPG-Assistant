@@ -295,7 +295,13 @@ describe('PATCH /api/me/timezone', () => {
   it('400 for an invalid zone or extra keys; 401 without a session; 403 for pending', async () => {
     const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Kyiv' });
     const cookie = await login(u.id);
-    for (const body of [{}, { timezone: 'Nope/Zone' }, { timezone: 'UTC', extra: 1 }]) {
+    for (const body of [
+      {},
+      { timezone: 'Nope/Zone' },
+      { timezone: 'UTC', extra: 1 },
+      { timezone: 'Europe/Moscow' },
+      { timezone: 'Asia/Vladivostok' },
+    ]) {
       const res = await call('patch', '/api/me/timezone', cookie, body);
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION');
@@ -311,6 +317,19 @@ describe('PATCH /api/me/timezone', () => {
     const p = await createUser(db, { status: 'pending' });
     const res = await call('patch', '/api/me/timezone', await login(p.id), { timezone: 'UTC' });
     expect(res.status).toBe(403);
+  });
+  it('Europe/Kiev is saved as Europe/Kyiv; Simferopol is allowed', async () => {
+    const u = await createUser(db, { nickname: 'Tz', timezone: 'Europe/Warsaw' });
+    const cookie = await login(u.id);
+    const res = await call('patch', '/api/me/timezone', cookie, { timezone: 'Europe/Kiev' });
+    expect(res.status).toBe(200);
+    expect(res.body.timezone).toBe('Europe/Kyiv');
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.timezone).toBe('Europe/Kyiv');
+    const sim = await call('patch', '/api/me/timezone', cookie, {
+      timezone: 'Europe/Simferopol',
+    });
+    expect(sim.status).toBe(200);
   });
 });
 

@@ -24,7 +24,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { NotesApi, type NoteSource } from '../../../core/notes/notes.api';
-import { differentZones, formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
+import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
 import { ViewsService } from '../../../core/views/views.service';
@@ -125,7 +125,6 @@ export class SessionsList {
   protected readonly rsvpStatuses: readonly RsvpStatus[] = ['going', 'not_going'];
 
   private readonly viewerZone = computed(() => viewerTimeZone(this.auth.me()));
-  private readonly showZone = computed(() => differentZones(this.viewerZone(), this.timezone()));
 
   protected readonly upcoming = computed(() =>
     (this.sessions() ?? []).filter((s) => Date.parse(s.startsAt) > this.now()),
@@ -239,7 +238,7 @@ export class SessionsList {
   }
 
   protected when(s: SessionDto): string {
-    return formatDateTime(s.startsAt, this.viewerZone(), { showZone: this.showZone() });
+    return formatDateTime(s.startsAt, this.viewerZone());
   }
 
   protected hours(s: SessionDto): number {

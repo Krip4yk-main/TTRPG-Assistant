@@ -264,18 +264,18 @@
               @if (g.weekdays.length) {
                 <div>
                   <dt>{{ 'games.form.weekdays' | translate }}</dt>
-                  <dd>
-                    <ul class="inline-list">
-                      @for (d of g.weekdays; track d) {
-                        <li>{{ 'games.weekdaysLong.' + d | translate }}</li>
-                      }
-                    </ul>
-                    @if (scheduleZone(); as z) {
+                  @if (schedule(); as s) {
+                    <dd>
+                      <ul class="inline-list">
+                        @for (d of s.weekdays; track d) {
+                          <li>{{ 'games.weekdaysLong.' + d | translate }}</li>
+                        }
+                      </ul>
                       <span class="schedule-zone">{{
-                        'games.details.scheduleAt' | translate: z
+                        'games.details.scheduleAt' | translate: s
                       }}</span>
-                    }
-                  </dd>
+                    </dd>
+                  }
                 </div>
               }
             }

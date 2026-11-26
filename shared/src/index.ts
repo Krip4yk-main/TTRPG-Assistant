@@ -6,6 +6,7 @@ export * from './contracts/me.js';
 export * from './contracts/theme.js';
 export * from './contracts/theme-schema.js';
 export * from './local-date.js';
+export * from './timezones.js';
 export * from './contracts/availability.js';
 export * from './schedule/tz.js';
 export * from './schedule/occurrences.js';

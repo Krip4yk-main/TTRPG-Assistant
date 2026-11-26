@@ -193,10 +193,11 @@ describe('SessionsList', () => {
     expect(el.querySelector('button[data-action]')).toBeNull();
   });
 
-  it('times are in the viewer zone, labelled when it differs from the game zone', async () => {
+  it('times are in the viewer zone, without a zone label', async () => {
     await create(false);
-    const expected = formatDateTime(upcoming.startsAt, 'Europe/Warsaw', { showZone: true });
+    const expected = formatDateTime(upcoming.startsAt, 'Europe/Warsaw');
     expect(row(3)!.querySelector('time')!.textContent!.trim()).toBe(expected);
+    expect(expected).not.toMatch(/GMT|CET|EET/);
     expect(row(3)!.querySelector('time')!.getAttribute('datetime')).toBe(upcoming.startsAt);
   });
 

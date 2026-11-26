@@ -605,7 +605,7 @@
       "coverAlt": "Обкладинка гри «{{title}}»",
       "apply": "Подати заявку",
       "nextSession": "Найближча сесія",
-      "scheduleAt": "о {{time}} за поясом гри ({{tz}})",
+      "scheduleAt": "о {{time}}",
       "duration": "Тривалість",
       "players": "Гравці",
       "playersValue": "від {{min}} до {{max}}, вільних місць: {{free}}",

@@ -219,6 +219,18 @@ describe('AccountSettings nickname', () => {
       expect(el.textContent).toContain('profile.errors.TIMEZONE');
     });
 
+    it('a blocked zone is not sent and shows an error', async () => {
+      fixture.detectChanges();
+      await typeTz('Europe/Moscow');
+      tzInput().dispatchEvent(new Event('blur'));
+      tzForm().dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      http.expectNone('/api/me/timezone');
+      expect(el.textContent).toContain('profile.errors.TIMEZONE');
+    });
+
     const recreate = async () => {
       fixture = TestBed.createComponent(AccountSettings);
       el = fixture.nativeElement as HTMLElement;
@@ -238,6 +250,12 @@ describe('AccountSettings nickname', () => {
       await fixture.whenStable();
       expect(tzInput().value).toBe('Asia/Tokyo');
       http.expectNone('/api/me/timezone');
+    });
+
+    it('a blocked device zone is not offered', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Moscow');
+      await recreate();
+      expect(el.querySelector('button.use-device-tz')).toBeNull();
     });
 
     it('no device-zone button when the device is already in the account zone', async () => {

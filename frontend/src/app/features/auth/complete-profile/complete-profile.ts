@@ -7,7 +7,14 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import { MIN_REGISTRATION_AGE, completeProfileSchema, type ErrorCode } from '@nri/shared';
+import {
+  DEFAULT_TIMEZONE,
+  MIN_REGISTRATION_AGE,
+  completeProfileSchema,
+  safeDefaultTimezone,
+  selectableTimezones,
+  type ErrorCode,
+} from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthApi } from '../../../core/auth/auth.api';
@@ -20,19 +27,21 @@ import {
   timezoneValidator,
 } from '../../../shared/forms/profile-validators';
 
+/** Пояс браузера за замовчуванням (заблокований → `Europe/Kyiv`). */
 function defaultTimezone(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Kyiv';
+    return safeDefaultTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
   } catch {
-    return 'Europe/Kyiv';
+    return DEFAULT_TIMEZONE;
   }
 }
 
+/** Пояси для вибору: з `Intl`, з правильними назвами (`Europe/Kyiv`) і без заблокованих. */
 function supportedTimezones(): string[] {
   try {
-    return Intl.supportedValuesOf('timeZone');
+    return selectableTimezones(Intl.supportedValuesOf('timeZone'));
   } catch {
-    return ['Europe/Kyiv'];
+    return [DEFAULT_TIMEZONE];
   }
 }
 

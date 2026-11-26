@@ -662,21 +662,21 @@ describe('GameDetails', () => {
       return dt.nextElementSibling!.textContent!;
     };
 
-    it('guest in Warsaw: same time as the search card (browser zone, labelled)', async () => {
+    it('guest in Warsaw: same time as the search card (browser zone, no label)', async () => {
       vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
       await open(null, (r) => r.flush(game));
       expect(nextSessionText()).toContain('18:00');
-      expect(nextSessionText()).toContain('GMT+1');
+      expect(nextSessionText()).not.toMatch(/GMT|CET|EET/);
     });
 
-    it('weekdays are labelled with the game time and zone', async () => {
+    it('weekly schedule is shown in the viewer zone, without a zone', async () => {
       vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
       await open(null, (r) => r.flush(game));
       const tr = TestBed.inject(TranslateService);
-      tr.setTranslation('uk', { games: { details: { scheduleAt: 'о {{time}} ({{tz}})' } } }, true);
+      tr.setTranslation('uk', { games: { details: { scheduleAt: 'о {{time}}' } } }, true);
       tr.use('uk');
       await settle();
-      expect(el().querySelector('.schedule-zone')!.textContent).toContain('о 19:00 (Europe/Kyiv)');
+      expect(el().querySelector('.schedule-zone')!.textContent!.trim()).toBe('о 18:00');
     });
 
     it('signed-in viewer uses the account zone, not the browser', async () => {

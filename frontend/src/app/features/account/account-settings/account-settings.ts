@@ -21,9 +21,13 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
+  DEFAULT_TIMEZONE,
   MIN_REGISTRATION_AGE,
   changeNicknameSchema,
   changeTimezoneSchema,
+  isBlockedTimezone,
+  normalizeTimezone,
+  selectableTimezones,
   type ErrorCode,
   type IdentityProvider,
 } from '@nri/shared';
@@ -61,11 +65,12 @@ const PROFILE_ERROR_CODES = new Set<ErrorCode>([
 /** Найбільше варіантів поясу в списку автодоповнення. */
 const MAX_TZ_OPTIONS = 50;
 
+/** Пояси для вибору: з `Intl`, з правильними назвами (`Europe/Kyiv`) і без заблокованих. */
 function supportedTimezones(): string[] {
   try {
-    return Intl.supportedValuesOf('timeZone');
+    return selectableTimezones(Intl.supportedValuesOf('timeZone'));
   } catch {
-    return ['Europe/Kyiv'];
+    return [DEFAULT_TIMEZONE];
   }
 }
 
@@ -181,10 +186,13 @@ export class AccountSettings {
       : this.allTimezones;
     return list.slice(0, MAX_TZ_OPTIONS);
   });
-  private readonly deviceTz = browserTimeZone();
+  // Пояс пристрою як підказка — з правильною назвою; заблокований не пропонуємо.
+  private readonly deviceTz = isBlockedTimezone(browserTimeZone())
+    ? null
+    : normalizeTimezone(browserTimeZone());
   /** Пояс пристрою, якщо він відрізняється від введеного; інакше `null`. */
   protected readonly deviceZone = computed(() =>
-    differentZones(this.deviceTz, this.timezoneQuery()) ? this.deviceTz : null,
+    this.deviceTz && differentZones(this.deviceTz, this.timezoneQuery()) ? this.deviceTz : null,
   );
 
   constructor() {

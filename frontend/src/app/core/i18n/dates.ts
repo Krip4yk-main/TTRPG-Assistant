@@ -5,7 +5,7 @@ import {
   NativeDateAdapter,
   provideNativeDateAdapter,
 } from '@angular/material/core';
-import { toZoned, zonedToUtc } from '@nri/shared';
+import { dayNumber, fromDayNumber, toZoned, zonedToUtc, type Weekday } from '@nri/shared';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -153,4 +153,30 @@ export function zonedInputToUtc(date: Date | null, time: string, timeZone: strin
 export function utcToZonedInput(iso: string, timeZone: string): { date: Date; time: string } {
   const z = toZoned(new Date(iso), timeZone);
   return { date: new Date(z.year, z.month - 1, z.day), time: `${pad(z.hour)}:${pad(z.minute)}` };
+}
+
+/**
+ * Тижневий розклад гри (дні тижня й час у поясі гри) — у поясі глядача: кожен день
+ * переводиться окремо, бо в іншому поясі сесія може припасти на сусідній день. Дні —
+ * без повторів, від понеділка; час — першої сесії.
+ */
+export function weeklyInZone(
+  startsAt: string,
+  gameTz: string,
+  weekdays: readonly Weekday[],
+  viewerTz: string,
+): { weekdays: Weekday[]; time: string } {
+  try {
+    const first = toZoned(new Date(startsAt), gameTz);
+    const base = dayNumber(first.year, first.month, first.day);
+    const out = new Set<Weekday>();
+    for (const d of weekdays) {
+      const day = fromDayNumber(base + ((d - first.weekday + 7) % 7));
+      const at = zonedToUtc({ ...day, hour: first.hour, minute: first.minute }, gameTz);
+      out.add(toZoned(at, viewerTz).weekday);
+    }
+    return { weekdays: [...out].sort((a, b) => a - b), time: formatTime(startsAt, viewerTz) };
+  } catch {
+    return { weekdays: [...weekdays], time: formatTime(startsAt, gameTz) };
+  }
 }

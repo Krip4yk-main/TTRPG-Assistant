@@ -38,12 +38,7 @@ import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { RatingsApi } from '../../../core/ratings/ratings.api';
 import { SeoService } from '../../../core/seo/seo.service';
-import {
-  differentZones,
-  formatDateTime,
-  formatTime,
-  viewerTimeZone,
-} from '../../../core/i18n/dates';
+import { formatDateTime, viewerTimeZone, weeklyInZone } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import {
   ConfirmDialog,
@@ -239,24 +234,21 @@ export class GameDetails {
       .map((id) => list.find((w) => w.id === id)?.slug)
       .filter((s): s is string => !!s);
   });
-  /**
-   * Найближча сесія — у поясі глядача (як на картці пошуку); назва поясу додається, якщо
-   * він відрізняється від поясу гри.
-   */
+  /** Найближча сесія — у поясі глядача, без назви поясу (як на картці пошуку). */
   protected readonly nextSession = computed(() => {
     const g = this.game();
     if (!g?.nextSessionAt) return null;
-    const tz = viewerTimeZone(this.auth.me());
-    return formatDateTime(g.nextSessionAt, tz, { showZone: differentZones(tz, g.timezone) });
+    return formatDateTime(g.nextSessionAt, viewerTimeZone(this.auth.me()));
   });
   /**
-   * Дні тижня розкладу задані в поясі гри, тож поруч показуємо час сесії в тому ж поясі з
-   * явною міткою (`о 19:00 за поясом гри (Europe/Kyiv)`), а не конвертуємо: у поясі
-   * глядача сесія може припадати на інший день.
+   * Тижневий розклад (дні й час) — теж у поясі глядача: дні задані в поясі гри й
+   * переводяться кожен окремо (сесія може припасти на сусідній день).
    */
-  protected readonly scheduleZone = computed(() => {
+  protected readonly schedule = computed(() => {
     const g = this.game();
-    return g ? { time: formatTime(g.startsAt, g.timezone), tz: g.timezone } : null;
+    return g
+      ? weeklyInZone(g.startsAt, g.timezone, g.weekdays, viewerTimeZone(this.auth.me()))
+      : null;
   });
   protected readonly durationHours = computed(() => (this.game()?.durationMinutes ?? 0) / 60);
   protected readonly returnTo = computed(() => `/games/${this.id()}`);

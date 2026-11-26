@@ -7,7 +7,7 @@ import type {
   ValidatorFn,
 } from '@angular/forms';
 import type { ErrorStateMatcher } from '@angular/material/core';
-import { canRegister, completeProfileSchema, localDate } from '@nri/shared';
+import { canRegister, completeProfileSchema, isBlockedTimezone, localDate } from '@nri/shared';
 import { toIsoDate } from '../../core/i18n/dates';
 
 /** Формат ніку — та сама Zod-схема, що й на бекенді. */
@@ -44,6 +44,7 @@ export const timezoneValidator: ValidatorFn = (
 ): ValidationErrors | null => {
   const value: unknown = control.value;
   if (typeof value !== 'string' || !value) return null;
+  if (isBlockedTimezone(value)) return { timezone: true };
   try {
     new Intl.DateTimeFormat('en', { timeZone: value });
     return null;
