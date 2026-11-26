@@ -471,6 +471,11 @@
   --mat-button-outlined-outline-color: var(--sc-outline);
   --mat-form-field-select-option-text-color: var(--sc-ink);
   --mat-form-field-select-disabled-option-text-color: var(--sc-ink-muted);
+  // Панелі mat-select і автодоповнення CDK вставляє поруч із полем (popover), тобто всередині
+  // цієї ділянки: текст варіантів бере тутешній --mat-sys-on-surface, тож і фон — тутешній
+  // (на корені змінна вже обчислена — інакше темний фон сторінки під темним чорнилом ділянки).
+  --mat-select-panel-background-color: var(--mat-sys-surface-container-high);
+  --mat-autocomplete-background-color: var(--mat-sys-surface-container-high);
 
   select option {
     background-color: var(--sc-overlay);

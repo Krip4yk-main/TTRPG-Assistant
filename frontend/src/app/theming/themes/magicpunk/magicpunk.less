@@ -1,4 +1,4 @@
-// Дизайн «Магіпанк» (родина сцени, макет docs/design-concepts/themes2/magicpunk.html і
+// Дизайн «Магіпанк» (родина сцени, макет .media/design-concepts/themes2/magicpunk.html і
 // magicpunk-card.html): окремий бандл `theme-magicpunk.css` (`inject: false` в angular.json),
 // який підключає ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — шрифти
 // (Cormorant Unicase — логотип і заголовок сторінки, Cormorant SC — мітки, «Фільтри», числа
@@ -169,6 +169,11 @@
   --nri-shadow-lg: 0 12px 24px rgba(70, 45, 15, 0.22);
 
   .sc-local-scheme(light);
+
+  // Текстові й обведені кнопки (Material бере primary #1F7F74 — 4.4 на картці #FBF4E4, замало
+  // для дрібного тексту) — текстом посилань #165A53: 6.6 / 5.7 пергамент / 6.3 виноска #FAEED5.
+  --mat-button-text-label-text-color: var(--sc-neon-b-text);
+  --mat-button-outlined-label-text-color: var(--sc-neon-b-text);
 
   color: var(--sc-ink);
 
