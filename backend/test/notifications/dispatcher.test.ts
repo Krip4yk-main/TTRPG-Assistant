@@ -5,6 +5,7 @@ import { toZoned, zonedToUtc } from '@nri/shared';
 import { createApp } from '../../src/app.js';
 import {
   events,
+  gameApplications,
   games,
   gameSessions,
   genres,
@@ -143,6 +144,11 @@ describe('recipients: applications', () => {
     expect(await notifiedOf('application.created')).toEqual(ids(gm, gm, gm));
     await ok(call('post', `/api/applications/${appA}/approve`, gm.cookie));
     await ok(call('post', `/api/applications/${appB}/reject`, gm.cookie));
+    // Не «швидке» відкликання (< 2 хв майстра не сповіщає — applications-hardening.test.ts).
+    await db
+      .update(gameApplications)
+      .set({ createdAt: new Date(Date.now() - 3 * 60_000) })
+      .where(eq(gameApplications.id, appC));
     await ok(call('delete', `/api/applications/${appC}`, c.cookie));
     expect(await notifiedOf('application.approved')).toEqual(ids(a));
     expect(await notifiedOf('application.rejected')).toEqual(ids(b));

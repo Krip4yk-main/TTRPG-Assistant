@@ -35,6 +35,8 @@ describe('notification contracts', () => {
       'session.rsvp_declined',
       'calendar.empty',
       'calendar.import_broken',
+      'application.pending_reminder',
+      'application.expired',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -107,11 +109,16 @@ describe('notificationLink', () => {
   it('routes by type', () => {
     expect(notificationLink('application.created', { gameId: 5 })).toBe('/games/5/applications');
     expect(notificationLink('application.rejected', { gameId: 5 })).toBe('/my-applications');
+    expect(notificationLink('application.pending_reminder', { gameId: 5 })).toBe(
+      '/games/5/applications',
+    );
+    expect(notificationLink('application.expired', { gameId: 5 })).toBe('/my-applications');
     expect(notificationLink('session.cancelled', { gameId: 5, sessionId: 2 })).toBe('/games/5');
     expect(notificationLink('game.finished', {})).toBe('/');
     const deadGameTypes = ['game.stale_reminder', 'game.dead', 'game.suspicious'] as const;
     for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/my-games');
-    expect(notificationLink('game.closed_by_admin', { gameId: 5 })).toBe('/games/5');    expect(notificationLink('session.rsvp_declined', { gameId: 5, sessionId: 2 })).toBe(
+    expect(notificationLink('game.closed_by_admin', { gameId: 5 })).toBe('/games/5');
+    expect(notificationLink('session.rsvp_declined', { gameId: 5, sessionId: 2 })).toBe(
       '/games/5?session=2',
     );
     expect(notificationLink('calendar.empty', { gameId: 5 })).toBe('/calendar');

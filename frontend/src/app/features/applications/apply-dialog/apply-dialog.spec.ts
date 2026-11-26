@@ -4,9 +4,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import type { ApplicationDto } from '@nri/shared';
 import { ThemeService } from '../../../theming/theme.service';
+import { browserTimeZone, formatTime } from '../../../core/i18n/dates';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
 
 const data: ApplyDialogData = {
@@ -244,6 +245,47 @@ describe('ApplyDialog', () => {
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('errors.GM_BLACKLISTED');
     expect(close).not.toHaveBeenCalled();
     expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+  });
+
+  it('409 APPLICATION_COOLDOWN says when to retry (HH:mm in the viewer zone)', async () => {
+    await create();
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('uk', {
+      errors: { APPLICATION_COOLDOWN: 'Спробуйте після {{time}}.' },
+    });
+    translate.use('uk');
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    const retryAt = '2026-11-27T17:05:00.000Z';
+    http
+      .expectOne('/api/games/7/applications')
+      .flush(
+        { error: { code: 'APPLICATION_COOLDOWN', details: { retryAt } } },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+    const time = formatTime(retryAt, browserTimeZone());
+    expect(time).toMatch(/^\d\d:\d\d$/);
+    expect(el.querySelector('[role="alert"]')!.textContent).toContain(`Спробуйте після ${time}.`);
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('409 APPLICATION_COOLDOWN without a valid retryAt falls back to «a bit later»', async () => {
+    await create();
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http
+      .expectOne('/api/games/7/applications')
+      .flush(
+        { error: { code: 'APPLICATION_COOLDOWN', details: {} } },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+    expect(el.querySelector('[role="alert"]')!.textContent).toContain(
+      'games.applications.apply.cooldownSoon',
+    );
   });
 
   it('409 SANCTION_ACTIVE explains the restriction with its end date and links to the details', async () => {

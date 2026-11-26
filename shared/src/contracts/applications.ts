@@ -8,6 +8,8 @@ export const APPLICATION_STATUSES = [
   'rejected',
   'withdrawn',
   'cancelled',
+  /** `pending` без рішення майстра понад `APPLICATION_EXPIRE_MS` (фоновий джоб). */
+  'expired',
 ] as const;
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
@@ -29,6 +31,24 @@ export const APPLICATION_ANSWER_MAX = 1000;
 export const APPLICATION_CONSTRAINTS_MAX = 10;
 export const APPLICATION_CONSTRAINT_MAX = 200;
 export const CONSTRAINT_COMMENT_MAX = 500;
+
+const MIN = 60_000;
+const DAY = 24 * 60 * MIN;
+/** Повторна заявка на ту саму гру після власного відкликання — не раніше ніж через 10 хв. */
+export const APPLICATION_WITHDRAW_COOLDOWN_MS = 10 * MIN;
+/** Повторна заявка на ту саму гру після відхилення майстром — не раніше ніж через 24 год. */
+export const APPLICATION_REJECT_COOLDOWN_MS = DAY;
+/** Відкликання заявки, поданої менш ніж 2 хв тому, майстра не турбує (див. сервіс). */
+export const APPLICATION_QUICK_WITHDRAW_MS = 2 * MIN;
+/** `pending` старше 3 днів — одне нагадування майстру. */
+export const APPLICATION_PENDING_REMINDER_MS = 3 * DAY;
+/** `pending` старше 14 днів — `expired`. */
+export const APPLICATION_EXPIRE_MS = 14 * DAY;
+
+/** `details` помилки 409 `APPLICATION_COOLDOWN`: коли можна подати нову заявку (ISO UTC). */
+export interface ApplicationCooldownDetails {
+  retryAt: string;
+}
 
 /**
  * Тіло `POST /api/games/:id/applications`. Обов'язковість погодження й відповідей

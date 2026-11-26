@@ -1,11 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPLICATION_CONSTRAINTS_MAX,
+  APPLICATION_EXPIRE_MS,
+  APPLICATION_PENDING_REMINDER_MS,
+  APPLICATION_QUICK_WITHDRAW_MS,
+  APPLICATION_REJECT_COOLDOWN_MS,
+  APPLICATION_STATUSES,
+  APPLICATION_WITHDRAW_COOLDOWN_MS,
   applicationInputSchema,
   constraintResponseInputSchema,
 } from './applications.js';
 
 const base = { warningsAccepted: true, answers: [] };
+
+describe('application statuses and timings', () => {
+  it('has the expired status', () => {
+    expect(APPLICATION_STATUSES).toEqual([
+      'pending',
+      'approved',
+      'rejected',
+      'withdrawn',
+      'cancelled',
+      'expired',
+    ]);
+  });
+  it('cooldowns, quick withdrawal, reminder and expiry', () => {
+    expect(APPLICATION_WITHDRAW_COOLDOWN_MS).toBe(10 * 60_000);
+    expect(APPLICATION_REJECT_COOLDOWN_MS).toBe(24 * 3_600_000);
+    expect(APPLICATION_QUICK_WITHDRAW_MS).toBe(2 * 60_000);
+    expect(APPLICATION_PENDING_REMINDER_MS).toBe(3 * 86_400_000);
+    expect(APPLICATION_EXPIRE_MS).toBe(14 * 86_400_000);
+  });
+});
 
 describe('applicationInputSchema', () => {
   it('trims and defaults optional fields', () => {

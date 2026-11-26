@@ -166,18 +166,26 @@ describe('POST /api/games/:id/applications', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('can reapply right after rejection and after withdrawal', async () => {
+  it('can reapply after rejection and after withdrawal once the cooldown has passed', async () => {
     const { gm, gameId } = await setup();
     const p = await userWithAge(25);
+    // Кулдаун (24 год / 10 хв) — від `decided_at`; тут зсуваємо його в минуле.
+    const past = (id: number) =>
+      db
+        .update(gameApplications)
+        .set({ decidedAt: new Date(Date.now() - 25 * 3_600_000) })
+        .where(eq(gameApplications.id, id));
     const first = await apply(gameId, p.cookie);
     const rej = await call('post', `/api/applications/${first.body.id}/reject`, gm.cookie);
     expect(rej.status).toBe(200);
     expect(rej.body.status).toBe('rejected');
+    await past(first.body.id);
     const second = await apply(gameId, p.cookie);
     expect(second.status).toBe(201);
     const wd = await call('delete', `/api/applications/${second.body.id}`, p.cookie);
     expect(wd.status).toBe(200);
     expect(wd.body.status).toBe('withdrawn');
+    await past(second.body.id);
     expect((await apply(gameId, p.cookie)).status).toBe(201);
     expect(await eventTypes()).toEqual(
       expect.arrayContaining(['application.rejected', 'application.withdrawn']),

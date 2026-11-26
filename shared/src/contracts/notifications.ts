@@ -46,7 +46,10 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * про порожній календар (не з подій, `schedule`): `calendar.empty` — учаснику кампейну без
  * тижневих слотів, один раз (`gameId`/`gameTitle` — кампейн, з якого почалось). Імпорт iCal
  * (не з подій, `schedule`): `calendar.import_broken` — власнику посилання, один раз, коли
- * автооновлення зупинилось після кількох невдач поспіль (без параметрів). Текст —
+ * автооновлення зупинилось після кількох невдач поспіль (без параметрів). Строк заявок (не з
+ * подій, `applications`, джоб `applications.housekeeping`): `application.pending_reminder` —
+ * майстру, один раз, коли заявка 3 дні без рішення (`applicationId`, `actor` — заявник);
+ * `application.expired` — заявнику, коли заявку 14 днів не розглянули. Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -56,6 +59,8 @@ export const NOTIFICATION_TYPES = [
   'application.rejected',
   'application.cancelled_age',
   'application.cancelled_game',
+  'application.pending_reminder',
+  'application.expired',
   'member.left',
   'member.kicked',
   'member.banned',
@@ -292,8 +297,10 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
         : `/games/${p.gameId}/rate`;
     case 'application.created':
     case 'application.withdrawn':
+    case 'application.pending_reminder':
       return `/games/${p.gameId}/applications`;
     case 'application.rejected':
+    case 'application.expired':
     case 'application.cancelled_age':
     case 'application.cancelled_game':
       return '/my-applications';

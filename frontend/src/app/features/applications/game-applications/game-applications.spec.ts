@@ -189,6 +189,19 @@ describe('GameApplications', () => {
     expect(card(12).querySelector('.save-constraint')).toBeNull();
   });
 
+  it('shows an expired application as closed: own group, status label, no decisions', async () => {
+    await create([member('m1')], [pending, { ...rejected, id: 13, status: 'expired' }]);
+    const groups = [...el.querySelectorAll('section[data-status]')].map((s) =>
+      s.getAttribute('data-status'),
+    );
+    expect(groups).toEqual(['pending', 'expired']);
+    expect(card(13).querySelector('.status')!.textContent).toContain(
+      'games.applications.status.expired',
+    );
+    expect(card(13).querySelector('button.approve')).toBeNull();
+    expect(card(13).querySelector('.save-constraint')).toBeNull();
+  });
+
   it('partial without a comment blocks saving; with a comment PUTs the response', async () => {
     await create();
     await pick('aaaaaaaa', 'partial');

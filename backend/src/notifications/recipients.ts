@@ -111,6 +111,8 @@ function ruleFor(ev: EventRow): Rule | null {
   // Автоскасування сесій разом із грою (завершення, скасування, нове правило) не сповіщають
   // окремо: учасники вже отримують сповіщення про саму гру — інакше по одному на кожну сесію.
   if (ev.type === 'session.cancelled' && p.auto === true) return null;
+  // Відкликання одразу після подання (див. `withdrawApplication`) майстра не турбує.
+  if (ev.type === 'application.withdrawn' && p.quick === true) return null;
   // Голосування закрилось разом із грою (завершення/скасування) — майстру підсумок не потрібен.
   if (ev.type === 'poll.closed' && p.reason === 'game_closed') return null;
   // Бан того, хто не був ні учасником, ні автором заявки, нічого в нього не забрав —

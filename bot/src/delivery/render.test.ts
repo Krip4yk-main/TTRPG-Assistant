@@ -267,6 +267,20 @@ describe('renderNotification', () => {
     expect(render('session.cancelled', { gameId: 1 }).text).toContain(uk.notify.unknownTime);
   });
 
+  it('pending reminder (to the GM, with the applicant) and expired (to the player)', () => {
+    const r = render('application.pending_reminder');
+    expect(r.text.split('\n')[0]).toBe(
+      '⏳ Заявка від Ґендальф на гру «Прокляття Страда» чекає на твоє рішення вже 3 дні. Через 14 днів без рішення вона стане простроченою.',
+    );
+    expect(r.text).toContain('Детальніше: https://nri.example/games/12/applications');
+    expect(render('application.pending_reminder', { gameId: 1, gameTitle: 'Гра' }).text).toMatch(
+      /^⏳ Заявка на гру «Гра» чекає/,
+    );
+    const e = render('application.expired');
+    expect(e.text).toContain('прострочена');
+    expect(e.text).toContain('Детальніше: https://nri.example/my-applications');
+  });
+
   it('withdrawn / left without an actor use the _noactor variants', () => {
     const w = render('application.withdrawn', { gameId: 1, gameTitle: 'Гра' });
     expect(w.text.split('\n')[0]).toBe('↩️ Заявку на гру «Гра» відкликано.');

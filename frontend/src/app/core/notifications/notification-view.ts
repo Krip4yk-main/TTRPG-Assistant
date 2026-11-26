@@ -24,6 +24,7 @@ export const ACCOUNT_DELETED_VARIANTS: readonly NotificationType[] = [
 export const ANONYMOUS_VARIANTS: readonly NotificationType[] = [
   'application.created',
   'application.withdrawn',
+  'application.pending_reminder',
   'member.left',
   'session.rsvp_declined',
 ];

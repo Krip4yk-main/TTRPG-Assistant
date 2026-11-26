@@ -142,6 +142,24 @@ describe('MyApplications', () => {
     expect(card$(1).querySelector('a.game-link')!.getAttribute('href')).toBe('/games/7');
   });
 
+  it('shows an expired application in its own group, without the withdraw action', async () => {
+    await create([
+      ...list,
+      { ...base, id: 4, gameId: 10, status: 'expired', game: { ...card, id: 10, title: 'Забута' } },
+    ]);
+    const groups = [...el.querySelectorAll('section[data-status]')].map((s) =>
+      s.getAttribute('data-status'),
+    );
+    expect(groups).toEqual(['pending', 'approved', 'cancelled', 'expired']);
+    expect(group('expired')!.textContent).toContain('games.applications.statusGroup.expired');
+    const c = card$(4);
+    expect(c.textContent).toContain('Забута');
+    expect(c.querySelector('.status')!.textContent).toContain('games.applications.status.expired');
+    expect(c.querySelector('button')?.textContent ?? '').not.toContain(
+      'games.applications.my.withdraw',
+    );
+  });
+
   it('shows the cancel reason and a restricted game without details', async () => {
     await create();
     const c = card$(2);

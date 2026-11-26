@@ -1,4 +1,9 @@
 import {
+  APPLICATIONS_HOUSEKEEPING_EVERY_MS,
+  APPLICATIONS_HOUSEKEEPING_JOB,
+  runApplicationsHousekeeping,
+} from '../applications/applications.housekeeping.js';
+import {
   DEAD_GAMES_AT_UTC,
   DEAD_GAMES_JOB,
   runDeadGamesDetector,
@@ -122,4 +127,10 @@ export function registerJobs(): void {
     await runCalendarImportSync(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
   });
   registerRecurring(CALENDAR_IMPORT_JOB, { everyMs: CALENDAR_IMPORT_EVERY_MS });
+
+  // Строк заявок: нагадування майстру через 3 дні, прострочення через 14; ідемпотентно.
+  registerHandler(APPLICATIONS_HOUSEKEEPING_JOB, async (deps, _payload, job) => {
+    await runApplicationsHousekeeping(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(APPLICATIONS_HOUSEKEEPING_JOB, { everyMs: APPLICATIONS_HOUSEKEEPING_EVERY_MS });
 }

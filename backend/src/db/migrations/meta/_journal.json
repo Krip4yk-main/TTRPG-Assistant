@@ -288,6 +288,13 @@
       "when": 1795725151381,
       "tag": "0040_plan12_calendar_import_truncated",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1795737063681,
+      "tag": "0041_plan13_application_expiry",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,7 @@ const APPLICATION_STATUSES = [
   'rejected',
   'withdrawn',
   'cancelled',
+  'expired',
 ] as const satisfies ApplicationStatus[];
 const APPLICATION_CANCEL_REASONS = [
   'age_rating',
@@ -69,6 +70,8 @@ export const gameApplications = mysqlTable(
       .default(sql`CURRENT_TIMESTAMP`),
     decidedAt: datetime('decided_at'),
     decidedBy: id('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Коли майстру нагадали про заявку без рішення (`applications.housekeeping`); один раз. */
+    remindedAt: datetime('reminded_at'),
     /** Будь-яка зміна заявки (статус, відповідь майстра на обмеження) — для стану «оновлено». */
     updatedAt: datetime('updated_at', { fsp: 3 })
       .notNull()
@@ -83,6 +86,8 @@ export const gameApplications = mysqlTable(
     uniqueIndex('game_applications_active_key_uq').on(t.activeKey),
     index('game_applications_game_id_status_idx').on(t.gameId, t.status),
     index('game_applications_user_id_idx').on(t.userId),
+    // Джоб строків: `WHERE status = 'pending' AND created_at <= ?` за зростанням часу.
+    index('game_applications_status_created_at_idx').on(t.status, t.createdAt),
   ],
 );
 

@@ -28,12 +28,15 @@ import {
   APPLICATION_CONSTRAINT_MAX,
   APPLICATION_CONSTRAINTS_MAX,
   APPLICATION_MESSAGE_MAX,
+  type ApplicationCooldownDetails,
   type ApplicationDto,
   type ErrorCode,
   type SanctionActiveDetails,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
-import { toApiError } from '../../../core/api/api-error';
+import { toApiError, type ApiError } from '../../../core/api/api-error';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { formatTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
@@ -55,6 +58,13 @@ export interface ApplyDialogData {
  * `announced` — успіх уже озвучено читачам екрана на старті ефекту дизайну: сторінка показує
  * своє повідомлення без повторного озвучення.
  */
+/** `retryAt` з `details` помилки 409 `APPLICATION_COOLDOWN`, якщо це коректна дата; інакше `null`. */
+function cooldownRetryAt(err: ApiError): string | null {
+  if (err.code !== 'APPLICATION_COOLDOWN') return null;
+  const at = (err.details as Partial<ApplicationCooldownDetails> | null | undefined)?.retryAt;
+  return typeof at === 'string' && !Number.isNaN(Date.parse(at)) ? at : null;
+}
+
 export type ApplyDialogResult =
   { status: 'applied'; application: ApplicationDto; announced?: true } | { status: 'exists' };
 
@@ -96,6 +106,7 @@ export class ApplyDialog {
   private readonly themes = inject(ThemeService);
   private readonly announcer = inject(LiveAnnouncer);
   private readonly translate = inject(TranslateService);
+  private readonly auth = inject(AuthStore);
 
   protected readonly limits = {
     answer: APPLICATION_ANSWER_MAX,
@@ -134,6 +145,8 @@ export class ApplyDialog {
   protected readonly submitting = signal(false);
   /** Загальна помилка API (ключ i18n). */
   protected readonly error = signal<string | null>(null);
+  /** Параметри тексту загальної помилки (кулдаун — `time`). */
+  protected readonly errorParams = signal<Record<string, string>>({});
   /** Відмова через санкцію (409 `SANCTION_ACTIVE`): пояснення з датою замість загальної помилки. */
   protected readonly sanction = signal<SanctionActiveDetails | null>(null);
   /** Помилка поля від сервера (на випадок розбіжності з клієнтською перевіркою). */
@@ -193,6 +206,7 @@ export class ApplyDialog {
     if (this.submitting()) return;
     this.submitted.set(true);
     this.error.set(null);
+    this.errorParams.set({});
     this.sanction.set(null);
     this.serverField.set(null);
     if (this.form.invalid) {
@@ -222,7 +236,16 @@ export class ApplyDialog {
         return;
       }
       const sanction = sanctionActiveDetails(apiError);
-      if (sanction) {
+      if (code === 'APPLICATION_COOLDOWN') {
+        // Час — у поясі глядача, без позначки поясу; без коректного `retryAt` — «трохи згодом».
+        const retryAt = cooldownRetryAt(apiError);
+        if (retryAt) {
+          this.errorParams.set({ time: formatTime(retryAt, viewerTimeZone(this.auth.me())) });
+          this.error.set('errors.APPLICATION_COOLDOWN');
+        } else {
+          this.error.set('games.applications.apply.cooldownSoon');
+        }
+      } else if (sanction) {
         this.sanction.set(sanction);
       } else if (FIELD_CODES.has(code)) {
         this.serverField.set(code);

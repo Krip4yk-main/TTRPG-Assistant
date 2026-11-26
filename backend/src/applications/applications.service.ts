@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull } from 'drizzle-orm';
 import {
+  APPLICATION_QUICK_WITHDRAW_MS,
+  APPLICATION_REJECT_COOLDOWN_MS,
+  APPLICATION_WITHDRAW_COOLDOWN_MS,
   applicationInputSchema,
+  type ApplicationCooldownDetails,
   constraintResponseInputSchema,
   meetsAgeRating,
   type ApplicationDto,
@@ -13,15 +17,18 @@ import type { AppDeps } from '../app.js';
 import { isDuplicateKey } from '../db/errors.js';
 import {
   applicationConstraintResponses,
+  events,
   gameApplications,
   gameBans,
   gameContentWarnings,
   gameMembers,
   games,
   gmBlacklist,
+  notifications,
   users,
 } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
+import { emitNotificationsNew } from '../notifications/notifications.service.js';
 import { loadGames, toCardDto, viewerById } from '../games/games.service.js';
 import { isHiddenFromNonGm, toCardView, viewerAge } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
@@ -199,6 +206,37 @@ async function assertApplySanctions(tx: Tx, userId: number, g: GameRow, now: Dat
   }
 }
 
+/**
+ * Кулдаун повторної заявки на ту саму гру: після власного відкликання — 10 хв, після
+ * відхилення майстром — 24 год (від `decided_at`). Прострочені й скасовані системою заявки
+ * кулдауну не дають; інші ігри — теж. Інакше 409 `APPLICATION_COOLDOWN` з `retryAt`.
+ */
+async function assertNoCooldown(tx: Tx, userId: number, gameId: number, now: Date): Promise<void> {
+  const since = new Date(now.getTime() - APPLICATION_REJECT_COOLDOWN_MS);
+  const rows = await tx
+    .select({ status: gameApplications.status, decidedAt: gameApplications.decidedAt })
+    .from(gameApplications)
+    .where(
+      and(
+        eq(gameApplications.gameId, gameId),
+        eq(gameApplications.userId, userId),
+        inArray(gameApplications.status, ['withdrawn', 'rejected']),
+        isNotNull(gameApplications.decidedAt),
+        gt(gameApplications.decidedAt, since),
+      ),
+    );
+  let retryAt = 0;
+  for (const r of rows) {
+    const wait =
+      r.status === 'rejected' ? APPLICATION_REJECT_COOLDOWN_MS : APPLICATION_WITHDRAW_COOLDOWN_MS;
+    retryAt = Math.max(retryAt, r.decidedAt!.getTime() + wait);
+  }
+  if (retryAt > now.getTime()) {
+    const details: ApplicationCooldownDetails = { retryAt: new Date(retryAt).toISOString() };
+    throw new AppError(409, 'APPLICATION_COOLDOWN', details);
+  }
+}
+
 export async function createApplication(
   deps: AppDeps,
   userId: number,
@@ -234,6 +272,7 @@ export async function createApplication(
         .where(and(eq(gmBlacklist.gmUserId, g.gmUserId), eq(gmBlacklist.userId, userId)));
       if (black) throw new AppError(403, 'GM_BLACKLISTED');
       if (await isActiveMember(tx, gameId, userId)) throw new AppError(409, 'APPLICATION_EXISTS');
+      await assertNoCooldown(tx, userId, gameId, now);
       await assertApplySanctions(tx, userId, g, now);
       if (input.warningsAccepted !== true && (await hasWarnings(tx, g))) {
         throw new AppError(400, 'WARNINGS_NOT_ACCEPTED');
@@ -271,7 +310,17 @@ export async function createApplication(
   return dtoById(deps, id);
 }
 
-/** Відкликання своєї `pending`-заявки. Чужа чи неіснуюча — 404. */
+/**
+ * Відкликання своєї `pending`-заявки. Чужа чи неіснуюча — 404.
+ *
+ * Швидке відкликання (заявка подана < `APPLICATION_QUICK_WITHDRAW_MS` тому) майстра не турбує:
+ * подія `application.withdrawn` іде з `quick: true` (диспетчер її не розсилає), ще не розіслана
+ * подія `application.created` позначається обробленою (без сповіщень), а вже створене
+ * непрочитане «нова заявка» видаляється — разом із рядком `telegram_outbox` (каскад FK). Прочитане
+ * лишається: майстер його вже бачив. Видалення, а не «прочитано»: сповіщення про заявку, якої
+ * вже немає, — шум, а історія лишається в подіях. Після коміту — пінг `notification.new`
+ * майстру: його вкладки перечитують лічильник.
+ */
 export async function withdrawApplication(
   deps: AppDeps,
   userId: number,
@@ -279,23 +328,64 @@ export async function withdrawApplication(
 ): Promise<ApplicationDto> {
   const { db } = deps;
   const [row] = await db
-    .select()
+    .select({ app: gameApplications, gmUserId: games.gmUserId })
     .from(gameApplications)
+    .innerJoin(games, eq(games.id, gameApplications.gameId))
     .where(and(eq(gameApplications.id, id), eq(gameApplications.userId, userId)));
   if (!row) throw new AppError(404, 'NOT_FOUND');
-  const [res] = await db
-    .update(gameApplications)
-    .set({ status: 'withdrawn', decidedAt: new Date() })
-    .where(and(eq(gameApplications.id, id), eq(gameApplications.status, 'pending')));
-  if (res.affectedRows === 0) throw new AppError(409, 'APPLICATION_CLOSED');
+  const now = new Date();
+  const quick = now.getTime() - row.app.createdAt.getTime() < APPLICATION_QUICK_WITHDRAW_MS;
+  const removed = await db.transaction(async (tx) => {
+    const [res] = await tx
+      .update(gameApplications)
+      .set({ status: 'withdrawn', decidedAt: now })
+      .where(and(eq(gameApplications.id, id), eq(gameApplications.status, 'pending')));
+    if (res.affectedRows === 0) throw new AppError(409, 'APPLICATION_CLOSED');
+    if (!quick) return [];
+    // Спершу подія: якщо диспетчер саме її обробляє, UPDATE чекає на його коміт — тоді
+    // сповіщення вже є й видаляється нижче (блокувальне читання бачить закомічене).
+    await tx
+      .update(events)
+      .set({ dispatchedAt: now })
+      .where(
+        and(
+          eq(events.type, 'application.created'),
+          eq(events.entityType, 'application'),
+          eq(events.entityId, id),
+          isNull(events.dispatchedAt),
+        ),
+      );
+    const unread = and(
+      eq(notifications.userId, row.gmUserId),
+      eq(notifications.type, 'application.created'),
+      eq(notifications.entityType, 'application'),
+      eq(notifications.entityId, id),
+      isNull(notifications.readAt),
+    );
+    const found = await tx
+      .select({ id: notifications.id, userId: notifications.userId })
+      .from(notifications)
+      .where(unread)
+      .for('update');
+    if (found.length) {
+      await tx.delete(notifications).where(
+        inArray(
+          notifications.id,
+          found.map((n) => n.id),
+        ),
+      );
+    }
+    return found;
+  });
   await logEvent(db, {
     type: 'application.withdrawn',
     userId,
     entityType: 'application',
     entityId: id,
-    payload: { gameId: row.gameId },
+    payload: { gameId: row.app.gameId, ...(quick ? { quick: true } : {}) },
   });
-  await afterChange(deps, userId, id, row.gameId);
+  emitNotificationsNew(deps, removed);
+  await afterChange(deps, userId, id, row.app.gameId, row.gmUserId);
   return dtoById(deps, id);
 }
 
