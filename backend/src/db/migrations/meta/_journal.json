@@ -239,6 +239,13 @@
       "when": 1795702689982,
       "tag": "0033_ui_send_animation",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1795716306546,
+      "tag": "0034_campaign_pause",
+      "breakpoints": true
     }
   ]
 }

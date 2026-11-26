@@ -41,7 +41,7 @@ import {
 export type LeaveReason = 'account_deleted' | 'banned_by_admin';
 
 /** Ігри майстра, які каскад скасовує. */
-export const ACTIVE_GAME_STATUSES: GameStatus[] = ['draft', 'recruiting', 'started'];
+export const ACTIVE_GAME_STATUSES: GameStatus[] = ['draft', 'recruiting', 'started', 'paused'];
 
 type DbLike = Db | Tx;
 type GameRef = { id: number; status: GameStatus };
@@ -127,7 +127,7 @@ export async function runLeaveCascade(
                   games.id,
                   open.map((m) => m.gameId),
                 ),
-                inArray(games.status, ['recruiting', 'started']),
+                inArray(games.status, ['recruiting', 'started', 'paused']),
               ),
             )
         ).map((g) => g.id),

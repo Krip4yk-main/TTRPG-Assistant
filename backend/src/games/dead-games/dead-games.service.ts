@@ -7,7 +7,6 @@ import {
   SUSPICIOUS_DISMISS_DAYS,
   type AdminDeadGameDto,
   type AdminPageDto,
-  type GameAction,
   type GameTransitionDto,
   type MyDeadGameDto,
   type MyDeadGamesDto,
@@ -40,7 +39,7 @@ type GameRow = typeof games.$inferSelect;
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
 /** Закриття «мертвої» гри: набір → скасована, гра, що йде, → завершена. */
-function closeAction(row: GameRow): GameAction {
+function closeAction(row: GameRow): 'cancel' | 'finish' {
   if (row.status === 'recruiting') return 'cancel';
   if (row.status === 'started') return 'finish';
   throw new AppError(409, 'GAME_INVALID_TRANSITION');

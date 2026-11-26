@@ -454,7 +454,7 @@ export async function pendingRatings(
         ne(games.status, 'draft'),
         isNotNull(games.publishedAt),
         or(
-          and(inArray(games.status, ['recruiting', 'started']), exists(someoneLeft)),
+          and(inArray(games.status, ['recruiting', 'started', 'paused']), exists(someoneLeft)),
           and(eq(games.status, 'finished'), gte(games.finishedAt, finalSince)),
           and(eq(games.status, 'cancelled'), gte(games.cancelledAt, finalSince)),
           exists(recentDone),

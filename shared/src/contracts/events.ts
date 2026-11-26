@@ -23,6 +23,8 @@ export const EVENT_TYPES = [
   'game.cancelled',
   'game.converted_to_campaign',
   'game.rule_changed',
+  'game.paused',
+  'game.resumed',
   // заявки
   'application.created',
   'application.approved',

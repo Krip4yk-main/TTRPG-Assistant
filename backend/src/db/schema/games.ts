@@ -25,6 +25,7 @@ import type {
   GameStatus,
   MemberLeftReason,
   MemberRole,
+  PauseReason,
   Recurrence,
   Weekday,
 } from '@nri/shared';
@@ -43,9 +44,16 @@ const GAME_STATUSES = [
   'draft',
   'recruiting',
   'started',
+  'paused',
   'finished',
   'cancelled',
 ] as const satisfies GameStatus[];
+const PAUSE_REASONS = [
+  'vacation',
+  'illness',
+  'study_work',
+  'other',
+] as const satisfies PauseReason[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
 
@@ -103,6 +111,10 @@ export const games = mysqlTable(
     startedAt: datetime('started_at'),
     finishedAt: datetime('finished_at'),
     cancelledAt: datetime('cancelled_at'),
+    // Пауза кампейну (План 11): заповнені лише в статусі `paused`, відновлення їх очищує.
+    pausedAt: datetime('paused_at'),
+    pauseReason: mysqlEnum('pause_reason', PAUSE_REASONS),
+    pauseNote: varchar('pause_note', { length: 300 }),
     // «Мертві» ігри (План 7, `games/dead-games`): стан перераховує щоденний детектор.
     /** Позначено «мертвою» (> 90 днів без проведеної сесії): прихована з пошуку й sitemap. */
     deadAt: datetime('dead_at'),

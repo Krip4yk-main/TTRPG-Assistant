@@ -1,5 +1,5 @@
 import { and, eq, gt, gte, inArray } from 'drizzle-orm';
-import { expandOccurrences, SESSION_WINDOW_DAYS } from '@nri/shared';
+import { CAMPAIGN_PAUSED_REASON, expandOccurrences, SESSION_WINDOW_DAYS } from '@nri/shared';
 import type { Db } from '../db/client.js';
 import { games, gameSessions, notes } from '../db/schema/index.js';
 import type { Tx } from '../applications/applications.rules.js';
@@ -216,22 +216,64 @@ export async function replaceRuleSessions(
   return cancelled;
 }
 
+/**
+ * Відновлення кампейну після паузи (викликати в транзакції, що вже змінила рядок гри на
+ * `started` з новим `startsAt`): правило перезапускається від нового `startsAt`.
+ * - майбутні сесії, скасовані паузою (`campaign_paused`), без нотаток видаляються — їх
+ *   замінює новий розклад; з нотатками лишаються скасованими;
+ * - усі майбутні скасовані сесії звільняють слот (`rule_starts_at = NULL`), інакше новий
+ *   слот на ту саму хвилину не створився б (UNIQUE) і перша сесія після паузи «зникла б»;
+ * - матеріалізуються сесії нового правила від `now`.
+ */
+export async function restartRuleAfterPause(tx: Tx, game: GameRow, now: Date): Promise<void> {
+  const future = and(
+    eq(gameSessions.gameId, game.id),
+    eq(gameSessions.status, 'cancelled'),
+    gt(gameSessions.startsAt, now),
+  );
+  const paused = await tx
+    .select({ id: gameSessions.id })
+    .from(gameSessions)
+    .where(and(future, eq(gameSessions.cancelReason, CAMPAIGN_PAUSED_REASON)))
+    .for('update');
+  if (paused.length) {
+    const noted = await tx
+      .selectDistinct({ id: notes.sessionId })
+      .from(notes)
+      .where(
+        inArray(
+          notes.sessionId,
+          paused.map((p) => p.id),
+        ),
+      )
+      .for('share');
+    const keep = new Set(noted.map((n) => n.id));
+    const gone = paused.map((p) => p.id).filter((id) => !keep.has(id));
+    if (gone.length) await tx.delete(gameSessions).where(inArray(gameSessions.id, gone));
+  }
+  await tx.update(gameSessions).set({ ruleStartsAt: null }).where(future);
+  await materializeForRow(tx, game, now, now);
+}
+
 /** Скасована сесія — для подій `session.cancelled` після коміту. */
 export interface CancelledSession {
   id: number;
   gameId: number;
 }
 
+/** Причини автоскасування майбутніх сесій разом зі зміною статусу гри. */
+export type AutoCancelReason = 'game_finished' | 'game_cancelled' | typeof CAMPAIGN_PAUSED_REASON;
+
 /**
- * Завершення чи скасування гри (викликати в транзакції, що тримає X-блокування гри):
- * майбутні `scheduled` сесії → `cancelled` з причиною `game_finished`/`game_cancelled`.
- * Минулі `scheduled` лишаються як є (історія; завершити їх уже не можна).
+ * Завершення, скасування чи пауза гри (викликати в транзакції, що тримає X-блокування гри):
+ * майбутні `scheduled` сесії → `cancelled` з причиною `game_finished`/`game_cancelled`/
+ * `campaign_paused`. Минулі `scheduled` лишаються як є (історія; завершити їх уже не можна).
  */
 export async function cancelFutureSessions(
   tx: Tx,
   gameIds: number[],
   now: Date,
-  reason: 'game_finished' | 'game_cancelled',
+  reason: AutoCancelReason,
 ): Promise<CancelledSession[]> {
   if (gameIds.length === 0) return [];
   const rows = await tx
@@ -267,7 +309,7 @@ export async function logSessionsCancelled(
   /** `null` — без автора (гру закрила адміністрація). */
   userId: number | null,
   rows: CancelledSession[],
-  reason: 'game_finished' | 'game_cancelled' | typeof RULE_CHANGED_REASON,
+  reason: AutoCancelReason | typeof RULE_CHANGED_REASON,
 ): Promise<void> {
   for (const r of rows) {
     await logEvent(db, {

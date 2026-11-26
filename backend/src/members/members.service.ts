@@ -19,7 +19,9 @@ type GameRow = typeof games.$inferSelect;
 type UserRow = typeof users.$inferSelect;
 
 /** Учасниками керують, поки гра набирає або йде. */
-const isRunning = (g: GameRow): boolean => g.status === 'recruiting' || g.status === 'started';
+/** Склад можна змінювати (вихід, виключення, бан) і під час паузи кампейну. */
+const isRunning = (g: GameRow): boolean =>
+  g.status === 'recruiting' || g.status === 'started' || g.status === 'paused';
 
 async function findGame(deps: AppDeps, gameId: number): Promise<GameRow> {
   const [g] = await deps.db.select().from(games).where(eq(games.id, gameId));

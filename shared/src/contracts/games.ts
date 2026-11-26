@@ -27,12 +27,34 @@ export type GameExperience = (typeof GAME_EXPERIENCE)[number];
 export const GAME_LANGUAGES = ['uk', 'en'] as const;
 export type GameLanguage = (typeof GAME_LANGUAGES)[number];
 
-export const GAME_STATUSES = ['draft', 'recruiting', 'started', 'finished', 'cancelled'] as const;
+/** `paused` — кампейн на паузі (лише `kind='campaign'`, ставить і знімає лише майстер). */
+export const GAME_STATUSES = [
+  'draft',
+  'recruiting',
+  'started',
+  'paused',
+  'finished',
+  'cancelled',
+] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
-/** Переходи статусу гри (`POST /api/games/:id/<action>`). */
-export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel'] as const;
+/**
+ * Переходи статусу гри (`POST /api/games/:id/<action>`). `pause` (тіло `pauseInputSchema`):
+ * `recruiting|started` → `paused`; `resume` (тіло `resumeInputSchema`): `paused` → `started`.
+ * `finish` і `cancel` доступні й з `paused`.
+ */
+export const GAME_ACTIONS = ['publish', 'start', 'finish', 'cancel', 'pause', 'resume'] as const;
 export type GameAction = (typeof GAME_ACTIONS)[number];
+
+/** Причини паузи кампейну (`games.pause_reason`). */
+export const PAUSE_REASONS = ['vacation', 'illness', 'study_work', 'other'] as const;
+export type PauseReason = (typeof PAUSE_REASONS)[number];
+
+/** Найдовший необов'язковий коментар до паузи. */
+export const PAUSE_NOTE_MAX = 300;
+
+/** Причина автоскасування майбутніх сесій під час паузи (`game_sessions.cancel_reason`). */
+export const CAMPAIGN_PAUSED_REASON = 'campaign_paused';
 
 /** Поля, які в `recruiting`/`started` змінювати не можна (рішення власника). */
 export const GAME_LOCKED_AFTER_PUBLISH = ['systemId', 'systemOther', 'kind'] as const;
@@ -195,6 +217,26 @@ export type ScheduleRuleInput = z.input<typeof scheduleRuleInputSchema>;
 export const gamePatchSchema = gameObject.partial();
 export type GamePatch = z.output<typeof gamePatchSchema>;
 
+/** Тіло `POST /api/games/:id/pause`: причина зі списку й необов'язковий коментар. */
+export const pauseInputSchema = z
+  .object({
+    reason: z.enum(PAUSE_REASONS),
+    note: optText(PAUSE_NOTE_MAX)
+      .optional()
+      .transform((n) => n ?? null),
+  })
+  .strict();
+export type PauseInput = z.input<typeof pauseInputSchema>;
+
+/**
+ * Тіло `POST /api/games/:id/resume`: дата першої сесії після паузи (ціла хвилина) і
+ * `recruit` — оголосити донабір (`showWhenFull = recruit`). Що `startsAt` у майбутньому й
+ * припадає на один із днів правила (`weekdays`, у поясі гри), бекенд перевіряє через
+ * `gameInputSchema` після злиття з грою.
+ */
+export const resumeInputSchema = z.object({ startsAt, recruit: z.boolean() }).strict();
+export type ResumeInput = z.input<typeof resumeInputSchema>;
+
 export interface GameGmDto {
   publicId: string;
   nickname: string | null;
@@ -304,6 +346,12 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   startedAt: string | null;
   finishedAt: string | null;
   cancelledAt: string | null;
+  /** Коли кампейн поставлено на паузу; `null` — не на паузі. */
+  pausedAt: string | null;
+  /** Причина паузи (лише майстру й активним учасникам); `null` — не на паузі. */
+  pauseReason: PauseReason | null;
+  /** Коментар до паузи (лише майстру й активним учасникам). */
+  pauseNote: string | null;
   createdAt: string;
   updatedAt: string;
   /** Опублікований загальний рейтинг майстра (див. `GameCardDto.gmRating`). */
@@ -320,7 +368,7 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
 }
 
 /** Приватні поля гри: лише майстру й учасникам. */
-export const GAME_PRIVATE_FIELDS = ['address', 'channelLinks'] as const;
+export const GAME_PRIVATE_FIELDS = ['address', 'channelLinks', 'pauseReason', 'pauseNote'] as const;
 
 /** Публічний повний вид (сторонній користувач, що проходить вікову позначку). */
 export type PublicGameDto = Omit<GameDto, (typeof GAME_PRIVATE_FIELDS)[number]>;

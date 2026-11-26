@@ -1,11 +1,14 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import {
+  CAMPAIGN_PAUSED_REASON,
   expandOccurrences,
   GAME_LOCKED_AFTER_PUBLISH,
   gameInputSchema,
   gamePatchSchema,
   isRestrictedGame,
   meetsAgeRating,
+  pauseInputSchema,
+  resumeInputSchema,
   scheduleRuleInputSchema,
   type GameAction,
   type GameCardDto,
@@ -51,6 +54,7 @@ import {
   logSessionsCancelled,
   materializeForRow,
   replaceRuleSessions,
+  restartRuleAfterPause,
   RULE_CHANGED_REASON,
 } from '../sessions/materialize.js';
 import { assertNoSanction, isPaid } from '../moderation/sanctions.enforce.js';
@@ -207,14 +211,16 @@ async function warningIdsOf(deps: AppDeps, gameId: number): Promise<number[]> {
 }
 
 /**
- * Найближча сесія, що починається не раніше `now`; для завершених/скасованих — `null`.
+ * Найближча сесія, що починається не раніше `now`; для завершених/скасованих/на паузі — `null`.
  * Матеріалізовані сесії мають пріоритет (перенесення й скасування враховано): найближча
  * `scheduled` або перший слот правила після вже матеріалізованих, якщо він раніший. Гра
  * без матеріалізованих сесій (чернетка) — з правила.
  */
 function nextSessionAt(l: Pick<Loaded, 'row' | 'sessions'>, now: Date): string | null {
   const { row, sessions } = l;
-  if (row.status === 'finished' || row.status === 'cancelled') return null;
+  if (row.status === 'finished' || row.status === 'cancelled' || row.status === 'paused') {
+    return null;
+  }
   const scheduled =
     sessions?.nextScheduled && sessions.nextScheduled >= now ? sessions.nextScheduled : null;
   const fromRule = ruleNext(row, sessions?.lastRuleSlot ?? null, now);
@@ -303,6 +309,9 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
     startedAt: iso(l.row.startedAt),
     finishedAt: iso(l.row.finishedAt),
     cancelledAt: iso(l.row.cancelledAt),
+    pausedAt: iso(l.row.pausedAt),
+    pauseReason: l.row.pauseReason,
+    pauseNote: l.row.pauseNote,
     createdAt: l.row.createdAt.toISOString(),
     updatedAt: l.row.updatedAt.toISOString(),
     gmRating: l.gmOverall === null ? null : round1(l.gmOverall),
@@ -494,6 +503,8 @@ export async function updateGame(
     // Зміна розкладу опублікованої гри — те саме, що нове правило (`PUT /schedule`): перша
     // сесія має бути в майбутньому, майбутні сесії правила замінюються.
     const ruleChanged = row.status !== 'draft' && isRuleChanged(current, next);
+    // Розклад кампейну на паузі змінюється лише відновленням (`resume` з новою датою).
+    if (ruleChanged && row.status === 'paused') throw new AppError(409, 'GAME_PAUSED');
     const startsMoved = row.status === 'recruiting' && next.startsAt !== current.startsAt;
     if ((ruleChanged || startsMoved) && new Date(next.startsAt) <= now) {
       throw new AppError(422, 'GAME_IN_PAST');
@@ -663,8 +674,11 @@ function pingCancelledApplications(
   applicationsChanged(deps, gameId, [gmUserId, ...cancelled.map((c) => c.userId)]);
 }
 
+/** Прості переходи (без тіла); `pause`/`resume` — окремі `pauseGame`/`resumeGame`. */
+type PlainAction = Exclude<GameAction, 'pause' | 'resume'>;
+
 const TRANSITIONS: Record<
-  GameAction,
+  PlainAction,
   {
     from: GameStatus[];
     to: GameStatus;
@@ -673,11 +687,15 @@ const TRANSITIONS: Record<
 > = {
   publish: { from: ['draft'], to: 'recruiting', stamp: 'publishedAt' },
   start: { from: ['recruiting'], to: 'started', stamp: 'startedAt' },
-  finish: { from: ['started'], to: 'finished', stamp: 'finishedAt' },
-  cancel: { from: ['draft', 'recruiting', 'started'], to: 'cancelled', stamp: 'cancelledAt' },
+  finish: { from: ['started', 'paused'], to: 'finished', stamp: 'finishedAt' },
+  cancel: {
+    from: ['draft', 'recruiting', 'started', 'paused'],
+    to: 'cancelled',
+    stamp: 'cancelledAt',
+  },
 };
 
-const EVENT: Record<GameAction, EventType> = {
+const EVENT: Record<PlainAction, EventType> = {
   publish: 'game.published',
   start: 'game.started',
   finish: 'game.finished',
@@ -723,9 +741,121 @@ export async function transitionGame(
   userId: number,
   id: number,
   action: GameAction,
+  body?: unknown,
 ): Promise<GameTransitionDto> {
+  // Лише майстер гри (адміністрація й модератори — теж 403, якщо це не їхня гра).
   const { row } = await loadOwned(deps, userId, id);
+  if (action === 'pause') return pauseGame(deps, userId, row, body);
+  if (action === 'resume') return resumeGame(deps, userId, row, body);
   return applyTransition(deps, userId, row, action);
+}
+
+// ---------- пауза кампейну ----------
+
+/**
+ * «Поставити на паузу» (`POST /api/games/:id/pause`, тіло `{ reason, note? }`): лише кампанія
+ * в `recruiting|started`. Майбутні `scheduled` сесії → `cancelled` (`campaign_paused`);
+ * минулі, уже скасовані й завершені сесії, склад учасників — без змін. `pending`-заявки
+ * лишаються `pending` (майстер вирішить після відновлення); нові заявки й затвердження —
+ * 409 `GAME_PAUSED`. Позначки «мертва»/«підозріла» знімаються (детектор паузу не перевіряє).
+ */
+async function pauseGame(
+  deps: AppDeps,
+  userId: number,
+  row: GameRow,
+  body: unknown,
+): Promise<GameTransitionDto> {
+  const { db } = deps;
+  const id = row.id;
+  const input = pauseInputSchema.parse(body ?? {});
+  if (row.status !== 'recruiting' && row.status !== 'started') {
+    throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  }
+  if (row.kind !== 'campaign') throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  const now = new Date();
+  const cancelledSessions = await db.transaction(async (tx) => {
+    // Умова за поточним статусом захищає від гонки двох переходів (повторна пауза → 409).
+    const [res] = await tx
+      .update(games)
+      .set({
+        status: 'paused',
+        pausedAt: now,
+        pauseReason: input.reason,
+        pauseNote: input.note,
+        deadAt: null,
+        suspiciousAt: null,
+      })
+      .where(and(eq(games.id, id), eq(games.status, row.status), eq(games.kind, 'campaign')));
+    if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    return cancelFutureSessions(tx, [id], now, CAMPAIGN_PAUSED_REASON);
+  });
+  await logEvent(db, {
+    type: 'game.paused',
+    userId,
+    entityType: 'game',
+    entityId: id,
+    payload: { from: row.status, to: 'paused', reason: input.reason, note: input.note },
+  });
+  await logSessionsCancelled(db, userId, cancelledSessions, CAMPAIGN_PAUSED_REASON);
+  await markOwnChange(deps, userId, 'game', [id]);
+  await markGameSessionsViewed(deps, userId, id);
+  sessionsChanged(deps, id);
+  return gmView(deps, id);
+}
+
+/**
+ * «Відновити» / «Оголосити донабір» (`POST /api/games/:id/resume`, тіло
+ * `{ startsAt, recruit }`): `paused` → `started`, `showWhenFull = recruit`. Правило розкладу
+ * (дні тижня, частота, тривалість) лишається, перезапускається від `startsAt`: ціла хвилина,
+ * у майбутньому (інакше 400 `VALIDATION` `{ reason: 'STARTS_AT_IN_PAST' }`), день тижня — з
+ * `weekdays` у поясі гри (інакше 400 `VALIDATION` з issue по `weekdays`).
+ */
+async function resumeGame(
+  deps: AppDeps,
+  userId: number,
+  seen: GameRow,
+  body: unknown,
+): Promise<GameTransitionDto> {
+  const { db } = deps;
+  const id = seen.id;
+  const input = resumeInputSchema.parse(body ?? {});
+  if (seen.status !== 'paused') throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  const now = new Date();
+  if (new Date(input.startsAt) <= now) {
+    throw new AppError(400, 'VALIDATION', { reason: 'STARTS_AT_IN_PAST' });
+  }
+  const startsAt = await db.transaction(async (tx) => {
+    const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
+    if (!row || row.status !== 'paused') throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    // Та сама перевірка, що при створенні: день `startsAt` має входити в `weekdays` правила.
+    const next = gameInputSchema(row.timezone).parse({
+      ...toInput(row, []),
+      startsAt: input.startsAt,
+    });
+    const set = {
+      status: 'started' as const,
+      startsAt: new Date(next.startsAt),
+      showWhenFull: input.recruit,
+      startedAt: row.startedAt ?? now,
+      pausedAt: null,
+      pauseReason: null,
+      pauseNote: null,
+    };
+    await tx.update(games).set(set).where(eq(games.id, id));
+    await restartRuleAfterPause(tx, { ...row, ...set }, now);
+    return next.startsAt;
+  });
+  await logEvent(db, {
+    type: 'game.resumed',
+    userId,
+    entityType: 'game',
+    entityId: id,
+    payload: { from: 'paused', to: 'started', startsAt, recruit: input.recruit },
+  });
+  await markOwnChange(deps, userId, 'game', [id]);
+  await markGameSessionsViewed(deps, userId, id);
+  sessionsChanged(deps, id);
+  return gmView(deps, id);
 }
 
 /** Закриття адміністрацією (вкладка «Мертві ігри»): хто й що ще записати в транзакції переходу. */
@@ -743,7 +873,7 @@ export async function applyTransition(
   deps: AppDeps,
   actorId: number,
   row: GameRow,
-  action: GameAction,
+  action: PlainAction,
   admin?: AdminClose,
 ): Promise<GameTransitionDto> {
   const { db } = deps;
@@ -928,7 +1058,7 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGame
  * Статуси, що показуються в історії ігор профілю. Скасовані — теж, але лише опубліковані
  * (умова `publishedAt` нижче): скасована чернетка лишається приватною (R9).
  */
-const PROFILE_STATUSES: GameStatus[] = ['recruiting', 'started', 'finished', 'cancelled'];
+const PROFILE_STATUSES: GameStatus[] = ['recruiting', 'started', 'paused', 'finished', 'cancelled'];
 
 /** Ігри користувача для публічного профілю (опубліковані; без чернеток). */
 export async function listProfileGames(

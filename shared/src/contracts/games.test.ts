@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GAME_ACTIONS,
+  GAME_PRIVATE_FIELDS,
+  GAME_STATUSES,
   gameInputSchema,
   gamePatchSchema,
+  pauseInputSchema,
+  resumeInputSchema,
   scheduleRuleInputSchema,
   searchFiltersSchema,
 } from './games.js';
@@ -184,6 +189,45 @@ describe('searchFiltersSchema', () => {
         dateFrom: '2027-01-10T00:00:00Z',
         dateTo: '2027-01-01T00:00:00Z',
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe('campaign pause contracts', () => {
+  it('adds the paused status, pause/resume actions and hides the reason from outsiders', () => {
+    expect(GAME_STATUSES).toContain('paused');
+    expect(GAME_ACTIONS).toEqual(expect.arrayContaining(['pause', 'resume']));
+    expect(GAME_PRIVATE_FIELDS).toEqual(expect.arrayContaining(['pauseReason', 'pauseNote']));
+  });
+
+  it('pauseInputSchema: reason from the list, optional note ≤ 300 (empty → null)', () => {
+    expect(pauseInputSchema.parse({ reason: 'vacation' })).toEqual({
+      reason: 'vacation',
+      note: null,
+    });
+    expect(pauseInputSchema.parse({ reason: 'other', note: '  до березня ' })).toEqual({
+      reason: 'other',
+      note: 'до березня',
+    });
+    expect(pauseInputSchema.parse({ reason: 'illness', note: '' }).note).toBeNull();
+    expect(pauseInputSchema.safeParse({ reason: 'bored' }).success).toBe(false);
+    expect(pauseInputSchema.safeParse({}).success).toBe(false);
+    expect(pauseInputSchema.safeParse({ reason: 'other', note: 'x'.repeat(301) }).success).toBe(
+      false,
+    );
+    expect(pauseInputSchema.safeParse({ reason: 'other', extra: 1 }).success).toBe(false);
+  });
+
+  it('resumeInputSchema: whole-minute startsAt (normalized to UTC) and boolean recruit', () => {
+    expect(
+      resumeInputSchema.parse({ startsAt: '2027-01-04T19:00:00+02:00', recruit: true }),
+    ).toEqual({ startsAt: '2027-01-04T17:00:00.000Z', recruit: true });
+    expect(
+      resumeInputSchema.safeParse({ startsAt: '2027-01-04T17:00:30Z', recruit: false }).success,
+    ).toBe(false);
+    expect(resumeInputSchema.safeParse({ startsAt: '2027-01-04T17:00:00Z' }).success).toBe(false);
+    expect(
+      resumeInputSchema.safeParse({ startsAt: '2027-01-04T17:00:00Z', recruit: 'yes' }).success,
     ).toBe(false);
   });
 });

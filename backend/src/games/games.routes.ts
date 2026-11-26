@@ -53,7 +53,9 @@ export function gamesRouter(deps: AppDeps): Router {
   });
   for (const action of GAME_ACTIONS) {
     router.post(`/:id/${action}`, auth, requireActive, async (req, res) => {
-      res.json(await transitionGame(deps, req.user!.userId, gameId(req.params.id), action));
+      const id = gameId(req.params.id);
+      // Тіло потрібне лише `pause` (`{ reason, note? }`) і `resume` (`{ startsAt, recruit }`).
+      res.json(await transitionGame(deps, req.user!.userId, id, action, req.body));
     });
   }
   return router;

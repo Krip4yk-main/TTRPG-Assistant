@@ -10,6 +10,8 @@ const ACTIONS: Record<GameStatus, GameAction[]> = {
   draft: ['publish', 'cancel'],
   recruiting: ['start', 'cancel'],
   started: ['finish', 'cancel'],
+  // Пауза/відновлення (діалоги) — План 11, Task 3.
+  paused: ['finish', 'cancel'],
   finished: [],
   cancelled: [],
 };

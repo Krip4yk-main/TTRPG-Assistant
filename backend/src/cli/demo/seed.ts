@@ -1250,6 +1250,9 @@ class Seeder {
         }
         C = P - r.float(0.05, 4) * DAY;
         break;
+      case 'paused':
+        // Демо-набір не планує кампейнів на паузі.
+        throw new Error('demo seed: paused games are not planned');
     }
     // Не раніше за акаунт майстра (крім власника — див. loadOwner).
     if (C < gm.createdAt.getTime() + HOUR) C = gm.createdAt.getTime() + HOUR;

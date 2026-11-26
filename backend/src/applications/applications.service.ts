@@ -223,6 +223,8 @@ export async function createApplication(
       if (!isGm && !meetsAgeRating(viewerAge(viewer, now), g.ageRating)) {
         throw new AppError(403, 'AGE_RESTRICTED_APPLY');
       }
+      // Кампейн на паузі: окремий код, щоб інтерфейс пояснив причину.
+      if (g.status === 'paused') throw new AppError(409, 'GAME_PAUSED');
       if (!acceptsApplications(g)) throw new AppError(409, 'APPLICATION_CLOSED');
       if (isGm) throw new AppError(403, 'FORBIDDEN');
       if (await isBannedInGame(tx, gameId, userId)) throw new AppError(403, 'BANNED_FROM_GAME');
@@ -324,6 +326,8 @@ export async function approveApplication(
       if (!u || u.status === 'deleted' || u.isBanned) {
         throw new AppError(409, 'APPLICATION_CLOSED');
       }
+      // Пауза: `pending`-заявки лишаються, майстер вирішує після відновлення (відхилити — можна).
+      if (g.status === 'paused') throw new AppError(409, 'GAME_PAUSED');
       if (g.status !== 'recruiting' && g.status !== 'started') {
         throw new AppError(409, 'APPLICATION_CLOSED');
       }
