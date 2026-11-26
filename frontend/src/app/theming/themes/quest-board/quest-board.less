@@ -11,16 +11,13 @@
 // Компоненти беруть лише var(--nri-…) / var(--mat-sys-…), тож той самий компонент читабельний
 // в обох контекстах; приколотий папірець (.qb-paper) повертає контекст «пергамент».
 
-@import (css) '@fontsource/kurale/cyrillic-400.css';
-@import (css) '@fontsource/kurale/latin-400.css';
-@import (css) '@fontsource/literata/cyrillic-400.css';
-@import (css) '@fontsource/literata/latin-400.css';
-@import (css) '@fontsource/literata/cyrillic-400-italic.css';
-@import (css) '@fontsource/literata/latin-400-italic.css';
-@import (css) '@fontsource/literata/cyrillic-600.css';
-@import (css) '@fontsource/literata/latin-600.css';
-@import (css) '@fontsource/literata/cyrillic-700.css';
-@import (css) '@fontsource/literata/latin-700.css';
+@import '../font-face.less';
+
+.nri-font-face(kurale; 'Kurale'; 400);
+.nri-font-face(literata; 'Literata'; 400);
+.nri-font-face(literata; 'Literata'; 400; italic);
+.nri-font-face(literata; 'Literata'; 600);
+.nri-font-face(literata; 'Literata'; 700);
 @import '../../../../styles/_shared-layout.less';
 
 @qb: ~":root[data-theme='quest-board']";

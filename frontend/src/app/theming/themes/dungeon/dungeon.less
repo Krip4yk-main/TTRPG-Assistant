@@ -25,24 +25,17 @@
 //     зсув текстури каменю й місце моху.
 
 // Шрифти (локально, @fontsource: лише кирилиця й латиниця).
-@import (css) '@fontsource/alegreya-sans/cyrillic-400.css';
-@import (css) '@fontsource/alegreya-sans/latin-400.css';
-@import (css) '@fontsource/alegreya-sans/cyrillic-500.css';
-@import (css) '@fontsource/alegreya-sans/latin-500.css';
-@import (css) '@fontsource/alegreya-sans/cyrillic-700.css';
-@import (css) '@fontsource/alegreya-sans/latin-700.css';
-@import (css) '@fontsource/alegreya-sans-sc/cyrillic-500.css';
-@import (css) '@fontsource/alegreya-sans-sc/latin-500.css';
-@import (css) '@fontsource/alegreya-sans-sc/cyrillic-700.css';
-@import (css) '@fontsource/alegreya-sans-sc/latin-700.css';
-@import (css) '@fontsource/podkova/cyrillic-500.css';
-@import (css) '@fontsource/podkova/latin-500.css';
-@import (css) '@fontsource/podkova/cyrillic-600.css';
-@import (css) '@fontsource/podkova/latin-600.css';
-@import (css) '@fontsource/podkova/cyrillic-700.css';
-@import (css) '@fontsource/podkova/latin-700.css';
-@import (css) '@fontsource/ruslan-display/cyrillic-400.css';
-@import (css) '@fontsource/ruslan-display/latin-400.css';
+@import '../font-face.less';
+
+.nri-font-face(alegreya-sans; 'Alegreya Sans'; 400);
+.nri-font-face(alegreya-sans; 'Alegreya Sans'; 500);
+.nri-font-face(alegreya-sans; 'Alegreya Sans'; 700);
+.nri-font-face(alegreya-sans-sc; 'Alegreya Sans SC'; 500);
+.nri-font-face(alegreya-sans-sc; 'Alegreya Sans SC'; 700);
+.nri-font-face(podkova; 'Podkova'; 500);
+.nri-font-face(podkova; 'Podkova'; 600);
+.nri-font-face(podkova; 'Podkova'; 700);
+.nri-font-face(ruslan-display; 'Ruslan Display'; 400);
 @import '../scene/scene-base.less';
 
 @dg: ~":root[data-theme='dungeon']";

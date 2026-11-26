@@ -17,22 +17,16 @@
 // Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини,
 // заголовки — Jura (500 — Material, 600 — дрібні заголовки, 700 — логотип, заголовок сторінки,
 // назви карток, ціна).
-@import (css) '@fontsource/golos-text/cyrillic-400.css';
-@import (css) '@fontsource/golos-text/latin-400.css';
-@import (css) '@fontsource/golos-text/cyrillic-500.css';
-@import (css) '@fontsource/golos-text/latin-500.css';
-@import (css) '@fontsource/golos-text/cyrillic-600.css';
-@import (css) '@fontsource/golos-text/latin-600.css';
-@import (css) '@fontsource/jetbrains-mono/cyrillic-500.css';
-@import (css) '@fontsource/jetbrains-mono/latin-500.css';
-@import (css) '@fontsource/jetbrains-mono/cyrillic-700.css';
-@import (css) '@fontsource/jetbrains-mono/latin-700.css';
-@import (css) '@fontsource/jura/cyrillic-500.css';
-@import (css) '@fontsource/jura/latin-500.css';
-@import (css) '@fontsource/jura/cyrillic-600.css';
-@import (css) '@fontsource/jura/latin-600.css';
-@import (css) '@fontsource/jura/cyrillic-700.css';
-@import (css) '@fontsource/jura/latin-700.css';
+@import '../font-face.less';
+
+.nri-font-face(golos-text; 'Golos Text'; 400);
+.nri-font-face(golos-text; 'Golos Text'; 500);
+.nri-font-face(golos-text; 'Golos Text'; 600);
+.nri-font-face(jetbrains-mono; 'JetBrains Mono'; 500);
+.nri-font-face(jetbrains-mono; 'JetBrains Mono'; 700);
+.nri-font-face(jura; 'Jura'; 500);
+.nri-font-face(jura; 'Jura'; 600);
+.nri-font-face(jura; 'Jura'; 700);
 @import '../scene/scene-base.less';
 
 @hm: ~":root[data-theme='holo-market']";

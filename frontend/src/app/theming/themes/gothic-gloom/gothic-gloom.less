@@ -27,48 +27,20 @@
 //   data-neon (варіант картки): колір рядка системи (золото, кістка, рожеве золото, світле
 //     золото, патина, червоне золото) і печатка (violet, lime).
 
-// Шрифти (локально, @fontsource: лише кирилиця й латиниця). Грані оголошено тут, а не імпортом
-// файлів підмножин @fontsource (`cyrillic-600.css` тощо): у тих файлах немає unicode-range, тож
-// кирилична й латинська грані однієї ваги — дві грані на весь Unicode, і Chrome інколи бере
-// літеру не з тієї (у заголовку «і» малювалась чужим гліфом). Тут кожна грань має свій діапазон.
-@gg-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-@gg-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
-  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця; грані з unicode-range —
+// ../font-face.less).
+@import '../font-face.less';
 
-.gg-face(@pkg; @family; @weight; @style: normal) {
-  @font-face {
-    font-family: @family;
-    font-style: @style;
-    font-display: swap;
-    font-weight: @weight;
-    src:
-      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'),
-      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff');
-    unicode-range: @gg-cyr;
-  }
-
-  @font-face {
-    font-family: @family;
-    font-style: @style;
-    font-display: swap;
-    font-weight: @weight;
-    src:
-      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'),
-      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff');
-    unicode-range: @gg-lat;
-  }
-}
-
-.gg-face(alegreya; 'Alegreya'; 400);
-.gg-face(alegreya; 'Alegreya'; 400; italic);
-.gg-face(alegreya; 'Alegreya'; 500);
-.gg-face(alegreya; 'Alegreya'; 500; italic);
-.gg-face(alegreya; 'Alegreya'; 700);
-.gg-face(cormorant-sc; 'Cormorant SC'; 500);
-.gg-face(cormorant-sc; 'Cormorant SC'; 600);
-.gg-face(cormorant-sc; 'Cormorant SC'; 700);
-.gg-face(ibm-plex-mono; 'IBM Plex Mono'; 500);
-.gg-face(ibm-plex-mono; 'IBM Plex Mono'; 600);
+.nri-font-face(alegreya; 'Alegreya'; 400);
+.nri-font-face(alegreya; 'Alegreya'; 400; italic);
+.nri-font-face(alegreya; 'Alegreya'; 500);
+.nri-font-face(alegreya; 'Alegreya'; 500; italic);
+.nri-font-face(alegreya; 'Alegreya'; 700);
+.nri-font-face(cormorant-sc; 'Cormorant SC'; 500);
+.nri-font-face(cormorant-sc; 'Cormorant SC'; 600);
+.nri-font-face(cormorant-sc; 'Cormorant SC'; 700);
+.nri-font-face(ibm-plex-mono; 'IBM Plex Mono'; 500);
+.nri-font-face(ibm-plex-mono; 'IBM Plex Mono'; 600);
 @import '../scene/scene-base.less';
 
 @gg: ~":root[data-theme='gothic-gloom']";
@@ -204,7 +176,8 @@
   --nri-header-height: 72px;
 
   // Alegreya і Cormorant SC типово мають старовинні цифри («3» майже як «з» — «1 з 4» читалося б
-  // «1 3 4») — по всьому сайту цифри рівної висоти.
+  // «1 3 4») — по всьому сайту цифри рівної висоти. Скорочення `font:` скидає це значення,
+  // тож де після нього бувають цифри (меню, рядок системи, ціна, стрічка) — повторено.
   body {
     font-variant-numeric: lining-nums;
   }
@@ -277,6 +250,7 @@
     border-radius: 0;
     color: #bdb196;
     font: 600 1.0625rem/1.2 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
     letter-spacing: 0.02em;
 
     &:hover {
@@ -638,6 +612,7 @@
   // ---- Текст картки ----
   :is(nri-sc-game-card, nri-sc-my-game-item) .sys {
     font: 700 0.875rem/1.4 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
     letter-spacing: 0.03em;
     text-transform: none;
   }
@@ -736,6 +711,7 @@
     background: linear-gradient(170deg, #fbe9b0, #e2b85a 40%, #b6872c 70%, #efd18a);
     color: #1d1406;
     font: 700 1rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
     letter-spacing: 0.02em;
     box-shadow:
       0 2px 0 #000,
@@ -764,6 +740,7 @@
       linear-gradient(90deg, #d6c193, #ecdfba 50%, #d2bd8e);
     color: #3a2410;
     font: italic 500 0.875rem/1.3 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
     clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
 
     &::before {

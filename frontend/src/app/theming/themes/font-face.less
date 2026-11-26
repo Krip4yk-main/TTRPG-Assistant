@@ -1,0 +1,35 @@
+// Спільний міксин граней шрифтів для бандлів дизайнів (локально, @fontsource: лише кирилиця й
+// латиниця). Грані оголошено тут, а не імпортом файлів підмножин @fontsource
+// (`cyrillic-600.css` тощо): у тих файлах немає unicode-range, тож кирилична й латинська грані
+// однієї ваги — дві грані на весь Unicode; браузер тоді вантажить обидві й інколи бере літеру не
+// з тієї (у заголовку «і» малювалась чужим гліфом). Тут кожна грань має свій діапазон
+// (діапазони — як у index.css самого @fontsource).
+//
+// Ужиток: `@import '../font-face.less';` і `.nri-font-face(podkova; 'Podkova'; 600);`
+// (необов'язково — стиль `italic` і font-display, типово `swap`).
+// Адреси — екранованим рядком: інакше Less переписав би відносні url() під файл, що імпортує
+// міксин (`../@fontsource/…`), а збірка шукає `@fontsource/…` у node_modules.
+
+@nri-font-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+@nri-font-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+  U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+.nri-font-face(@pkg; @family; @weight; @style: normal; @display: swap) {
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: @display;
+    font-weight: @weight;
+    src: ~"url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'), url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff')";
+    unicode-range: @nri-font-cyr;
+  }
+
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: @display;
+    font-weight: @weight;
+    src: ~"url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'), url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff')";
+    unicode-range: @nri-font-lat;
+  }
+}
