@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { ThemeId } from '@nri/shared';
 import { ThemeService } from '../theme.service';
-import { GuestThemeToggle } from './guest-theme-toggle';
+import { FOCUS_HANDOFF_MS, GuestThemeToggle } from './guest-theme-toggle';
 
 describe('GuestThemeToggle', () => {
   let fixture: ComponentFixture<GuestThemeToggle>;
@@ -52,22 +52,91 @@ describe('GuestThemeToggle', () => {
     expect(pressed()).toEqual(['false', 'true']);
   });
 
-  it('keyboard focus moves to the same button in the new header after the shell swap', async () => {
-    document.body.appendChild(el);
-    try {
+  /**
+   * Зміна дизайну міняє каркас: старий перемикач знищується, новий з'являється в новій шапці.
+   * `between` — що відбувається поміж ними (напр. користувач переводить фокус деінде).
+   */
+  const swapShell = (between?: () => void) => {
+    fixture.destroy();
+    between?.();
+    const next = TestBed.createComponent(GuestThemeToggle);
+    document.body.appendChild(next.nativeElement as HTMLElement);
+    next.detectChanges();
+    return next.nativeElement as HTMLElement;
+  };
+
+  describe('focus across the shell swap', () => {
+    let fresh: HTMLElement | null = null;
+
+    beforeEach(() => document.body.appendChild(el));
+    afterEach(() => {
+      fresh?.remove();
+      document.querySelectorAll('input.elsewhere').forEach((i) => i.remove());
+    });
+
+    it('keyboard: focus moves to the pressed button of the new toggle', () => {
       buttons()[1]!.focus();
       buttons()[1]!.click();
-      // Стара шапка зникає разом із кнопкою, нова — з власним перемикачем.
-      const fresh = document.createElement('nri-guest-theme-toggle');
-      fresh.append(el.firstElementChild!.cloneNode(true));
-      el.replaceWith(fresh);
-      await vi.waitFor(() =>
-        expect((document.activeElement as HTMLElement).dataset['themeId']).toBe('night-city'),
-      );
-      expect(fresh.contains(document.activeElement)).toBe(true);
-      fresh.remove();
+      fresh = swapShell();
+      const active = document.activeElement as HTMLElement;
+      expect(fresh.contains(active)).toBe(true);
+      expect(active.dataset['themeId']).toBe('night-city');
+      expect(active.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('focus moved to another element meanwhile stays there', () => {
+      buttons()[1]!.focus();
+      buttons()[1]!.click();
+      const other = document.createElement('input');
+      other.className = 'elsewhere';
+      document.body.appendChild(other);
+      fresh = swapShell(() => other.focus());
+      expect(document.activeElement).toBe(other);
+    });
+
+    it('mouse click without focus on the button does not grab focus', () => {
+      buttons()[1]!.click();
+      fresh = swapShell();
+      expect(fresh.contains(document.activeElement)).toBe(false);
+    });
+
+    it('a stale hand-off (past FOCUS_HANDOFF_MS) is ignored', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        buttons()[1]!.focus();
+        buttons()[1]!.click();
+        vi.setSystemTime(Date.now() + FOCUS_HANDOFF_MS + 1);
+        fresh = swapShell();
+        expect(fresh.contains(document.activeElement)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('wide screen: visible names, no redundant title; narrow: title on icon-only buttons', () => {
+    // jsdom без matchMedia — як широкий екран.
+    expect(buttons().every((b) => !b.hasAttribute('title'))).toBe(true);
+    const original = window.matchMedia;
+    const listeners: ((e: { matches: boolean }) => void)[] = [];
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: (_: string, l: (e: { matches: boolean }) => void) => listeners.push(l),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const narrow = TestBed.createComponent(GuestThemeToggle);
+      narrow.detectChanges();
+      const titles = () =>
+        Array.from((narrow.nativeElement as HTMLElement).querySelectorAll('button')).map((b) =>
+          b.getAttribute('title'),
+        );
+      expect(titles()).toEqual(['theme.names.quest-board', 'theme.names.night-city']);
+      listeners.forEach((l) => l({ matches: true }));
+      narrow.detectChanges();
+      expect(titles()).toEqual([null, null]);
     } finally {
-      el.remove();
+      window.matchMedia = original;
     }
   });
 

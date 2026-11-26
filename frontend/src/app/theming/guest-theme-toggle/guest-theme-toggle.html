@@ -8,7 +8,7 @@
         [class.active]="themes.guestTheme() === opt.id"
         [attr.aria-pressed]="themes.guestTheme() === opt.id"
         [attr.data-theme-id]="opt.id"
-        [title]="'theme.names.' + opt.id | translate"
+        [attr.title]="wide() ? null : ('theme.names.' + opt.id | translate)"
         (click)="pick(opt.id, btn)"
       >
         <mat-icon aria-hidden="true">{{ opt.icon }}</mat-icon>
