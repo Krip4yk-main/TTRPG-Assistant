@@ -27,49 +27,48 @@ const get = (key) => process.env[key] ?? fileVars[key] ?? '';
 
 /**
  * Версія бандлів стилів дизайнів (`theme-<id>.css?v=…`): хеш вихідних стилів дизайнів
- * (`src/styles/**` і файли верхнього рівня `src/app/theming/themes/<id>/`) та версій пакетів,
- * що потрапляють у бандл (Material, шрифти). Бандли з `inject: false` Angular не хешує в імені,
- * тож після релізу браузер бере новий файл лише завдяки зміні `?v=`.
+ * (`src/styles/**
+ * Версія бандлів стилів дизайнів (`theme-<id>.css?v=…`): хеш усіх вихідних стилів, з яких
+ * збираються бандли (`src/styles/**` і `src/app/theming/themes/**` — разом зі спільними
+ * `font-face.less`, `scene/**` і вкладеними файлами ефектів), та версій пакетів, що потрапляють
+ * у бандл (`@angular/material` і всі `@fontsource/*` / `@material-symbols/*` з `package.json`).
+ * Бандли з `inject: false` Angular не хешує в імені, тож після релізу браузер бере новий файл
+ * лише завдяки зміні `?v=`. Детерміновано між ОС: відносні шляхи з `/`, сортування за кодами
+ * символів, кінці рядків нормалізовано до `\n`.
  */
 function themeStyleVersion() {
   const hash = createHash('sha256');
-  const addDir = (dir, recursive) => {
+  const files = [];
+  const walk = (dir, rel) => {
     if (!existsSync(dir)) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      const file = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
-      if (entry.isDirectory()) {
-        if (recursive) addDir(file, true);
-      } else if (/\.(less|scss|css)$/.test(entry.name)) {
-        hash.update(entry.name).update(readFileSync(file));
-      }
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = `${rel}${entry.name}`;
+      if (entry.isDirectory()) walk(new URL(`${entry.name}/`, dir), `${path}/`);
+      else if (/\.(less|scss|css)$/.test(entry.name)) files.push(path);
     }
   };
-  addDir(new URL('src/styles/', root), true);
-  const themes = new URL('src/app/theming/themes/', root);
-  if (existsSync(themes)) {
-    for (const entry of readdirSync(themes, { withFileTypes: true })) {
-      if (entry.isDirectory()) addDir(new URL(`${entry.name}/`, themes), false);
-    }
+  walk(new URL('src/styles/', root), 'src/styles/');
+  walk(new URL('src/app/theming/themes/', root), 'src/app/theming/themes/');
+  files.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const path of files) {
+    const text = readFileSync(new URL(path, root), 'utf8').replace(/\r\n?/g, '\n');
+    hash.update(`${path}\0${text}\0`);
   }
+  const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
+  const deps = { ...manifest.dependencies, ...manifest.devDependencies };
+  const packages = Object.keys(deps)
+    .filter((name) => /^@(fontsource|material-symbols)\//.test(name))
+    .concat('@angular/material')
+    .sort();
   const require = createRequire(new URL('package.json', root));
-  for (const pkg of [
-    '@angular/material',
-    '@fontsource/golos-text',
-    '@fontsource/jetbrains-mono',
-    '@fontsource/jura',
-    '@fontsource/kurale',
-    '@fontsource/literata',
-    '@fontsource/m-plus-rounded-1c',
-    '@fontsource/unbounded',
-    '@material-symbols/font-400',
-  ]) {
+  for (const pkg of packages) {
+    let version = '?';
     try {
-      hash.update(`${pkg}@${require(`${pkg}/package.json`).version}`);
+      version = require(`${pkg}/package.json`).version;
     } catch {
-      hash.update(`${pkg}@?`);
+      // Пакет не встановлено — у хеші лишається маркер.
     }
+    hash.update(`${pkg}@${version}\0`);
   }
   return hash.digest('hex').slice(0, 12);
 }

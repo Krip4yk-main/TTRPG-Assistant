@@ -230,7 +230,11 @@
             }
           </div>
 
-          <div class="notice-area" aria-live="polite" tabindex="-1">
+          <div
+            class="notice-area"
+            [attr.aria-live]="notice()?.silent ? 'off' : 'polite'"
+            tabindex="-1"
+          >
             @if (notice(); as n) {
               <p
                 [class.nri-alert]="n.kind === 'error'"

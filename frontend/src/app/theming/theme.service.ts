@@ -43,6 +43,12 @@ export const THEME_VERSION_STORAGE_KEY = 'nri.theme.v';
 /** `<link>` бандла стилів дизайну (його ж створює інлайн-скрипт). */
 export const THEME_LINK_ID = 'nri-theme-style';
 /**
+ * Атрибут `<link>` бандла: `load` чи `error`, щойно завантаження скінчилося (ставлять і
+ * інлайн-скрипт, і `setStyle`). Без нього не відрізнити бандл, що ще вантажиться, від того, що
+ * вже впав: в обох `sheet` порожній, а подій більше не буде.
+ */
+export const THEME_LINK_SETTLED_ATTR = 'data-settled';
+/**
  * Скільки чекати бандл стилів нового дизайну, перш ніж перемкнути дизайн без нього (мережа
  * «зависла»): довше старий дизайн лишатися не повинен.
  */
@@ -310,7 +316,7 @@ export class ThemeService {
       this.setStyle(href, true);
       return;
     }
-    const { link, created } = this.setStyle(href, false);
+    const link = this.setStyle(href, false);
     return new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout> | null = null;
       const apply = () => {
@@ -333,8 +339,11 @@ export class ThemeService {
         void withTimeout(this.headingFont(id), FONT_WAIT_MS).then(apply);
       };
       timer = setTimeout(() => finish(false), STYLE_WAIT_MS);
-      if (!created) {
-        finish(true); // бандл цього дизайну вже підключено
+      // Бандл цього дизайну вже підключено (A→B→C→B): завантажений чи впав — одразу; ще
+      // вантажиться — чекаємо, як на новий.
+      const settled = settledState(link);
+      if (settled) {
+        finish(settled === 'load');
         return;
       }
       link.addEventListener('load', () => finish(true), { once: true });
@@ -358,11 +367,12 @@ export class ThemeService {
   }
 
   /**
-   * Бандл стилів `link` завантажився (чи впав). Уже завантажений (`sheet`) — одразу; без
-   * `document.fonts` (тести, старий браузер) чекати нема чого — теж одразу.
+   * Бандл стилів `link` завантажився (чи впав). Уже завантажений чи впав (`sheet`,
+   * `THEME_LINK_SETTLED_ATTR`) — одразу; без `document.fonts` (тести, старий браузер) чекати
+   * нема чого — теж одразу.
    */
   private whenLoaded(link: HTMLLinkElement): Promise<void> {
-    if (link.sheet || !(this.doc.fonts as FontFaceSet | undefined)?.load) {
+    if (settledState(link) || !(this.doc.fonts as FontFaceSet | undefined)?.load) {
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
@@ -414,7 +424,7 @@ export class ThemeService {
    * потрібний уже підключено — одразу). Інакше старі лишаються: їх знімає `commit`, коли
    * перемикає `data-theme` на новий дизайн.
    */
-  private setStyle(href: string, dropOld: boolean): { link: HTMLLinkElement; created: boolean } {
+  private setStyle(href: string, dropOld: boolean): HTMLLinkElement {
     const known = new Set(Object.values(this.registry).map((d) => bundlePath(d.styleHref)));
     const [stale, old] = partition(
       this.themeLinks(),
@@ -424,20 +434,30 @@ export class ThemeService {
     const same = old.find((l) => l.getAttribute('href') === href);
     if (same) {
       if (dropOld) this.removeLinksExcept(same);
-      return { link: same, created: false };
+      return same;
     }
     const link = this.doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
     link.id = THEME_LINK_ID;
+    const mark = (e: Event) => link.setAttribute(THEME_LINK_SETTLED_ATTR, e.type);
+    link.addEventListener('load', mark, { once: true });
+    link.addEventListener('error', mark, { once: true });
     if (dropOld && old.length > 0) {
       const drop = () => old.forEach((l) => l.remove());
       link.addEventListener('load', drop, { once: true });
       link.addEventListener('error', drop, { once: true });
     }
     this.doc.head.appendChild(link);
-    return { link, created: true };
+    return link;
   }
+}
+
+/** Завантаження бандла `link` скінчилося: `load` (є `sheet`), `error` чи `null` — ще триває. */
+function settledState(link: HTMLLinkElement): 'load' | 'error' | null {
+  if (link.sheet) return 'load';
+  const attr = link.getAttribute(THEME_LINK_SETTLED_ATTR);
+  return attr === 'load' || attr === 'error' ? attr : null;
 }
 
 /** Результат `promise` або `undefined`, якщо він не встиг за `ms` (помилка — далі). */

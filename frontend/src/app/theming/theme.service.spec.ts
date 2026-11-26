@@ -14,6 +14,7 @@ import {
   FONT_WAIT_MS,
   STYLE_WAIT_MS,
   THEME_LINK_ID,
+  THEME_LINK_SETTLED_ATTR,
   THEME_STORAGE_KEY,
   THEME_VERSION_STORAGE_KEY,
   ThemeService,
@@ -322,6 +323,38 @@ describe('ThemeService', () => {
     expect(links()).toEqual(['theme-holo-market.css?v=1']);
   });
 
+  it('A to B to C to B while B is still loading waits for the B bundle (no switch to unstyled B)', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    void choose('neon-signs');
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    void choose('holo-market');
+    await vi.waitFor(() => expect(links()).toHaveLength(3));
+    const backToB = choose('neon-signs');
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    // Бандл B ще вантажиться: лишається старий дизайн.
+    expect(theme()).toBe('night-city');
+    await settleWhenAdded('theme-neon-signs.css?v=1');
+    await backToB;
+    expect(theme()).toBe('neon-signs');
+    expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+  });
+
+  it('A to B to C to B after the B bundle already failed switches at once', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    void choose('neon-signs');
+    await vi.waitFor(() => expect(links()).toHaveLength(2));
+    void choose('holo-market');
+    await vi.waitFor(() => expect(links()).toHaveLength(3));
+    await settleWhenAdded('theme-neon-signs.css?v=1', 'error');
+    await choose('neon-signs');
+    expect(theme()).toBe('neon-signs');
+    expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+  });
+
   it('switching back to the shown design before the new bundle loads keeps it and drops the pending bundle', async () => {
     setup();
     auth.setMe(user);
@@ -504,6 +537,28 @@ describe('ThemeService', () => {
       await init;
       expect(service.theme()).toBe('night-city');
       expect(links()).toEqual(['theme-night-city.css?v=1']);
+    });
+
+    it('a cached bundle that already failed before init does not delay the first render', async () => {
+      setup();
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      // Інлайн-скрипт позначив кінець завантаження (помилка) ще до старту застосунку.
+      document.head
+        .querySelector(`link#${THEME_LINK_ID}`)!
+        .setAttribute(THEME_LINK_SETTLED_ATTR, 'error');
+      fontLoad.mockResolvedValue([]);
+      auth.setMe(user);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        let ready = false;
+        const init = service.init().then(() => (ready = true));
+        for (let i = 0; i < 50 && !ready; i++) await Promise.resolve();
+        expect(ready).toBe(true);
+        await init;
+        expect(service.theme()).toBe('night-city');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('the first render never waits longer than FONT_WAIT_MS', async () => {

@@ -51,6 +51,10 @@
         link.rel = 'stylesheet';
         link.id = 'nri-theme-style';
         link.setAttribute('blocking', 'render');
+        // Кінець завантаження — для ThemeService (впалий бандл не має sheet і подій уже не дасть).
+        link.onload = link.onerror = function (e) {
+          link.setAttribute('data-settled', e.type);
+        };
         link.href = 'theme-' + theme[0] + '.css' + (/^[a-z0-9]+$/.test(v) ? '?v=' + v : '');
         document.head.appendChild(link);
       })();

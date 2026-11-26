@@ -79,6 +79,8 @@ interface Notice {
   key: string;
   /** Показати посилання на «Мої заявки». */
   link?: boolean;
+  /** Не озвучувати (те саме вже озвучено інакше, напр. на старті ефекту заявки). */
+  silent?: boolean;
 }
 
 /** Повна гра для показу; приватні поля — лише для майстра й учасників. */
@@ -484,7 +486,12 @@ export class GameDetails {
       this.quiet();
       if (result.status === 'applied') {
         this.setViewer({ relation: 'pending', applicationId: result.application.id });
-        this.notice.set({ kind: 'info', key: 'games.details.applied', link: true });
+        this.notice.set({
+          kind: 'info',
+          key: 'games.details.applied',
+          link: true,
+          silent: result.announced,
+        });
       } else {
         // Заявка вже є (інша вкладка) — беремо актуальний стан із сервера.
         this.notice.set({ kind: 'info', key: 'games.details.alreadyApplied', link: true });

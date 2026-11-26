@@ -21,7 +21,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { TranslatePipe } from '@ngx-translate/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   APPLICATION_ANSWER_MAX,
   APPLICATION_CONSTRAINT_MAX,
@@ -49,9 +50,13 @@ export interface ApplyDialogData {
   questions: string[];
 }
 
-/** `exists` — сервер відповів `APPLICATION_EXISTS` (заявка вже є або глядач — учасник). */
+/**
+ * `exists` — сервер відповів `APPLICATION_EXISTS` (заявка вже є або глядач — учасник).
+ * `announced` — успіх уже озвучено читачам екрана на старті ефекту дизайну: сторінка показує
+ * своє повідомлення без повторного озвучення.
+ */
 export type ApplyDialogResult =
-  { status: 'applied'; application: ApplicationDto } | { status: 'exists' };
+  { status: 'applied'; application: ApplicationDto; announced?: true } | { status: 'exists' };
 
 /** Коди, що стосуються конкретного поля (показуються біля нього, а не загальним алертом). */
 const FIELD_CODES = new Set<ErrorCode>(['WARNINGS_NOT_ACCEPTED', 'ANSWERS_REQUIRED']);
@@ -89,6 +94,8 @@ export class ApplyDialog {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly themes = inject(ThemeService);
+  private readonly announcer = inject(LiveAnnouncer);
+  private readonly translate = inject(TranslateService);
 
   protected readonly limits = {
     answer: APPLICATION_ANSWER_MAX,
@@ -205,8 +212,8 @@ export class ApplyDialog {
           constraints: v.constraints.map((c) => c.trim()),
         }),
       );
-      await this.playSent();
-      this.ref.close({ status: 'applied', application });
+      const announced = await this.playSent();
+      this.ref.close({ status: 'applied', application, ...(announced && { announced }) });
     } catch (err) {
       const apiError = toApiError(err);
       const { code } = apiError;
@@ -234,14 +241,23 @@ export class ApplyDialog {
   /**
    * Ефект надсилання (якщо є): заявку вже прийнято, тож поки ефект грає, діалог не
    * закривається Escape чи кліком поза ним — інакше успіх загубився б. Ефект ніколи не
-   * відхиляється.
+   * відхиляється. Оверлей ефекту декоративний (`aria-hidden`), а діалог під ним прихований,
+   * тож про успіх одразу на старті ввічливо повідомляє `LiveAnnouncer` (його регіон CDK
+   * відкриває й модальним діалогам). `true` — ефект стартував (успіх озвучено).
    */
-  private async playSent(): Promise<void> {
+  private async playSent(): Promise<boolean> {
     const host = this.host.nativeElement;
     const surface = host.closest<HTMLElement>('.mat-mdc-dialog-surface') ?? host;
+    let started = false;
     await this.themes.playEffect('applicationSent', surface, () => {
+      started = true;
       this.ref.disableClose = true;
+      void this.announcer.announce(
+        this.translate.instant('games.applications.apply.sent') as string,
+        'polite',
+      );
     });
+    return started;
   }
 
   /** Фокус на елементі після рендеру (перший збіг). */

@@ -1,3 +1,4 @@
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -34,6 +35,7 @@ describe('ApplyDialog', () => {
   let close: ReturnType<typeof vi.fn>;
   let ref: { close: ReturnType<typeof vi.fn>; disableClose?: boolean };
   let el: HTMLElement;
+  let announce: ReturnType<typeof vi.fn>;
   /** Ефекти дизайну: справжній ThemeService покритий своїм спеком (вимкнення, тайм-аут). */
   let themes: {
     preloadEffect: ReturnType<typeof vi.fn>;
@@ -52,6 +54,7 @@ describe('ApplyDialog', () => {
     close = vi.fn();
     ref = { close };
     themes = { preloadEffect: vi.fn(), playEffect: vi.fn(async () => {}) };
+    announce = vi.fn(async () => {});
     await TestBed.configureTestingModule({
       imports: [ApplyDialog],
       providers: [
@@ -62,6 +65,7 @@ describe('ApplyDialog', () => {
         { provide: MAT_DIALOG_DATA, useValue: d },
         { provide: MatDialogRef, useValue: ref },
         { provide: ThemeService, useValue: themes },
+        { provide: LiveAnnouncer, useValue: { announce } },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -140,7 +144,8 @@ describe('ApplyDialog', () => {
     await vi.waitFor(() =>
       expect(close).toHaveBeenCalledWith({ status: 'applied', application: created }),
     );
-    // Ефект не грав — закриття не блокувалось.
+    // Ефект не грав — закриття не блокувалось, озвучує сама сторінка.
+    expect(announce).not.toHaveBeenCalled();
     expect(ref.disableClose).toBeFalsy();
   });
 
@@ -170,11 +175,19 @@ describe('ApplyDialog', () => {
     expect(themes.playEffect.mock.calls[0]![0]).toBe('applicationSent');
     expect(themes.playEffect.mock.calls[0]![1]).toBeInstanceOf(HTMLElement);
     expect(ref.disableClose).toBe(true);
+    // Оверлей ефекту декоративний: про успіх повідомляє ввічливий live-регіон на старті.
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('games.applications.apply.sent', 'polite');
     expect(close).not.toHaveBeenCalled();
     finish();
     await settle();
     expect(close).toHaveBeenCalledTimes(1);
-    expect(close).toHaveBeenCalledWith({ status: 'applied', application: created });
+    // Сторінка не озвучує своє повідомлення вдруге.
+    expect(close).toHaveBeenCalledWith({
+      status: 'applied',
+      application: created,
+      announced: true,
+    });
   });
 
   it('an API error plays no effect and keeps the form filled', async () => {

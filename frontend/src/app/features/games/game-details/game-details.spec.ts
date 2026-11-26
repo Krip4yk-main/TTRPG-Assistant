@@ -284,6 +284,17 @@ describe('GameDetails', () => {
       expect(el().querySelector('.relation')!.textContent).toContain('games.details.pending');
       expect(applyButton()).toBeNull();
       expect(el().querySelector('button.withdraw')).not.toBeNull();
+      expect(el().querySelector('.notice-area')!.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('success already announced by the dialog effect shows the notice without a second announcement', async () => {
+      await open(me, (r) => r.flush(game));
+      nextDialog({ status: 'applied', application, announced: true });
+      applyButton()!.click();
+      await settle();
+      const area = el().querySelector('.notice-area')!;
+      expect(area.textContent).toContain('games.details.applied');
+      expect(area.getAttribute('aria-live')).toBe('off');
     });
 
     it('cancelled dialog changes nothing', async () => {

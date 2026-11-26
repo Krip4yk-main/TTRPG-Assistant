@@ -685,7 +685,8 @@
         "addConstraint": "Додати обмеження",
         "removeConstraint": "Видалити обмеження {{n}}",
         "submit": "Подати заявку",
-        "submitting": "Надсилаємо…"
+        "submitting": "Надсилаємо…",
+        "sent": "Заявку надіслано"
       },
       "status": {
         "pending": "На розгляді",
