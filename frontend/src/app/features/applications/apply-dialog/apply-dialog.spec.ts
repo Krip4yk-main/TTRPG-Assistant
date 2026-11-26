@@ -37,7 +37,9 @@ describe('ApplyDialog', () => {
   /** Ефекти дизайну: справжній ThemeService покритий своїм спеком (вимкнення, тайм-аут). */
   let themes: {
     preloadEffect: ReturnType<typeof vi.fn>;
-    playEffect: ReturnType<typeof vi.fn<(name: string, source: HTMLElement) => Promise<void>>>;
+    playEffect: ReturnType<
+      typeof vi.fn<(name: string, source: HTMLElement, onStart?: () => void) => Promise<void>>
+    >;
   };
 
   const settle = async () => {
@@ -138,6 +140,8 @@ describe('ApplyDialog', () => {
     await vi.waitFor(() =>
       expect(close).toHaveBeenCalledWith({ status: 'applied', application: created }),
     );
+    // Ефект не грав — закриття не блокувалось.
+    expect(ref.disableClose).toBeFalsy();
   });
 
   it('preloads the design «sent» effect when opened', async () => {
@@ -149,12 +153,12 @@ describe('ApplyDialog', () => {
   it('on success plays the design effect once, then closes (no Escape while it plays)', async () => {
     await create();
     let finish!: () => void;
-    themes.playEffect.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
-    );
+    themes.playEffect.mockImplementation((_name, _source, onStart) => {
+      onStart?.();
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    });
     await accept();
     await type('textarea.answer', 'Багато');
     await submit();

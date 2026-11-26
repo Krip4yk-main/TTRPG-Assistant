@@ -232,14 +232,16 @@ export class ApplyDialog {
   }
 
   /**
-   * Ефект надсилання (якщо є): заявку вже прийнято, тож діалог не закривається Escape чи
-   * кліком поза ним, поки ефект грає, — інакше успіх загубився б. Ефект ніколи не відхиляється.
+   * Ефект надсилання (якщо є): заявку вже прийнято, тож поки ефект грає, діалог не
+   * закривається Escape чи кліком поза ним — інакше успіх загубився б. Ефект ніколи не
+   * відхиляється.
    */
   private async playSent(): Promise<void> {
-    this.ref.disableClose = true;
     const host = this.host.nativeElement;
     const surface = host.closest<HTMLElement>('.mat-mdc-dialog-surface') ?? host;
-    await this.themes.playEffect('applicationSent', surface);
+    await this.themes.playEffect('applicationSent', surface, () => {
+      this.ref.disableClose = true;
+    });
   }
 
   /** Фокус на елементі після рендеру (перший збіг). */

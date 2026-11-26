@@ -30,7 +30,9 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
   beforeEach(() => {
     source = document.createElement('div');
     source.className = 'surface';
-    source.innerHTML = '<textarea class="answer"></textarea><input type="checkbox" />';
+    source.innerHTML =
+      '<textarea class="answer" name="answer"></textarea><input type="checkbox" />' +
+      '<input type="radio" name="pick" value="a" checked />';
     document.body.append(source);
     source.querySelector('textarea')!.value = 'Багато';
     source.querySelector<HTMLInputElement>('input')!.checked = true;
@@ -61,8 +63,22 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
     overlay
       .querySelectorAll<HTMLInputElement>('[data-mp-send-copy] input')
       .forEach((c) => expect(c.checked).toBe(true));
+    // Копії полів — без `name` (однойменні радіокнопки не перемикали б оригінал).
+    expect(overlay.querySelector('[data-mp-send-copy] [name]')).toBeNull();
+    expect(source.querySelector<HTMLInputElement>('input[type="radio"]')!.checked).toBe(true);
     vi.advanceTimersByTime(DUST_MS + 60);
     expect(document.querySelector('.mp-send')).toBeNull();
+  });
+
+  it('a setup failure removes the overlay and shows the source again', async () => {
+    Element.prototype.animate = fakeAnimate(true).animate;
+    source.style.visibility = 'visible';
+    source.cloneNode = () => {
+      throw new Error('boom');
+    };
+    await sendInEnvelope(source, new AbortController().signal);
+    expect(document.querySelector('.mp-send')).toBeNull();
+    expect(source.style.visibility).toBe('visible');
   });
 
   it('abort cancels the animations and removes the overlay at once', async () => {

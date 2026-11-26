@@ -9,6 +9,7 @@ import { FALLBACK_SLOTS } from './fallback/fallback-slots';
 import type { ThemeSlots } from './slots';
 import { THEME_REGISTRY, type ThemeDefinition, type ThemeEffect } from './theme.registry';
 import {
+  EFFECT_LOAD_TIMEOUT_MS,
   EFFECT_TIMEOUT_MS,
   STYLE_WAIT_MS,
   THEME_LINK_ID,
@@ -38,6 +39,7 @@ const ALL: ThemeId[] = [
   'gothic-gloom',
   'magicpunk',
   'brass-steam',
+  'solar-garden',
 ];
 const user: MeDto = {
   ...base,
@@ -76,6 +78,7 @@ function registry(
     'gothic-gloom': def('gothic-gloom', scene),
     magicpunk: def('magicpunk', scene),
     'brass-steam': def('brass-steam', scene),
+    'solar-garden': def('solar-garden', scene),
   };
 }
 
@@ -523,8 +526,8 @@ describe('ThemeService', () => {
 
   describe('decorative effects (applicationSent)', () => {
     /** «Нічне місто» з ефектом за налаштуванням `sendAnimation`. */
-    const withEffect = (effect: ThemeEffect) => {
-      const load = vi.fn(() => Promise.resolve(effect));
+    const withEffect = (effect: ThemeEffect, loading?: () => Promise<ThemeEffect>) => {
+      const load = vi.fn(loading ?? (() => Promise.resolve(effect)));
       const reg = registry();
       reg['night-city'] = {
         ...reg['night-city'],
@@ -557,8 +560,10 @@ describe('ThemeService', () => {
       await start(reg);
       const el = source();
       let done = false;
-      const played = service.playEffect('applicationSent', el).then(() => (done = true));
+      const onStart = vi.fn(() => expect(effect).not.toHaveBeenCalled());
+      const played = service.playEffect('applicationSent', el, onStart).then(() => (done = true));
       await vi.waitFor(() => expect(effect).toHaveBeenCalledTimes(1));
+      expect(onStart).toHaveBeenCalledTimes(1);
       expect(effect.mock.calls[0]![0]).toBe(el);
       expect(done).toBe(false);
       finish();
@@ -587,9 +592,11 @@ describe('ThemeService', () => {
       const { reg, load } = withEffect(effect);
       await start(reg, { ...user, uiPrefs: { tearAnimation: true, sendAnimation: false } });
       service.preloadEffect('applicationSent');
-      await service.playEffect('applicationSent', source());
+      const onStart = vi.fn();
+      await service.playEffect('applicationSent', source(), onStart);
       expect(load).not.toHaveBeenCalled();
       expect(effect).not.toHaveBeenCalled();
+      expect(onStart).not.toHaveBeenCalled();
     });
 
     it('prefers-reduced-motion: reduce → no effect', async () => {
@@ -628,6 +635,56 @@ describe('ThemeService', () => {
       await played;
       expect(done).toBe(true);
       expect(signal?.aborted).toBe(true);
+    });
+
+    it('the effect timer starts once the chunk is loaded', async () => {
+      let signal: AbortSignal | undefined;
+      const hanging: ThemeEffect = (_el, s) => {
+        signal = s;
+        return new Promise<void>(() => {});
+      };
+      const loadMs = EFFECT_LOAD_TIMEOUT_MS - 100;
+      const { reg } = withEffect(
+        hanging,
+        () => new Promise((resolve) => setTimeout(() => resolve(hanging), loadMs)),
+      );
+      await start(reg);
+      vi.useFakeTimers();
+      let done = false;
+      const played = service.playEffect('applicationSent', source()).then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(loadMs + EFFECT_TIMEOUT_MS - 1);
+      expect(signal?.aborted).toBe(false);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await played;
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it('a chunk slower than EFFECT_LOAD_TIMEOUT_MS skips the effect (no onStart)', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      let release!: (e: ThemeEffect) => void;
+      const { reg } = withEffect(
+        effect,
+        () =>
+          new Promise<ThemeEffect>((resolve) => {
+            release = resolve;
+          }),
+      );
+      await start(reg);
+      vi.useFakeTimers();
+      const onStart = vi.fn();
+      let done = false;
+      const played = service
+        .playEffect('applicationSent', source(), onStart)
+        .then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(EFFECT_LOAD_TIMEOUT_MS - 1);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await played;
+      release(effect);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onStart).not.toHaveBeenCalled();
+      expect(effect).not.toHaveBeenCalled();
     });
   });
 });

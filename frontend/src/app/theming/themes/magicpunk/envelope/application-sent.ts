@@ -36,46 +36,61 @@ export const sendInEnvelope: ThemeEffect = async (source, signal) => {
   const third = h / 3;
 
   const overlay = div(doc, 'mp-send');
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.inert = true;
-  const flight = div(doc, 'mp-send-flight');
-  Object.assign(flight.style, {
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
-    width: `${w}px`,
-    height: `${h}px`,
-  });
+  const shownVisibility = source.style.visibility;
+  // Побудова оверлею (копії аркуша, popover, значення полів) може впасти на незвичному DOM —
+  // тоді ефекту немає: оверлей геть, джерело знову видиме.
+  let flight: HTMLDivElement;
+  let panels: HTMLDivElement[];
+  let envelope: HTMLDivElement;
+  let pocket: HTMLDivElement;
+  let flap: HTMLDivElement;
+  let seal: HTMLDivElement;
+  try {
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.inert = true;
+    flight = div(doc, 'mp-send-flight');
+    Object.assign(flight.style, {
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${w}px`,
+      height: `${h}px`,
+    });
 
-  // Три смуги аркуша: лице — копія форми зі зсувом, звороть — пергамент.
-  const panels = [0, 1, 2].map((i) => {
-    const panel = div(doc, `mp-send-panel mp-send-panel-${i}`);
-    Object.assign(panel.style, { top: `${i * third}px`, height: `${third}px` });
-    const front = div(doc, 'mp-send-face mp-send-front');
-    const sheet = copyVisual(source, w, h);
-    sheet.style.top = `${-i * third}px`;
-    front.append(sheet);
-    panel.append(front, div(doc, 'mp-send-face mp-send-back'));
-    return panel;
-  });
+    // Три смуги аркуша: лице — копія форми зі зсувом, звороть — пергамент.
+    panels = [0, 1, 2].map((i) => {
+      const panel = div(doc, `mp-send-panel mp-send-panel-${i}`);
+      Object.assign(panel.style, { top: `${i * third}px`, height: `${third}px` });
+      const front = div(doc, 'mp-send-face mp-send-front');
+      const sheet = copyVisual(source, w, h);
+      sheet.style.top = `${-i * third}px`;
+      front.append(sheet);
+      panel.append(front, div(doc, 'mp-send-face mp-send-back'));
+      return panel;
+    });
 
-  const envelope = div(doc, 'mp-send-envelope');
-  Object.assign(envelope.style, { top: `${third}px`, height: `${third}px` });
-  const pocket = div(doc, 'mp-send-pocket');
-  const flap = div(doc, 'mp-send-flap');
-  const seal = div(doc, 'mp-send-seal');
-  envelope.append(pocket, flap, seal);
+    envelope = div(doc, 'mp-send-envelope');
+    Object.assign(envelope.style, { top: `${third}px`, height: `${third}px` });
+    pocket = div(doc, 'mp-send-pocket');
+    flap = div(doc, 'mp-send-flap');
+    seal = div(doc, 'mp-send-seal');
+    envelope.append(pocket, flap, seal);
 
-  flight.append(...panels, envelope);
-  overlay.append(flight);
-  doc.body.append(overlay);
-  // Оверлеї CDK живуть у top layer (popover) — оверлей ефекту теж, інакше він опиниться під
-  // діалогом і його тлом.
-  if (typeof overlay.showPopover === 'function') {
-    overlay.setAttribute('popover', 'manual');
-    overlay.showPopover();
+    flight.append(...panels, envelope);
+    overlay.append(flight);
+    doc.body.append(overlay);
+    // Оверлеї CDK живуть у top layer (popover) — оверлей ефекту теж, інакше він опиниться під
+    // діалогом і його тлом.
+    if (typeof overlay.showPopover === 'function') {
+      overlay.setAttribute('popover', 'manual');
+      overlay.showPopover();
+    }
+    syncState(source, overlay);
+    source.style.visibility = 'hidden';
+  } catch {
+    overlay.remove();
+    source.style.visibility = shownVisibility;
+    return;
   }
-  syncState(source, overlay);
-  source.style.visibility = 'hidden';
 
   const anims: Animation[] = [];
   let cancelled = false;
@@ -204,6 +219,8 @@ function copyVisual(source: HTMLElement, w: number, h: number): HTMLElement {
   const clone = source.cloneNode(true) as HTMLElement;
   clone.removeAttribute('id');
   clone.setAttribute('data-mp-send-copy', '');
+  // Копії полів без `name`: однойменні радіокнопки в копіях не знімали б позначку з оригіналу.
+  clone.querySelectorAll('[name]').forEach((el) => el.removeAttribute('name'));
   clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
   clone.style.cssText += `;visibility:visible;margin:0;width:${w}px;height:${h}px;max-width:none;max-height:none;transform:none;`;
   let inner: HTMLElement = clone;

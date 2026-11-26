@@ -48,10 +48,15 @@ export const THEME_LINK_ID = 'nri-theme-style';
  */
 export const STYLE_WAIT_MS = 3000;
 /**
- * Найдовше очікування декоративного ефекту (разом із завантаженням його чанка): далі викликач
- * іде своїм шляхом, а ефект переривається (`AbortSignal`) і прибирає себе.
+ * Найдовше очікування самого декоративного ефекту (після завантаження чанка): далі викликач іде
+ * своїм шляхом, а ефект переривається (`AbortSignal`) і прибирає себе.
  */
 export const EFFECT_TIMEOUT_MS = 2500;
+/**
+ * Найдовше очікування чанка ефекту в мить події: повільніше — ефект пропускається (чанк
+ * довантажиться в кеш для наступного разу).
+ */
+export const EFFECT_LOAD_TIMEOUT_MS = 800;
 
 /**
  * Чинний дизайн: вибір користувача, якщо він дозволений ролі (`MeDto.uiTheme` уже враховує
@@ -165,27 +170,30 @@ export class ThemeService {
 
   /**
    * Програти декоративний ефект чинного дизайну на `source` і дочекатися його кінця. Немає
-   * ефекту, вимкнений налаштуванням чи `prefers-reduced-motion: reduce` — завершується одразу.
-   * Ніколи не відхиляється: збій ефекту — тихо, довше за `EFFECT_TIMEOUT_MS` — ефект
-   * переривається, і викликач іде далі.
+   * ефекту, вимкнений налаштуванням чи `prefers-reduced-motion: reduce`, чанк не встиг за
+   * `EFFECT_LOAD_TIMEOUT_MS` — завершується одразу, `onStart` не викликається. Ніколи не
+   * відхиляється: збій ефекту — тихо, довше за `EFFECT_TIMEOUT_MS` — ефект переривається, і
+   * викликач іде далі. `onStart` — саме перед стартом ефекту (напр. заборонити закриття).
    */
-  async playEffect(name: ThemeEffectName, source: HTMLElement): Promise<void> {
+  async playEffect(
+    name: ThemeEffectName,
+    source: HTMLElement,
+    onStart?: () => void,
+  ): Promise<void> {
     const def = this.activeEffect(name);
     if (!def) return;
-    const abort = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), EFFECT_TIMEOUT_MS);
-    });
     try {
-      const run = this.loadEffect(def).then((effect) =>
-        abort.signal.aborted ? undefined : effect(source, abort.signal),
+      const effect = await withTimeout(this.loadEffect(def), EFFECT_LOAD_TIMEOUT_MS);
+      if (!effect) return;
+      onStart?.();
+      const abort = new AbortController();
+      const done = await withTimeout(
+        effect(source, abort.signal).then(() => true),
+        EFFECT_TIMEOUT_MS,
       );
-      if ((await Promise.race([run, timeout])) === 'timeout') abort.abort();
+      if (!done) abort.abort();
     } catch {
       // Ефект декоративний: його збій не заважає основній дії.
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -373,6 +381,19 @@ export class ThemeService {
     }
     this.doc.head.appendChild(link);
     return { link, created: true };
+  }
+}
+
+/** Результат `promise` або `undefined`, якщо він не встиг за `ms` (помилка — далі). */
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
