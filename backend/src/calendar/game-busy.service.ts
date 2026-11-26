@@ -1,8 +1,13 @@
 import { and, asc, eq, exists, gt, inArray, isNull, lt, max, or, sql } from 'drizzle-orm';
 import { expandOccurrences, type GameBusyDto, type PinnedGamesDto } from '@nri/shared';
 import type { AppDeps } from '../app.js';
-import { getCalendarSettings } from '../availability/availability.service.js';
-import { calendarPinnedGames, gameMembers, games, gameSessions } from '../db/schema/index.js';
+import {
+  calendarPinnedGames,
+  gameMembers,
+  games,
+  gameSessions,
+  userSettings,
+} from '../db/schema/index.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 
@@ -38,40 +43,72 @@ export async function gameBusyIntervals(
   to: Date,
   now: Date = new Date(),
 ): Promise<GameBusy[]> {
+  return (await gameBusyIntervalsForUsers(deps, [userId], from, to, now)).get(userId) ?? [];
+}
+
+/**
+ * Те саме для кількох користувачів одразу (підбір спільного часу групи): фіксована кількість
+ * запитів незалежно від кількості користувачів. Ключі результату — усі `userIds`.
+ */
+export async function gameBusyIntervalsForUsers(
+  deps: AppDeps,
+  userIds: readonly number[],
+  from: Date,
+  to: Date,
+  now: Date = new Date(),
+): Promise<Map<number, GameBusy[]>> {
   const { db } = deps;
-  const { calendarAutoBusy } = await getCalendarSettings(deps, userId);
-  const activeMember = exists(
+  const result = new Map<number, GameBusy[]>(userIds.map((u) => [u, []]));
+  if (userIds.length === 0) return result;
+  const ids = [...new Set(userIds)];
+
+  const [settings, pins, mine] = await Promise.all([
     db
-      .select({ one: sql`1` })
+      .select({ userId: userSettings.userId, autoBusy: userSettings.calendarAutoBusy })
+      .from(userSettings)
+      .where(inArray(userSettings.userId, ids)),
+    db
+      .select({ userId: calendarPinnedGames.userId, gameId: calendarPinnedGames.gameId })
+      .from(calendarPinnedGames)
+      .where(inArray(calendarPinnedGames.userId, ids)),
+    db
+      .select()
+      .from(games)
+      .where(
+        and(
+          inArray(games.status, ['recruiting', 'started']),
+          or(
+            inArray(games.gmUserId, ids),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(gameMembers)
+                .where(
+                  and(
+                    eq(gameMembers.gameId, games.id),
+                    inArray(gameMembers.userId, ids),
+                    isNull(gameMembers.leftAt),
+                  ),
+                ),
+            ),
+          ),
+        ),
+      ),
+  ]);
+  if (mine.length === 0) return result;
+  const gameIds = mine.map((g) => g.id);
+
+  const [members, sessions, lastSlots] = await Promise.all([
+    db
+      .select({ gameId: gameMembers.gameId, userId: gameMembers.userId })
       .from(gameMembers)
       .where(
         and(
-          eq(gameMembers.gameId, games.id),
-          eq(gameMembers.userId, userId),
+          inArray(gameMembers.gameId, gameIds),
+          inArray(gameMembers.userId, ids),
           isNull(gameMembers.leftAt),
         ),
       ),
-  );
-  const pinned = exists(
-    db
-      .select({ one: sql`1` })
-      .from(calendarPinnedGames)
-      .where(and(eq(calendarPinnedGames.gameId, games.id), eq(calendarPinnedGames.userId, userId))),
-  );
-  const mine = await db
-    .select()
-    .from(games)
-    .where(
-      and(
-        inArray(games.status, ['recruiting', 'started']),
-        or(eq(games.gmUserId, userId), activeMember),
-        calendarAutoBusy ? undefined : pinned,
-      ),
-    );
-  if (mine.length === 0) return [];
-  const ids = mine.map((g) => g.id);
-
-  const [sessions, lastSlots] = await Promise.all([
     db
       .select({
         id: gameSessions.id,
@@ -82,7 +119,7 @@ export async function gameBusyIntervals(
       .from(gameSessions)
       .where(
         and(
-          inArray(gameSessions.gameId, ids),
+          inArray(gameSessions.gameId, gameIds),
           eq(gameSessions.status, 'scheduled'),
           lt(gameSessions.startsAt, to),
           gt(gameSessions.startsAt, new Date(from.getTime() - MAX_SESSION_MS)),
@@ -92,16 +129,17 @@ export async function gameBusyIntervals(
     db
       .select({ gameId: gameSessions.gameId, last: max(gameSessions.ruleStartsAt) })
       .from(gameSessions)
-      .where(inArray(gameSessions.gameId, ids))
+      .where(inArray(gameSessions.gameId, gameIds))
       .groupBy(gameSessions.gameId),
   ]);
 
+  // Проміжки кожної гри — один раз, далі розподіляються між її користувачами.
   const byId = new Map(mine.map((g) => [g.id, g]));
-  const out: GameBusy[] = [];
+  const perGame = new Map<number, GameBusy[]>(gameIds.map((id) => [id, []]));
   for (const s of sessions) {
     const end = new Date(s.startsAt.getTime() + s.durationMinutes * MINUTE_MS);
     if (end <= from) continue;
-    out.push({
+    perGame.get(s.gameId)!.push({
       gameId: s.gameId,
       gameTitle: byId.get(s.gameId)!.title,
       sessionId: s.id,
@@ -109,7 +147,6 @@ export async function gameBusyIntervals(
       end,
     });
   }
-
   const last = new Map(lastSlots.map((r) => [r.gameId, r.last ? new Date(r.last) : null]));
   for (const g of mine) {
     const after = last.get(g.id) ?? null;
@@ -129,10 +166,34 @@ export async function gameBusyIntervals(
     );
     for (const o of occ) {
       if (after && o.start <= after) continue;
-      out.push({ gameId: g.id, gameTitle: g.title, sessionId: null, start: o.start, end: o.end });
+      perGame.get(g.id)!.push({
+        gameId: g.id,
+        gameTitle: g.title,
+        sessionId: null,
+        start: o.start,
+        end: o.end,
+      });
     }
   }
-  return out.sort((a, b) => a.start.getTime() - b.start.getTime() || a.gameId - b.gameId);
+
+  const autoBusy = new Map(settings.map((r) => [r.userId, r.autoBusy]));
+  const pinned = new Set(pins.map((p) => `${p.userId}:${p.gameId}`));
+  const memberOf = new Set(members.map((m) => `${m.userId}:${m.gameId}`));
+  for (const u of ids) {
+    const auto = autoBusy.get(u) ?? true;
+    const out: GameBusy[] = [];
+    for (const g of mine) {
+      const key = `${u}:${g.id}`;
+      if (g.gmUserId !== u && !memberOf.has(key)) continue;
+      if (!auto && !pinned.has(key)) continue;
+      out.push(...perGame.get(g.id)!);
+    }
+    result.set(
+      u,
+      out.sort((a, b) => a.start.getTime() - b.start.getTime() || a.gameId - b.gameId),
+    );
+  }
+  return result;
 }
 
 export async function gameBusy(
