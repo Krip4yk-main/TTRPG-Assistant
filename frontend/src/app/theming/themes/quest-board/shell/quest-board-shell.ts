@@ -10,6 +10,7 @@ import { UserName } from '../../../../shared/user-name/user-name';
 import { NotificationBell } from '../../../../features/notifications/notification-bell/notification-bell';
 import { RateLink } from '../../../../features/ratings/rate-link/rate-link';
 import { SanctionsBanner } from '../../../../features/moderation/sanctions-banner/sanctions-banner';
+import { GuestThemeToggle } from '../../../guest-theme-toggle/guest-theme-toggle';
 import type { ShellSlot } from '../../../slots';
 
 /**
@@ -27,6 +28,7 @@ import type { ShellSlot } from '../../../slots';
     MatButtonToggleModule,
     MatIconModule,
     MatMenuModule,
+    GuestThemeToggle,
     NotificationBell,
     RateLink,
     SanctionsBanner,

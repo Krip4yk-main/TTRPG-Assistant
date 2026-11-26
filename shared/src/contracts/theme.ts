@@ -22,6 +22,19 @@ export type ThemeId = (typeof THEME_IDS)[number];
 /** Дизайн за замовчуванням (і запасний, якщо збережений недоступний ролі). */
 export const DEFAULT_THEME: ThemeId = 'quest-board';
 
+/**
+ * Дизайни, між якими перемикається гість (не ввійшов) — перемикач у шапці; вибір лише в
+ * `localStorage`, без бекенду. Перший — за замовчуванням. Кібер-варіант — один id тут (змінити —
+ * один рядок). Після входу діє дизайн акаунта, після виходу — знову вибір гостя.
+ */
+export const GUEST_THEMES = ['quest-board', 'night-city'] as const satisfies readonly ThemeId[];
+export type GuestThemeId = (typeof GUEST_THEMES)[number];
+
+/** Дизайн гостя: збережений id, якщо він серед `GUEST_THEMES`; інакше перший з них. */
+export function resolveGuestTheme(stored: string | null): GuestThemeId {
+  return GUEST_THEMES.find((t) => t === stored) ?? GUEST_THEMES[0];
+}
+
 /** Кому доступний дизайн: усім чи лише власнику платформи. */
 export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   'quest-board': 'everyone',

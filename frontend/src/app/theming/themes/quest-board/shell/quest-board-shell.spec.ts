@@ -135,6 +135,12 @@ describe('QuestBoardShell (slot «shell»)', () => {
     expect(el.querySelector('a[href="/login"]')).not.toBeNull();
     expect(el.querySelector('button.avatar')).toBeNull();
     expect(el.querySelector('.view-mode')).toBeNull();
+    expect(el.querySelectorAll('nri-guest-theme-toggle button[aria-pressed]')).toHaveLength(2);
+  });
+
+  it('a logged-in user does not see the guest design toggle', async () => {
+    await settle();
+    expect(el.querySelector('nri-guest-theme-toggle [role="group"]')).toBeNull();
   });
 
   it('has the skip link, the main landmark and the footer «About» link', async () => {

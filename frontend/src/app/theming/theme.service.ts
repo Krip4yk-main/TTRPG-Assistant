@@ -5,9 +5,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   DEFAULT_THEME,
   DEFAULT_UI_PREFS,
+  GUEST_THEMES,
   ME_CHANGED_EVENT,
   THEME_IDS,
+  resolveGuestTheme,
   resolveTheme,
+  type GuestThemeId,
   type MeChangedPing,
   type MeDto,
   type ThemeId,
@@ -40,6 +43,11 @@ import {
 export const THEME_STORAGE_KEY = 'nri.theme';
 /** Версія бандлів стилів, з якою інлайн-скрипт будує `?v=` до старту застосунку. */
 export const THEME_VERSION_STORAGE_KEY = 'nri.theme.v';
+/**
+ * Вибір гостя з `GUEST_THEMES` (перемикач у шапці). Окремо від `THEME_STORAGE_KEY`: той
+ * перезаписує дизайн акаунта, а вибір гостя має пережити вхід і повернутися після виходу.
+ */
+export const GUEST_THEME_STORAGE_KEY = 'nri.theme.guest';
 /** `<link>` бандла стилів дизайну (його ж створює інлайн-скрипт). */
 export const THEME_LINK_ID = 'nri-theme-style';
 /**
@@ -74,7 +82,8 @@ const HEADING_FONT_SAMPLE = 'Знайдіть свою гру 0123456789';
 
 /**
  * Чинний дизайн: вибір користувача, якщо він дозволений ролі (`MeDto.uiTheme` уже враховує
- * роль; перевіряємо ще раз), інакше — за замовчуванням; гість — завжди за замовчуванням.
+ * роль; перевіряємо ще раз), інакше — за замовчуванням; гість — його вибір з `GUEST_THEMES`
+ * (лише в `localStorage`), інакше — за замовчуванням.
  * Ставить `data-theme` і `color-scheme` на `<html>`, підключає бандл стилів і вантажить слоти.
  * Кеш у `localStorage` — лише підказка: права перевіряються тут, після `/api/me`.
  */
@@ -86,6 +95,7 @@ export class ThemeService {
   private readonly doc = inject(DOCUMENT);
 
   private readonly current = signal<ThemeId>(DEFAULT_THEME);
+  private readonly guestChoice = signal<GuestThemeId>(readGuestTheme());
   private readonly loaded = signal<ThemeSlots | null>(null);
   /** Останній запитаний дизайн і обіцянка його застосування. */
   private target: ThemeId | null = null;
@@ -113,13 +123,20 @@ export class ThemeService {
   /** Дизайни, які користувач може обрати. */
   readonly available = computed<ThemeId[]>(() => {
     const me = this.auth.me();
-    return me ? me.availableThemes : [DEFAULT_THEME];
+    return me ? me.availableThemes : [...GUEST_THEMES];
   });
+  /** Гість (не ввійшов): дизайн обирає перемикачем у шапці, а не у «Вигляді». */
+  readonly isGuest = computed(() => this.auth.me() === null);
+  /** Вибір гостя (одразу після кліку — ще до того, як новий дизайн завантажився й показаний). */
+  readonly guestTheme = this.guestChoice.asReadonly();
 
   /** Налаштування вигляду з профілю; гість — за замовчуванням (анімації ввімкнені). */
   readonly uiPrefs = computed<UiPrefsDto>(() => this.auth.me()?.uiPrefs ?? DEFAULT_UI_PREFS);
 
-  private readonly effective = computed<ThemeId>(() => effectiveTheme(this.auth.me()));
+  private readonly effective = computed<ThemeId>(() => {
+    const me = this.auth.me();
+    return me ? effectiveTheme(me) : this.guestChoice();
+  });
 
   constructor() {
     // Вхід, вихід, зміна ролі чи вибору в іншій вкладці — дизайн іде за станом акаунта.
@@ -240,8 +257,23 @@ export class ThemeService {
     return chunk;
   }
 
-  /** Обрати дизайн: зберігає в профілі й застосовує без перезавантаження. */
+  /**
+   * Обрати дизайн: зберігає в профілі й застосовує без перезавантаження. Гість — лише дизайн з
+   * `GUEST_THEMES`, вибір — у `localStorage` (без бекенду); інший id ігнорується.
+   */
   async select(id: ThemeId): Promise<void> {
+    if (!this.auth.me()) {
+      const guest = GUEST_THEMES.find((t) => t === id);
+      if (!guest) return;
+      try {
+        localStorage.setItem(GUEST_THEME_STORAGE_KEY, guest);
+      } catch {
+        // Сховище недоступне — вибір діє до перезавантаження.
+      }
+      this.guestChoice.set(guest);
+      await this.apply(guest);
+      return;
+    }
     const body: UpdateThemeRequest = { theme: id };
     const me = await this.write(this.http.patch<MeDto>('/api/me/theme', body));
     await this.apply(effectiveTheme(me));
@@ -482,8 +514,16 @@ function partition<T>(items: T[], test: (item: T) => boolean): [T[], T[]] {
   return [items.filter(test), items.filter((i) => !test(i))];
 }
 
-/** Чинний дизайн для акаунта (гість — за замовчуванням). */
-function effectiveTheme(me: MeDto | null): ThemeId {
-  if (!me) return DEFAULT_THEME;
+/** Збережений вибір гостя (недоступне сховище чи чужий id — за замовчуванням). */
+function readGuestTheme(): GuestThemeId {
+  try {
+    return resolveGuestTheme(localStorage.getItem(GUEST_THEME_STORAGE_KEY));
+  } catch {
+    return resolveGuestTheme(null);
+  }
+}
+
+/** Чинний дизайн для акаунта. */
+function effectiveTheme(me: MeDto): ThemeId {
   return THEME_IDS.includes(me.uiTheme) ? resolveTheme(me.uiTheme, me.role) : DEFAULT_THEME;
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { availableThemes, resolveTheme } from './theme.js';
+import {
+  DEFAULT_THEME,
+  GUEST_THEMES,
+  THEME_IDS,
+  availableThemes,
+  resolveGuestTheme,
+  resolveTheme,
+} from './theme.js';
 
 const ALL = [
   'quest-board',
@@ -31,5 +38,22 @@ describe('themes', () => {
     for (const role of ['user', 'admin', 'owner'] as const) {
       expect(availableThemes(role)).toEqual(ALL);
     }
+  });
+
+  it('GUEST_THEMES: «Дошка» перша (дефолт), далі один кібер-дизайн; усі — відомі й доступні гравцю', () => {
+    expect(GUEST_THEMES).toEqual(['quest-board', 'night-city']);
+    expect(GUEST_THEMES[0]).toBe(DEFAULT_THEME);
+    for (const id of GUEST_THEMES) {
+      expect(THEME_IDS).toContain(id);
+      expect(availableThemes('user')).toContain(id);
+    }
+  });
+
+  it('resolveGuestTheme: лише дизайни гостя, інакше «Дошка»', () => {
+    expect(resolveGuestTheme('night-city')).toBe('night-city');
+    expect(resolveGuestTheme('quest-board')).toBe('quest-board');
+    expect(resolveGuestTheme('dungeon')).toBe('quest-board');
+    expect(resolveGuestTheme('bogus')).toBe('quest-board');
+    expect(resolveGuestTheme(null)).toBe('quest-board');
   });
 });

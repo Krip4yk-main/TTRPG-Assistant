@@ -12,6 +12,7 @@ import {
   EFFECT_LOAD_TIMEOUT_MS,
   EFFECT_TIMEOUT_MS,
   FONT_WAIT_MS,
+  GUEST_THEME_STORAGE_KEY,
   STYLE_WAIT_MS,
   THEME_LINK_ID,
   THEME_LINK_SETTLED_ATTR,
@@ -164,7 +165,7 @@ describe('ThemeService', () => {
     expect(localStorage.getItem(THEME_VERSION_STORAGE_KEY)).toMatch(/^[a-z0-9]+$/);
   });
 
-  it('a guest always gets the default design', async () => {
+  it('a guest without a stored choice gets the default design (cached account design is dropped)', async () => {
     setup();
     bootFromCache('night-city', 'theme-night-city.css?v=1');
     auth.setMe(null);
@@ -375,6 +376,104 @@ describe('ThemeService', () => {
     await settleWhenAdded('theme-quest-board.css?v=1');
     await vi.waitFor(() => expect(service.theme()).toBe('quest-board'));
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
+  });
+
+  describe('guest design switch (GUEST_THEMES, localStorage only)', () => {
+    const http = () => TestBed.inject(HttpTestingController);
+
+    it('a guest may pick only GUEST_THEMES; isGuest is true', async () => {
+      setup();
+      auth.setMe(null);
+      await service.init();
+      expect(service.isGuest()).toBe(true);
+      expect(service.available()).toEqual(['quest-board', 'night-city']);
+    });
+
+    it('select() as a guest stores the choice locally, applies it and makes no request', async () => {
+      setup();
+      auth.setMe(null);
+      await service.init();
+      const done = service.select('night-city');
+      await settleWhenAdded('theme-night-city.css?v=1');
+      await done;
+      http().expectNone('/api/me/theme');
+      expect(theme()).toBe('night-city');
+      expect(service.theme()).toBe('night-city');
+      expect(service.slots()).toBe(SC_SLOTS);
+      expect(links()).toEqual(['theme-night-city.css?v=1']);
+      expect(localStorage.getItem(GUEST_THEME_STORAGE_KEY)).toBe('night-city');
+      // Підказка для інлайн-скрипту — теж «Нічне місто» (перезавантаження без мигання).
+      expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('night-city');
+    });
+
+    it('a guest cannot pick a design outside GUEST_THEMES', async () => {
+      setup();
+      auth.setMe(null);
+      await service.init();
+      await service.select('dungeon');
+      http().expectNone('/api/me/theme');
+      expect(service.theme()).toBe('quest-board');
+      expect(localStorage.getItem(GUEST_THEME_STORAGE_KEY)).toBeNull();
+    });
+
+    it('the stored guest choice is applied on start', async () => {
+      localStorage.setItem(GUEST_THEME_STORAGE_KEY, 'night-city');
+      setup();
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      const cached = document.head.querySelector(`link#${THEME_LINK_ID}`);
+      auth.setMe(null);
+      await service.init();
+      expect(theme()).toBe('night-city');
+      expect(service.slots()).toBe(SC_SLOTS);
+      expect(document.head.querySelector(`link#${THEME_LINK_ID}`)).toBe(cached);
+    });
+
+    it('a stored guest value outside GUEST_THEMES falls back to the default', async () => {
+      localStorage.setItem(GUEST_THEME_STORAGE_KEY, 'dungeon');
+      setup();
+      auth.setMe(null);
+      await service.init();
+      expect(service.theme()).toBe('quest-board');
+    });
+
+    it('login: the account design wins over the guest choice', async () => {
+      localStorage.setItem(GUEST_THEME_STORAGE_KEY, 'night-city');
+      setup();
+      auth.setMe(null);
+      await service.init();
+      auth.setMe({ ...user, uiTheme: 'holo-market' });
+      TestBed.tick();
+      await settleWhenAdded('theme-holo-market.css?v=1');
+      await vi.waitFor(() => expect(theme()).toBe('holo-market'));
+      expect(service.isGuest()).toBe(false);
+      // Вибір гостя лишається для наступного виходу.
+      expect(localStorage.getItem(GUEST_THEME_STORAGE_KEY)).toBe('night-city');
+    });
+
+    it('logout: back to the stored guest choice', async () => {
+      localStorage.setItem(GUEST_THEME_STORAGE_KEY, 'night-city');
+      setup();
+      auth.setMe({ ...user, uiTheme: 'dungeon' });
+      await service.init();
+      expect(theme()).toBe('dungeon');
+      auth.setMe(null);
+      TestBed.tick();
+      await settleWhenAdded('theme-night-city.css?v=1');
+      await vi.waitFor(() => expect(theme()).toBe('night-city'));
+    });
+
+    it('a logged-in user still saves select() in the profile (not the guest key)', async () => {
+      setup();
+      auth.setMe({ ...user, uiTheme: 'quest-board' });
+      await service.init();
+      const done = service.select('night-city');
+      http()
+        .expectOne('/api/me/theme')
+        .flush({ ...user, uiTheme: 'night-city' });
+      await settleWhenAdded('theme-night-city.css?v=1');
+      await done;
+      expect(localStorage.getItem(GUEST_THEME_STORAGE_KEY)).toBeNull();
+    });
   });
 
   it('a failed design chunk still applies the design and leaves slots to the fallback (RF 3)', async () => {
