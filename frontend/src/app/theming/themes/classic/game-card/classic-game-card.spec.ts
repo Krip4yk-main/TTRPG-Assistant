@@ -161,13 +161,13 @@ describe('ClassicGameCard (slot «game-card»)', () => {
   describe('session time zone', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it('guest in Warsaw sees the browser-zone time with a zone label', async () => {
+    it('guest in Warsaw sees the browser-zone time without a zone label', async () => {
       vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
       TestBed.inject(AuthStore).setMe(null);
       await render(game, true);
       const next = el.querySelector('.facts dd')!.textContent!;
       expect(next).toContain('18:00');
-      expect(next).toContain('GMT+1');
+      expect(next).not.toMatch(/GMT|EET|CET/);
     });
 
     it('viewer in the game zone sees no zone label', async () => {

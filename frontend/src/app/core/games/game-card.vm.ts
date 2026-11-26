@@ -5,7 +5,7 @@ import {
   type RestrictedGameDto,
   type SearchGameCardDto,
 } from '@nri/shared';
-import { differentZones, formatDateTime, viewerTimeZone } from '../i18n/dates';
+import { formatDateTime, viewerTimeZone } from '../i18n/dates';
 
 /**
  * Бейдж (позначка) для слотів дизайну. `kind` + `value` — семантика (дизайн за ними обирає
@@ -140,11 +140,9 @@ export function toGameCardVm(
 
   let nextSession: string | null = null;
   if (game.nextSessionAt) {
-    // Час — у поясі глядача; назва поясу додається, якщо він відрізняється від поясу гри.
-    const tz = viewerTimeZone(me);
-    nextSession = formatDateTime(game.nextSessionAt, tz, {
-      showZone: differentZones(tz, game.timezone),
-    });
+    // Час — у поясі глядача (акаунта або браузера) і без назви поясу: на картці «Коли» завжди
+    // «по-вашому»; пояс гри видно на сторінці гри.
+    nextSession = formatDateTime(game.nextSessionAt, viewerTimeZone(me));
   }
 
   const systemName = game.system?.name ?? game.systemOther ?? '';

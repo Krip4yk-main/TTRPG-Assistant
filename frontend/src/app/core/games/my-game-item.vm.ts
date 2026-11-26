@@ -1,5 +1,5 @@
 import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
-import { differentZones, formatDateTime, viewerTimeZone } from '../i18n/dates';
+import { formatDateTime, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
 import type { LinePart } from './game-card.vm';
 
@@ -131,10 +131,8 @@ export function toMyGameItemVm(
 
   let nextSession: string | null = null;
   if (game.nextSessionAt) {
-    const tz = viewerTimeZone(me);
-    nextSession = formatDateTime(game.nextSessionAt, tz, {
-      showZone: differentZones(tz, game.timezone),
-    });
+    // У поясі глядача, без назви поясу (як на картці пошуку).
+    nextSession = formatDateTime(game.nextSessionAt, viewerTimeZone(me));
   }
 
   const systemName = game.system?.name ?? game.systemOther ?? '';

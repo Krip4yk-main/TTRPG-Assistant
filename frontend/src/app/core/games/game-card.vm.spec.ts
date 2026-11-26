@@ -108,10 +108,10 @@ describe('toGameCardVm', () => {
     expect(full({ ...game, nextSessionAt: null }).nextSession).toBeNull();
   });
 
-  it('next session in the viewer zone, with a zone label only when it differs', () => {
+  it('next session in the viewer zone, never with a zone label', () => {
     vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
     expect(full(game).nextSession).toContain('18:00');
-    expect(full(game).nextSession).toContain('GMT+1');
+    expect(full(game).nextSession).not.toMatch(/GMT|EET|CET/);
     vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
     expect(full(game).nextSession).toContain('19:00');
     expect(full(game).nextSession).not.toMatch(/GMT|EET/);
