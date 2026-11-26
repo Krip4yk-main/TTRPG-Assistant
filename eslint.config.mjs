@@ -8,6 +8,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/.angular/**',
       '**/coverage/**',
+      // Локальні медіа й скрипти перевірок (git-ignored).
+      '.media/**',
       // Згенерований перед збіркою файл (scripts/gen-runtime-config.mjs).
       'frontend/src/environments/runtime-config.ts',
     ],
