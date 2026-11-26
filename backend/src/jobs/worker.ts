@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import type { Db } from '../db/client.js';
+import { writeWorkerHeartbeat } from '../http/health.js';
 import { jobs } from '../db/schema/index.js';
 import {
   ensureRecurring,
@@ -16,6 +17,8 @@ export const LOCK_MS = 5 * 60_000;
 const BACKOFF_BASE_MS = 30_000;
 const ERROR_MAX_LEN = 4000;
 const ENSURE_RECURRING_EVERY_MS = 60_000;
+/** Як часто воркер пише heartbeat у Redis (не рідше раза на хвилину). */
+const HEARTBEAT_EVERY_MS = 30_000;
 
 /** Затримка перед повтором після спроби №`attempts` (з 1): 30 с · 2^(attempts-1). */
 export const backoffMs = (attempts: number): number => BACKOFF_BASE_MS * 2 ** (attempts - 1);
@@ -227,6 +230,11 @@ export function startWorker(
   let lastEnsureAt = -Infinity;
   const shouldStop = (): boolean => stopped;
 
+  // Heartbeat окремим таймером: довга задача не маскує живий процес, а збій Redis не валить воркер.
+  void writeWorkerHeartbeat(deps.redis);
+  const heartbeat = setInterval(() => void writeWorkerHeartbeat(deps.redis), HEARTBEAT_EVERY_MS);
+  heartbeat.unref();
+
   const tick = (): void => {
     if (stopped) return;
     current = (async () => {
@@ -249,6 +257,7 @@ export function startWorker(
   return {
     async stop() {
       stopped = true;
+      clearInterval(heartbeat);
       clearTimeout(timer);
       await current;
     },

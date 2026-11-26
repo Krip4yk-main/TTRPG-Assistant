@@ -349,7 +349,7 @@ describe('google oauth', () => {
   describe('link mode', () => {
     async function loggedInTelegram(app: ReturnType<typeof createApp>, id: string) {
       const agent = request.agent(app);
-      const r = await agent.get('/api/health');
+      const r = await agent.get('/api/auth/ping');
       const csrf = /nri_csrf=([^;]+)/.exec(cookies(r))![1]!;
       const body = sign(
         { id, first_name: 'Ada', auth_date: String(Math.floor(Date.now() / 1000)) },

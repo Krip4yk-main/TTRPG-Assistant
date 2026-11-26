@@ -129,7 +129,7 @@ describe('realtime', () => {
     const res = await fetch(`${url}/socket.io/?EIO=4&transport=polling`);
     expect(res.status).not.toBe(404);
     expect(await res.text()).not.toContain('NOT_FOUND');
-    expect((await fetch(`${url}/api/health`)).status).toBe(200);
+    expect((await fetch(`${url}/api/health/live`)).status).toBe(200);
   });
 
   it('logout-all disconnects an open socket', async () => {

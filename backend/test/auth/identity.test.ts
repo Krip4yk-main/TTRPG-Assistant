@@ -115,7 +115,7 @@ describe('telegram routes', () => {
 
   async function agentWithCsrf(app: ReturnType<typeof createApp>) {
     const agent = request.agent(app);
-    const r = await agent.get('/api/health');
+    const r = await agent.get('/api/auth/ping');
     const csrf = /nri_csrf=([^;]+)/.exec(cookies(r))![1]!;
     return { agent, csrf };
   }

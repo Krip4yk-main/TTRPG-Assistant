@@ -46,6 +46,7 @@ import {
   myDeadGamesRouter,
 } from './games/dead-games/dead-games.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
+import { healthRouter } from './http/health.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
 export type AppDeps = {
@@ -71,6 +72,8 @@ export function createApp(deps: AppDeps): express.Express {
 
   app.use(helmet());
   app.use(cookieParser());
+  // Health-check — до rate limiter, CSRF та сесії: без cookie, дешево, не залежить від них.
+  app.use(healthRouter(deps));
   // Поза /api: без сесії, CSRF-cookie та загального rate limiter (лише GET — тіло не потрібне).
   app.use(seoRootRouter(deps));
   // Rate limiter — ДО парсерів тіла: клієнт поза лімітом не змусить розбирати 1 МБ.
@@ -82,10 +85,6 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(express.json({ limit: '100kb' }));
   app.use(csrfProtection(env));
   app.use(loadSession(deps));
-
-  app.get('/api/health', (_req, res) => {
-    res.json({ ok: true });
-  });
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));

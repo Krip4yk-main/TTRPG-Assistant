@@ -61,21 +61,21 @@ describe('loadEnv', () => {
 });
 
 describe('app', () => {
-  it('GET /api/health returns ok and sets nri_csrf', async () => {
-    const res = await request(makeApp()).get('/api/health');
+  it('GET /api/auth/ping returns ok and sets nri_csrf', async () => {
+    const res = await request(makeApp()).get('/api/auth/ping');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
     expect((res.headers['set-cookie'] as unknown as string[]).join(';')).toMatch(/nri_csrf=/);
   });
 
   it('sends helmet headers', async () => {
-    const res = await request(makeApp()).get('/api/health');
+    const res = await request(makeApp()).get('/api/auth/ping');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
   it('rejects POST without CSRF header, accepts with matching one', async () => {
     const agent = request.agent(makeApp());
-    const get = await agent.get('/api/health');
+    const get = await agent.get('/api/auth/ping');
     const token = csrfToken(get.headers['set-cookie'] as unknown as string[]);
 
     const bad = await agent.post('/api/health-echo').send({});
@@ -121,7 +121,7 @@ describe('app', () => {
 
   it('maps malformed JSON to 400 VALIDATION', async () => {
     const agent = request.agent(makeApp());
-    const get = await agent.get('/api/health');
+    const get = await agent.get('/api/auth/ping');
     const token = csrfToken(get.headers['set-cookie'] as unknown as string[]);
     const res = await agent
       .post('/api/health-echo')
@@ -136,7 +136,7 @@ describe('app', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const agent = request.agent(makeApp());
-      const get = await agent.get('/api/health');
+      const get = await agent.get('/api/auth/ping');
       const token = csrfToken(get.headers['set-cookie'] as unknown as string[]);
       const big = await agent
         .post('/api/health-echo')
@@ -176,9 +176,9 @@ describe('app', () => {
 
   it('rate-limits the general API', async () => {
     const app = makeApp({ RATE_LIMIT_MAX: '2' });
-    await request(app).get('/api/health');
-    await request(app).get('/api/health');
-    const res = await request(app).get('/api/health');
+    await request(app).get('/api/auth/ping');
+    await request(app).get('/api/auth/ping');
+    const res = await request(app).get('/api/auth/ping');
     expect(res.status).toBe(429);
   });
 });
