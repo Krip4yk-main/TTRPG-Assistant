@@ -471,7 +471,8 @@ describe('me.changed ping on appearance PATCH', () => {
   beforeEach(() => {
     emitted.length = 0;
     deps.realtime = {
-      toUser: (userId, event, payload) => void emitted.push({ userId, event, payload }),
+      toUser: (userId: number, event: string, payload: unknown) =>
+        void emitted.push({ userId, event, payload }),
       toRoom: () => {},
       disconnectUser: () => {},
       disconnectSession: () => {},

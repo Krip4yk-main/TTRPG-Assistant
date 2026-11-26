@@ -14,7 +14,15 @@ import {
   type UiPrefsDto,
   type UpdateThemeRequest,
 } from '@nri/shared';
-import { EMPTY, Subject, catchError, filter, firstValueFrom, switchMap, type Observable } from 'rxjs';
+import {
+  EMPTY,
+  Subject,
+  catchError,
+  filter,
+  firstValueFrom,
+  switchMap,
+  type Observable,
+} from 'rxjs';
 import { runtimeConfig } from '../../environments/runtime-config';
 import { AuthStore } from '../core/auth/auth.store';
 import { SocketService } from '../core/realtime/socket.service';
@@ -105,10 +113,18 @@ export class ThemeService {
             return EMPTY;
           }
           const since = this.localWritesDone;
+          const before = this.auth.me();
           return this.http.get<MeDto>('/api/me').pipe(
             catchError(() => EMPTY), // втрату сесії обробляє AuthStore
-            // Тим часом почався чи завершився власний PATCH — ця відповідь уже застаріла.
-            filter(() => this.localWrites === 0 && since === this.localWritesDone),
+            // Відповідь застаріла, якщо тим часом почався чи завершився власний PATCH, стан
+            // профілю оновив хтось інший (напр. зміна ніка), або в цій вкладці вже інший акаунт.
+            filter(
+              (me) =>
+                this.localWrites === 0 &&
+                since === this.localWritesDone &&
+                this.auth.me() === before &&
+                me.id === before?.id,
+            ),
           );
         }),
         takeUntilDestroyed(),

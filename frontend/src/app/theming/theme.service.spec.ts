@@ -413,7 +413,9 @@ describe('ThemeService', () => {
       expect(theme()).toBe('night-city');
 
       meChanged.next({ scope: 'appearance' });
-      http().expectOne({ method: 'GET', url: '/api/me' }).flush({ ...user, uiTheme: 'dungeon' });
+      http()
+        .expectOne({ method: 'GET', url: '/api/me' })
+        .flush({ ...user, uiTheme: 'dungeon' });
       await settleWhenAdded('theme-dungeon.css?v=1');
       await vi.waitFor(() => expect(theme()).toBe('dungeon'));
       expect(links()).toEqual(['theme-dungeon.css?v=1']);
@@ -429,7 +431,9 @@ describe('ThemeService', () => {
       const link = document.head.querySelector(`link#${THEME_LINK_ID}`);
 
       meChanged.next({ scope: 'appearance' });
-      http().expectOne('/api/me').flush({ ...user });
+      http()
+        .expectOne('/api/me')
+        .flush({ ...user });
       await Promise.resolve();
       expect(theme()).toBe('night-city');
       expect(document.head.querySelector(`link#${THEME_LINK_ID}`)).toBe(link);
@@ -465,10 +469,43 @@ describe('ThemeService', () => {
       await done;
       expect(theme()).toBe('quest-board');
       // Після PATCH — одне перечитування; те саме значення нічого не змінює.
-      http().expectOne('/api/me').flush({ ...user, uiTheme: 'quest-board' });
+      http()
+        .expectOne('/api/me')
+        .flush({ ...user, uiTheme: 'quest-board' });
       await Promise.resolve();
       expect(theme()).toBe('quest-board');
       expect(links()).toEqual(['theme-quest-board.css?v=1']);
+      http().verify();
+    });
+
+    it('a stale response is dropped when the profile changed meanwhile', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+
+      meChanged.next({ scope: 'appearance' });
+      const req = http().expectOne('/api/me');
+      auth.setMe({ ...user, nickname: 'Mithrandir' }); // напр. зміна ніка в цій вкладці
+      req.flush({ ...user, uiTheme: 'dungeon' });
+      await Promise.resolve();
+      expect(auth.me()!.nickname).toBe('Mithrandir');
+      expect(auth.me()!.uiTheme).toBe('night-city');
+      expect(theme()).toBe('night-city');
+      http().verify();
+    });
+
+    it('a response for another account is not applied', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+
+      meChanged.next({ scope: 'appearance' });
+      http()
+        .expectOne('/api/me')
+        .flush({ ...user, id: 2, nickname: 'Saruman', uiTheme: 'dungeon' });
+      await Promise.resolve();
+      expect(auth.me()!.id).toBe(1);
+      expect(theme()).toBe('night-city');
       http().verify();
     });
 
