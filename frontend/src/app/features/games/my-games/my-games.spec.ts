@@ -7,6 +7,8 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import type { MeDto, MyGameCardDto } from '@nri/shared';
 import { MyGames } from './my-games';
+import { PauseDialog } from '../pause/pause-dialog';
+import { ResumeDialog } from '../pause/resume-dialog';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { ViewModeStore } from '../../../core/view-mode/view-mode.store';
@@ -321,6 +323,72 @@ describe('MyGames', () => {
       http.expectOne('/api/games/mine').flush([card(6, 'cancelled')]);
       await settle();
       expect(flags(6)).toEqual([]);
+    });
+  });
+
+  describe('campaign pause', () => {
+    const campaign = (id: number, status: MyGameCardDto['status']): MyGameCardDto => ({
+      ...card(id, status),
+      kind: 'campaign',
+    });
+    const show = async (games: MyGameCardDto[]) => {
+      fixture.componentInstance['games'].set(games);
+      await settle();
+    };
+
+    it('a running campaign offers «pause»; the dialog result updates the card', async () => {
+      await show([campaign(11, 'started')]);
+      expect(actions(11)).toEqual(['edit', 'finish', 'pause', 'cancel']);
+      open.mockReturnValueOnce({
+        afterClosed: () => of({ ...campaign(11, 'paused'), nextSessionAt: null }),
+      });
+      article(11).querySelector<HTMLButtonElement>('[data-action="pause"]')!.click();
+      await settle();
+      await settle();
+      expect(open).toHaveBeenCalledWith(
+        PauseDialog,
+        expect.objectContaining({ data: { gameId: 11, title: 'Гра 11' } }),
+      );
+      expect(article(11).querySelector('.status')!.textContent).toContain('games.status.paused');
+      expect(actions(11)).toEqual(['resume', 'recruit', 'finish', 'cancel']);
+      expect(el.textContent).toContain('games.pause.done.pause');
+      http.expectOne('/api/games/mine').flush([campaign(11, 'paused')]);
+      await settle();
+    });
+
+    it('«recruit» on a paused campaign loads the game rule, then opens the date dialog', async () => {
+      await show([campaign(12, 'paused')]);
+      open.mockReturnValueOnce({
+        afterClosed: () => of({ ...campaign(12, 'started'), showWhenFull: true }),
+      });
+      article(12).querySelector<HTMLButtonElement>('[data-action="recruit"]')!.click();
+      await settle();
+      const full = { ...campaign(12, 'paused'), weekdays: [1], recurrence: 'weekly' };
+      http.expectOne('/api/games/12').flush(full);
+      await settle();
+      await settle();
+      expect(open).toHaveBeenCalledWith(
+        ResumeDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ recruit: true, viewerTimezone: 'Europe/Kyiv' }),
+        }),
+      );
+      expect(article(12).querySelector('.status')!.textContent).toContain('games.status.started');
+      expect(el.textContent).toContain('games.pause.done.recruit');
+      http.expectOne('/api/games/mine').flush([campaign(12, 'started')]);
+      await settle();
+    });
+
+    it('«finish» from a pause goes through the regular confirmation', async () => {
+      await show([campaign(13, 'paused')]);
+      open.mockReturnValueOnce({ afterClosed: () => of(true) });
+      article(13).querySelector<HTMLButtonElement>('[data-action="finish"]')!.click();
+      await settle();
+      http.expectOne('/api/games/13/finish').flush(campaign(13, 'finished'));
+      await settle();
+      http.expectOne('/api/games/mine').flush([campaign(13, 'finished')]);
+      await settle();
+      expect(actions(13)).toEqual([]);
     });
   });
 });

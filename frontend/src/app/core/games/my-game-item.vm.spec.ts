@@ -49,6 +49,28 @@ describe('toMyGameItemVm', () => {
     expect(cancel).toMatchObject({ danger: true, link: null, labelKey: 'games.actions.cancel' });
   });
 
+  it('campaign pause: «pause» for running campaigns; «resume» / «recruit» on paused, no edit', () => {
+    const campaign = (id: number, status: MyGameCardDto['status']): MyGameCardDto => ({
+      ...card(id, status),
+      kind: 'campaign',
+    });
+    expect(actions(campaign(1, 'recruiting'))).toEqual(['edit', 'start', 'pause', 'cancel']);
+    expect(actions(campaign(2, 'started'))).toEqual(['edit', 'finish', 'pause', 'cancel']);
+    expect(actions(campaign(3, 'draft'))).toEqual(['edit', 'publish', 'cancel']);
+    // Ваншот на паузу не ставиться.
+    expect(actions(card(4, 'started'))).not.toContain('pause');
+    const paused = vm(campaign(5, 'paused'));
+    expect(paused.actions.map((a) => a.id)).toEqual(['resume', 'recruit', 'finish', 'cancel']);
+    expect(paused.statusKey).toBe('games.status.paused');
+    expect(paused.actions[0]).toMatchObject({
+      labelKey: 'games.actions.resume',
+      emphasis: 'stroked',
+      link: null,
+    });
+    expect(paused.actions[1]).toMatchObject({ labelKey: 'games.actions.recruit', link: null });
+    expect(paused.applications).toEqual({ link: ['/games', 5, 'applications'], pending: 0 });
+  });
+
   it('cover: passed through (null — none)', () => {
     expect(vm(card(1, 'recruiting')).coverUrl).toBeNull();
     const url = 'https://example.com/c.png';

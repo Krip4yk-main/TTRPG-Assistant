@@ -1,0 +1,40 @@
+// Панель «Кампейн на паузі»: причина, з якого часу й дії майстра.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  border-left: 4px solid var(--nri-accent);
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--nri-space-xs);
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .reason {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .note {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+}
+
+.pause-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}
+
+.finish.danger {
+  --mat-button-text-label-text-color: var(--nri-danger-text);
+}

@@ -171,6 +171,21 @@
                   <span class="dot" aria-hidden="true"></span>
                 }
               </a>
+              @if (row.view.actions.length) {
+                <div class="item-actions">
+                  @for (act of row.view.actions; track act.action) {
+                    <a
+                      mat-stroked-button
+                      class="item-action"
+                      [attr.data-action]="act.action"
+                      [routerLink]="row.n.link"
+                      [queryParams]="{ action: act.action }"
+                      (click)="openItem(row.n)"
+                      >{{ act.labelKey | translate }}</a
+                    >
+                  }
+                </div>
+              }
             </li>
           }
         </ul>

@@ -1,4 +1,5 @@
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
+import uk from '../../../assets/i18n/uk.json';
 import { browserZone } from '../i18n/dates';
 import {
   toGameCardVm,
@@ -103,6 +104,15 @@ describe('toGameCardVm', () => {
     ).toEqual([
       { kind: 'status', value: 'cancelled', labelKey: 'games.status.cancelled', icon: null },
     ]);
+  });
+
+  it('paused campaign: «На паузі» status badge with an icon, no schedule', () => {
+    const paused = full({ ...game, fit: undefined, ageRating: 'none', status: 'paused' });
+    expect(paused.badges).toEqual([
+      { kind: 'status', value: 'paused', labelKey: 'games.status.paused', icon: 'pause_circle' },
+    ]);
+    expect(paused.showSchedule).toBe(false);
+    expect(uk.games.status.paused).toBe('На паузі');
   });
 
   it('next session and free seats only for recruiting/started games', () => {

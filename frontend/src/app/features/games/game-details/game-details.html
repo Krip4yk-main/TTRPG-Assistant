@@ -164,6 +164,18 @@
                   </button>
                 }
               }
+              @if (canPause()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="pause"
+                  [disabled]="busy()"
+                  (click)="pause()"
+                >
+                  <mat-icon aria-hidden="true">pause</mat-icon>
+                  {{ 'games.actions.pause' | translate }}
+                </button>
+              }
             } @else if (!signedIn()) {
               @if (accepting()) {
                 <a
@@ -174,7 +186,11 @@
                   >{{ 'games.details.applyLogin' | translate }}</a
                 >
               } @else {
-                <p class="nri-muted apply-hint">{{ 'games.details.closedHint' | translate }}</p>
+                <p class="nri-muted apply-hint">
+                  {{
+                    (paused() ? 'games.details.pausedHint' : 'games.details.closedHint') | translate
+                  }}
+                </p>
               }
             } @else if (relation() === 'member') {
               <span class="badge relation" data-relation="member">
@@ -207,6 +223,9 @@
               >
                 {{ 'games.details.withdraw' | translate }}
               </button>
+            } @else if (paused()) {
+              <!-- На паузі заявки не приймаються — кнопки немає, лише пояснення. -->
+              <p class="nri-muted apply-hint">{{ 'games.details.pausedHint' | translate }}</p>
             } @else {
               <button
                 mat-flat-button
@@ -250,6 +269,17 @@
               </p>
             }
           </div>
+
+          @if (pauseInfo(); as p) {
+            <nri-pause-panel
+              class="pause-panel nri-card"
+              [info]="p"
+              [isGm]="isGm()"
+              [member]="relation() === 'member'"
+              [busy]="busy()"
+              (action)="runPauseAction($event)"
+            />
+          }
 
           <dl class="facts nri-card">
             <div>
@@ -346,7 +376,7 @@
               class="nri-card members"
               [gameId]="g.id"
               [isGm]="isGm()"
-              [manageable]="manageable()"
+              [manageable]="membersManageable()"
               (changed)="membersChanged()"
             />
             <section class="nri-card notes" aria-labelledby="notes-title">

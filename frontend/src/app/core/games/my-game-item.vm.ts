@@ -10,21 +10,33 @@ const ACTIONS: Record<GameStatus, GameAction[]> = {
   draft: ['publish', 'cancel'],
   recruiting: ['start', 'cancel'],
   started: ['finish', 'cancel'],
-  // Пауза/відновлення (діалоги) — План 11, Task 3.
-  paused: ['finish', 'cancel'],
+  // «Відновити» / «Оголосити донабір» — діалог дати першої сесії (див. `PAUSE_ACTIONS`).
+  paused: ['resume', 'finish', 'cancel'],
   finished: [],
   cancelled: [],
 };
 
+/** Кампейн можна поставити на паузу, поки він набирає чи триває. */
+const PAUSABLE = new Set<GameStatus>(['recruiting', 'started']);
+
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 /** Статуси, у яких у гри можуть бути заявки (чернетка — ще ні). */
-const HAS_APPLICATIONS = new Set<GameStatus>(['recruiting', 'started', 'finished', 'cancelled']);
+const HAS_APPLICATIONS = new Set<GameStatus>([
+  'recruiting',
+  'started',
+  'paused',
+  'finished',
+  'cancelled',
+]);
 
 /** Позначка детектора «мертвих» ігор на картці (ключ `games.dead.badge.*`). */
 export type DeadFlag = 'stale' | 'dead' | 'suspicious';
 
-/** Дія на рядку «Моїх ігор»: «Все ок», «Закрити», редагування або перехід статусу. */
-export type MyGameActionId = 'still-alive' | 'close-dead' | 'edit' | GameAction;
+/**
+ * Дія на рядку «Моїх ігор»: «Все ок», «Закрити», редагування, перехід статусу або
+ * «Оголосити донабір» (відновлення з паузи з донабором).
+ */
+export type MyGameActionId = 'still-alive' | 'close-dead' | 'edit' | 'recruit' | GameAction;
 
 export interface MyGameActionVm {
   id: MyGameActionId;
@@ -127,11 +139,17 @@ export function toMyGameItemVm(
       link: ['/games', game.id, 'edit'],
     });
   }
-  for (const action of ACTIONS[game.status]) {
+  const transitions: MyGameActionId[] = [...ACTIONS[game.status]];
+  if (game.status === 'paused') transitions.splice(1, 0, 'recruit');
+  if (game.kind === 'campaign' && PAUSABLE.has(game.status)) {
+    transitions.splice(transitions.indexOf('cancel'), 0, 'pause');
+  }
+  for (const action of transitions) {
     actions.push({
       id: action,
       labelKey: `games.actions.${action}`,
-      emphasis: 'text',
+      // Із паузи головна дія — «Відновити».
+      emphasis: action === 'resume' ? 'stroked' : 'text',
       danger: action === 'cancel',
       link: null,
     });

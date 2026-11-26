@@ -58,6 +58,12 @@ nri-qb-attachment {
     color: var(--nri-accent-text);
   }
 
+  // Пауза — пунктирна рамка: гра жива, але стоїть.
+  &[data-status='paused'] {
+    border-style: dashed;
+    color: var(--nri-text-muted);
+  }
+
   &[data-status='finished'] {
     color: var(--nri-text-muted);
   }

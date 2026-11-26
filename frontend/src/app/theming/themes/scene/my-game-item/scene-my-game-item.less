@@ -42,6 +42,12 @@
     color: var(--sc-amber-text);
   }
 
+  // Пауза — пунктирна рамка: гра жива, але стоїть.
+  &[data-status='paused'] {
+    border-style: dashed;
+    color: var(--sc-ink-muted);
+  }
+
   &[data-status='finished'] {
     color: var(--sc-ink-muted);
   }

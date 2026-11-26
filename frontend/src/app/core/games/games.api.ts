@@ -11,6 +11,8 @@ import type {
   MyDeadGameDto,
   MyDeadGamesDto,
   MyGameCardDto,
+  PauseInput,
+  ResumeInput,
   ScheduleRuleInput,
   SearchFiltersInput,
   SearchResultDto,
@@ -56,6 +58,19 @@ export class GamesApi {
 
   transition(id: number, action: GameAction): Observable<GameTransitionDto> {
     return this.http.post<GameTransitionDto>(`/api/games/${id}/${action}`, {});
+  }
+
+  /** Пауза кампейну (`recruiting|started` → `paused`): причина й необов'язкове пояснення. */
+  pause(id: number, input: PauseInput): Observable<GameDto> {
+    return this.http.post<GameDto>(`/api/games/${id}/pause`, input);
+  }
+
+  /**
+   * Продовжити кампейн після паузи з датою першої сесії; `recruit` — оголосити донабір.
+   * Перший старт (пауза з набору) може мати `warning: 'BELOW_MIN_PLAYERS'`.
+   */
+  resume(id: number, input: ResumeInput): Observable<GameTransitionDto> {
+    return this.http.post<GameTransitionDto>(`/api/games/${id}/resume`, input);
   }
 
   /** Ігри майстра з позначками «давно не проводилась» / «мертва» / «підозріла». */

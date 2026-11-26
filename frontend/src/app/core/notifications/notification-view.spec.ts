@@ -143,6 +143,23 @@ describe('notificationView', () => {
     expect(String(lookup('notifications.game.resumed_recruit'))).toContain('донабір');
   });
 
+  it('long pause reminder: text names the three choices; quick actions link to the game page', () => {
+    const v = notificationView(dto('game.long_pause'), 'UTC');
+    expect(v.key).toBe('notifications.game.long_pause');
+    const text = String(lookup('notifications.game.long_pause'));
+    expect(text).toContain('відновити');
+    expect(text).toContain('донабір');
+    expect(text).toContain('завершити');
+    expect(v.actions).toEqual([
+      { labelKey: 'games.actions.resume', action: 'resume' },
+      { labelKey: 'games.actions.recruit', action: 'recruit' },
+      { labelKey: 'games.pause.panel.finish', action: 'finish' },
+    ]);
+    for (const a of v.actions) expect(typeof lookup(a.labelKey)).toBe('string');
+    // Інші сповіщення — без швидких дій.
+    expect(notificationView(dto('game.paused'), 'UTC').actions).toEqual([]);
+  });
+
   it('rating.*: ratee name, deadline in the viewer zone only with closesAt', () => {
     const left = notificationView(
       dto('rating.member_left', { ratee: { publicId: 'r', nickname: 'Арвен' } }),

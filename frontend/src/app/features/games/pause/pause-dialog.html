@@ -1,0 +1,53 @@
+<h2 mat-dialog-title>{{ 'games.pause.dialog.title' | translate: { title: data.title } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p>{{ 'games.pause.dialog.intro' | translate }}</p>
+    <fieldset class="reasons">
+      <legend id="pause-reason-label" class="group-label">
+        {{ 'games.pause.dialog.reason' | translate }}
+      </legend>
+      <mat-radio-group
+        class="reason-list"
+        formControlName="reason"
+        aria-labelledby="pause-reason-label"
+        [attr.aria-describedby]="reason.invalid && reason.touched ? 'pause-reason-error' : null"
+        required
+      >
+        @for (r of reasons; track r) {
+          <mat-radio-button [value]="r">{{
+            'games.pause.reasons.' + r | translate
+          }}</mat-radio-button>
+        }
+      </mat-radio-group>
+      @if (reason.invalid && reason.touched) {
+        <p id="pause-reason-error" class="field-error" role="alert">
+          {{ 'games.pause.dialog.reasonRequired' | translate }}
+        </p>
+      }
+    </fieldset>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'games.pause.dialog.note' | translate }}</mat-label>
+      <textarea matInput rows="3" formControlName="note" [attr.maxlength]="max"></textarea>
+      <mat-hint>{{ 'games.pause.dialog.noteHint' | translate }}</mat-hint>
+      <mat-hint align="end" class="counter">{{
+        'games.pause.dialog.counter' | translate: { count: noteLength().length, max }
+      }}</mat-hint>
+      @if (note.hasError('maxlength')) {
+        <mat-error>{{ 'games.form.errors.tooLong' | translate: { max } }}</mat-error>
+      }
+    </mat-form-field>
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="submit" [disabled]="submitting()">
+      {{ 'games.pause.dialog.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

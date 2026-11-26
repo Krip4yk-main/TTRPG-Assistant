@@ -225,6 +225,53 @@ describe('NotificationBell', () => {
     main.remove();
   });
 
+  it('campaign pause texts; the long-pause reminder has three quick links to the game page', async () => {
+    await start(3);
+    await open([
+      notification(3, {
+        type: 'game.long_pause',
+        params: { gameId: 7, gameTitle: 'Морія' },
+      }),
+      notification(2, {
+        type: 'game.paused',
+        params: { gameId: 7, gameTitle: 'Морія', pauseReason: 'illness', note: 'Застуда' },
+      }),
+      notification(1, {
+        type: 'game.resumed',
+        params: {
+          gameId: 7,
+          gameTitle: 'Морія',
+          startsAt: '2026-12-01T17:00:00.000Z',
+          recruit: true,
+        },
+      }),
+    ]);
+    const items = panel()!.querySelectorAll<HTMLAnchorElement>('a.item');
+    expect(items[0]!.textContent).toContain('на паузі вже понад 90 днів');
+    expect(items[1]!.textContent).toContain('поставлено на паузу');
+    expect(items[1]!.textContent).toContain('Причина: хвороба — Застуда');
+    expect(items[2]!.textContent).toContain('оголосив донабір');
+    // Час — у поясі глядача (Київ), без назви поясу.
+    expect(items[2]!.textContent).toContain('19:00');
+    expect(panel()!.textContent).not.toMatch(/notifications\.|games\.|\{\{/);
+
+    const actions = [...panel()!.querySelectorAll<HTMLAnchorElement>('a.item-action')];
+    expect(actions.map((a) => [a.textContent!.trim(), a.getAttribute('href')])).toEqual([
+      ['Відновити', '/games/7?action=resume'],
+      ['Оголосити донабір', '/games/7?action=recruit'],
+      ['Завершити кампейн', '/games/7?action=finish'],
+    ]);
+    // Дії — окремі посилання, не всередині рядка-посилання.
+    expect(items[0]!.querySelector('a')).toBeNull();
+
+    actions[1]!.click();
+    await settle();
+    http.expectOne('/api/me/notifications/3/read').flush(notification(3));
+    await flushAsync();
+    await settle();
+    expect(TestBed.inject(Router).url).toBe('/games/7?action=recruit');
+  });
+
   it('clicking an item for the current page returns focus to the bell', async () => {
     await TestBed.inject(Router).navigateByUrl('/games/7');
     await start(1);

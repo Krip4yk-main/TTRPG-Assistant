@@ -140,7 +140,8 @@ export function toGameCardVm(
       kind: 'status',
       value: game.status,
       labelKey: `games.status.${game.status}`,
-      icon: null,
+      // «На паузі» — зі значком, щоб не сплутати з завершеною грою в будь-якому дизайні.
+      icon: game.status === 'paused' ? 'pause_circle' : null,
     });
   }
 

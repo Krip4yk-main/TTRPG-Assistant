@@ -53,7 +53,12 @@ const SESSION_RATING_WINDOW_MS = SESSION_RATING_WINDOW_DAYS * 24 * 60 * 60 * 100
 const CLOCK_MS = 60_000;
 
 /** Причини автоскасування сесій бекендом (`cancel_reason` — код, а не текст майстра). */
-const SYSTEM_CANCEL_REASONS = ['game_finished', 'game_cancelled', 'rule_changed'] as const;
+const SYSTEM_CANCEL_REASONS = [
+  'game_finished',
+  'game_cancelled',
+  'rule_changed',
+  'campaign_paused',
+] as const;
 
 const DIALOG_OPTIONS = {
   autoFocus: 'first-tabbable',

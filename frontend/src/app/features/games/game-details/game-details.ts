@@ -13,7 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,9 +22,9 @@ import {
   isRestrictedGame,
   type ApplicationConstraintDto,
   type GameChangeScope,
-  type ChannelLink,
   type GameDto,
   type GameStatus,
+  type GameTransitionDto,
   type GameViewDto,
   type GameViewerDto,
   type PublicGameDto,
@@ -56,6 +56,8 @@ import {
   type ScheduleRuleDialogData,
 } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { SessionsList } from '../../sessions/sessions-list/sessions-list';
+import { openPauseDialog, openResumeDialog, resumedNoticeKey } from '../pause/pause-flow';
+import { PausePanel, type PauseAction } from '../pause/pause-panel';
 import { CalendarPin } from '../../calendar/calendar-pin/calendar-pin';
 import { NoteEditor } from '../../notes/note-editor/note-editor';
 import { SharedPlayerNotes } from '../../notes/shared-player-notes/shared-player-notes';
@@ -72,6 +74,8 @@ import {
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
+/** Дії майстра з паузи, які можна відкрити посиланням (`?action=…`, з нагадування). */
+const PAUSE_LINK_ACTIONS: readonly PauseAction[] = ['resume', 'recruit', 'finish'];
 
 /** Повідомлення про дію із заявкою: ключ i18n. */
 interface Notice {
@@ -84,7 +88,8 @@ interface Notice {
 }
 
 /** Повна гра для показу; приватні поля — лише для майстра й учасників. */
-type FullGame = PublicGameDto & { address?: string | null; channelLinks?: ChannelLink[] };
+type FullGame = PublicGameDto &
+  Partial<Pick<GameDto, 'address' | 'channelLinks' | 'pauseReason' | 'pauseNote'>>;
 
 /**
  * Сторінка гри (`/games/:id`, публічна). Обмежена гра (16+/18+/21+ для гостя чи молодшого) —
@@ -106,6 +111,7 @@ type FullGame = PublicGameDto & { address?: string | null; channelLinks?: Channe
     UpdateBanner,
     GmRating,
     BlockedBadge,
+    PausePanel,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
@@ -122,6 +128,7 @@ export class GameDetails {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly notes = inject(NotesApi);
+  private readonly router = inject(Router);
   private readonly sessionsList = viewChild(SessionsList);
   private readonly membersPanel = viewChild(MembersPanel);
   private readonly watcher = inject(ChangeWatcher);
@@ -136,6 +143,12 @@ export class GameDetails {
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
+  /**
+   * `?action=resume|recruit|finish` — відкрити діалог майстра для кампейну на паузі (посилання
+   * з нагадування про довгу паузу). Після відкриття параметр прибирається з адреси.
+   */
+  readonly action = input<string | undefined>();
+  private actionHandled: string | null = null;
 
   protected readonly view = signal<GameViewDto | null>(null);
   protected readonly state = signal<'loading' | 'ready' | 'notFound' | 'error'>('loading');
@@ -198,10 +211,31 @@ export class GameDetails {
     return s === 'recruiting' || s === 'started';
   });
 
-  /** Учасник може вийти, поки гра набирає чи триває (як на бекенді). */
-  protected readonly canLeave = computed(
-    () => !this.isGm() && this.relation() === 'member' && this.manageable(),
+  /** Склад (вихід, виключення, бан) змінюється й під час паузи (як на бекенді). */
+  protected readonly membersManageable = computed(
+    () => this.manageable() || this.game()?.status === 'paused',
   );
+
+  /** Учасник може вийти, поки гра набирає, триває чи на паузі (як на бекенді). */
+  protected readonly canLeave = computed(
+    () => !this.isGm() && this.relation() === 'member' && this.membersManageable(),
+  );
+
+  protected readonly paused = computed(() => this.game()?.status === 'paused');
+  /** «Поставити на паузу» — лише майстру кампейну, що набирає чи триває. */
+  protected readonly canPause = computed(
+    () => this.isGm() && this.game()?.kind === 'campaign' && this.manageable(),
+  );
+  /** Панель «Кампейн на паузі»: з якого моменту (у поясі глядача, без назви поясу) і причина. */
+  protected readonly pauseInfo = computed(() => {
+    const g = this.game();
+    if (!g || g.status !== 'paused') return null;
+    return {
+      since: g.pausedAt ? formatDateTime(g.pausedAt, viewerTimeZone(this.auth.me())) : null,
+      reasonKey: g.pauseReason ? `games.pause.reasons.${g.pauseReason}` : null,
+      note: g.pauseNote ?? null,
+    };
+  });
 
   /** Стосунок глядача до гри (сервер віддає лише автентифікованому). */
   protected readonly relation = computed(() => this.game()?.viewer?.relation ?? null);
@@ -215,6 +249,7 @@ export class GameDetails {
     const rel = this.relation();
     if (rel === 'banned') return 'games.details.bannedHint';
     if (rel === 'blacklisted') return 'games.details.blacklistedHint';
+    if (this.paused()) return 'games.details.pausedHint';
     if (!this.accepting()) return 'games.details.closedHint';
     return null;
   });
@@ -298,6 +333,24 @@ export class GameDetails {
         this.ratingKey = key;
         this.canRateMembers.set(false);
         if (key) void this.loadRatingTargets(g!.id, key);
+      });
+    });
+    // `?action=…` з нагадування про довгу паузу — відкриваємо діалог один раз.
+    effect(() => {
+      const action = this.action();
+      const g = this.game();
+      if (!action || !g || !this.isGm() || g.status !== 'paused') return;
+      const key = `${g.id}:${action}`;
+      if (key === this.actionHandled) return;
+      this.actionHandled = key;
+      if (!(PAUSE_LINK_ACTIONS as readonly string[]).includes(action)) return;
+      untracked(() => {
+        void this.router.navigate([], {
+          queryParams: { action: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+        void this.runPauseAction(action as PauseAction);
       });
     });
     // Учасник бачить відповіді майстра на свої обмеження.
@@ -433,6 +486,92 @@ export class GameDetails {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** «Поставити на паузу»: діалог причини; після паузи — перечитати гру й сесії. */
+  protected async pause(): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.canPause()) return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const dto = await openPauseDialog(this.dialog, {
+        gameId: g.id,
+        title: g.title,
+        beforeRequest: () => this.quiet(),
+      });
+      if (!dto) return;
+      await this.afterPauseChange(g.id, 'games.pause.done.pause');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Дія з панелі паузи: «Відновити», «Оголосити донабір» чи «Завершити кампейн». */
+  protected async runPauseAction(action: PauseAction): Promise<void> {
+    if (action === 'finish') await this.finishPaused();
+    else await this.resume(action === 'recruit');
+  }
+
+  /** «Відновити» / «Оголосити донабір»: діалог дати першої сесії. */
+  protected async resume(recruit: boolean): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.isGm() || g.status !== 'paused') return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const dto: GameTransitionDto | null = await openResumeDialog(this.dialog, {
+        game: g,
+        recruit,
+        viewerTimezone: viewerTimeZone(this.auth.me()),
+        beforeRequest: () => this.quiet(),
+      });
+      if (!dto) return;
+      await this.afterPauseChange(g.id, resumedNoticeKey(dto, recruit));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** «Завершити кампейн» з паузи — після підтвердження. */
+  private async finishPaused(): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.isGm() || g.status !== 'paused') return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
+        data: {
+          title: 'games.confirm.finish.title',
+          text: 'games.confirm.finish.text',
+          confirm: 'games.confirm.finish.confirm',
+          danger: true,
+        },
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      });
+      if (!(await firstValueFrom(ref.afterClosed()))) return;
+      this.quiet();
+      await firstValueFrom(this.api.transition(g.id, 'finish'));
+      await this.afterPauseChange(g.id, 'games.my.done.finish');
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') {
+        this.notice.set({ kind: 'error', key: `errors.${code}` });
+        this.focusNotice();
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Після паузи, відновлення чи завершення: свої пінги тихі, гра й сесії — із сервера. */
+  private async afterPauseChange(id: number, key: string): Promise<void> {
+    this.quiet();
+    await this.load(id, true);
+    await this.sessionsList()?.reload();
+    this.notice.set({ kind: 'info', key });
+    this.focusNotice();
   }
 
   /** Діалог скарги на гру; після надсилання — повідомлення на сторінці. */

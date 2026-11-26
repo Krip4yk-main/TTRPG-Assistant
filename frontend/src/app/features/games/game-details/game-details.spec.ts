@@ -16,6 +16,8 @@ import { ApplyDialog } from '../../applications/apply-dialog/apply-dialog';
 import { LeaveDialog } from '../../members/leave-dialog/leave-dialog';
 import { ScheduleRuleDialog } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { PauseDialog } from '../pause/pause-dialog';
+import { ResumeDialog } from '../pause/resume-dialog';
 
 const me = {
   id: 1,
@@ -115,8 +117,13 @@ describe('GameDetails', () => {
   };
   const el = () => harness.routeNativeElement!;
 
-  async function open(user: MeDto | null, respond: (r: ReturnType<typeof expectGame>) => void) {
-    dialogOpen = vi.fn();
+  async function open(
+    user: MeDto | null,
+    respond: (r: ReturnType<typeof expectGame>) => void,
+    url = '/games/7',
+  ) {
+    // Типово діалог закривається без результату (напр. відкритий з `?action=`).
+    dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
     pings = new Subject();
     socket = {
       request: vi.fn(() => Promise.resolve({ ok: true, members: true })),
@@ -157,7 +164,7 @@ describe('GameDetails', () => {
     TestBed.inject(AuthStore).setMe(user);
     http = TestBed.inject(HttpTestingController);
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/games/7', GameDetails);
+    await harness.navigateByUrl(url, GameDetails);
     await settle();
     http.expectOne('/api/catalog').flush(catalog);
     respond(expectGame());
@@ -618,6 +625,165 @@ describe('GameDetails', () => {
     await open(me, (r) => r.flush(game));
     expect(el().querySelector('header .gm .gm-rating')).toBeNull();
     expect(el().querySelector('header .gm')!.textContent).toContain('ratings.gmRating.none');
+  });
+
+  describe('campaign pause', () => {
+    const own = { ...game, gm: { ...game.gm, publicId: me.publicId } };
+    const paused = {
+      ...own,
+      status: 'paused',
+      nextSessionAt: null,
+      pausedAt: '2026-11-20T08:00:00.000Z',
+      pauseReason: 'illness',
+      pauseNote: 'Застуда, до тижня',
+    } as const;
+    const flushGmExtras = async () => {
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      flushNotesAndCalendar(true);
+      await settle();
+    };
+    const flushMemberExtras = async () => {
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      http.expectOne('/api/me/applications').flush([]);
+      flushNotesAndCalendar(false);
+      await settle();
+    };
+    const button = (cls: string) => el().querySelector<HTMLButtonElement>(`button.${cls}`);
+    const afterChange = async (dto: object) => {
+      await settle();
+      expectGame().flush(dto);
+      await settle();
+      http.expectOne('/api/games/7/sessions').flush([]);
+      await settle();
+      await settle();
+    };
+
+    it('GM of a running campaign: «pause» opens the reason dialog, then reloads the game and sessions', async () => {
+      await open(me, (r) => r.flush(own));
+      await flushGmExtras();
+      expect(button('pause')!.textContent).toContain('games.actions.pause');
+      nextDialog({ ...paused });
+      button('pause')!.click();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        PauseDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ gameId: 7, title: 'Туман над Дніпром' }),
+        }),
+      );
+      await afterChange(paused);
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.pause.done.pause');
+      expect(button('pause')).toBeNull();
+      expect(el().querySelector('.pause-panel')).not.toBeNull();
+    });
+
+    it('no «pause» for a member, a oneshot GM or a draft', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, viewer: { relation: 'member', applicationId: null } }),
+      );
+      await flushMemberExtras();
+      expect(button('pause')).toBeNull();
+      TestBed.resetTestingModule();
+      await open(me, (r) => r.flush({ ...own, kind: 'oneshot', recurrence: 'none', weekdays: [] }));
+      await flushGmExtras();
+      expect(button('pause')).toBeNull();
+      TestBed.resetTestingModule();
+      await open(me, (r) => r.flush({ ...own, status: 'draft' }));
+      expect(button('pause')).toBeNull();
+    });
+
+    it('paused, GM: panel with reason, note and date; resume / recruit / finish; no schedule change', async () => {
+      await open(me, (r) => r.flush(paused));
+      await flushGmExtras();
+      const panel = el().querySelector<HTMLElement>('.pause-panel')!;
+      expect(panel.textContent).toContain('games.pause.panel.title');
+      expect(panel.textContent).toContain('games.pause.panel.reason');
+      expect(panel.querySelector('.note')!.textContent).toContain('Застуда, до тижня');
+      expect(panel.querySelector('.since')!.textContent).toContain('games.pause.panel.since');
+      expect(el().querySelector('.badge[data-status="paused"]')!.textContent).toContain(
+        'games.status.paused',
+      );
+      expect(button('change-schedule')).toBeNull();
+      expect(button('pause')).toBeNull();
+      expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
+      expect(button('resume')).not.toBeNull();
+      expect(button('finish')).not.toBeNull();
+
+      nextDialog({ ...own, status: 'started', showWhenFull: true, warning: 'BELOW_MIN_PLAYERS' });
+      button('recruit')!.click();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        ResumeDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            recruit: true,
+            viewerTimezone: 'Europe/Kyiv',
+            game: expect.objectContaining({ id: 7, weekdays: [1] }),
+          }),
+        }),
+      );
+      await afterChange({ ...own, status: 'started', showWhenFull: true });
+      expect(el().querySelector('.notice-area')!.textContent).toContain(
+        'games.pause.done.resumedBelowMin',
+      );
+      expect(el().querySelector('.pause-panel')).toBeNull();
+    });
+
+    it('paused, GM: «finish» asks for confirmation and POSTs finish', async () => {
+      await open(me, (r) => r.flush(paused));
+      await flushGmExtras();
+      nextDialog(true);
+      button('finish')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenLastCalledWith(ConfirmDialog, expect.anything());
+      const req = http.expectOne('/api/games/7/finish');
+      expect(req.request.method).toBe('POST');
+      req.flush({ ...own, status: 'finished' });
+      await afterChange({ ...own, status: 'finished' });
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.my.done.finish');
+    });
+
+    it('paused, outsider: panel without the private reason, no apply button, a clear hint', async () => {
+      const pub = { ...paused, pauseReason: undefined, pauseNote: undefined };
+      await open(me, (r) => r.flush({ ...pub, gm: game.gm }));
+      expect(el().querySelector('button.apply')).toBeNull();
+      expect(el().querySelector('.apply-hint')!.textContent).toContain('games.details.pausedHint');
+      const panel = el().querySelector<HTMLElement>('.pause-panel')!;
+      expect(panel.textContent).toContain('games.pause.panel.title');
+      expect(panel.querySelector('.reason')).toBeNull();
+      expect(panel.querySelector('button')).toBeNull();
+    });
+
+    it('paused, guest: no login-to-apply link, the paused hint instead', async () => {
+      await open(null, (r) => r.flush({ ...paused, gm: game.gm }));
+      expect(el().querySelector('a.apply-login')).toBeNull();
+      expect(el().querySelector('.apply-hint')!.textContent).toContain('games.details.pausedHint');
+    });
+
+    it('?action=recruit from the long-pause reminder opens the resume dialog for the GM once', async () => {
+      await open(me, (r) => r.flush(paused), '/games/7?action=recruit');
+      await flushGmExtras();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledTimes(1);
+      expect(dialogOpen).toHaveBeenCalledWith(
+        ResumeDialog,
+        expect.objectContaining({ data: expect.objectContaining({ recruit: true }) }),
+      );
+    });
+
+    it('?action=… is ignored for a member', async () => {
+      await open(
+        me,
+        (r) =>
+          r.flush({ ...paused, gm: game.gm, viewer: { relation: 'member', applicationId: null } }),
+        '/games/7?action=resume',
+      );
+      await flushMemberExtras();
+      expect(dialogOpen).not.toHaveBeenCalled();
+      expect(el().querySelector('.pause-panel')!.textContent).toContain(
+        'games.pause.panel.memberHint',
+      );
+    });
   });
 
   describe('"Rate members" entry (final / leave ratings)', () => {

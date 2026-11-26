@@ -1,0 +1,57 @@
+<h2 id="pause-panel-title">
+  <mat-icon aria-hidden="true">pause_circle</mat-icon>
+  {{ 'games.pause.panel.title' | translate }}
+</h2>
+@if (info().since) {
+  <p class="since nri-muted">
+    {{ 'games.pause.panel.since' | translate: { date: info().since } }}
+  </p>
+}
+@if (info().reasonKey || info().note) {
+  <p class="reason">
+    @if (info().reasonKey) {
+      <strong>{{
+        'games.pause.panel.reason' | translate: { reason: (info().reasonKey | translate) }
+      }}</strong>
+    }
+    @if (info().note) {
+      <span class="note">{{ info().note }}</span>
+    }
+  </p>
+}
+@if (isGm()) {
+  <p class="hint">{{ 'games.pause.panel.gmHint' | translate }}</p>
+  <div class="pause-actions">
+    <button
+      mat-flat-button
+      type="button"
+      class="resume"
+      [disabled]="busy()"
+      (click)="action.emit('resume')"
+    >
+      <mat-icon aria-hidden="true">play_arrow</mat-icon>
+      {{ 'games.actions.resume' | translate }}
+    </button>
+    <button
+      mat-stroked-button
+      type="button"
+      class="recruit"
+      [disabled]="busy()"
+      (click)="action.emit('recruit')"
+    >
+      <mat-icon aria-hidden="true">group_add</mat-icon>
+      {{ 'games.actions.recruit' | translate }}
+    </button>
+    <button
+      mat-button
+      type="button"
+      class="finish danger"
+      [disabled]="busy()"
+      (click)="action.emit('finish')"
+    >
+      {{ 'games.pause.panel.finish' | translate }}
+    </button>
+  </div>
+} @else if (member()) {
+  <p class="hint nri-muted">{{ 'games.pause.panel.memberHint' | translate }}</p>
+}

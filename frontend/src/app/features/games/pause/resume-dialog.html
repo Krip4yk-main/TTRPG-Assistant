@@ -1,0 +1,72 @@
+<h2 mat-dialog-title>{{ titleKey | translate: { title: data.game.title } }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content class="content">
+    <p>{{ 'games.pause.' + mode + '.intro' | translate }}</p>
+    @if (belowMin) {
+      <p class="nri-notice below-min">
+        {{ 'games.pause.belowMin' | translate: { count: members, min: data.game.minPlayers } }}
+      </p>
+    }
+    <p class="nri-muted zone-hint">
+      {{ 'sessions.zoneHint' | translate }} <strong>{{ data.game.timezone }}</strong>
+    </p>
+    @if (ruleDays.length) {
+      <p class="nri-muted rule-days" id="resume-rule-days">
+        {{ 'games.pause.ruleDays' | translate }}
+        @for (d of ruleDays; track d; let last = $last) {
+          {{ 'games.weekdaysLong.' + d | translate }}{{ last ? '' : ', ' }}
+        }
+      </p>
+    }
+    <div class="row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.startDate' | translate }}</mat-label>
+        <input
+          matInput
+          class="date"
+          required
+          [matDatepicker]="picker"
+          [min]="minDate"
+          formControlName="date"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker />
+        <mat-hint>{{ 'games.form.startDateHint' | translate }}</mat-hint>
+        @if (
+          form.controls.date.hasError('past') || form.controls.date.hasError('matDatepickerMin')
+        ) {
+          <mat-error>{{ 'sessions.rule.past' | translate }}</mat-error>
+        } @else if (form.controls.date.hasError('weekday')) {
+          <mat-error>{{ 'games.pause.weekdayError' | translate }}</mat-error>
+        } @else if (form.controls.date.hasError('required')) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
+        <input matInput class="time" type="time" step="60" required formControlName="time" />
+        @if (form.controls.time.invalid && form.controls.time.touched) {
+          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+    @if (preview(); as p) {
+      <p class="nri-muted preview" aria-live="polite">
+        {{ 'sessions.viewerPreview' | translate: { when: p } }}
+      </p>
+    }
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | translate }}
+    </button>
+    <button mat-flat-button type="submit" class="submit" [disabled]="submitting()">
+      {{ 'games.pause.' + mode + '.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -92,8 +92,26 @@ export interface NotificationView {
   sanction: string | null;
   /** Кінець санкції (`sanction.imposed`); безстрокова — окремий текст `_permanent`. */
   until: string | null;
+  /**
+   * Швидкі дії під сповіщенням — посилання на сторінку гри з `?action=…` (нагадування про
+   * довгу паузу: відновити, оголосити донабір, завершити); інакше порожньо.
+   */
+  actions: NotificationActionView[];
   icon: string;
 }
+
+export interface NotificationActionView {
+  labelKey: string;
+  /** Значення `?action=` на сторінці гри. */
+  action: string;
+}
+
+/** Дії нагадування про довгу паузу — ті самі, що на панелі паузи сторінки гри. */
+const LONG_PAUSE_ACTIONS: readonly NotificationActionView[] = [
+  { labelKey: 'games.actions.resume', action: 'resume' },
+  { labelKey: 'games.actions.recruit', action: 'recruit' },
+  { labelKey: 'games.pause.panel.finish', action: 'finish' },
+];
 
 /** Текст сповіщення з типу й знімка параметрів; дати — у поясі `timeZone` глядача. */
 export function notificationView(n: NotificationDto, timeZone: string): NotificationView {
@@ -113,6 +131,7 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     count: p.count ?? 0,
     sanction: null,
     until: null,
+    actions: [],
     icon: CATEGORY_ICONS[n.category] ?? 'notifications',
   };
   if (!isType(n.type)) return view;
@@ -152,6 +171,11 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {
     view.key = 'notifications.game.resumed_recruit';
+  }
+
+  // Довга пауза: майстру — швидкі дії на сторінці гри.
+  if (n.type === 'game.long_pause' && n.link.startsWith('/games/')) {
+    view.actions = [...LONG_PAUSE_ACTIONS];
   }
 
   // Нагадування про дедлайн сесійного набору — з датою сесії (як у боті).

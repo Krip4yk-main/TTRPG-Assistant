@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { GameAction, MyGameCardDto } from '@nri/shared';
+import { isRestrictedGame, type GameAction, type MyGameCardDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -19,6 +19,8 @@ import {
   type ConfirmDialogData,
 } from '../../../shared/confirm-dialog/confirm-dialog';
 import { confirmCloseDead } from '../dead-games/dead-game-close';
+import { openPauseDialog, openResumeDialog, resumedNoticeKey } from '../pause/pause-flow';
+import { viewerTimeZone } from '../../../core/i18n/dates';
 import { Slot } from '../../../theming/slot';
 import type { SlotLinkAction, SlotOutputEvent } from '../../../theming/slots';
 
@@ -116,7 +118,57 @@ export class MyGames {
     const { action } = event.value as MyGameActionEvent;
     if (action === 'still-alive') void this.stillAlive(game);
     else if (action === 'close-dead') void this.closeDead(game);
+    else if (action === 'pause') void this.pause(game);
+    else if (action === 'resume' || action === 'recruit')
+      void this.resume(game, action === 'recruit');
     else void this.run(game, action);
+  }
+
+  /** «Поставити на паузу»: діалог причини робить запит сам. */
+  protected async pause(game: MyGameCardDto): Promise<void> {
+    if (this.busyId() !== null) return;
+    this.busyId.set(game.id);
+    this.message.set(null);
+    try {
+      const dto = await openPauseDialog(this.dialog, { gameId: game.id, title: game.title });
+      if (!dto) return;
+      this.patch(game.id, { status: dto.status, nextSessionAt: dto.nextSessionAt });
+      this.message.set({ kind: 'info', key: 'games.pause.done.pause' });
+      void this.refresh();
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  /**
+   * «Відновити» / «Оголосити донабір»: діалогу потрібне правило розкладу гри, якого немає в
+   * картці, — спершу беремо гру з сервера.
+   */
+  protected async resume(game: MyGameCardDto, recruit: boolean): Promise<void> {
+    if (this.busyId() !== null) return;
+    this.busyId.set(game.id);
+    this.message.set(null);
+    try {
+      const full = await firstValueFrom(this.api.get(game.id));
+      if (isRestrictedGame(full) || full.status !== 'paused') {
+        void this.refresh();
+        return;
+      }
+      const dto = await openResumeDialog(this.dialog, {
+        game: full,
+        recruit,
+        viewerTimezone: viewerTimeZone(this.auth.me()),
+      });
+      if (!dto) return;
+      this.patch(game.id, { status: dto.status, nextSessionAt: dto.nextSessionAt });
+      this.message.set({ kind: 'info', key: resumedNoticeKey(dto, recruit) });
+      void this.refresh();
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') this.message.set({ kind: 'error', key: `errors.${code}` });
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   /** «Все ок»: позначку «давно не проводилась» / «мертва» знято на 14 днів. */

@@ -338,6 +338,7 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
         'close-dead',
         'edit',
         'start',
+        'pause',
         'cancel',
       ]);
       for (const a of actions) expect(getComputedStyle(a).display).not.toBe('none');
