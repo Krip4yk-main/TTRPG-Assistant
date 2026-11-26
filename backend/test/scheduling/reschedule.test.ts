@@ -462,4 +462,16 @@ describe('empty-calendar reminder', () => {
     expect(sent).not.toContain(other.a.id);
     void gameId;
   });
+
+  it('first run is throttled: at most N users per run, the rest on later runs, oldest first', async () => {
+    const { a, b, c } = await group();
+    const now = new Date(Date.now() + 30 * DAY);
+    const first = await runCalendarReminders(deps, now, 2);
+    expect(first).toHaveLength(2);
+    const second = await runCalendarReminders(deps, now, 2);
+    expect([...first, ...second].sort((x, y) => x - y)).toEqual(
+      [a.id, b.id, c.id].sort((x, y) => x - y),
+    );
+    expect(await runCalendarReminders(deps, now, 2)).toEqual([]);
+  });
 });

@@ -32,9 +32,15 @@ import {
 } from '../notifications/notifications.service.js';
 
 export const CALENDAR_REMINDERS_JOB = 'schedule.calendar_reminders';
-/** Щогодини: «через 24 год після вступу» — з точністю до години. */
-export const CALENDAR_REMINDERS_EVERY_MS = 3_600_000;
-const BATCH = 500;
+/** Кожні 10 хв: «через 24 год після вступу» — з точністю до 10 хв. */
+export const CALENDAR_REMINDERS_EVERY_MS = 600_000;
+/**
+ * Не більше стількох користувачів за прогін (≈150/год). Перший запуск після деплою має чергу
+ * з усіх давніх учасників — розтягуємо її на години, щоб не завалити сервер і доставку в
+ * Telegram сплеском; черга йде від найраніше вступивших.
+ */
+export const CALENDAR_REMINDERS_PER_RUN = 25;
+const BATCH = 100;
 const MAX_BATCHES_PER_RUN = 10;
 
 type DbLike = Db | Tx;
@@ -72,8 +78,10 @@ export function noCalendarData(db: DbLike, userId: AnyMySqlColumn): SQL[] {
 export async function runCalendarReminders(
   deps: Pick<AppDeps, 'db' | 'env'> & Partial<Pick<AppDeps, 'realtime'>>,
   now: Date,
+  maxPerRun = CALENDAR_REMINDERS_PER_RUN,
 ): Promise<number[]> {
   const { db } = deps;
+  let handled = 0;
   const cutoff = new Date(now.getTime() - CALENDAR_REMINDER_DELAY_MS);
   const sent: number[] = [];
   const created: NotificationRow[] = [];
@@ -116,6 +124,7 @@ export async function runCalendarReminders(
     for (const r of rows) if (!firstGame.has(r.userId)) firstGame.set(r.userId, r);
     let progressed = 0;
     for (const [userId, g] of firstGame) {
+      if (handled >= maxPerRun) break;
       try {
         const n = await db.transaction(async (tx) => {
           // Даних календаря могло з'явитись між вибіркою й транзакцією.
@@ -148,6 +157,7 @@ export async function runCalendarReminders(
         });
         if (n === undefined) continue;
         progressed++;
+        handled++;
         if (n) {
           created.push(n);
           sent.push(userId);
@@ -156,6 +166,7 @@ export async function runCalendarReminders(
         console.error(`calendar reminder: user ${userId} failed`, err);
         skipped.add(userId);
         progressed++;
+        handled++;
         if (isTransientDbError(err)) {
           failure ??= err;
         } else {
@@ -169,7 +180,7 @@ export async function runCalendarReminders(
         }
       }
     }
-    if (rows.length < BATCH || progressed === 0) break;
+    if (rows.length < BATCH || progressed === 0 || handled >= maxPerRun) break;
   }
   emitNotificationsNew(deps, created);
   if (failure) throw failure;
