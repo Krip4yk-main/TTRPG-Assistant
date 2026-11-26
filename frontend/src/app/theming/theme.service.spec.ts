@@ -39,7 +39,7 @@ const user: MeDto = {
 
 // Окремі «чанки» дизайнів (тест не тягне справжні чанки): «Дошка» і кібер-родина.
 const QB_SLOTS = { ...FALLBACK_SLOTS } as ThemeSlots;
-const CY_SLOTS = { ...FALLBACK_SLOTS } as ThemeSlots;
+const SC_SLOTS = { ...FALLBACK_SLOTS } as ThemeSlots;
 
 function def(id: ThemeId, loadSlots: () => Promise<ThemeSlots>): ThemeDefinition {
   return {
@@ -54,14 +54,14 @@ function def(id: ThemeId, loadSlots: () => Promise<ThemeSlots>): ThemeDefinition
 
 /** Як справжній реєстр: три кібер-дизайни мають один спільний завантажувач слотів. */
 function registry(
-  load: { qb?: () => Promise<ThemeSlots>; cyber?: () => Promise<ThemeSlots> } = {},
+  load: { qb?: () => Promise<ThemeSlots>; scene?: () => Promise<ThemeSlots> } = {},
 ): Record<ThemeId, ThemeDefinition> {
-  const cyber = load.cyber ?? (() => Promise.resolve(CY_SLOTS));
+  const scene = load.scene ?? (() => Promise.resolve(SC_SLOTS));
   return {
     'quest-board': def('quest-board', load.qb ?? (() => Promise.resolve(QB_SLOTS))),
-    'neon-signs': def('neon-signs', cyber),
-    'holo-market': def('holo-market', cyber),
-    'night-city': def('night-city', cyber),
+    'neon-signs': def('neon-signs', scene),
+    'holo-market': def('holo-market', scene),
+    'night-city': def('night-city', scene),
   };
 }
 
@@ -157,7 +157,7 @@ describe('ThemeService', () => {
     await service.init();
     expect(service.theme()).toBe('night-city');
     expect(service.available()).toEqual(ALL);
-    expect(service.slots()).toBe(CY_SLOTS);
+    expect(service.slots()).toBe(SC_SLOTS);
     expect(document.head.querySelector(`link#${THEME_LINK_ID}`)).toBe(cached);
   });
 
@@ -193,8 +193,8 @@ describe('ThemeService', () => {
   });
 
   it('switching between cyber designs swaps data-theme and the bundle link but loads the shared slot chunk once (RF 2)', async () => {
-    const cyber = vi.fn(() => Promise.resolve(CY_SLOTS));
-    setup(registry({ cyber }));
+    const scene = vi.fn(() => Promise.resolve(SC_SLOTS));
+    setup(registry({ scene }));
     auth.setMe(user);
     await service.init();
     expect(links()).toEqual(['theme-night-city.css?v=1']);
@@ -210,8 +210,8 @@ describe('ThemeService', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
     // Старий бандл знято разом із перемиканням — стилі «Нічного міста» не лишаються.
     expect(links()).toEqual(['theme-neon-signs.css?v=1']);
-    expect(service.slots()).toBe(CY_SLOTS);
-    expect(cyber).toHaveBeenCalledTimes(1);
+    expect(service.slots()).toBe(SC_SLOTS);
+    expect(scene).toHaveBeenCalledTimes(1);
   });
 
   /** Обрати дизайн (відповідь PATCH — одразу). */
@@ -233,7 +233,7 @@ describe('ThemeService', () => {
     // Новий бандл ще вантажиться: показано старий дизайн цілком.
     expect(theme()).toBe('night-city');
     expect(service.theme()).toBe('night-city');
-    expect(service.slots()).toBe(CY_SLOTS);
+    expect(service.slots()).toBe(SC_SLOTS);
     expect(links()).toEqual(['theme-night-city.css?v=1', 'theme-quest-board.css?v=1']);
 
     await settleWhenAdded('theme-quest-board.css?v=1');
@@ -333,7 +333,7 @@ describe('ThemeService', () => {
     setup(registry({ qb: load }));
     auth.setMe(user);
     await service.init();
-    expect(service.slots()).toBe(CY_SLOTS);
+    expect(service.slots()).toBe(SC_SLOTS);
 
     // Перехід на «Дошку» — чанк не завантажився: резервні слоти.
     let done = service.select('quest-board');

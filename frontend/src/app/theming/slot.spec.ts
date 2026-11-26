@@ -11,7 +11,7 @@ import { Slot } from './slot';
 import type { SlotOutputEvent, ThemeSlots } from './slots';
 import { THEME_REGISTRY, THEMES, type ThemeDefinition } from './theme.registry';
 import { ThemeService } from './theme.service';
-import { CYBER_SLOTS } from './themes/cyber/slots';
+import { SCENE_SLOTS } from './themes/scene/slots';
 
 const game: MyGameCardDto = {
   id: 2,
@@ -90,8 +90,8 @@ describe('nri-slot', () => {
   });
 
   it("renders the design's component with inputs and forwards its outputs", async () => {
-    await setup(() => Promise.resolve(CYBER_SLOTS));
-    const item = el.querySelector('nri-cy-my-game-item')!;
+    await setup(() => Promise.resolve(SCENE_SLOTS));
+    const item = el.querySelector('nri-sc-my-game-item')!;
     expect(item).not.toBeNull();
     expect(item.querySelector('.pending-count')!.getAttribute('data-count')).toBe('3');
 
@@ -100,22 +100,22 @@ describe('nri-slot', () => {
   });
 
   it('input changes update the same component instance', async () => {
-    await setup(() => Promise.resolve(CYBER_SLOTS));
-    const before = el.querySelector('nri-cy-my-game-item');
+    await setup(() => Promise.resolve(SCENE_SLOTS));
+    const before = el.querySelector('nri-sc-my-game-item');
     fixture.componentRef.setInput('inputs', {
       item: vm({ ...game, status: 'started' }),
       busy: true,
     });
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(el.querySelector('nri-cy-my-game-item')).toBe(before);
+    expect(el.querySelector('nri-sc-my-game-item')).toBe(before);
     expect(el.querySelector('.status')!.getAttribute('data-status')).toBe('started');
     expect(el.querySelector<HTMLButtonElement>('[data-action="finish"]')!.disabled).toBe(true);
   });
 
   it('a failed design chunk renders the plain fallback, which still works (RF 3)', async () => {
     await setup(() => Promise.reject(new Error('ChunkLoadError')));
-    expect(el.querySelector('nri-cy-my-game-item')).toBeNull();
+    expect(el.querySelector('nri-sc-my-game-item')).toBeNull();
     expect(el.querySelector('nri-fallback-my-game-item')).not.toBeNull();
     expect(el.textContent).toContain('Гра 2');
     const actions = Array.from(el.querySelectorAll<HTMLElement>('[data-action]')).map(

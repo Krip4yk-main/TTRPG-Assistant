@@ -10,8 +10,8 @@ import { toMyGameItemVm } from '../../../core/games/my-game-item.vm';
 import { ThemeService } from '../../theme.service';
 import { QuestBoardGameCard } from '../../themes/quest-board/game-card/quest-board-game-card';
 import { QuestBoardMyGameItem } from '../../themes/quest-board/my-game-item/quest-board-my-game-item';
-import { CyberGameCard } from '../../themes/cyber/game-card/cyber-game-card';
-import { CyberMyGameItem } from '../../themes/cyber/my-game-item/cyber-my-game-item';
+import { SceneGameCard } from '../../themes/scene/game-card/scene-game-card';
+import { SceneMyGameItem } from '../../themes/scene/my-game-item/scene-my-game-item';
 
 const COVER = 'https://example.com/cover.png';
 
@@ -62,8 +62,8 @@ const itemInputs = () => ({ item: toMyGameItemVm(myGame, { me: null, seen: null 
 const CASES: Case[] = [
   ['quest-board game-card', QuestBoardGameCard, 'nri-qb-attachment', cardInputs],
   ['quest-board my-game-item', QuestBoardMyGameItem, 'nri-qb-attachment', itemInputs],
-  ['cyber game-card', CyberGameCard, 'nri-cy-attachment', cardInputs],
-  ['cyber my-game-item', CyberMyGameItem, 'nri-cy-attachment', itemInputs],
+  ['scene game-card', SceneGameCard, 'nri-sc-attachment', cardInputs],
+  ['scene my-game-item', SceneMyGameItem, 'nri-sc-attachment', itemInputs],
 ];
 
 describe.each(CASES)('cover attachment — %s', (_name, component, selector, inputs) => {

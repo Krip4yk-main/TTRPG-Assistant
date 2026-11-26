@@ -1,0 +1,460 @@
+// Спільна основа стилів родини сцени — дизайнів «стіна-фон + панелі-картки з декором» зі
+// спільними слотами (themes/scene/*): кібер-дизайни «Неонові вивіски», «Голо-ринок», «Нічне
+// місто» й наступні дизайни сцени. Не окремий бандл: її імпортує бандл кожного дизайну сцени
+// (`themes/<id>/<id>.less`) і викликає міксин `.sc-base()` усередині свого
+// `:root[data-theme='<id>']`. Тут — шрифти тексту й підписів (типові — Golos Text і JetBrains
+// Mono; файли @fontsource імпортує кожен бандл сам: LESS переписує шляхи @import (css) у
+// вкладених файлах), поверхні всього сайту (сторінки, панелі, картки, повідомлення, оверлеї
+// Material, скролбари) за схемою дизайну й загальні гачки декору слотів. Material —
+// scene-material.scss.
+//
+// Дизайн задає ТОКЕНИ --sc-* (усі обов'язкові, якщо не сказано інше), а основа перетворює їх
+// на --nri-* / --mat-sys-* і стилі. Контраст кожної пари — у коментарях до токенів дизайну.
+//   Шрифти:   --sc-font-display (заголовки, логотип, ціна); необов'язкові --sc-font-body (текст,
+//             Material; типово Golos Text) і --sc-font-mono (підписи, мітки; типово JetBrains
+//             Mono) — типові значення стоять у правилі з нульовою специфічністю (:where), тож
+//             дизайн перевизначає їх у своєму `:root[data-theme]` у будь-якому місці.
+//   Стіна:    --sc-wall (основний фон сторінки), --sc-wall-deep (фон <html>, ранній фон),
+//             --sc-bar (шапка/підвал), --sc-bar-line (межа смуги).
+//   Поверхні: --sc-panel (панель, непрозора оцінка для тексту), --sc-glass (фон панелі —
+//             колір або градієнт: скло, камінь, папір…), --sc-glass-line (межа панелі),
+//             --sc-panel-raised (картка всередині панелі-сторінки),
+//             --sc-overlay (діалоги, меню, списки — рівень над панелями), --sc-overlay-line,
+//             --sc-field (поля вводу, заглиблення), --sc-backdrop (затемнення під діалогом),
+//             --sc-blur-overlay (підкладка тексту на обмеженій картці).
+//   Текст:    --sc-ink (основний), --sc-ink-soft (описи), --sc-ink-muted (підписи),
+//             --sc-line (тонкі розділювачі, декор), --sc-outline (межі полів, ≥ 3:1).
+//   Акценти:  («неони» — історична назва з кібер-дизайнів) --sc-neon-a / -a-core / -a-text /
+//             --sc-on-neon-a — перший акцент (CTA); --sc-neon-b / -b-core / -b-text /
+//             --sc-on-neon-b / --sc-neon-b-glow — другий (primary Material: фокус, посилання,
+//             прапорці); --sc-mark, --sc-mark-glow — знак логотипа.
+//   Стани:    --sc-lime / -lime-text / -lime-line / -lime-fill (збіг розкладу, набір),
+//             --sc-amber / -amber-text / -amber-line / -amber-fill / --sc-on-amber (частковий
+//             збіг, «Нове», попередження), --sc-red / -red-text / -red-fill / --sc-on-red (вік,
+//             помилки, небезпечні дії). Типові значення станів і кольорів картки — міксин
+//             .sc-neon-tokens() (кібер-набір; дизайн викликає його й за потреби перевизначає).
+//   Картки:   --sc-neon-<колір> / -<колір>-core / -<колір>-text для шести варіантів картки
+//             (pink, cyan, violet, amber, lime, red — імена варіантів; не кібер-дизайн кладе в
+//             них свої кольори): основа ставить їх як --sc-n / --sc-n-core / --sc-n-text на
+//             елементі з [data-neon] (стабільно за id гри, див. neon.ts); --sc-card-height —
+//             висота картки пошуку й «Моїх ігор».
+//
+// Схема (світла / темна): `.sc-base(@scheme)` — dark (типово) або light; той самий параметр —
+// у `sc.material($scheme)` (scene-material.scss). Схема задає color-scheme (нативні select,
+// календарі, скролбари) і базову палітру Material; усі кольори поверхонь, полів, оверлеїв,
+// скролбарів і списків нативного <select> — з токенів, тож світлий дизайн дає світлі токени.
+// Світла ділянка на темному дизайні (паперова картка на темній стіні) або навпаки —
+// `.sc-local-scheme(@scheme)` на корені ділянки ПІСЛЯ перевизначення там токенів --sc-ink…
+// --sc-field: він заново виводить --nri-* і --mat-sys-* з токенів ділянки (змінні, що
+// посилаються на інші змінні, обчислюються там, де оголошені, — на :root вони вже «застигли»).
+//
+// Гачки декору слотів (`aria-hidden`, порожні <span>; основа ховає всі, крім sc-accent; бандл
+// дизайну показує потрібні й описує в шапці, чим вони є; ::before/::after кожного — теж його):
+//   Картка пошуку й «Мої ігри» — на хості, поза панеллю (сусіди .panel, у DOM перед
+//     обкладинкою й панеллю; хост — position: relative, розмір картки):
+//       sc-d1 … sc-d4 — декор навколо / над / під / за панеллю (шина, ланцюги, кільця, рамка,
+//       світловий конус, проєктор, печатка зі стрічками на куті…). Без z-index малюються під
+//       панеллю (.panel — z-index 2); над нею — z-index ≥ 3.
+//   Усередині панелі (.panel.sc-glass, position: relative; у картці пошуку — overflow: hidden):
+//       sc-accent — лінія вгорі панелі (основа малює неонову трубку кольору картки; дизайн
+//       перемальовує або ховає); sc-p1, sc-p2 — декор у межах панелі (гвинти, кутики, корінець
+//       з перфорацією внизу, скріпка…). Під текстом — без z-index; поверх тексту не класти.
+//   Заголовок сторінки: .sc-sign (пластина під заголовком), sc-s1 (декор пластини), частини
+//     тексту .sc-sign-title > .sc-sign-w1 (перше слово, усередині — .sc-sign-mark: виділена
+//     літера) і .sc-sign-w2 (решта).
+//   Каркас: .sc-wall (стіна під усім), .sc-bar (шапка й підвал), .sc-glass (панель).
+//   Декор з площею — `pointer-events: none`; ціни, бейджі, обкладинка — звичайні елементи
+//   слотів (.price, nri-sc-badge, nri-sc-attachment…), їх дизайн стилізує напряму.
+// --qb-* тут не вживаються.
+
+@import '../../../../styles/_shared-layout.less';
+
+@sc-neons: pink, cyan, violet, amber, lime, red;
+
+// Викликати всередині `:root[data-theme='<id>'] { … }` після токенів --sc-*.
+// @scheme — dark | light (color-scheme сторінки; див. шапку).
+.sc-base(@scheme: dark) {
+  // Типові шрифти тексту й підписів — з нульовою специфічністю: токен дизайну завжди сильніший.
+  :where(&) {
+    --sc-font-body: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+    --sc-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  // ---- Токени застосунку з токенів дизайну ----
+  --nri-font-heading: var(--sc-font-display);
+  --nri-font-body: var(--sc-font-body);
+
+  --nri-bg: var(--sc-wall);
+  --nri-surface: var(--sc-panel);
+  --nri-surface-raised: var(--sc-overlay);
+  --nri-surface-sunken: var(--sc-field);
+  --nri-text: var(--sc-ink);
+  --nri-text-muted: var(--sc-ink-muted);
+  --nri-border: var(--sc-line);
+
+  --nri-primary: var(--sc-neon-b);
+  --nri-on-primary: var(--sc-on-neon-b);
+  --nri-primary-text: var(--sc-neon-b-text);
+  --nri-accent: var(--sc-neon-a);
+  --nri-on-accent: var(--sc-on-neon-a);
+  --nri-accent-text: var(--sc-neon-a-text);
+  --nri-danger: var(--sc-red);
+  --nri-on-danger: var(--sc-on-red);
+  --nri-danger-text: var(--sc-red-text);
+  --nri-danger-surface: var(--sc-red-fill);
+  --nri-success-text: var(--sc-lime-text);
+
+  --nri-focus-ring: var(--sc-neon-b);
+  --nri-new-highlight: var(--sc-amber-fill);
+  --nri-new-highlight-border: var(--sc-amber);
+  --nri-blur-overlay: var(--sc-blur-overlay);
+  --nri-blur-radius: 8px;
+  --nri-backdrop: var(--sc-backdrop);
+  --nri-overlay-border: var(--sc-overlay-line);
+  --nri-game-busy-stripe: var(--sc-amber-line);
+  --nri-game-busy-edge: var(--sc-amber);
+  --nri-game-busy-hatch: repeating-linear-gradient(
+    -45deg,
+    var(--nri-game-busy-stripe) 0 3px,
+    transparent 3px 7px
+  );
+
+  --nri-radius-sm: 6px;
+  --nri-radius-md: 10px;
+  --nri-radius-lg: 14px;
+  --nri-shadow-md: 0 14px 28px rgba(0, 0, 0, 0.5);
+  --nri-shadow-lg: 0 24px 40px rgba(0, 0, 0, 0.6);
+
+  // Картки на сітці: ширина 300–360px; проміжки вміщують затискачі/декор над карткою й
+  // обкладинку, що визирає з-за панелі.
+  --sc-card-height: 23.75rem;
+  --nri-card-grid-min: 300px;
+  --nri-card-grid-max: 360px;
+  --nri-card-grid-gap: 3rem 1.75rem;
+  // Шапка 68px + межа 1px.
+  --nri-header-height: 69px;
+
+  color-scheme: @scheme;
+  background-color: var(--sc-wall-deep);
+  scrollbar-color: var(--sc-outline) var(--sc-wall-deep);
+
+  // До першого рендера body прозорий — видно ранній фон <html>; далі — колір стіни на всю
+  // висоту вмісту (резервний каркас при збої чанку теж лежить на стіні).
+  body {
+    height: auto;
+    min-height: 100%;
+
+    &:has(> nri-root:empty) {
+      background: transparent;
+    }
+  }
+
+  ::selection {
+    background: var(--sc-neon-b);
+    color: var(--sc-on-neon-b);
+  }
+
+  // Широкий заголовковий шрифт — трохи дрібніші розміри, ніж у світлих дизайнах. Низька
+  // специфічність (:where) — стилі заголовків у компонентах мають перевагу.
+  :where(&) :is(h1, h2, h3) {
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  :where(&) h1 {
+    font-size: 2rem;
+  }
+
+  :where(&) h2 {
+    font-size: 1.4rem;
+  }
+
+  // ---- Каркас і декор слотів сцени (вигляд — у бандлі дизайну) ----
+  .sc-wall {
+    isolation: isolate;
+    background-color: var(--sc-wall);
+  }
+
+  .sc-bar {
+    background: var(--sc-bar);
+    border-color: var(--sc-bar-line);
+  }
+
+  .top.sc-bar {
+    border-bottom: 1px solid var(--sc-bar-line);
+  }
+
+  .bottom.sc-bar {
+    border-top: 1px solid var(--sc-bar-line);
+  }
+
+  // Панель, «повішена» на стіну (скло, камінь, папір — фон і межа з токенів).
+  .sc-glass {
+    --nri-surface: var(--sc-panel);
+
+    position: relative;
+    background: var(--sc-glass);
+    border: 1px solid var(--sc-glass-line);
+    border-radius: var(--nri-radius-md);
+    box-shadow:
+      0 24px 40px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    color: var(--sc-ink);
+  }
+
+  // Лінія-акцент вгорі панелі: неонова трубка (колір — варіант картки або другий акцент
+  // дизайну). Світіння — на декоративній лінії, не на тексті. Дизайн перемальовує або ховає.
+  .sc-accent {
+    position: absolute;
+    top: -1px;
+    left: 18px;
+    right: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--sc-n-core, var(--sc-neon-b-core));
+    box-shadow:
+      0 0 5px var(--sc-n, var(--sc-neon-b)),
+      0 0 14px var(--sc-n, var(--sc-neon-b));
+    pointer-events: none;
+  }
+
+  // Загальні гачки декору (див. шапку) — приховані; показує й малює бандл дизайну.
+  .sc-d1,
+  .sc-d2,
+  .sc-d3,
+  .sc-d4,
+  .sc-p1,
+  .sc-p2,
+  .sc-s1 {
+    display: none;
+  }
+
+  .sc-neon-colors(@sc-neons);
+
+  // ---- Сторінки ----
+  // Звичайна сторінка — велика панель на стіні (форми, таблиці, тексти).
+  .nri-page {
+    margin-top: var(--nri-space-xl);
+    margin-bottom: var(--nri-space-2xl);
+    background: var(--sc-glass);
+    border: 1px solid var(--sc-glass-line);
+    border-radius: var(--nri-radius-md);
+    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+  }
+
+  // Сторінки-дошки: картки висять прямо на стіні; панелі й повідомлення — окремі панелі.
+  .nri-page.nri-board {
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: var(--nri-space-xl);
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+
+    :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
+      background: var(--sc-glass);
+      box-shadow: var(--nri-shadow-md);
+    }
+
+    // Панель (фільтри пошуку) — з лінією-акцентом (неоновою трубкою) вгорі. Позицію не
+    // перебиваємо: на широкому екрані сторінка робить фільтри липкими (`sticky` — теж опора для
+    // трубки), на вузькому — див. медіазапит унизу.
+    .nri-panel {
+      padding: 22px 18px 18px;
+      border: 1px solid var(--sc-glass-line);
+      border-radius: var(--nri-radius-md);
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 18px;
+        right: 18px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--sc-neon-b-core);
+        box-shadow:
+          0 0 6px var(--sc-neon-b),
+          0 0 14px var(--sc-neon-b);
+        pointer-events: none;
+      }
+    }
+
+    .nri-card-grid {
+      padding-top: var(--nri-space-lg);
+    }
+  }
+
+  .nri-card {
+    background: var(--sc-panel-raised);
+    border-color: var(--sc-glass-line);
+    box-shadow: var(--nri-shadow-md);
+  }
+
+  .nri-alert,
+  .nri-notice {
+    color: var(--sc-ink);
+  }
+
+  // Бейдж «Нове» / «Оновлено» — бурштинова табличка з темним текстом.
+  .nri-seen-badge {
+    border-color: var(--sc-amber);
+    border-radius: 4px;
+    background: var(--sc-amber);
+    color: var(--sc-on-amber);
+    font-family: var(--sc-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
+  // ---- Оверлеї ----
+  // Спливні поверхні — рівнем вище за панелі, з межею й глибокою тінню над затемненням.
+  .mat-mdc-dialog-surface.mdc-dialog__surface,
+  .mat-mdc-menu-panel.mat-mdc-menu-panel,
+  .mat-mdc-select-panel.mat-mdc-select-panel,
+  .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel,
+  .mat-datepicker-content.mat-datepicker-content {
+    box-shadow: var(--nri-shadow-lg);
+  }
+
+  .mat-datepicker-content.mat-datepicker-content {
+    outline: 1px solid var(--nri-overlay-border);
+    outline-offset: -1px;
+  }
+
+  // Список нативного <select matNativeControl>: Chromium малює його за схемою сторінки, а
+  // Material фарбує <option> у майже чорний (розрахований на світлий список). Фон і текст —
+  // явно з токенів, щоб варіанти читалися незалежно від того, як браузер малює список.
+  select option {
+    background-color: var(--sc-overlay);
+    color: var(--sc-ink);
+  }
+
+  // Вузький екран: сторінка робить фільтри статичними — повертаємо `relative` для трубки, але
+  // без зсуву `top`, який лишився від липкого положення (інакше панель налазить на сортування).
+  // Межа 899.98px — та сама, що в features/search/search-page/search-page.less (медіазапит, у
+  // якому фільтри стають статичними): міняти разом.
+  @media (max-width: 899.98px) {
+    .nri-page.nri-board .nri-panel {
+      position: relative;
+      top: auto;
+    }
+  }
+
+  @media (max-width: 599.98px) {
+    .nri-page:not(.nri-board) {
+      margin-top: var(--nri-space-md);
+      margin-bottom: var(--nri-space-lg);
+    }
+  }
+}
+
+// Типові токени станів і шести неонів картки (однакові в усіх кібер-дизайнах; дизайн може
+// перевизначити будь-який після виклику, не кібер-дизайн — задати всі свої). Контраст тексту
+// ≥ 4.5 на темному склі #0B1220…#17131F…#222532 (перевірено для кожного дизайну в його бандлі).
+.sc-neon-tokens() {
+  --sc-lime: #9dff4d;
+  --sc-lime-text: #e2ffc9;
+  --sc-lime-line: rgba(157, 255, 77, 0.55);
+  --sc-lime-fill: rgba(157, 255, 77, 0.09);
+  --sc-amber: #ffad3d;
+  --sc-amber-text: #ffd49a;
+  --sc-amber-line: rgba(255, 173, 61, 0.55);
+  --sc-amber-fill: rgba(255, 173, 61, 0.1);
+  --sc-on-amber: #1d1204;
+  --sc-red: #ff4a5c;
+  --sc-red-text: #ffa3ad;
+  --sc-red-fill: rgba(255, 74, 92, 0.1);
+  --sc-on-red: #1a0408;
+
+  // Шість неонів картки (колір, серцевина трубки, текст).
+  --sc-neon-pink: #ff3d8b;
+  --sc-neon-pink-core: #ffd3e5;
+  --sc-neon-pink-text: #ff87b7;
+  --sc-neon-cyan: #3fe3ff;
+  --sc-neon-cyan-core: #d3f8ff;
+  --sc-neon-cyan-text: #85eeff;
+  --sc-neon-violet: #a274ff;
+  --sc-neon-violet-core: #e6dcff;
+  --sc-neon-violet-text: #c5a9ff;
+  --sc-neon-amber: #ffad3d;
+  --sc-neon-amber-core: #ffecd0;
+  --sc-neon-amber-text: #ffcc87;
+  --sc-neon-lime: #9dff4d;
+  --sc-neon-lime-core: #ecffd8;
+  --sc-neon-lime-text: #c2ff91;
+  --sc-neon-red: #ff4a5c;
+  --sc-neon-red-core: #ffd9dd;
+  --sc-neon-red-text: #ff8f9a;
+}
+
+// [data-neon='<колір>'] → --sc-n / --sc-n-core / --sc-n-text з токенів дизайну.
+.sc-neon-colors(@list; @i: 1) when (@i =< length(@list)) {
+  @c: extract(@list, @i);
+
+  [data-neon='@{c}'] {
+    --sc-n: ~'var(--sc-neon-@{c})';
+    --sc-n-core: ~'var(--sc-neon-@{c}-core)';
+    --sc-n-text: ~'var(--sc-neon-@{c}-text)';
+  }
+
+  .sc-neon-colors(@list; (@i + 1));
+}
+
+// Локальна схема ділянки (див. шапку): світла паперова картка на темному дизайні або навпаки.
+// Викликати на корені ділянки ПІСЛЯ перевизначення там токенів ділянки (--sc-ink, -ink-soft,
+// -ink-muted, --sc-line, --sc-outline, --sc-panel, --sc-panel-raised, --sc-field, --sc-overlay
+// і за потреби акцентів --sc-neon-b… / станів). Заново виводить із них --nri-* і --mat-sys-*
+// (поля, кнопки, прапорці Material усередині ділянки), а також color-scheme, скролбари й
+// список нативного <select>. Спливні оверлеї Material (меню, списки, діалоги, датапікер)
+// рендеряться поза ділянкою — у схемі сторінки.
+.sc-local-scheme(@scheme) {
+  color-scheme: @scheme;
+  scrollbar-color: var(--sc-outline) transparent;
+
+  --nri-surface: var(--sc-panel);
+  --nri-surface-raised: var(--sc-overlay);
+  --nri-surface-sunken: var(--sc-field);
+  --nri-text: var(--sc-ink);
+  --nri-text-muted: var(--sc-ink-muted);
+  --nri-border: var(--sc-line);
+  --nri-primary: var(--sc-neon-b);
+  --nri-on-primary: var(--sc-on-neon-b);
+  --nri-primary-text: var(--sc-neon-b-text);
+  --nri-accent: var(--sc-neon-a);
+  --nri-on-accent: var(--sc-on-neon-a);
+  --nri-accent-text: var(--sc-neon-a-text);
+  --nri-danger-text: var(--sc-red-text);
+  --nri-success-text: var(--sc-lime-text);
+  --nri-focus-ring: var(--sc-neon-b);
+
+  --mat-sys-surface: var(--sc-panel);
+  --mat-sys-surface-container-lowest: var(--sc-field);
+  --mat-sys-surface-container-low: var(--sc-panel);
+  --mat-sys-surface-container: var(--sc-panel);
+  --mat-sys-surface-container-high: var(--sc-overlay);
+  --mat-sys-surface-container-highest: var(--sc-panel-raised);
+  --mat-sys-on-surface: var(--sc-ink);
+  --mat-sys-on-surface-variant: var(--sc-ink-soft);
+  --mat-sys-outline: var(--sc-outline);
+  --mat-sys-outline-variant: var(--sc-line);
+  --mat-sys-primary: var(--sc-neon-b);
+  --mat-sys-on-primary: var(--sc-on-neon-b);
+  --mat-sys-primary-container: var(--sc-neon-b);
+  --mat-sys-on-primary-container: var(--sc-on-neon-b);
+  --mat-sys-secondary: var(--sc-ink-soft);
+  --mat-sys-secondary-container: var(--sc-neon-b);
+  --mat-sys-on-secondary-container: var(--sc-on-neon-b);
+  --mat-sys-tertiary: var(--sc-neon-a-text);
+  --mat-sys-error: var(--sc-red-text);
+  // Токени компонентів, які scene-material.scss задає прямо з --sc-* (не через --mat-sys-*).
+  --mat-button-outlined-outline-color: var(--sc-outline);
+  --mat-form-field-select-option-text-color: var(--sc-ink);
+  --mat-form-field-select-disabled-option-text-color: var(--sc-ink-muted);
+
+  select option {
+    background-color: var(--sc-overlay);
+    color: var(--sc-ink);
+  }
+}

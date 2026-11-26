@@ -49,8 +49,8 @@ function theme(
   };
 }
 
-/** Слоти кібер-родини (спільний лінивий чанк трьох кібер-дизайнів). */
-const loadCyberSlots = () => import('./themes/cyber/slots').then((m) => m.CYBER_SLOTS);
+/** Слоти родини сцени (спільний лінивий чанк усіх дизайнів сцени). */
+const loadSceneSlots = () => import('./themes/scene/slots').then((m) => m.SCENE_SLOTS);
 
 /**
  * Усі дизайни. Мапа «дизайн → [бандл, color-scheme, ранній фон]» продубльована в інлайн-скрипті
@@ -66,11 +66,12 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     () => import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
     ['tearAnimation'],
   ),
-  // Кібер-родина: три окремі дизайни з одним лінивим чанком слотів (той самий import —
-  // вантажиться один раз) і власним бандлом стилів кожен. Текст світлий на темному склі.
-  'neon-signs': theme('neon-signs', 'dark', loadCyberSlots),
-  'holo-market': theme('holo-market', 'dark', loadCyberSlots),
-  'night-city': theme('night-city', 'dark', loadCyberSlots),
+  // Родина сцени (themes/scene): окремі дизайни з одним лінивим чанком слотів (той самий
+  // import — вантажиться один раз) і власним бандлом стилів кожен. Кібер-дизайни — текст
+  // світлий на темному склі.
+  'neon-signs': theme('neon-signs', 'dark', loadSceneSlots),
+  'holo-market': theme('holo-market', 'dark', loadSceneSlots),
+  'night-city': theme('night-city', 'dark', loadSceneSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

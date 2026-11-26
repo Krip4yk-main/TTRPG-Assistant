@@ -1,7 +1,7 @@
-// Material для дизайну «Нічне місто» (бандл `theme-night-city`): спільний темний Material
-// кібер-родини (../cyber/cyber-material.scss) з заголовковим шрифтом дизайну.
-@use '../cyber/cyber-material' as cy;
+// Material для дизайну «Нічне місто» (бандл `theme-night-city`): спільний Material родини сцени
+// (../scene/scene-material.scss) у темній схемі; шрифти — токени --sc-font-* дизайну (night-city.less).
+@use '../scene/scene-material' as sc;
 
 :root[data-theme='night-city'] {
-  @include cy.material("'Unbounded', 'Golos Text', 'Segoe UI', system-ui, sans-serif");
+  @include sc.material(dark);
 }

@@ -1,14 +1,18 @@
 // Дизайн «Голо-ринок» (кібер-родина, макет docs/design-concepts/cyberpunk/cyber-c-holo.html):
 // окремий бандл `theme-holo-market.css` (`inject: false` в angular.json), який підключає
 // ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — заголовковий шрифт (Jura,
-// @fontsource: лише кирилиця й латиниця), токени --cy-* і вигляд варіанта: розмитий нічний
+// @fontsource: лише кирилиця й латиниця), токени --sc-* і вигляд варіанта: розмитий нічний
 // ринок з українськими вивісками (маленький inline SVG, без растрових файлів), шапка з ціановою
 // лінією, великий заголовок з хроматичним краєм, картки — напівпрозорі голо-панелі зі
 // зрізаними кутами й хроматичною рамкою, проєктор зі світловим конусом під карткою,
 // обкладинка — ч/б голо-прев'ю, повернуте в 3D за панеллю (кольорове й наперед при наведенні).
 // Рядка статистики з макета («Нових за добу / Найближча / Майстрів онлайн») немає: таких даних
 // у DTO пошуку немає, а нових API дизайн не додає.
-// Спільні темні поверхні сайту — ../cyber/cyber-base.less; Material — holo-market-material.scss.
+// Кібер-дизайн родини сцени: спільні слоти, темні поверхні сайту й токени — ../scene/scene-base.less;
+// Material — holo-market-material.scss.
+// Гачки декору сцени (карта — у шапці scene-base.less): sc-d1 — рамка зі зрізаними кутами й
+// хроматичним краєм, sc-d2 — світловий конус під карткою, sc-d3 — проєктор; sc-p1 — кутики й
+// сканлайни біля країв панелі; sc-accent — ціанова лінія вгорі. sc-d4, sc-p2, sc-s1 — не вживаються.
 
 // Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини,
 // заголовки — Jura (500 — Material, 600 — дрібні заголовки, 700 — логотип, заголовок сторінки,
@@ -29,7 +33,7 @@
 @import (css) '@fontsource/jura/latin-600.css';
 @import (css) '@fontsource/jura/cyrillic-700.css';
 @import (css) '@fontsource/jura/latin-700.css';
-@import '../cyber/cyber-base.less';
+@import '../scene/scene-base.less';
 
 @hm: ~":root[data-theme='holo-market']";
 
@@ -47,7 +51,7 @@
 // бурштинова вивіска) ≈ #4A3A20. Голо-панель картки — скло rgba(9,26,38,.9) поверх
 // притемненого (brightness .5) фону й рамки кольору гри: найгірше ≈ #152126 угорі, з
 // відтінком неону внизу ≈ #2D2A21 (бурштин) … #193036 (ціан). Непрозора оцінка скла
-// --cy-panel #0A1824, оверлей #0F2230, поле #050C14, смуга шапки над вивіскою ≈ #1F1C19.
+// --sc-panel #0A1824, оверлей #0F2230, поле #050C14, смуга шапки над вивіскою ≈ #1F1C19.
 //   Текст #EAF7FA — 15.0 на склі картки / 14.8 оверлей / 12.3 з відтінком / 9.4 на стіні;
 //   #CFE2E8 (описи) — 12.3 скло / 12.2 оверлей; підзаголовок #D6E8EE — 8.1 на стіні.
 //   #9DBFCB (підписи) — 8.4 скло / 8.3 оверлей / ≥ 6.9 з відтінком / 8.7 смуга / 5.3 стіна.
@@ -63,65 +67,65 @@
 //     й нижнього країв; рамка, конус, проєктор, світіння — декор поза текстом.
 
 @{hm} {
-  --cy-font-display: 'Jura', 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+  --sc-font-display: 'Jura', 'Golos Text', 'Segoe UI', system-ui, sans-serif;
 
-  --cy-wall: #070914;
-  --cy-wall-deep: #070914;
-  --cy-bar: rgba(6, 10, 20, 0.86);
-  --cy-bar-line: rgba(94, 242, 255, 0.42);
+  --sc-wall: #070914;
+  --sc-wall-deep: #070914;
+  --sc-bar: rgba(6, 10, 20, 0.86);
+  --sc-bar-line: rgba(94, 242, 255, 0.42);
 
-  --cy-panel: #0a1824;
-  --cy-glass: linear-gradient(rgba(9, 26, 38, 0.93), rgba(6, 16, 26, 0.95));
-  --cy-glass-line: rgba(94, 242, 255, 0.3);
-  --cy-panel-raised: #112636;
-  --cy-overlay: #0f2230;
-  --cy-overlay-line: rgba(94, 242, 255, 0.42);
-  --cy-field: #050c14;
-  --cy-backdrop: rgba(2, 3, 8, 0.75);
-  --cy-blur-overlay: rgba(6, 14, 22, 0.75);
+  --sc-panel: #0a1824;
+  --sc-glass: linear-gradient(rgba(9, 26, 38, 0.93), rgba(6, 16, 26, 0.95));
+  --sc-glass-line: rgba(94, 242, 255, 0.3);
+  --sc-panel-raised: #112636;
+  --sc-overlay: #0f2230;
+  --sc-overlay-line: rgba(94, 242, 255, 0.42);
+  --sc-field: #050c14;
+  --sc-backdrop: rgba(2, 3, 8, 0.75);
+  --sc-blur-overlay: rgba(6, 14, 22, 0.75);
 
-  --cy-ink: #eaf7fa;
-  --cy-ink-soft: #cfe2e8;
-  --cy-ink-muted: #9dbfcb;
-  --cy-line: rgba(94, 242, 255, 0.18);
-  --cy-outline: #4f7584;
+  --sc-ink: #eaf7fa;
+  --sc-ink-soft: #cfe2e8;
+  --sc-ink-muted: #9dbfcb;
+  --sc-line: rgba(94, 242, 255, 0.18);
+  --sc-outline: #4f7584;
 
   // Перший неон — рожевий (CTA, «Скинути»), другий — ціан (логотип, фокус, посилання).
-  --cy-neon-a: #ff5cb4;
-  --cy-neon-a-core: #ffe0f0;
-  --cy-neon-a-text: #ff9ccf;
-  --cy-on-neon-a: #1a0610;
-  --cy-neon-b: #5ef2ff;
-  --cy-neon-b-core: #d8fcff;
-  --cy-neon-b-text: #5ef2ff;
-  --cy-neon-b-glow: rgba(94, 242, 255, 0.45);
-  --cy-on-neon-b: #04161b;
-  --cy-mark: #5ef2ff;
-  --cy-mark-glow: rgba(94, 242, 255, 0.8);
+  --sc-neon-a: #ff5cb4;
+  --sc-neon-a-core: #ffe0f0;
+  --sc-neon-a-text: #ff9ccf;
+  --sc-on-neon-a: #1a0610;
+  --sc-neon-b: #5ef2ff;
+  --sc-neon-b-core: #d8fcff;
+  --sc-neon-b-text: #5ef2ff;
+  --sc-neon-b-glow: rgba(94, 242, 255, 0.45);
+  --sc-on-neon-b: #04161b;
+  --sc-mark: #5ef2ff;
+  --sc-mark-glow: rgba(94, 242, 255, 0.8);
 
-  .cy-neon-tokens();
+  .sc-neon-tokens();
 
   // Шість кольорів голограм — з макета (колір, серцевина, текст системи).
-  --cy-neon-pink: #ff5cb4;
-  --cy-neon-pink-core: #ffe0f0;
-  --cy-neon-pink-text: #ff8dcb;
-  --cy-neon-cyan: #5ef2ff;
-  --cy-neon-cyan-core: #d8fcff;
-  --cy-neon-cyan-text: #8ef6ff;
-  --cy-neon-violet: #b18cff;
-  --cy-neon-violet-core: #ece2ff;
-  --cy-neon-violet-text: #c8afff;
-  --cy-neon-amber: #ffbf4a;
-  --cy-neon-amber-core: #fff0d2;
-  --cy-neon-amber-text: #ffd280;
-  --cy-neon-lime: #c6ff4a;
-  --cy-neon-lime-core: #f1ffd2;
-  --cy-neon-lime-text: #d7ff80;
-  --cy-neon-red: #ff6a78;
-  --cy-neon-red-core: #ffdde1;
-  --cy-neon-red-text: #ff97a1;
+  --sc-neon-pink: #ff5cb4;
+  --sc-neon-pink-core: #ffe0f0;
+  --sc-neon-pink-text: #ff8dcb;
+  --sc-neon-cyan: #5ef2ff;
+  --sc-neon-cyan-core: #d8fcff;
+  --sc-neon-cyan-text: #8ef6ff;
+  --sc-neon-violet: #b18cff;
+  --sc-neon-violet-core: #ece2ff;
+  --sc-neon-violet-text: #c8afff;
+  --sc-neon-amber: #ffbf4a;
+  --sc-neon-amber-core: #fff0d2;
+  --sc-neon-amber-text: #ffd280;
+  --sc-neon-lime: #c6ff4a;
+  --sc-neon-lime-core: #f1ffd2;
+  --sc-neon-lime-text: #d7ff80;
+  --sc-neon-red: #ff6a78;
+  --sc-neon-red-core: #ffdde1;
+  --sc-neon-red-text: #ff97a1;
 
-  .cy-base();
+  .sc-base();
 
   // Зрізані кути (голо-панелі, табличка ціни, активний пункт меню).
   --hm-cut: 16px;
@@ -140,11 +144,11 @@
   // «ЗАПЧАСТИНИ», «ГРИБИ»…) — фіксований шар на розмір вікна, розмитий усередині SVG і
   // притемнений; над ним — вуаль, віньєтка й ледь помітні сканлайни (теж фіксовані, під
   // усім вмістом). Без зменшеного руху сцена зрідка ледь мерехтить.
-  .cy-wall {
+  .sc-wall {
     // Повернуте прев'ю крайньої картки не дає горизонтального скролу (clip — не контейнер
     // прокрутки: липка шапка й фільтри працюють).
     overflow-x: clip;
-    background-color: var(--cy-wall);
+    background-color: var(--sc-wall);
 
     &::before,
     &::after {
@@ -184,7 +188,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .cy-wall::before {
+    .sc-wall::before {
       animation: hm-flicker 9s steps(1) infinite;
     }
   }
@@ -192,14 +196,14 @@
   // ---- Шапка: напівпрозора смуга з ціановою лінією й світінням ----
   // backdrop-filter робить .top контейнером для position: fixed нащадків шапки (у ній таких
   // немає: меню й підказки — оверлеї CDK у <body>).
-  .top.cy-bar {
+  .top.sc-bar {
     backdrop-filter: blur(10px);
     box-shadow: 0 0 18px rgba(94, 242, 255, 0.15);
   }
 
   .top .brand {
     color: #eafdff;
-    font: 700 1.375rem/1 var(--cy-font-display);
+    font: 700 1.375rem/1 var(--sc-font-display);
     letter-spacing: 0.02em;
 
     &:hover {
@@ -208,7 +212,7 @@
   }
 
   .top .mark {
-    filter: drop-shadow(0 0 5px var(--cy-mark-glow));
+    filter: drop-shadow(0 0 5px var(--sc-mark-glow));
   }
 
   // Активний пункт — ціанова плашка зі зрізаними кутами.
@@ -223,12 +227,12 @@
   .top .avatar {
     background: rgba(94, 242, 255, 0.12);
     color: #eafdff;
-    font-family: var(--cy-font-display);
+    font-family: var(--sc-font-display);
     font-weight: 700;
   }
 
   // ---- Заголовок сторінки: великий Jura з хроматичним краєм (без пластини) ----
-  .cy-sign-title {
+  .sc-sign-title {
     color: #f2feff;
     font-weight: 700;
     font-size: clamp(2rem, 4.2vw, 3.625rem);
@@ -240,14 +244,14 @@
       0 0 26px rgba(94, 242, 255, 0.4);
   }
 
-  nri-cy-page-header .lead {
+  nri-sc-page-header .lead {
     margin-top: 10px;
     color: #d6e8ee;
   }
 
   // ---- Панелі сайту: скло зі зрізаними кутами ----
   // Тінь панелі зрізаний контур однаково обрізає — замість неї тонка межа.
-  .cy-glass,
+  .sc-glass,
   .nri-page:not(.nri-board),
   .nri-page.nri-board .nri-panel {
     border-radius: 0;
@@ -275,25 +279,25 @@
 
   // ---- Голо-панель картки (пошук і «Мої ігри») ----
   // Напівпрозоре скло зі зрізаними кутами й відтінком кольору гри знизу; позаду — рамка-
-  // градієнт з хроматичним краєм (.cy-frame), під карткою — світловий конус (.cy-beam) і
-  // проєктор (.cy-emitter). Сканлайни — у .cy-brackets під текстом, лише біля країв.
-  [data-neon] > .cy-glass {
+  // градієнт з хроматичним краєм (.sc-d1), під карткою — світловий конус (.sc-d2) і
+  // проєктор (.sc-d3). Сканлайни — у .sc-p1 під текстом, лише біля країв.
+  [data-neon] > .sc-glass {
     border: 0;
     background:
-      linear-gradient(0deg, color-mix(in srgb, var(--cy-n) 12%, transparent), transparent 40%),
+      linear-gradient(0deg, color-mix(in srgb, var(--sc-n) 12%, transparent), transparent 40%),
       linear-gradient(180deg, rgba(9, 26, 38, 0.9), rgba(6, 16, 26, 0.92));
     box-shadow: none;
 
-    .cy-tube {
+    .sc-accent {
       display: none;
     }
   }
 
   // Рамка: градієнт кольору гри під панеллю (виступає на 1px) з червоно-ціановим зсувом.
   // z-index 1 — під панеллю картки, бо спільна розкладка дає .panel z-index 2
-  // (cyber-game-card.less / cyber-my-game-item.less): міняти разом.
+  // (scene-game-card.less / scene-my-game-item.less): міняти разом.
   // Фільтр — на хості рамки, контур — на псевдоелементі (інакше clip-path обрізав би тінь).
-  .cy-frame {
+  .sc-d1 {
     position: absolute;
     inset: -1px;
     z-index: 1;
@@ -309,10 +313,10 @@
       inset: 0;
       background: linear-gradient(
         160deg,
-        var(--cy-n),
+        var(--sc-n),
         rgba(94, 242, 255, 0.25) 40%,
         rgba(94, 242, 255, 0.15) 70%,
-        var(--cy-n)
+        var(--sc-n)
       );
       clip-path: polygon(
         var(--hm-cut) 0,
@@ -326,7 +330,7 @@
   }
 
   // Сканлайни й кутики-приціли (верхній правий, нижній лівий).
-  .cy-brackets {
+  .sc-p1 {
     position: absolute;
     inset: 0;
     z-index: -1;
@@ -345,7 +349,7 @@
       position: absolute;
       width: 14px;
       height: 14px;
-      border: 0 solid var(--cy-n, var(--cy-neon-b));
+      border: 0 solid var(--sc-n, var(--sc-neon-b));
       opacity: 0.9;
     }
 
@@ -363,7 +367,7 @@
   }
 
   // Світловий конус від проєктора до нижнього краю панелі.
-  .cy-beam {
+  .sc-d2 {
     position: absolute;
     bottom: -24px;
     left: 50%;
@@ -373,8 +377,8 @@
     height: 26px;
     background: linear-gradient(
       0deg,
-      color-mix(in srgb, var(--cy-n) 60%, transparent),
-      color-mix(in srgb, var(--cy-n) 8%, transparent)
+      color-mix(in srgb, var(--sc-n) 60%, transparent),
+      color-mix(in srgb, var(--sc-n) 8%, transparent)
     );
     clip-path: polygon(43% 100%, 57% 100%, 100% 0, 0 0);
     opacity: 0.8;
@@ -383,7 +387,7 @@
   }
 
   // Проєктор: металевий брусок зі світною лінзою й зеленим діодом живлення.
-  .cy-emitter {
+  .sc-d3 {
     position: absolute;
     bottom: -32px;
     left: 50%;
@@ -421,25 +425,25 @@
       border-radius: 2px;
       background: #fff;
       box-shadow:
-        0 0 6px var(--cy-n),
-        0 0 14px var(--cy-n);
+        0 0 6px var(--sc-n),
+        0 0 14px var(--sc-n);
     }
   }
 
   [data-neon]:is(:hover, :focus-within) {
-    > .cy-frame {
+    > .sc-d1 {
       opacity: 1;
       filter: drop-shadow(-3px 0 0 rgba(255, 60, 140, 0.7))
-        drop-shadow(3px 0 0 rgba(60, 230, 255, 0.75)) drop-shadow(0 0 10px var(--cy-n));
+        drop-shadow(3px 0 0 rgba(60, 230, 255, 0.75)) drop-shadow(0 0 10px var(--sc-n));
     }
 
-    > .cy-beam {
+    > .sc-d2 {
       opacity: 1;
     }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :is(.cy-frame, .cy-beam) {
+    :is(.sc-d1, .sc-d2) {
       transition:
         opacity var(--nri-transition),
         filter var(--nri-transition);
@@ -447,7 +451,7 @@
   }
 
   // ---- Вміст картки ----
-  :is(nri-cy-game-card, nri-cy-my-game-item) .title {
+  :is(nri-sc-game-card, nri-sc-my-game-item) .title {
     color: #f3feff;
     font-weight: 700;
     font-size: 1.35rem;
@@ -468,17 +472,17 @@
     }
 
     .on {
-      border-color: var(--cy-n);
+      border-color: var(--sc-n);
     }
   }
 
   // Мітки й ініціал майстра — прямокутні.
-  :is(nri-cy-game-card, nri-cy-my-game-item) :is(.badge, .status, .nri-seen-badge) {
+  :is(nri-sc-game-card, nri-sc-my-game-item) :is(.badge, .status, .nri-seen-badge) {
     border-radius: 2px;
   }
 
-  nri-cy-game-card .gm .initial {
-    border: 1px solid color-mix(in srgb, var(--cy-n) 70%, transparent);
+  nri-sc-game-card .gm .initial {
+    border: 1px solid color-mix(in srgb, var(--sc-n) 70%, transparent);
     border-radius: 2px;
     background: rgba(94, 242, 255, 0.08);
     color: #eafdff;
@@ -486,7 +490,7 @@
   }
 
   // «Підходить вашому розкладу» — смуга з лаймовим краєм і ромбом (частковий — бурштин).
-  nri-cy-game-card .fit .badge.fit {
+  nri-sc-game-card .fit .badge.fit {
     padding: 5px 10px;
     border: 0;
     border-left: 3px solid #c6ff4a;
@@ -516,7 +520,7 @@
   // Ціна — бурштинова табличка зі зрізаними кутами, безкоштовна — лайм. Компактна (підпис
   // майстра поруч має лишатися читабельним); межа на зрізах — діагоналі фоном (clip-path
   // обрізає саму рамку).
-  nri-cy-game-card .price {
+  nri-sc-game-card .price {
     --hm-sign: #ffbf4a;
 
     padding: 5px 10px;
@@ -527,7 +531,7 @@
       @hm-cut-edge bottom right / 8px 8px no-repeat border-box,
       rgba(255, 191, 74, 0.1);
     color: #ffe1a6;
-    font: 700 0.875rem/1.2 var(--cy-font-display);
+    font: 700 0.875rem/1.2 var(--sc-font-display);
     letter-spacing: 0;
     clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 
@@ -544,7 +548,7 @@
 
   // Підпис майстра: роль («майстер · ★ 4,5» / «майстер · ще немає рейтингу») — до двох
   // рядків з «…» (повний текст — у підказці), щоб не обрізатися поруч із ціною.
-  nri-cy-game-card .gm .role {
+  nri-sc-game-card .gm .role {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -561,17 +565,17 @@
   // ---- Обкладинка: ч/б голо-прев'ю, повернуте в 3D за верхнім правим кутом панелі ----
   // Наперед (наведення / клік / Enter) — кольорове, вирівнюється, виїжджає на панель і
   // збільшується, з хроматичним краєм і світінням кольору гри.
-  nri-cy-attachment {
+  nri-sc-attachment {
     top: -36px;
     right: -30px;
     width: 160px;
     height: 112px;
 
     .attach {
-      border: 1px solid color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 70%, transparent);
+      border: 1px solid color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 70%, transparent);
       border-radius: 0;
-      background: var(--cy-field);
-      box-shadow: 0 0 18px color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 35%, transparent);
+      background: var(--sc-field);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 35%, transparent);
       opacity: 0.85;
       transform: perspective(500px) rotateY(-24deg) rotateZ(4deg);
       transform-origin: 100% 50%;
@@ -588,8 +592,8 @@
         background:
           repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
           linear-gradient(
-            color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 22%, transparent),
-            color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 22%, transparent)
+            color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 22%, transparent),
+            color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 22%, transparent)
           );
         pointer-events: none;
       }
@@ -603,9 +607,9 @@
       z-index: 2;
       display: block;
       padding: 1px 4px;
-      background: var(--cy-n, var(--cy-neon-b));
+      background: var(--sc-n, var(--sc-neon-b));
       color: #04141a;
-      font: 700 0.5625rem/1.4 var(--cy-font-mono);
+      font: 700 0.5625rem/1.4 var(--sc-font-mono);
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
@@ -616,7 +620,7 @@
       -3px 0 0 rgba(255, 60, 140, 0.75),
       3px 0 0 rgba(60, 230, 255, 0.75),
       0 14px 30px rgba(0, 0, 0, 0.6),
-      0 0 30px color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 45%, transparent);
+      0 0 30px color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 45%, transparent);
     opacity: 1;
     transform: translate(-46px, 26px) scale(1.16);
 
@@ -629,18 +633,18 @@
     }
   }
 
-  nri-cy-attachment.front .attach {
+  nri-sc-attachment.front .attach {
     .hm-attachment-front();
   }
 
   @media (hover: hover) {
-    nri-cy-attachment:hover:not(.dismissed) .attach {
+    nri-sc-attachment:hover:not(.dismissed) .attach {
       .hm-attachment-front();
     }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    nri-cy-attachment .attach {
+    nri-sc-attachment .attach {
       transition:
         transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
         opacity 350ms,
@@ -681,7 +685,7 @@
 
 @media (max-width: 599.98px) {
   // Вузький екран: прев'ю не виходить за поля сторінки (без горизонтального скролу).
-  @{hm} nri-cy-attachment {
+  @{hm} nri-sc-attachment {
     right: -8px;
   }
 }

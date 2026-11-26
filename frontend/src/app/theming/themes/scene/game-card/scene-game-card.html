@@ -1,0 +1,117 @@
+@let g = game();
+<!-- Загальні гачки декору поза панеллю (sc-d1…sc-d4; основа ховає, бандл дизайну показує й
+     малює — що чим є, описано в бандлі; карта — у шапці scene-base.less). -->
+<span class="sc-d1" aria-hidden="true"></span>
+<span class="sc-d2" aria-hidden="true"></span>
+<span class="sc-d3" aria-hidden="true"></span>
+<span class="sc-d4" aria-hidden="true"></span>
+@if (g.restricted) {
+  <article class="panel sc-glass restricted" [attr.data-game-id]="g.id">
+    <span class="sc-accent" aria-hidden="true"></span>
+    <span class="sc-p1" aria-hidden="true"></span>
+    <span class="sc-p2" aria-hidden="true"></span>
+    <div class="veil" aria-hidden="true">
+      <mat-icon>visibility_off</mat-icon>
+    </div>
+    <div class="sysrow">
+      <span class="marks">
+        @for (b of g.badges; track $index) {
+          <nri-sc-badge [badge]="b" />
+        }
+      </span>
+    </div>
+    <h2 class="title">
+      <a class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
+    </h2>
+    <p class="restricted-text">{{ g.restrictedKey | translate }}</p>
+    @if (g.loginReturnTo; as returnTo) {
+      <a class="login" routerLink="/login" [queryParams]="{ returnTo }">{{
+        'games.restricted.login' | translate
+      }}</a>
+    }
+    <footer class="foot">
+      <nri-sc-gm-signature class="gm" [gm]="g.gm" />
+    </footer>
+  </article>
+} @else {
+  <!-- Обкладинка — знімок за верхнім правим кутом панелі (під нею; наперед — над нею). -->
+  @if (g.coverUrl; as cover) {
+    <nri-sc-attachment [src]="cover" [title]="g.title" />
+  }
+  <article class="panel sc-glass" [attr.data-game-id]="g.id">
+    <span class="sc-accent" aria-hidden="true"></span>
+    <span class="sc-p1" aria-hidden="true"></span>
+    <span class="sc-p2" aria-hidden="true"></span>
+    <div class="sysrow">
+      @let sys = g.systemLine | nriLine;
+      <span class="sys" [nriTruncateTooltip]="sys">{{ sys }}</span>
+      @if (marks().length > 0) {
+        <!-- Мітки — один рядок: зайві ховаються за «+N» (для читачів екрана — усі). -->
+        <span class="marks">
+          @for (b of marks().slice(0, maxMarks); track $index) {
+            <nri-sc-badge [badge]="b" />
+          }
+          @if (marks().length > maxMarks) {
+            <span class="more" aria-hidden="true">+{{ marks().length - maxMarks }}</span>
+            <span class="nri-visually-hidden">
+              @for (b of marks().slice(maxMarks); track $index) {
+                <nri-sc-badge [badge]="b" />
+              }
+            </span>
+          }
+        </span>
+      }
+    </div>
+    <h2 class="title">
+      <a class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
+    </h2>
+    @if (g.summary; as summary) {
+      <p class="desc" [nriTruncateTooltip]="summary">{{ summary }}</p>
+    }
+    <dl class="facts">
+      @if (g.showSchedule) {
+        <div>
+          <dt>{{ 'scene.card.when' | translate }}</dt>
+          @let next = g.nextSession ?? ('search.card.noNext' | translate);
+          <dd [nriTruncateTooltip]="next">{{ next }}</dd>
+        </div>
+      }
+      <div>
+        @let where = g.whereLine | nriLine;
+        <dt>{{ 'scene.card.where' | translate }}</dt>
+        <dd [nriTruncateTooltip]="where">{{ where }}</dd>
+      </div>
+      @if (g.showSchedule) {
+        <div>
+          <dt>{{ 'search.card.slots' | translate }}</dt>
+          <dd class="seats">
+            @if (pips().length > 0) {
+              <span class="pips" aria-hidden="true">
+                @for (on of pips(); track $index) {
+                  <b [class.on]="on"></b>
+                }
+              </span>
+            }
+            <span class="seats-text">{{
+              'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers }
+            }}</span>
+          </dd>
+        </div>
+      }
+    </dl>
+    @if (fit(); as f) {
+      <div class="fit"><nri-sc-badge [badge]="f" /></div>
+    }
+    <footer class="foot">
+      <nri-sc-gm-signature class="gm" [gm]="g.gm" />
+      <p class="price" [class.free]="g.priceUah === null">
+        <span class="nri-visually-hidden">{{ 'scene.price.label' | translate }}:</span>
+        @if (g.priceUah === null) {
+          {{ 'scene.price.free' | translate }}
+        } @else {
+          {{ 'scene.price.value' | translate: { price: g.priceUah } }}
+        }
+      </p>
+    </footer>
+  </article>
+}

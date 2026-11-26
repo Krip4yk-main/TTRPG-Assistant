@@ -11,7 +11,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { ViewsService } from '../../../core/views/views.service';
 import { provideThemeSlots } from '../../../theming/theme-testing';
-import { CYBER_SLOTS } from '../../../theming/themes/cyber/slots';
+import { SCENE_SLOTS } from '../../../theming/themes/scene/slots';
 
 const me = {
   id: 1,
@@ -87,8 +87,8 @@ describe('MyGames', () => {
         provideRouter([]),
         provideTranslateService(),
         { provide: MatDialog, useValue: { open } },
-        // Рядки малює слот `my-game-item` кібер-родини.
-        provideThemeSlots(CYBER_SLOTS),
+        // Рядки малює слот `my-game-item` родини сцени.
+        provideThemeSlots(SCENE_SLOTS),
         {
           provide: SocketService,
           useValue: {

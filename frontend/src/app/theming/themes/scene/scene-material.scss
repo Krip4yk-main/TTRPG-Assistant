@@ -1,0 +1,132 @@
+// Material для родини сцени: спільний міксин, який кожен дизайн сцени викликає у своєму
+// `<id>-material.scss` під `:root[data-theme='<id>']` (той самий бандл `theme-<id>`). Сам
+// файл CSS не виводить. Angular Material генерує токени теми лише через Sass API; кольорові
+// ролі й шрифти — CSS-змінні --sc-* дизайну (scene-base.less, контраст — у токенах дизайну),
+// тож один міксин дає Material для всіх дизайнів сцени.
+//
+// Ролі: primary — другий акцент (--sc-neon-b: фокус полів, прапорці, вибраний день, filled-
+// кнопки); tertiary — перший акцент (--sc-neon-a); error — червоний; поверхні — панелі дизайну
+// (діалоги, меню, списки — --sc-overlay, рівнем вище за панелі). Шрифти — --sc-font-body
+// (текст) і --sc-font-display (заголовки).
+//
+// Схема: `$scheme` — dark (типово; кібер-дизайни) або light (світлий дизайн, напр. «Сонячний
+// сад»): задає color-scheme і базову палітру M3 для ролей, яких токени не перевизначають. Той
+// самий `@scheme` дизайн передає в `.sc-base()` (scene-base.less). Світлі ділянки на темному
+// дизайні (паперова картка на темній стіні) — `.sc-local-scheme()` у scene-base.less.
+@use '@angular/material' as mat;
+
+/// @param $scheme — dark | light (color-scheme і тип теми M3).
+@mixin material($scheme: dark) {
+  color-scheme: $scheme;
+
+  @include mat.theme(
+    (
+      color: (
+        theme-type: $scheme,
+        primary: mat.$cyan-palette,
+        tertiary: mat.$magenta-palette,
+      ),
+      typography: (
+        plain-family: 'var(--sc-font-body)',
+        brand-family: 'var(--sc-font-display)',
+      ),
+      density: 0,
+    )
+  );
+
+  @include mat.theme-overrides(
+    (
+      surface: var(--sc-panel),
+      background: var(--sc-wall),
+      surface-container-lowest: var(--sc-field),
+      surface-container-low: var(--sc-panel),
+      surface-container: var(--sc-panel),
+      surface-container-high: var(--sc-overlay),
+      surface-container-highest: var(--sc-panel-raised),
+      surface-bright: var(--sc-panel-raised),
+      surface-dim: var(--sc-wall),
+      on-surface: var(--sc-ink),
+      on-surface-variant: var(--sc-ink-soft),
+      inverse-surface: var(--sc-ink),
+      inverse-on-surface: var(--sc-wall),
+      outline: var(--sc-outline),
+      outline-variant: var(--sc-line),
+      // Primary — другий акцент.
+      primary: var(--sc-neon-b),
+      on-primary: var(--sc-on-neon-b),
+      primary-container: var(--sc-neon-b),
+      on-primary-container: var(--sc-on-neon-b),
+      inverse-primary: var(--sc-neon-b-text),
+      // Secondary — м'який текст; контейнер (вибраний перемикач, чіпи) — другий акцент.
+      secondary: var(--sc-ink-soft),
+      on-secondary: var(--sc-wall),
+      secondary-container: var(--sc-neon-b),
+      on-secondary-container: var(--sc-on-neon-b),
+      // Tertiary — перший акцент.
+      tertiary: var(--sc-neon-a-text),
+      on-tertiary: var(--sc-on-neon-a),
+      tertiary-container: var(--sc-neon-a),
+      on-tertiary-container: var(--sc-on-neon-a),
+      // Error.
+      error: var(--sc-red-text),
+      on-error: var(--sc-on-red),
+      error-container: var(--sc-red),
+      on-error-container: var(--sc-on-red),
+    )
+  );
+
+  // Поля. Поле з помилкою під курсором: Material бере on-error-container, а в нас
+  // error-container — насичений червоний, on-error-container — контрастний до нього (у темній
+  // схемі — майже чорний). Без цього підпис і рамка поля з помилкою під курсором зливаються з
+  // фоном.
+  @include mat.form-field-overrides(
+    (
+      error-hover-trailing-icon-color: var(--mat-sys-error),
+      filled-error-hover-active-indicator-color: var(--mat-sys-error),
+      filled-error-hover-label-text-color: var(--mat-sys-error),
+      outlined-error-hover-label-text-color: var(--mat-sys-error),
+      outlined-error-hover-outline-color: var(--mat-sys-error),
+      // Варіанти нативного <select>: типово neutral10 (майже чорний) — на темному списку
+      // невидимі. Текст і фон списку — з токенів (`select option` у scene-base.less).
+      select-option-text-color: var(--sc-ink),
+      select-disabled-option-text-color: var(--sc-ink-muted),
+    )
+  );
+
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.menu-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.select-overrides(
+    (
+      panel-background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.autocomplete-overrides(
+    (
+      background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+  @include mat.datepicker-overrides(
+    (
+      calendar-container-background-color: var(--mat-sys-surface-container-high),
+    )
+  );
+
+  // Кнопки — трохи заокруглені «панельки», обведені — межею полів (≥ 3:1).
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 8px,
+      outlined-container-shape: 8px,
+      protected-container-shape: 8px,
+      text-container-shape: 8px,
+      outlined-outline-color: var(--sc-outline),
+    )
+  );
+}

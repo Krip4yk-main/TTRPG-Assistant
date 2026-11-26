@@ -1,0 +1,17 @@
+<!-- Клік / Enter / Space по кнопці спливає до хоста, а той перемикає вкладення. -->
+<button
+  type="button"
+  class="attach"
+  [attr.aria-label]="'scene.attachment.label' | translate: { title: att.title() }"
+  [attr.aria-pressed]="att.front()"
+  (blur)="att.onBlur()"
+>
+  <img
+    [src]="att.src()"
+    alt=""
+    loading="lazy"
+    referrerpolicy="no-referrer"
+    (error)="att.onError()"
+  />
+  <span class="cap" aria-hidden="true">{{ 'scene.attachment.caption' | translate }}</span>
+</button>

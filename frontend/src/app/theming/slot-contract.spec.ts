@@ -9,7 +9,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type { MyGameCardDto, SearchGameCardDto } from '@nri/shared';
 import uk from '../../assets/i18n/uk.json';
 import type { ThemeSlots } from './slots';
-import { CYBER_SLOTS } from './themes/cyber/slots';
+import { SCENE_SLOTS } from './themes/scene/slots';
 import { QUEST_BOARD_SLOTS } from './themes/quest-board/slots';
 import {
   toGameCardVm,
@@ -31,7 +31,7 @@ import { browserZone } from '../core/i18n/dates';
  */
 const DESIGNS: [string, ThemeSlots][] = [
   ['quest-board', QUEST_BOARD_SLOTS],
-  ['night-city', CYBER_SLOTS],
+  ['night-city', SCENE_SLOTS],
 ];
 
 const game: SearchGameCardDto = {

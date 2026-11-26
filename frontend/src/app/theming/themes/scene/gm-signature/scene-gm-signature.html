@@ -1,0 +1,32 @@
+@let g = gm();
+<span class="sign">
+  <span class="initial" aria-hidden="true">{{ initial() }}</span>
+  <span class="who">
+    <span class="name">
+      <span class="nri-visually-hidden">{{ 'search.card.gm' | translate }}:</span>
+      @if (g.nickname) {
+        <a
+          class="gm-link"
+          [routerLink]="['/users', g.publicId]"
+          [nriTruncateTooltip]="g.nickname"
+          >{{ g.nickname }}</a
+        >
+      } @else {
+        {{ 'user.deleted' | translate }}
+      }
+      @if (g.blocked) {
+        <nri-blocked-badge />
+      }
+    </span>
+    <!-- Рядок «майстер · ★ рейтинг» обрізається «…», коли не вміщається (у «Голо-ринку» —
+         до двох рядків); підказка — той самий текст повністю, з рейтингом і без. -->
+    @let tip = roleTip();
+    <small class="role" [nriTruncateTooltip]="tip.key | translate: tip.params">
+      <span aria-hidden="true">{{ 'scene.gm' | translate }}</span>
+      @if (g.showRating) {
+        <span aria-hidden="true">·</span>
+        <nri-gm-rating [value]="g.rating" [showEmpty]="true" />
+      }
+    </small>
+  </span>
+</span>
