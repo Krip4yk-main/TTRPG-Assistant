@@ -9,6 +9,7 @@ const ALL = [
   'dungeon',
   'gothic-gloom',
   'magicpunk',
+  'brass-steam',
 ];
 
 describe('themes', () => {

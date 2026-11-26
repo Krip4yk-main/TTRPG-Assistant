@@ -9,11 +9,12 @@
 @if (game.coverUrl; as cover) {
   <nri-sc-attachment [src]="cover" [title]="game.title" />
 }
-<!-- data-invite — текст для декору дизайну (напр. шапка запрошення «Магіпанку»). -->
+<!-- data-invite / data-telegram — текст для декору дизайну (шапки «Магіпанку», «Латуні і пари»). -->
 <article
   class="panel sc-glass"
   [attr.data-game-id]="game.id"
   [attr.data-invite]="'scene.invite' | translate: { id: game.id }"
+  [attr.data-telegram]="'scene.telegram' | translate: { id: game.id }"
 >
   <span class="sc-accent" aria-hidden="true"></span>
   <span class="sc-p1" aria-hidden="true"></span>

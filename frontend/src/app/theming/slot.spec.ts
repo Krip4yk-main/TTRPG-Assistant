@@ -53,6 +53,7 @@ function registry(load: () => Promise<ThemeSlots>): Record<ThemeId, ThemeDefinit
     dungeon: { ...THEMES.dungeon, loadSlots: load },
     'gothic-gloom': { ...THEMES['gothic-gloom'], loadSlots: load },
     magicpunk: { ...THEMES.magicpunk, loadSlots: load },
+    'brass-steam': { ...THEMES['brass-steam'], loadSlots: load },
   };
 }
 
@@ -104,6 +105,7 @@ describe('nri-slot', () => {
     expect(item.querySelector('.pending-count')!.getAttribute('data-count')).toBe('3');
     // Текст шапки-запрошення для декору дизайну (ключ без перекладу в тесті — сам ключ).
     expect(item.querySelector('.panel')!.getAttribute('data-invite')).toBe('scene.invite');
+    expect(item.querySelector('.panel')!.getAttribute('data-telegram')).toBe('scene.telegram');
 
     el.querySelector<HTMLButtonElement>('[data-action="cancel"]')!.click();
     expect(events).toEqual([{ name: 'action', value: { action: 'cancel' } }]);

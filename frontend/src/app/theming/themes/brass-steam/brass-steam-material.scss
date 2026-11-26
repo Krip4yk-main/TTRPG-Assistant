@@ -1,0 +1,23 @@
+// Material для дизайну «Латунь і пара» (бандл `theme-brass-steam`): спільний Material родини
+// сцени (../scene/scene-material.scss) у темній схемі сторінки — оверлеї (меню, списки, діалоги,
+// датапікер, автодоповнення) рендеряться поза світлими ділянками, тож вони — темна прусська синь
+// з латунною межею (токени --sc-overlay / --sc-overlay-line у brass-steam.less). Поля, кнопки й
+// прапорці всередині бланка й на латунній шапці беруть світлі ролі з `.sc-local-scheme(light)`
+// (brass-steam.less) — тут без перевизначень кольорів компонентів сталими значеннями, бо такі
+// токени «застигли» б на :root у темних значеннях.
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='brass-steam'] {
+  @include sc.material(dark);
+
+  // Кнопки — майже прямокутні, як латунні таблички макета (форма — стала величина, не колір).
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 3px,
+      outlined-container-shape: 3px,
+      protected-container-shape: 3px,
+      text-container-shape: 3px,
+    )
+  );
+}

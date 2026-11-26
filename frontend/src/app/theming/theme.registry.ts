@@ -76,6 +76,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   dungeon: theme('dungeon', 'dark', loadSceneSlots),
   'gothic-gloom': theme('gothic-gloom', 'dark', loadSceneSlots),
   magicpunk: theme('magicpunk', 'dark', loadSceneSlots),
+  'brass-steam': theme('brass-steam', 'dark', loadSceneSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

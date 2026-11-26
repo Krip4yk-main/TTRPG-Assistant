@@ -106,6 +106,16 @@
                 "input": "src/app/theming/themes/magicpunk/magicpunk-material.scss",
                 "bundleName": "theme-magicpunk",
                 "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/brass-steam/brass-steam.less",
+                "bundleName": "theme-brass-steam",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/brass-steam/brass-steam-material.scss",
+                "bundleName": "theme-brass-steam",
+                "inject": false
               }
             ]
           },

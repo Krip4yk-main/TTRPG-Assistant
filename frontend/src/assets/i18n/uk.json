@@ -65,7 +65,8 @@
       "night-city": "Нічне місто",
       "dungeon": "Підземелля",
       "gothic-gloom": "Готичний морок",
-      "magicpunk": "Магіпанк"
+      "magicpunk": "Магіпанк",
+      "brass-steam": "Латунь і пара"
     }
   },
   "scene": {
@@ -89,6 +90,7 @@
       "caption": "Обкладинка"
     },
     "invite": "Запрошення № {{id}}",
+    "telegram": "Телеграма № {{id}}",
     "shell": {
       "navMenu": "Навігація"
     }

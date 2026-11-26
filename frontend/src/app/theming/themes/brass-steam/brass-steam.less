@@ -1,0 +1,1139 @@
+// Дизайн «Латунь і пара» (родина сцени, макет docs/design-concepts/themes2/steampunk.html і
+// steampunk-card.html): окремий бандл `theme-brass-steam.css` (`inject: false` в angular.json),
+// який підключає ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — шрифти
+// (Playfair Display SC — логотип, заголовки, числа монет; Old Standard TT — назви карток; PT
+// Serif — текст; PT Mono — телеграфні мітки й підписи; @fontsource: лише кирилиця й латиниця),
+// токени --sc-* і вигляд: стіна — креслення прусської сині (сітка 120 / 24px, контури
+// шестерень без повтору вгорі праворуч і внизу ліворуч), шапка й підвал — латунна смуга з
+// рядом заклепок, заголовок сторінки — латунна табличка з чотирма заклепками (лід — «депеша»
+// праворуч на стіні). Панель фільтрів, картки, порожні стани й сторінки-панелі — світлий
+// сепієвий бланк у латунній рамці із заклепками (локальна світла схема, див. нижче). Картка —
+// телеграма: шапка «Телеграма № <id гри>» з подвійною лінією й трьома квадратиками кольору
+// варіанта, місця — манометр (поділка на кожне місце: червона — вільне, темна — зайняте;
+// стрілка — на межі; число — у тексті поруч), ціна — латунна монета (мідна — «без плати»),
+// «Підходить» — гумовий штамп зеленим чорнилом, вік — штамп червоним чорнилом, «Нове» —
+// латунна бирка; обкладинка — ціанотипія під латунною скріпкою (у спокої — синя й тьмяна,
+// наперед — справжні кольори; поведінка — спільна CoverAttachment). Material —
+// brass-steam-material.scss. Без назв, символів і шрифтів чужих франшиз — лише загальна
+// естетика креслень, латуні й телеграфу.
+//
+// Схема. Сторінка — темна (стіна, заголовок, лічильник, сортування, оверлеї Material: меню,
+// списки, діалоги, датапікер, автодоповнення — темна прусська синь з латунною межею; вони
+// рендеряться поза ділянками й «висять» над кресленням). Світлі ділянки:
+//   `.bs-paper()` — токени сепієвого бланка + `.sc-local-scheme(light)` на кожній .sc-glass
+//     (картки, «Мої ігри», порожні стани, банер), на панелях і повідомленнях сторінок-дощок і
+//     на звичайній сторінці-панелі (форми, сторінка гри, налаштування);
+//   `.bs-brass()` — токени латуні + `.sc-local-scheme(light)` на шапці й підвалі (навігація,
+//     перемикач виду, дзвіночок, кнопка меню — темні на латуні).
+//
+// Гачки декору сцени (карта — у шапці scene-base.less):
+//   sc-s1 — чотири заклепки й внутрішня рамка латунної таблички заголовка сторінки.
+//   sc-accent, sc-p1, sc-p2, sc-d1…sc-d4 — не вживаються (заклепки рамок — шари фону самих
+//     панелей, у латунній межі).
+//   Шапка телеграми — `::before` (текст з атрибута data-telegram панелі: uk.json
+//     `scene.telegram`, номер — id гри; декоративний, альтернативний текст порожній) і `::after`
+//     (три квадратики кольору варіанта) самої панелі картки / «Моїх ігор».
+//   Манометр — `.pips` (циферблат), кожне `b` — поділка (`::before`) і, на останньому вільному
+//     місці, стрілка (`::after`); без вільних місць стрілка — `.pips::before`; вісь —
+//     `.pips::after`.
+//   Обкладинка: скріпка — `.attach::before`, синій шар ціанотипії — `.attach::after`.
+//   Панель фільтрів: неонова трубка основи (`::before`) прихована.
+//   data-neon (варіант картки): колір рядка системи й квадратиків шапки (фіалка, вишня,
+//     прусська синь, охра, оливка, червоне чорнило).
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця). Грані оголошено тут, а не імпортом
+// файлів підмножин @fontsource: у тих файлах немає unicode-range, тож кирилична й латинська
+// грані однієї ваги — дві грані на весь Unicode, і Chrome інколи бере літеру не з тієї. Тут
+// кожна грань має свій діапазон.
+@bs-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+@bs-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+.bs-face(@pkg; @family; @weight; @style: normal) {
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @bs-cyr;
+  }
+
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @bs-lat;
+  }
+}
+
+.bs-face(playfair-display-sc; 'Playfair Display SC'; 700);
+.bs-face(playfair-display-sc; 'Playfair Display SC'; 900);
+.bs-face(old-standard-tt; 'Old Standard TT'; 700);
+.bs-face(pt-serif; 'PT Serif'; 400);
+.bs-face(pt-serif; 'PT Serif'; 400; italic);
+.bs-face(pt-serif; 'PT Serif'; 700);
+.bs-face(pt-mono; 'PT Mono'; 400);
+@import '../scene/scene-base.less';
+
+@bs: ~":root[data-theme='brass-steam']";
+
+// Зображення (data-URI SVG). Шви:
+//   Сітка креслення — CSS-градієнти з кроком 120 і 24px (повтор точно на межі плитки, лінія — на
+//     її початку): безшовна за побудовою.
+//   Шестерні — дві композиції без повтору (вгорі праворуч і внизу ліворуч стіни), без фільтрів.
+//   Папір 300×300: обидва фільтри — область = плитка (x/y 0, width/height 1), stitchTiles,
+//     baseFrequency 0.02 × 300 = 6 і 0.6 × 300 = 180 (цілі).
+@bs-gear-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='330' height='330' viewBox='0 0 330 330'%3E%3Cg fill='none' stroke='%23cee2ff' stroke-opacity='.3' stroke-width='1.2'%3E%3Cpath d='M250.0 160.0L261.9 163.9L260.9 174.4L248.4 175.8L245.2 187.4L255.1 195.1L250.5 204.6L238.3 201.7L231.3 211.4L237.9 222.0L230.4 229.4L219.9 222.5L210.0 229.3L212.6 241.5L203.0 245.9L195.5 235.8L183.9 238.8L182.2 251.2L171.6 252.0L168.0 240.0L156.1 238.8L150.2 249.9L140.0 247.0L140.8 234.5L130.0 229.3L120.7 237.7L112.1 231.5L117.1 220.0L108.7 211.4L97.1 216.1L91.1 207.4L99.8 198.3L94.8 187.4L82.3 187.8L79.7 177.6L90.9 172.0L90.0 160.0L78.1 156.1L79.1 145.6L91.6 144.2L94.8 132.6L84.9 124.9L89.5 115.4L101.7 118.3L108.7 108.6L102.1 98.0L109.6 90.6L120.1 97.5L130.0 90.7L127.4 78.5L137.0 74.1L144.5 84.2L156.1 81.2L157.8 68.8L168.4 68.0L172.0 80.0L183.9 81.2L189.8 70.1L200.0 73.0L199.2 85.5L210.0 90.7L219.3 82.3L227.9 88.5L222.9 100.0L231.3 108.6L242.9 103.9L248.9 112.6L240.2 121.7L245.2 132.6L257.7 132.2L260.3 142.4L249.1 148.0Z'/%3E%3Ccircle cx='170' cy='160' r='57'/%3E%3Ccircle cx='170' cy='160' r='15'/%3E%3Cpath d='M185.0 160.0L227.0 160.0M177.5 173.0L198.5 209.4M162.5 173.0L141.5 209.4M155.0 160.0L113.0 160.0M162.5 147.0L141.5 110.6M177.5 147.0L198.5 110.6'/%3E%3Ccircle cx='170' cy='160' r='130' stroke-dasharray='6 6'/%3E%3Cpath d='M40 160H320M170 10V310' stroke-dasharray='14 4 2 4'/%3E%3Cpath d='M78 18H262M78 12v12M262 12v12'/%3E%3Cpath d='M322.6 267.8L330.9 272.4L328.1 281.0L318.7 279.9L313.3 287.8L317.8 296.1L310.8 301.8L303.5 295.8L294.7 299.5L294.0 308.9L285.0 310.0L282.2 301.0L272.7 299.3L267.0 306.9L258.9 302.9L261.4 293.8L254.3 287.3L245.4 290.6L240.8 282.9L247.8 276.5L245.4 267.3L236.1 265.2L236.4 256.2L245.7 254.6L248.6 245.5L242.0 238.8L247.1 231.3L255.8 235.1L263.2 229.0L261.2 219.8L269.5 216.2L274.8 224.1L284.3 223.0L287.6 214.1L296.5 215.7L296.7 225.1L305.3 229.3L312.9 223.7L319.6 229.8L314.6 237.9L319.6 246.1L329.0 245.4L331.4 254.2L322.8 258.3Z'/%3E%3Ccircle cx='284' cy='262' r='26'/%3E%3Ccircle cx='284' cy='262' r='8'/%3E%3Cpath d='M291.4 265.1L307.9 272.1M280.9 269.4L273.9 285.9M276.6 258.9L260.1 251.9M287.1 254.6L294.1 238.1'/%3E%3C/g%3E%3C/svg%3E");
+@bs-gear-bot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='360' viewBox='0 0 300 360'%3E%3Cg fill='none' stroke='%23cee2ff' stroke-opacity='.3' stroke-width='1.2'%3E%3Cpath d='M163.6 158.4L176.9 164.4L174.3 176.8L159.6 176.7L154.0 189.7L164.1 200.4L156.9 210.8L143.3 205.2L133.2 215.0L138.4 228.7L127.7 235.6L117.4 225.2L104.2 230.4L103.8 245.1L91.3 247.3L85.8 233.8L71.6 233.6L65.6 246.9L53.2 244.3L53.3 229.6L40.3 224.0L29.6 234.1L19.2 226.9L24.8 213.3L15.0 203.2L1.3 208.4L-5.6 197.7L4.8 187.4L-0.4 174.2L-15.1 173.8L-17.3 161.3L-3.8 155.8L-3.6 141.6L-16.9 135.6L-14.3 123.2L0.4 123.3L6.0 110.3L-4.1 99.6L3.1 89.2L16.7 94.8L26.8 85.0L21.6 71.3L32.3 64.4L42.6 74.8L55.8 69.6L56.2 54.9L68.7 52.7L74.2 66.2L88.4 66.4L94.4 53.1L106.8 55.7L106.7 70.4L119.7 76.0L130.4 65.9L140.8 73.1L135.2 86.7L145.0 96.8L158.7 91.6L165.6 102.3L155.2 112.6L160.4 125.8L175.1 126.2L177.3 138.7L163.8 144.2Z'/%3E%3Ccircle cx='80' cy='150' r='62'/%3E%3Ccircle cx='80' cy='150' r='14'/%3E%3Cpath d='M93.4 154.1L139.2 168.3M80.2 164.0L80.9 212.0M66.7 154.5L21.3 170.0M71.6 138.8L42.9 100.4M88.1 138.6L115.7 99.3'/%3E%3Cpath d='M243.0 305.5L252.0 311.1L248.6 320.5L238.2 318.9L232.0 327.8L237.0 337.1L229.3 343.5L221.0 337.0L211.3 341.5L211.0 352.0L201.1 353.8L197.2 344.0L186.5 343.0L180.9 352.0L171.5 348.6L173.1 338.2L164.2 332.0L154.9 337.0L148.5 329.3L155.0 321.0L150.5 311.3L140.0 311.0L138.2 301.1L148.0 297.2L149.0 286.5L140.0 280.9L143.4 271.5L153.8 273.1L160.0 264.2L155.0 254.9L162.7 248.5L171.0 255.0L180.7 250.5L181.0 240.0L190.9 238.2L194.8 248.0L205.5 249.0L211.1 240.0L220.5 243.4L218.9 253.8L227.8 260.0L237.1 255.0L243.5 262.7L237.0 271.0L241.5 280.7L252.0 281.0L253.8 290.9L244.0 294.8Z'/%3E%3Ccircle cx='196' cy='296' r='34'/%3E%3Ccircle cx='196' cy='296' r='9'/%3E%3Cpath d='M205.0 296.9L229.8 299.4M199.7 304.2L210.0 327.0M190.7 303.3L176.1 323.6M187.0 295.1L162.2 292.6M192.3 287.8L182.0 265.0M201.3 288.7L215.9 268.4'/%3E%3C/g%3E%3C/svg%3E");
+@bs-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='f' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02' numOctaves='3' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .38 0 0 0 0 .16 0 0 0 .7 -.42'/%3E%3C/filter%3E%3Cfilter id='p' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='2' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .3 0 0 0 0 .16 0 0 0 .5 -.2'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23f)'/%3E%3Crect width='300' height='300' filter='url(%23p)' opacity='.3'/%3E%3C/svg%3E");
+
+// Контраст (WCAG, відносна яскравість).
+// Темна схема сторінки. Поверхні: стіна #17324F (світліша пляма вгорі ≈ #21456D), оверлей
+// (меню, діалоги, датапікер) #1C3556, поле #10243C.
+//   Текст #F2E6C9 — 10.8 стіна / 7.9 пляма / 10.0 оверлей / 12.6 поле; лід і лічильник
+//   #DCE8F7 — 10.5 / 7.9; підписи #BCD1EE — 8.6 / 6.3 / 8.0.
+//   Межа полів #8A9FC0 — 4.6 оверлей / 5.8 поле (≥ 3:1).
+//   Латунь #F0D78F (primary: фокус, посилання, filled-кнопки) — 9.4 стіна / 6.9 пляма / 8.8
+//     оверлей; #2A1B0A на ній — 11.9. Мідь #E19A64 (перший акцент); #2B1206 на ній — 7.3;
+//     текст акценту #F3B98C — ≥ 6.
+//   Червоний текст #FFB0A6 — 8.5 оверлей; небезпечні кнопки #B5443A, текст #FFF6F2 — 5.1.
+// Латунь (шапка, підвал, табличка): смуга #F0D98F … #D4AB55 … #B88C3A … #7A5619 (текст — у
+//   середній частині, #D4AB55 … #B88C3A).
+//   Текст #2A1B0A — 7.7 … 5.4; навігація #3A280F — 6.4 … 4.6; підписи #4A3512 — 5.4 … 4.5.
+//   Активний пункт #FBECC0 на заглибленні #5A3F12 … #3D2A0B — 8.3 … 11.6.
+//   Заголовок на табличці #2C1D08 — 11.5 … 4.7 (великий текст, ≥ 3:1).
+// Світлі ділянки (бланк): #F6EBD0 у центрі … #E5CFA2 на краях, плями ≈ #DCC290; поле #FBF4E1.
+//   Текст #24170C — 14.7 / 11.5 / 10.1 пляма / 15.9 поле; описи #3E2C1D — 11.2 / 8.7 / 7.7;
+//     підписи #5E4426 — 7.6 / 5.9 / 5.2 / 8.2.
+//   Межа полів #7A5A32 — 5.3 / 4.1 край / 5.7 поле (≥ 3:1).
+//   Прусська синь #1F4F86 (primary: фокус, прапорці, filled-кнопки, посилання) — 7.0 / 5.5 /
+//     7.6 поле; білий на ній — 8.3.
+//   Темна латунь #5A4013 (перший акцент) — 8.1 / 6.3; #FBECC0 на ній — 8.3.
+//   Червоне чорнило #8E2A18 (вік, помилки) — 5.5 край / 4.9 пляма.
+//   Штамп «Підходить» #2C6136 — 6.2 / 4.8; частковий — охра #6E4508 — 5.5 / 4.8.
+//   Рядок системи (варіанти, край #E5CFA2 / пляма #DCC290): фіалка #57357F — 6.2 / 5.5, вишня
+//     #85204A — 6.0 / 5.3, прусська синь #184D63 — 6.0 / 5.3, охра #6E4508 — 5.5 / 4.8, оливка
+//     #3B5514 — 5.5 / 4.9, червоне чорнило #8E2A18 — 5.5 / 4.9.
+//   Шапка телеграми #6B4C2C (декоративний текст) — 6.6 / 5.1 / 4.5 пляма.
+//   Монета: #2A1B06 на латуні #E6C271 … #C9A04F (зона тексту) — 9.8 … 6.9; «без плати» #2B1206
+//     на міді #E8A57A … #CF8656 — 8.5 … 6.0. Цифри й підписи монети ≥ 12px.
+//   «Нове» #2A1B0A на латунній бирці #F0D78F … #C99F48 — 11.9 … 6.8.
+//   Ініціал майстра #FFF4DD на міді #A5552A (центр кульки) — 4.9.
+// Шестерні, сітка, заклепки, рамки, скріпка, циферблат — декор, не фон тексту.
+
+// Токени сепієвого бланка — на корені кожної світлої ділянки, потім локальна світла схема.
+// Список токенів тримати в лад із `.sc-local-scheme()` (scene-base.less): кожен токен, з якого
+// вона виводить --nri-* / --mat-sys-*, має бути тут перевизначений (інакше в ділянці лишиться
+// темне значення сторінки).
+.bs-paper() {
+  --sc-ink: #24170c;
+  --sc-ink-soft: #3e2c1d;
+  --sc-ink-muted: #5e4426;
+  --sc-line: rgba(122, 90, 50, 0.38);
+  --sc-outline: #7a5a32;
+  --sc-panel: #f6ebd0;
+  --sc-panel-raised: #fbf4e1;
+  --sc-field: #fbf4e1;
+  --sc-overlay: #fbf4e1;
+  --sc-blur-overlay: rgba(246, 235, 208, 0.9);
+
+  --sc-neon-a: #5a4013;
+  --sc-neon-a-core: #c99f48;
+  --sc-neon-a-text: #5a4013;
+  --sc-on-neon-a: #fbecc0;
+  --sc-neon-b: #1f4f86;
+  --sc-neon-b-core: #4f86c6;
+  --sc-neon-b-text: #1f4f86;
+  --sc-neon-b-glow: rgba(31, 79, 134, 0.3);
+  --sc-on-neon-b: #fff;
+
+  --sc-lime: #2c6136;
+  --sc-lime-text: #2c6136;
+  --sc-lime-line: rgba(44, 97, 54, 0.5);
+  --sc-lime-fill: rgba(44, 97, 54, 0.1);
+  --sc-amber: #b8913d;
+  --sc-amber-text: #6e4508;
+  --sc-amber-line: rgba(110, 69, 8, 0.55);
+  --sc-amber-fill: rgba(184, 145, 61, 0.2);
+  --sc-on-amber: #2a1b0a;
+  --sc-red: #8e2a18;
+  --sc-red-text: #8e2a18;
+  --sc-red-fill: rgba(142, 42, 24, 0.08);
+  --sc-on-red: #fff4dd;
+
+  --nri-shadow-md: 0 6px 14px rgba(60, 40, 10, 0.2);
+  --nri-shadow-lg: 0 12px 24px rgba(60, 40, 10, 0.24);
+
+  .sc-local-scheme(light);
+
+  color: var(--sc-ink);
+
+  ::selection {
+    background: #1f4f86;
+    color: #fff;
+  }
+}
+
+// Токени латуні (шапка й підвал) — та сама вимога синхронності з `.sc-local-scheme()`.
+// Акцент — темна латунь: вибраний перемикач виду й фокус — темне заглиблення з світлим текстом.
+.bs-brass() {
+  --sc-ink: #2a1b0a;
+  --sc-ink-soft: #3a280f;
+  --sc-ink-muted: #3a280f;
+  --sc-line: rgba(59, 42, 13, 0.45);
+  --sc-outline: #4a3512;
+  --sc-panel: #d4ab55;
+  --sc-panel-raised: #e6c271;
+  --sc-field: #f6ebd0;
+  --sc-overlay: #f6ebd0;
+  --sc-blur-overlay: rgba(240, 217, 143, 0.9);
+
+  --sc-neon-a: #3d2a0b;
+  --sc-neon-a-core: #5a3f12;
+  --sc-neon-a-text: #2a1b0a;
+  --sc-on-neon-a: #fbecc0;
+  --sc-neon-b: #3d2a0b;
+  --sc-neon-b-core: #5a3f12;
+  --sc-neon-b-text: #2a1b0a;
+  --sc-neon-b-glow: rgba(61, 42, 11, 0.3);
+  --sc-on-neon-b: #fbecc0;
+
+  --sc-lime: #2c6136;
+  --sc-lime-text: #1f4a28;
+  --sc-lime-line: rgba(44, 97, 54, 0.5);
+  --sc-lime-fill: rgba(44, 97, 54, 0.12);
+  --sc-amber: #7a5619;
+  --sc-amber-text: #3b2a08;
+  --sc-amber-line: rgba(59, 42, 8, 0.55);
+  --sc-amber-fill: rgba(122, 86, 25, 0.15);
+  --sc-on-amber: #fbecc0;
+  --sc-red: #8e2a18;
+  --sc-red-text: #6e1e10;
+  --sc-red-fill: rgba(142, 42, 24, 0.12);
+  --sc-on-red: #fff4dd;
+
+  .sc-local-scheme(light);
+
+  color: var(--sc-ink);
+}
+
+// Латунь (градієнт пластин), заклепка, бланк, рамка.
+@bs-brass-v: linear-gradient(180deg, #f0d78f 0%, #c99f48 22%, #a37a2e 60%, #7a5619 100%);
+@bs-rivet: radial-gradient(
+  circle at 50% 50%,
+  #fff3c4 0 1px,
+  #d9b25f 1.8px,
+  #8a6421 3.2px,
+  #3b2a0d 4px,
+  transparent 4.6px
+);
+@bs-paper-bg:
+  @bs-paper 0 0 / 300px 300px padding-box,
+  radial-gradient(ellipse 120% 90% at 50% 40%, #f6ebd0 55%, #e5cfa2 100%) padding-box;
+// Латунна рамка (межа 7px прозора — під нею цей шар) з чотирма заклепками в кутах межі.
+@bs-frame-bg:
+  @bs-rivet left 0 top 0 / 10px 10px no-repeat border-box,
+  @bs-rivet right 0 top 0 / 10px 10px no-repeat border-box,
+  @bs-rivet left 0 bottom 0 / 10px 10px no-repeat border-box,
+  @bs-rivet right 0 bottom 0 / 10px 10px no-repeat border-box,
+  @bs-paper-bg,
+  linear-gradient(180deg, #f0d78f, #c99f48 20%, #a37a2e 55%, #6f4e17) border-box;
+@bs-frame-shadow:
+  inset 0 0 0 1.5px #5a4013,
+  inset 0 0 0 3px rgba(255, 240, 200, 0.6),
+  0 0 0 1px rgba(30, 20, 5, 0.55),
+  0 14px 26px rgba(4, 12, 28, 0.55);
+
+// Манометр: --n (кількість місць) на циферблаті, --i (номер місця) на поділці; до 8 місць —
+// як MAX_PIPS у scene-game-card.ts (більше — без поділок, лише текст).
+.bs-gauge-count(@k) when (@k > 0) {
+  .pips:has(> b:nth-child(@{k}):last-child) {
+    --n: @k;
+  }
+
+  .pips > b:nth-child(@{k}) {
+    --i: @k;
+  }
+
+  .bs-gauge-count((@k - 1));
+}
+
+@{bs} {
+  --sc-font-display: 'Playfair Display SC', Georgia, 'Times New Roman', serif;
+  --sc-font-body: 'PT Serif', Georgia, 'Times New Roman', serif;
+  --sc-font-mono: 'PT Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --sc-wall: #17324f;
+  --sc-wall-deep: #142a46;
+  --sc-bar: linear-gradient(180deg, #f0d98f 0%, #d4ab55 30%, #b88c3a 75%, #7a5619 100%);
+  --sc-bar-line: #3b2a0d;
+
+  // Темні поверхні (оверлеї Material, поля поза бланком); фон .sc-glass — бланк у латунній
+  // рамці (токени бланка — .bs-paper() на тій самій панелі).
+  --sc-panel: #1a3554;
+  --sc-glass: @bs-frame-bg;
+  --sc-glass-line: transparent;
+  --sc-panel-raised: #24446a;
+  --sc-overlay: #1c3556;
+  --sc-overlay-line: rgba(201, 159, 72, 0.7);
+  --sc-field: #10243c;
+  --sc-backdrop: rgba(6, 14, 28, 0.78);
+  --sc-blur-overlay: rgba(20, 40, 66, 0.85);
+
+  --sc-ink: #f2e6c9;
+  --sc-ink-soft: #dce8f7;
+  --sc-ink-muted: #bcd1ee;
+  --sc-line: rgba(190, 215, 250, 0.22);
+  --sc-outline: #8a9fc0;
+
+  // Перший акцент — мідь; другий (primary: фокус, посилання, filled-кнопки) — світла латунь.
+  --sc-neon-a: #e19a64;
+  --sc-neon-a-core: #ffe2c8;
+  --sc-neon-a-text: #f3b98c;
+  --sc-on-neon-a: #2b1206;
+  --sc-neon-b: #f0d78f;
+  --sc-neon-b-core: #fff3c4;
+  --sc-neon-b-text: #f0d78f;
+  --sc-neon-b-glow: rgba(240, 215, 143, 0.35);
+  --sc-on-neon-b: #2a1b0a;
+  --sc-mark: #2a1b0a;
+  --sc-mark-glow: transparent;
+
+  .sc-neon-tokens();
+
+  --sc-lime: #8fd19e;
+  --sc-lime-text: #b5e6bf;
+  --sc-lime-line: rgba(143, 209, 158, 0.5);
+  --sc-lime-fill: rgba(143, 209, 158, 0.12);
+  --sc-amber: #f0d78f;
+  --sc-amber-text: #f6e3b4;
+  --sc-amber-line: rgba(240, 215, 143, 0.55);
+  --sc-amber-fill: rgba(240, 215, 143, 0.12);
+  --sc-on-amber: #2a1b0a;
+  --sc-red: #b5443a;
+  --sc-red-text: #ffb0a6;
+  --sc-red-fill: rgba(181, 68, 58, 0.25);
+  --sc-on-red: #fff6f2;
+
+  // Шість варіантів картки (картки — бланк): колір — квадратики шапки, текст — рядок системи.
+  --sc-neon-violet: #57357f;
+  --sc-neon-violet-core: #57357f;
+  --sc-neon-violet-text: #57357f;
+  --sc-neon-pink: #85204a;
+  --sc-neon-pink-core: #85204a;
+  --sc-neon-pink-text: #85204a;
+  --sc-neon-cyan: #184d63;
+  --sc-neon-cyan-core: #184d63;
+  --sc-neon-cyan-text: #184d63;
+  --sc-neon-amber: #6e4508;
+  --sc-neon-amber-core: #6e4508;
+  --sc-neon-amber-text: #6e4508;
+  --sc-neon-lime: #3b5514;
+  --sc-neon-lime-core: #3b5514;
+  --sc-neon-lime-text: #3b5514;
+  --sc-neon-red: #8e2a18;
+  --sc-neon-red-core: #8e2a18;
+  --sc-neon-red-text: #8e2a18;
+
+  .sc-base();
+
+  --sc-shadow-panel: 0 14px 26px rgba(4, 12, 28, 0.55);
+  --sc-glass-highlight: inset 0 0 0 0 transparent;
+  --nri-shadow-md: 0 12px 24px rgba(4, 12, 28, 0.5);
+  --nri-shadow-lg: 0 22px 40px rgba(4, 12, 28, 0.65);
+  --nri-radius-sm: 2px;
+  --nri-radius-md: 3px;
+  --nri-radius-lg: 4px;
+  // Шапка 68px + межа 2px.
+  --nri-header-height: 70px;
+
+  // Playfair Display має старовинні цифри — по всьому сайту цифри рівної висоти. Скорочення
+  // `font:` скидає font-variant-numeric — у правилах цього бандла з `font:` їх задано ще раз.
+  body {
+    font-variant-numeric: lining-nums;
+  }
+
+  // Те саме для скорочень `font:` у спільних компонентах карток (там немає табличних цифр).
+  :is(nri-sc-game-card, nri-sc-my-game-item, nri-sc-empty-state) * {
+    font-variant-numeric: lining-nums;
+  }
+
+  ::selection {
+    background: #f0d78f;
+    color: #2a1b0a;
+  }
+
+  // ---- Стіна: креслення прусської сині ----
+  // Згори вниз: шестерні вгорі праворуч і внизу ліворуч (без повтору), світліша пляма під
+  // заголовком (фіксованого розміру, згасає до прозорого), сітка 120px і 24px (повтор), колір
+  // стіни.
+  .sc-wall {
+    // Обкладинки й монети не дають горизонтального скролу (clip — не контейнер прокрутки:
+    // липка шапка й фільтри працюють).
+    overflow-x: clip;
+    background-color: var(--sc-wall);
+    background-image:
+      @bs-gear-top, @bs-gear-bot,
+      radial-gradient(ellipse 1100px 760px at 58% 320px, rgba(42, 86, 134, 0.55), transparent 72%),
+      linear-gradient(rgba(190, 215, 250, 0.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(190, 215, 250, 0.16) 1px, transparent 1px),
+      linear-gradient(rgba(190, 215, 250, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(190, 215, 250, 0.07) 1px, transparent 1px);
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat;
+    background-position:
+      right -20px top 40px,
+      left -70px bottom -50px,
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+    background-size:
+      330px 330px,
+      300px 360px,
+      100% 1400px,
+      120px 120px,
+      120px 120px,
+      24px 24px,
+      24px 24px;
+  }
+
+  // ---- Шапка й підвал: латунна смуга з рядом заклепок ----
+  .sc-bar {
+    .bs-brass();
+  }
+
+  .top.sc-bar {
+    border-bottom: 2px solid #3b2a0d;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+
+    // Ряд заклепок унизу смуги (`space` — лише цілі заклепки, без обрізаної на краю).
+    &::after {
+      content: '';
+      position: absolute;
+      right: 12px;
+      bottom: 5px;
+      left: 12px;
+      height: 6px;
+      background: radial-gradient(
+          circle at 3px 3px,
+          #f6e3a8 0 1px,
+          #7a5619 1.6px,
+          #4c3711 2.6px,
+          transparent 3px
+        )
+        0 0 / 48px 6px space no-repeat;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+  }
+
+  .bottom.sc-bar {
+    border-top: 2px solid #3b2a0d;
+
+    a {
+      color: #2a1b0a;
+    }
+  }
+
+  .top .brand {
+    color: #2a1b0a;
+    font:
+      700 1.4375rem/1 'Playfair Display SC',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 0 rgba(255, 240, 190, 0.55);
+
+    &:hover {
+      color: #000;
+    }
+  }
+
+  .top .mark {
+    color: #2a1b0a;
+    filter: none;
+  }
+
+  .top .nav-link {
+    border-radius: 6px;
+    color: #3a280f;
+    font: 700 0.96875rem/1.2 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+    text-shadow: 0 1px 0 rgba(255, 240, 190, 0.45);
+
+    &:hover {
+      color: #000;
+    }
+
+    &.active {
+      background: linear-gradient(#5a3f12, #3d2a0b);
+      color: #fbecc0;
+      text-shadow: none;
+      box-shadow:
+        inset 0 2px 3px rgba(0, 0, 0, 0.6),
+        0 1px 0 rgba(255, 240, 190, 0.5);
+    }
+  }
+
+  // Аватар — мідна кулька в темному обідку.
+  .top .avatar {
+    border: 2px solid #3b2a0d;
+    background: radial-gradient(circle at 35% 30%, #e8a06a, #a5552a 60%, #6a3214);
+    color: #fff4dd;
+    font: 700 1.0625rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow: 0 1px 0 rgba(255, 240, 190, 0.5);
+  }
+
+  // ---- Заголовок сторінки: латунна табличка з заклепками; лід — «депеша» праворуч ----
+  nri-sc-page-header .heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 36px;
+  }
+
+  .sc-sign {
+    padding: 20px 40px 22px;
+    border: 2px solid #3b2a0d;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #f0d78f 0%, #d2aa55 30%, #ad832f 70%, #8a6320 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 246, 210, 0.7),
+      inset 0 -3px 0 rgba(60, 40, 10, 0.45),
+      0 10px 22px rgba(0, 0, 0, 0.5);
+  }
+
+  // Внутрішня рамка й чотири заклепки таблички.
+  .sc-s1 {
+    position: absolute;
+    inset: 6px;
+    display: block;
+    border: 1px solid rgba(60, 40, 10, 0.55);
+    border-radius: 2px;
+    background:
+      @bs-rivet left -5px top -5px / 11px 11px no-repeat,
+      @bs-rivet right -5px top -5px / 11px 11px no-repeat,
+      @bs-rivet left -5px bottom -5px / 11px 11px no-repeat,
+      @bs-rivet right -5px bottom -5px / 11px 11px no-repeat;
+    background-origin: border-box;
+    background-clip: border-box;
+    box-shadow:
+      0 1px 0 rgba(255, 246, 210, 0.5),
+      inset 0 1px 0 rgba(255, 246, 210, 0.4);
+    pointer-events: none;
+  }
+
+  .sc-sign-title {
+    position: relative;
+    color: #2c1d08;
+    font:
+      900 clamp(2rem, 3.6vw, 3.125rem) / 1.05 'Playfair Display SC',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.01em;
+    text-shadow:
+      0 1.5px 0 rgba(255, 244, 200, 0.75),
+      0 -1px 0 rgba(40, 25, 5, 0.5);
+  }
+
+  nri-sc-page-header .lead {
+    max-width: 26rem;
+    margin: 0;
+    color: #dce8f7;
+    font-size: 1.0625rem;
+  }
+
+  // Обведені кнопки й поля прямо на стіні (кнопки заголовка сторінки, сортування, «Показати
+  // ще») — на темній підкладці поля: шестерні й сітка креслення не проходять під текстом.
+  nri-sc-page-header .mat-mdc-outlined-button,
+  .nri-page.nri-board
+    :is(.mat-mdc-outlined-button, .mdc-text-field--outlined):not(
+      :is(.sc-glass, .nri-panel, .nri-card, .nri-alert, .nri-notice) *
+    ) {
+    background-color: var(--sc-field);
+  }
+
+  // ---- Світлі ділянки: сепієвий бланк у латунній рамці ----
+  .sc-glass,
+  .nri-page:not(.nri-board),
+  .nri-page.nri-board :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
+    .bs-paper();
+  }
+
+  .sc-glass,
+  .nri-page:not(.nri-board),
+  .nri-page.nri-board :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
+    border: 7px solid transparent;
+    border-radius: 0;
+    background: @bs-frame-bg;
+    box-shadow: @bs-frame-shadow;
+  }
+
+  // Декор усередині панелей (шапка телеграми з z-index -1) — над фоном, під текстом.
+  .sc-glass {
+    isolation: isolate;
+  }
+
+  // Картки й повідомлення всередині сторінки-панелі чи фільтрів — світліший аркуш без рамки.
+  .nri-page:not(.nri-board) .nri-card,
+  .nri-page.nri-board .nri-panel .nri-notice {
+    border: 1px solid rgba(122, 90, 50, 0.45);
+    border-radius: 2px;
+    background: #fbf4e1;
+    box-shadow: none;
+  }
+
+  .sc-accent {
+    display: none;
+  }
+
+  // Порожній стан і банер — той самий бланк.
+  nri-sc-empty-state .note {
+    padding: 26px 26px 22px;
+  }
+
+  // Панель фільтрів: бланк у рамці (неонова трубка основи прихована), заголовки груп — з
+  // подвійною лінією.
+  .nri-page.nri-board .nri-panel {
+    padding: 22px 18px 20px;
+
+    &::before {
+      content: none;
+    }
+
+    legend {
+      color: #2a1b0a;
+      font: 700 1.1875rem/1.2 var(--sc-font-display);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.02em;
+    }
+  }
+
+  // ---- Картка (пошук і «Мої ігри»): телеграма ----
+  [data-neon] > .sc-glass {
+    padding-top: 44px;
+    padding-inline: 18px;
+
+    // Шапка телеграми: «Телеграма № <id>» (текст — uk.json `scene.telegram` в атрибуті
+    // data-telegram панелі) над подвійною лінією. Декор — без альтернативного тексту для читачів
+    // екрана. z-index -1 — над фоном бланка, під текстом (панель — свій контекст накладання).
+    &::before {
+      content: attr(data-telegram) / '';
+      position: absolute;
+      top: 13px;
+      right: 18px;
+      left: 18px;
+      z-index: -1;
+      overflow: hidden;
+      padding: 0 64px 4px 0;
+      border-bottom: 3px double #8a6a42;
+      color: #6b4c2c;
+      font: 400 0.75rem/1.3 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.14em;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    // Три квадратики кольору варіанта праворуч у шапці.
+    &::after {
+      content: '\25A0\2002\25A0\2002\25A0' / '';
+      position: absolute;
+      top: 13px;
+      right: 18px;
+      z-index: -1;
+      color: var(--sc-n, #6b4c2c);
+      font: 400 0.625rem/1.6 var(--sc-font-body);
+      pointer-events: none;
+    }
+  }
+
+  // Наведення / фокус — латунне сяйво навколо рамки.
+  [data-neon]:is(:hover, :focus-within) > .sc-glass {
+    box-shadow:
+      inset 0 0 0 1.5px #5a4013,
+      inset 0 0 0 3px rgba(255, 240, 200, 0.6),
+      0 0 0 1px rgba(30, 20, 5, 0.55),
+      0 0 0 3px rgba(240, 215, 143, 0.55),
+      0 20px 34px rgba(4, 12, 28, 0.65);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-neon] > .sc-glass {
+      transition:
+        box-shadow 350ms,
+        transform 350ms;
+    }
+
+    [data-neon]:is(:hover, :focus-within) > .sc-glass {
+      transform: translateY(-3px);
+    }
+  }
+
+  // ---- Текст картки ----
+  :is(nri-sc-game-card, nri-sc-my-game-item) .sys {
+    font: 700 0.75rem/1.4 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.04em;
+  }
+
+  :is(nri-sc-game-card, nri-sc-my-game-item) .title {
+    color: #20140a;
+    font:
+      700 1.25rem/1.2 'Old Standard TT',
+      var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0;
+  }
+
+  nri-sc-game-card .title {
+    margin: 6px 0 4px;
+  }
+
+  nri-sc-game-card .desc {
+    color: #3e2c1d;
+    font-size: 0.90625rem;
+    line-height: 1.38;
+  }
+
+  // Коли / Де / Місця — рядки бланка з пунктирними лініями.
+  :is(nri-sc-game-card, nri-sc-my-game-item) .facts {
+    gap: 0;
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: 0;
+    font-size: 0.90625rem;
+
+    > div {
+      align-items: center;
+      min-height: 26px;
+      padding: 2px 0 1px;
+      border-bottom: 1px dotted #9c7f58;
+    }
+
+    dt {
+      color: #5e4426;
+      font: 400 0.75rem/1.4 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.08em;
+    }
+  }
+
+  nri-sc-my-game-item .facts {
+    gap: 2px 12px;
+
+    dt {
+      align-self: center;
+    }
+  }
+
+  // ---- Місця — манометр ----
+  // Циферблат (латунний обідок, кремова шкала, вісь) на 240° (від -120° до +120°): поділка на
+  // кожне місце (червона — вільне, темна — зайняте), стрілка — на межі вільних і зайнятих (на
+  // останньому вільному місці; без вільних — на нулі). Число місць — у тексті поруч.
+  [data-neon] .pips {
+    position: relative;
+    display: block;
+    width: 28px;
+    height: 28px;
+    margin: -4px 0 -4px -1px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      #f7eed6 0 11.4px,
+      #6b4f1c 11.4px 12.2px,
+      #c9a04f 12.2px 13.2px,
+      #4c3711 13.2px 14px,
+      transparent 14px
+    );
+    box-shadow: 0 1px 2px rgba(40, 25, 5, 0.35);
+
+    // Вісь стрілки.
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 1;
+      width: 5px;
+      height: 5px;
+      margin: -2.5px 0 0 -2.5px;
+      border-radius: 50%;
+      background: #2a1b10;
+    }
+
+    b {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      transform: rotate(calc(-120deg + 240deg * (var(--i, 1) - 0.5) / var(--n, 1)));
+
+      // Поділка біля обідка.
+      &::before {
+        content: '';
+        position: absolute;
+        top: -11px;
+        left: -0.75px;
+        width: 1.5px;
+        height: 4px;
+        background: #2a1b10;
+      }
+    }
+
+    .on {
+      border: 0;
+      background: none;
+      box-shadow: none;
+
+      &::before {
+        background: #b3361f;
+      }
+    }
+
+    // Стрілка — на правому краї сектора останнього вільного місця.
+    .on:not(:has(+ .on))::after,
+    &:not(:has(.on))::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -0.8px;
+      width: 1.6px;
+      height: 10px;
+      border-radius: 1px;
+      background: #9b1f12;
+      transform: rotate(calc(120deg / var(--n, 1)));
+      transform-origin: 50% 100%;
+    }
+
+    // Без вільних місць — стрілка на нулі (від центру циферблата).
+    &:not(:has(.on))::before {
+      bottom: 50%;
+      left: calc(50% - 0.8px);
+      transform: rotate(-120deg);
+    }
+  }
+
+  .bs-gauge-count(8);
+
+  // Ініціал майстра — мідна кулька в темному обідку.
+  nri-sc-game-card .gm .initial {
+    width: 32px;
+    height: 32px;
+    border: 1.5px solid #3b2a0d;
+    background: radial-gradient(circle at 35% 30%, #e8a06a, #a5552a 60%, #6a3214);
+    color: #fff4dd;
+    font: 700 0.875rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow: none;
+  }
+
+  nri-sc-game-card .gm .name {
+    color: #20140a;
+    font-weight: 700;
+  }
+
+  nri-sc-game-card .gm .role {
+    color: #5f4934;
+  }
+
+  // ---- Ціна — латунна монета (мідна — «без плати») ----
+  // Перший рядок (число / «без») — крупніше; «грн» / «плати» — другим рядком (word-spacing
+  // ширший за монету переносить кожне слово). Гурт — штрихова межа.
+  nri-sc-game-card .foot {
+    padding-top: 4px;
+  }
+
+  nri-sc-game-card .price {
+    position: relative;
+    display: block;
+    width: 62px;
+    height: 62px;
+    box-sizing: border-box;
+    margin: -6px -2px -4px 0;
+    padding: 12px 0 0;
+    border: 2px dashed #5a4013;
+    border-radius: 50%;
+    background:
+      radial-gradient(
+        circle at 50% 50%,
+        transparent 0 23px,
+        rgba(60, 40, 10, 0.6) 23.5px 24.5px,
+        transparent 25px
+      ),
+      radial-gradient(circle at 38% 32%, #fff1c0 0, #e6c271 30%, #c9a04f 62%, #8a6421 100%);
+    color: #2a1b06;
+    font: 400 0.75rem/1.1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(255, 244, 200, 0.6);
+    white-space: normal;
+    word-spacing: 62px;
+    box-shadow:
+      0 0 0 2px #b48a38,
+      0 0 0 3.5px #4c3711,
+      0 3px 6px rgba(40, 25, 5, 0.45);
+
+    &::first-line {
+      font-family: var(--sc-font-display);
+      font-size: 1.1875rem;
+      font-weight: 900;
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+
+    &.free {
+      padding-top: 14px;
+      border-color: #4a2410;
+      background:
+        radial-gradient(
+          circle at 50% 50%,
+          transparent 0 23px,
+          rgba(40, 30, 25, 0.55) 23.5px 24.5px,
+          transparent 25px
+        ),
+        radial-gradient(circle at 38% 32%, #ffe2c8 0, #e8a57a 32%, #cf8656 62%, #7a3a18 100%);
+      color: #2b1206;
+      box-shadow:
+        0 0 0 2px #b0623a,
+        0 0 0 3.5px #4a2410,
+        0 3px 6px rgba(40, 25, 5, 0.45);
+
+      &::first-line {
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+    }
+  }
+
+  // ---- Бейджі ----
+  // «Підходить вашому розкладу» — гумовий штамп зеленим чорнилом; частковий збіг — охрою.
+  .badge.fit {
+    padding: 3px 9px 2px;
+    border: 2px solid #2c6136;
+    border-radius: 3px;
+    background: none;
+    color: #2c6136;
+    font: 700 0.75rem/1.3 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: inset 0 0 0 1px rgba(44, 97, 54, 0.35);
+    transform: rotate(-1.5deg);
+
+    &::before,
+    mat-icon {
+      display: none;
+    }
+
+    &[data-fit='partial'] {
+      border-color: #6e4508;
+      color: #6e4508;
+      box-shadow: inset 0 0 0 1px rgba(110, 69, 8, 0.35);
+    }
+  }
+
+  nri-sc-game-card .fit {
+    margin-top: 9px;
+    padding-left: 2px;
+  }
+
+  // Вік — прямокутний штамп червоним чорнилом; скасована гра — так само.
+  .badge:is(.age, .status[data-status='cancelled']) {
+    padding: 4px 5px 3px;
+    border: 1.5px solid #8e2a18;
+    border-radius: 2px;
+    background: none;
+    color: #8e2a18;
+    font: 700 0.75rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    transform: rotate(-4deg);
+  }
+
+  nri-sc-my-game-item .status {
+    border-radius: 2px;
+    font: 700 0.75rem/1.2 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.04em;
+  }
+
+  // «Нове» / «Оновлено» — латунна бирка.
+  .nri-seen-badge {
+    padding: 4px 6px 3px;
+    border: 1px solid #5a4013;
+    border-radius: 2px;
+    background: linear-gradient(#f0d78f, #c99f48);
+    color: #2a1b0a;
+    font: 700 0.75rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.02em;
+  }
+
+  // ---- Обкладинка: ціанотипія під латунною скріпкою ----
+  // Відбиток з білим полем (фон кнопки + padding), синій шар ціанотипії — ::after, скріпка —
+  // ::before, підпис «ОБКЛАДИНКА» — рамкою в куті (лише наперед). У спокої — синя, тьмяна,
+  // нахилена за кутом бланка; наперед (наведення / клік / Enter) — виходить на бланк, більшає,
+  // справжні кольори.
+  nri-sc-attachment {
+    top: -34px;
+    right: -22px;
+    width: 150px;
+    height: 112px;
+
+    .attach {
+      overflow: visible;
+      padding: 5px;
+      border-radius: 0;
+      background: #eef2f3;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+      filter: brightness(0.72) saturate(0.7);
+      transform: rotate(7deg);
+
+      &:focus-visible {
+        outline: 3px solid #f0d78f;
+        outline-offset: 3px;
+      }
+
+      img {
+        filter: grayscale(1) contrast(1.15);
+      }
+
+      // Синій шар ціанотипії (світле — синє, темне — темно-синє).
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 5px;
+        background: #123f78;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+
+      // Латунна скріпка за верхній край.
+      &::before {
+        content: '';
+        position: absolute;
+        top: -12px;
+        left: 14px;
+        z-index: 3;
+        width: 16px;
+        height: 34px;
+        box-sizing: border-box;
+        border: 2.5px solid #c99f48;
+        border-radius: 8px;
+        box-shadow:
+          0 1px 1px rgba(0, 0, 0, 0.6),
+          inset 0 0 0 1px rgba(90, 64, 19, 0.5);
+        pointer-events: none;
+      }
+    }
+
+    .cap {
+      position: absolute;
+      right: 9px;
+      bottom: 9px;
+      z-index: 2;
+      display: block;
+      padding: 1px 5px;
+      border: 1px solid rgba(232, 241, 255, 0.8);
+      background: rgba(10, 30, 60, 0.55);
+      color: #f4f8ff;
+      font: 400 0.75rem/1.3 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
+  .bs-attachment-front() {
+    box-shadow: 0 18px 28px rgba(0, 0, 0, 0.5);
+    filter: none;
+    transform: translate(-46px, 26px) rotate(-2deg) scale(1.16);
+
+    img {
+      filter: none;
+    }
+
+    .cap {
+      opacity: 1;
+    }
+
+    &::after {
+      opacity: 0;
+    }
+  }
+
+  nri-sc-attachment.front .attach {
+    .bs-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-sc-attachment:hover:not(.dismissed) .attach {
+      .bs-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-sc-attachment .attach {
+      transition:
+        transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 350ms,
+        box-shadow 350ms;
+
+      img {
+        transition: filter 350ms;
+      }
+
+      &::after,
+      .cap {
+        transition: opacity 350ms;
+      }
+    }
+  }
+}
+
+// Вузький екран: обкладинка не виходить за поля сторінки (без горизонтального скролу), табличка
+// заголовка — щільніша, шестерня вгорі — менша.
+@media (max-width: 599.98px) {
+  @{bs} nri-sc-attachment {
+    right: -6px;
+  }
+
+  @{bs} .sc-sign {
+    padding: 16px 26px 18px;
+  }
+
+  @{bs} .sc-sign-title {
+    font-size: 1.875rem;
+  }
+
+  @{bs} .sc-wall {
+    background-size:
+      220px 220px,
+      300px 360px,
+      100% 1400px,
+      120px 120px,
+      120px 120px,
+      24px 24px,
+      24px 24px;
+  }
+}

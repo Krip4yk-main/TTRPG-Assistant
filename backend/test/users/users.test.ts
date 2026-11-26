@@ -106,6 +106,7 @@ describe('GET /api/me', () => {
         'dungeon',
         'gothic-gloom',
         'magicpunk',
+        'brass-steam',
       ],
       uiPrefs: { tearAnimation: true },
     });
@@ -388,6 +389,7 @@ describe('PATCH /api/me/theme', () => {
     'dungeon',
     'gothic-gloom',
     'magicpunk',
+    'brass-steam',
   ];
 
   it('a regular user picks a cyber design; /api/me returns it; defaults to quest-board', async () => {
@@ -422,6 +424,13 @@ describe('PATCH /api/me/theme', () => {
     const res = await call('patch', '/api/me/theme', await login(u.id), { theme: 'magicpunk' });
     expect(res.status).toBe(200);
     expect(res.body.uiTheme).toBe('magicpunk');
+  });
+
+  it('Plan 10: «brass-steam» is accepted for a regular user', async () => {
+    const u = await createUser(db, { nickname: 'Brass' });
+    const res = await call('patch', '/api/me/theme', await login(u.id), { theme: 'brass-steam' });
+    expect(res.status).toBe(200);
+    expect(res.body.uiTheme).toBe('brass-steam');
   });
 
   it('removed «classic», unknown id or extra keys: 400', async () => {

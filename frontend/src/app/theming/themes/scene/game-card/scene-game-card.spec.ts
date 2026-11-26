@@ -186,15 +186,17 @@ describe('SceneGameCard (slot «game-card»)', () => {
     expect(decodeURIComponent(login!.getAttribute('href')!)).toContain('returnTo=/games/6');
   });
 
-  it('panel carries the translated invitation text (data-invite) for design decor', async () => {
+  it('panel carries the translated header texts (data-invite, data-telegram) for design decor', async () => {
     TestBed.inject(TranslateService).setTranslation('uk', {
-      scene: { invite: 'Запрошення № {{id}}' },
+      scene: { invite: 'Запрошення № {{id}}', telegram: 'Телеграма № {{id}}' },
     });
     TestBed.inject(TranslateService).use('uk');
     await render(game);
     expect(el.querySelector('.panel')!.getAttribute('data-invite')).toBe('Запрошення № 5');
+    expect(el.querySelector('.panel')!.getAttribute('data-telegram')).toBe('Телеграма № 5');
     await render(restricted);
     expect(el.querySelector('.panel')!.getAttribute('data-invite')).toBe('Запрошення № 6');
+    expect(el.querySelector('.panel')!.getAttribute('data-telegram')).toBe('Телеграма № 6');
   });
 
   it('neon colour on the host is stable per game id; neighbouring games differ', async () => {
