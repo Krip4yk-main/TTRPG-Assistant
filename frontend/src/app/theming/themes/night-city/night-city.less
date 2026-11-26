@@ -83,6 +83,8 @@
   --cy-on-neon-b: #04161b;
   --cy-mark: #ff6aa6;
   --cy-mark-glow: rgba(255, 61, 139, 0.8);
+  // Шина живлення виходить за картку на половину проміжку сітки (1.75rem).
+  --cy-rail-reach: 14px;
 
   // Стани й шість неонів картки — типові значення кібер-родини.
   .cy-neon-tokens();
@@ -271,11 +273,146 @@
   .cy-clamp-r {
     right: 44px;
   }
+
+  // Шина живлення, на якій висять картки: відрізок на ширину картки й половину проміжку
+  // сітки з кожного боку — відрізки сусідніх карток зливаються в одну шину ряду.
+  .cy-rail {
+    position: absolute;
+    top: -6px;
+    right: calc(-1 * var(--cy-rail-reach));
+    left: calc(-1 * var(--cy-rail-reach));
+    z-index: 0;
+    display: block;
+    height: 12px;
+    background: linear-gradient(#4a4f5c, #2a2d36 45%, #181a20);
+    box-shadow:
+      0 5px 10px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    pointer-events: none;
+  }
+
+  // ---- Картка пошуку ----
+  // Ціна — табличка, що світиться: бурштинова, безкоштовна — лайм.
+  nri-cy-game-card .price {
+    border-color: #ffd49a;
+    background: rgba(255, 173, 61, 0.08);
+    color: #ffe9cc;
+    box-shadow:
+      0 0 6px rgba(255, 173, 61, 0.55),
+      inset 0 0 6px rgba(255, 173, 61, 0.3);
+
+    &.free {
+      border-color: #d4ffb0;
+      background: rgba(157, 255, 77, 0.07);
+      color: #e9ffd6;
+      box-shadow:
+        0 0 6px rgba(157, 255, 77, 0.5),
+        inset 0 0 6px rgba(157, 255, 77, 0.25);
+    }
+  }
+
+  // Ледь помітні сканлайни скла — поверх панелі, але це лише 2% білого (текст не зачіпає
+  // контраст: ≤ 0.1 від значень вище).
+  nri-cy-game-card .panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.018) 0 1px,
+      transparent 1px 3px
+    );
+    pointer-events: none;
+  }
+
+  // ---- Обкладинка: приглушений знімок, засунутий за верхній правий кут панелі ----
+  // Наперед (наведення / клік / Enter) — виїжджає на панель, вирівнюється, збільшується й
+  // отримує кольорову рамку неону гри з хроматичним зсувом.
+  nri-cy-attachment {
+    top: -34px;
+    right: -26px;
+    width: 156px;
+    height: 112px;
+
+    .attach {
+      border: 1px solid color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 70%, #fff);
+      border-radius: 6px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
+      filter: brightness(0.62) saturate(0.55);
+      transform: rotate(7deg);
+
+      // Сканлайни й відблиск скла знімка.
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px),
+          linear-gradient(200deg, rgba(255, 255, 255, 0.18), transparent 40%);
+        pointer-events: none;
+      }
+    }
+
+    .cap {
+      position: absolute;
+      bottom: 5px;
+      left: 6px;
+      z-index: 2;
+      display: block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font: 700 0.5625rem/1.4 var(--cy-font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+  }
+
+  .cy-attachment-front() {
+    border-color: var(--cy-n-core, var(--cy-neon-b-core));
+    box-shadow:
+      -3px 0 0 rgba(255, 61, 139, 0.65),
+      3px 0 0 rgba(63, 227, 255, 0.65),
+      0 18px 30px rgba(0, 0, 0, 0.65),
+      0 0 26px color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 45%, transparent);
+    filter: none;
+    transform: translate(-44px, 24px) rotate(-2deg) scale(1.15);
+  }
+
+  nri-cy-attachment.front .attach {
+    .cy-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-cy-attachment:hover:not(.dismissed) .attach {
+      .cy-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-cy-attachment .attach {
+      transition:
+        transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 350ms,
+        box-shadow 350ms,
+        border-color 350ms;
+    }
+  }
 }
 
 @media (max-width: 599.98px) {
   @{nc} .cy-sign {
     padding: 18px 22px 20px;
     margin-left: 0;
+  }
+
+  // Вузький екран: шина й знімок не виходять за поля сторінки (без горизонтального скролу).
+  @{nc} {
+    --cy-rail-reach: 8px;
+  }
+
+  @{nc} nri-cy-attachment {
+    right: -8px;
   }
 }

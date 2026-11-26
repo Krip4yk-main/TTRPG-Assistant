@@ -11,15 +11,17 @@ import type { MyGameItemSlot } from '../../../slots';
 import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-tooltip';
 import { LinePipe } from '../../../../core/i18n/line.pipe';
 import { neonOf } from '../neon';
+import { CyberAttachment } from '../attachment/cyber-attachment';
 
 /**
  * Слот `my-game-item` кібер-родини: темна скляна панель з неоновою трубкою кольору гри
  * (`data-neon`, той самий колір, що в картці пошуку) — статус, позначки «давно не
- * проводилась / мертва / підозріла», дати й місця, заявки, дії внизу.
+ * проводилась / мертва / підозріла», дати й місця, заявки, дії внизу. Обкладинка — знімок за
+ * кутом панелі (`nri-cy-attachment`, та сама поведінка, що в картці пошуку).
  */
 @Component({
   selector: 'nri-cy-my-game-item',
-  imports: [RouterLink, MatButtonModule, TranslatePipe, TruncateTooltip, LinePipe],
+  imports: [RouterLink, MatButtonModule, TranslatePipe, TruncateTooltip, LinePipe, CyberAttachment],
   templateUrl: './cyber-my-game-item.html',
   styleUrl: './cyber-my-game-item.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

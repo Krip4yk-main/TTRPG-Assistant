@@ -1,0 +1,60 @@
+// Каркас вкладення: під панеллю картки (панель — z-index 2), наперед — над нею. Розмір, місце,
+// нахил, рамку й рух задає бандл дизайну; без бандла (резервний вигляд) — просто мініатюра.
+:host {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: block;
+  width: 156px;
+  height: 112px;
+}
+
+:host(.failed) {
+  display: none;
+}
+
+:host(.front) {
+  z-index: 5;
+}
+
+@media (hover: hover) {
+  :host(:hover:not(.dismissed)) {
+    z-index: 5;
+  }
+}
+
+.attach {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--cy-field, var(--nri-surface-sunken));
+  color: inherit;
+  cursor: zoom-in;
+
+  &:focus-visible {
+    outline: 3px solid var(--nri-focus-ring);
+    outline-offset: 2px;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+:host(.front) .attach {
+  cursor: zoom-out;
+}
+
+// Підпис «ОБКЛАДИНКА» — показує бандл дизайну.
+.cap {
+  display: none;
+}

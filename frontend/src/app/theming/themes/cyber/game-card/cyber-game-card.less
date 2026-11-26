@@ -1,51 +1,64 @@
+// Розкладка картки кібер-родини (спільна). Розмір сталий: ширина — від сітки, висота —
+// --cy-card-height; довгі рядки обрізаються «…» (повний текст — у підказці). Колір неону гри
+// (--cy-n / --cy-n-core / --cy-n-text) задає основа за [data-neon] на хості; вигляд варіанта
+// (скло, трубка, декор `cy-*`, ціна, вкладення) — бандл дизайну.
 :host {
+  position: relative;
   display: block;
-  height: 100%;
+  height: var(--cy-card-height, 23.75rem);
 }
 
-.card {
+.panel {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
+  padding: 26px 24px 18px;
   overflow: hidden;
-  background: var(--nri-surface-raised);
-  border: 1px solid var(--nri-border);
-  border-radius: var(--nri-radius-md);
-  box-shadow: var(--nri-shadow-md);
-  transition: border-color var(--nri-transition);
-
-  &:hover,
-  &:focus-within {
-    border-color: var(--nri-primary);
-  }
 }
 
-.cover {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  background: var(--nri-surface-sunken);
-}
-
-.body {
+// Рядок системи: текст кольору неону гри + мітки (вік, статус) праворуч.
+.sysrow {
   display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 20px;
+}
+
+.sys {
   flex: 1;
-  flex-direction: column;
-  gap: var(--nri-space-xs);
-  padding: var(--nri-space-md);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cy-n-text, var(--cy-ink-muted));
+  font: 700 0.6875rem/1.4 var(--cy-font-mono);
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.badges {
+.marks {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--nri-space-xs);
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.more {
+  color: var(--cy-ink-muted);
+  font: 700 0.6875rem/1 var(--cy-font-mono);
 }
 
 .title {
-  margin: 0;
-  font-size: 1.3rem;
+  flex: none;
+  margin: 8px 0 6px;
+  color: var(--cy-ink);
+  font: 600 1.15rem/1.3 var(--cy-font-display);
+  letter-spacing: -0.005em;
   overflow-wrap: anywhere;
 
   // Довга назва — не більше двох рядків з «…» (повна — у підказці).
@@ -60,82 +73,170 @@
     &:hover,
     &:focus-visible {
       text-decoration: underline;
+      text-decoration-color: var(--cy-n, var(--cy-neon-b));
+      text-underline-offset: 4px;
     }
   }
 }
 
-.meta {
-  margin: 0;
-  color: var(--nri-text-muted);
-}
-
-// Короткий опис — до трьох рядків з «…» (решта — у підказці).
-.summary {
+// Короткий опис — до трьох рядків з «…» (решта — у підказці). Стискається першим, щоб підпис
+// майстра й ціна лишались видимими.
+.desc {
   display: -webkit-box;
+  flex: 0 1 auto;
+  min-height: 0;
   margin: 0;
   overflow: hidden;
+  color: var(--cy-ink-soft);
+  font-size: 0.875rem;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
 
 .facts {
-  display: grid;
+  display: flex;
+  flex: none;
+  flex-direction: column;
   gap: 2px;
-  margin: var(--nri-space-xs) 0 0;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--cy-line);
+  font-size: 0.875rem;
 
-  div {
+  > div {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--nri-space-xs);
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
   }
 
   dt {
-    color: var(--nri-text-muted);
-
-    &::after {
-      content: ':';
-    }
+    flex: none;
+    width: 52px;
+    color: var(--cy-ink-muted);
+    font: 700 0.65625rem/1.4 var(--cy-font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   dd {
+    min-width: 0;
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-.gm {
-  margin-top: auto;
-  padding-top: var(--nri-space-sm);
+.seats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.seats-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// «Діоди» місць: світяться вільні (колір неону гри).
+.pips {
+  display: flex;
+  flex: none;
+  gap: 4px;
+
+  b {
+    width: 9px;
+    height: 9px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--cy-outline);
+    border-radius: 50%;
+  }
+
+  .on {
+    border-color: var(--cy-n-core, var(--cy-neon-b-core));
+    background: var(--cy-n, var(--cy-neon-b));
+    box-shadow: 0 0 6px var(--cy-n, var(--cy-neon-b));
+  }
+}
+
+.fit {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+.foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.gm {
+  flex: 1;
+  min-width: 0;
+}
+
+// Ціна-табличка (вигляд варіанта — у бандлі дизайну): бурштинова, безкоштовна — лайм.
+.price {
+  flex: none;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1.5px solid var(--cy-amber-text);
+  border-radius: 8px;
+  background: var(--cy-amber-fill);
+  color: var(--cy-amber-text);
+  font: 600 0.84375rem/1.2 var(--cy-font-display);
+  white-space: nowrap;
+
+  &.free {
+    border-color: var(--cy-lime-text);
+    background: var(--cy-lime-fill);
+    color: var(--cy-lime-text);
+  }
+}
+
+// ---- Обмежена картка: «завіса» замість обкладинки, без деталей ----
 .restricted {
   .veil {
     position: relative;
     display: grid;
+    flex: none;
     place-items: center;
-    aspect-ratio: 16 / 9;
+    height: 72px;
+    margin-bottom: 12px;
     overflow: hidden;
-    background: var(--nri-surface-sunken);
-    color: var(--nri-text-muted);
+    border-radius: var(--nri-radius-sm);
+    background: var(--cy-field);
+    color: var(--cy-ink-muted);
 
-    // Розмита «імітація» обкладинки — справжньої картинки обмежена картка не має.
+    // Розмита «імітація» обкладинки кольору неону — справжньої картинки обмежена картка не має.
     &::before {
       content: '';
       position: absolute;
       inset: calc(-2 * var(--nri-blur-radius));
       background: repeating-linear-gradient(
         135deg,
-        var(--nri-surface-raised) 0 14px,
-        var(--nri-border) 14px 28px
+        color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 18%, transparent) 0 14px,
+        transparent 14px 28px
       );
       filter: blur(var(--nri-blur-radius));
     }
 
     mat-icon {
       position: relative;
-      width: 40px;
-      height: 40px;
-      font-size: 40px;
+      width: 32px;
+      height: 32px;
+      font-size: 32px;
     }
   }
 
@@ -144,9 +245,12 @@
     padding: var(--nri-space-sm);
     border-radius: var(--nri-radius-sm);
     background: var(--nri-blur-overlay);
+    color: var(--cy-ink-soft);
+    font-size: 0.875rem;
   }
 
   .login {
+    margin-top: var(--nri-space-sm);
     color: var(--nri-primary-text);
     font-weight: 600;
   }

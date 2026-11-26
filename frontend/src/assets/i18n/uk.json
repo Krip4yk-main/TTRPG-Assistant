@@ -71,6 +71,15 @@
       "when": "Коли",
       "where": "Де"
     },
+    "price": {
+      "label": "Ціна за сесію",
+      "free": "без плати",
+      "value": "{{price}} грн"
+    },
+    "attachment": {
+      "label": "Обкладинка гри: {{title}}",
+      "caption": "Обкладинка"
+    },
     "shell": {
       "navMenu": "Навігація"
     }

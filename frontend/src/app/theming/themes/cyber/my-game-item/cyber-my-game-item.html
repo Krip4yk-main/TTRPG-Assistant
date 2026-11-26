@@ -1,7 +1,13 @@
 @let game = item();
-<!-- Затискачі, якими панель висить на шині (декор «Нічного міста», інші дизайни ховають). -->
+<!-- Шина й затискачі, якими панель висить на ній (декор «Нічного міста», інші дизайни
+     ховають). -->
+<span class="cy-rail" aria-hidden="true"></span>
 <span class="cy-clamp cy-clamp-l" aria-hidden="true"></span>
 <span class="cy-clamp cy-clamp-r" aria-hidden="true"></span>
+<!-- Обкладинка — знімок за верхнім правим кутом панелі (як у картці пошуку). -->
+@if (game.coverUrl; as cover) {
+  <nri-cy-attachment [src]="cover" [title]="game.title" />
+}
 <article class="panel cy-glass" [attr.data-game-id]="game.id">
   <span class="cy-tube" aria-hidden="true"></span>
   <header class="head">

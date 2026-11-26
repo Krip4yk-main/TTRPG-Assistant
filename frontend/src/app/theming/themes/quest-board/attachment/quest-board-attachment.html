@@ -2,9 +2,15 @@
 <button
   type="button"
   class="attach"
-  [attr.aria-label]="'questBoard.attachment.label' | translate: { title: title() }"
-  [attr.aria-pressed]="front()"
-  (blur)="onBlur()"
+  [attr.aria-label]="'questBoard.attachment.label' | translate: { title: att.title() }"
+  [attr.aria-pressed]="att.front()"
+  (blur)="att.onBlur()"
 >
-  <img [src]="src()" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="onError()" />
+  <img
+    [src]="att.src()"
+    alt=""
+    loading="lazy"
+    referrerpolicy="no-referrer"
+    (error)="att.onError()"
+  />
 </button>

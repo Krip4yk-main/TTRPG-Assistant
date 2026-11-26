@@ -73,6 +73,16 @@ function myGame(patch: Partial<MyGameCardDto> = {}): MyGameCardDto {
   } as MyGameCardDto;
 }
 
+const COVER = 'https://example.com/cover.png';
+
+/** Обкладинка (RF 3): картинка з адресою обкладинки в кнопці, названій за грою. */
+function expectCover(el: HTMLElement): void {
+  const img = el.querySelector<HTMLImageElement>(`img[src="${COVER}"]`);
+  expect(img).not.toBeNull();
+  expect(img!.getAttribute('alt')).toBe('');
+  expect(img!.closest('button')!.getAttribute('aria-label')).toContain('Туман над Дніпром');
+}
+
 const LONG_TITLE = 'Довга-назва-без-пробілів-'.repeat(5).slice(0, 120);
 const LONG_NICK = 'Нікнейм_на_сорок_символів_без_пробілів_X'.slice(0, 40);
 
@@ -137,6 +147,14 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(tooltips(fixture.debugElement)).toContain(long);
       const none = await mount(slots['game-card'], { game: cardVm({ ...game, summary: null }) });
       expect(none.nativeElement.textContent).not.toContain('Готичний жах');
+    });
+
+    it('cover: shown as a named button with the image; no cover — no image', async () => {
+      const el = (await mount(slots['game-card'], { game: cardVm({ ...game, coverUrl: COVER }) }))
+        .nativeElement;
+      expectCover(el);
+      const none = (await mount(slots['game-card'], { game: cardVm(game) })).nativeElement;
+      expect(none.querySelector('img')).toBeNull();
     });
 
     it('free game says so; no rating yet is stated', async () => {
@@ -217,6 +235,20 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
   describe('my-game-item', () => {
     const itemVm = (g: MyGameCardDto): MyGameItemVm =>
       toMyGameItemVm(g, { me: null, seen: 'updated' });
+
+    it('cover: shown as a named button with the image; no cover — no image', async () => {
+      const el: HTMLElement = (
+        await mount(slots['my-game-item'], {
+          item: itemVm(myGame({ coverUrl: COVER })),
+          busy: false,
+        })
+      ).nativeElement;
+      expectCover(el);
+      const none: HTMLElement = (
+        await mount(slots['my-game-item'], { item: itemVm(myGame()), busy: false })
+      ).nativeElement;
+      expect(none.querySelector('img')).toBeNull();
+    });
 
     it('shows title, status, schedule, seats, applications and all GM actions', async () => {
       const fixture = await mount(slots['my-game-item'], {

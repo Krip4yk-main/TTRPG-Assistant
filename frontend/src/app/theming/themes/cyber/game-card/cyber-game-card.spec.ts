@@ -7,7 +7,12 @@ import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { CyberGameCard } from './cyber-game-card';
 import { browserZone } from '../../../../core/i18n/dates';
 import { AuthStore } from '../../../../core/auth/auth.store';
-import { toGameCardVm } from '../../../../core/games/game-card.vm';
+import {
+  toGameCardVm,
+  type BadgeVm,
+  type FullGameCardVm,
+} from '../../../../core/games/game-card.vm';
+import { neonOf } from '../neon';
 
 const game: SearchGameCardDto = {
   id: 5,
@@ -104,12 +109,12 @@ describe('CyberGameCard (slot «game-card»)', () => {
   it('finished/cancelled cards hide the next session and free seats', async () => {
     for (const status of ['finished', 'cancelled'] as const) {
       await render({ ...game, status });
-      expect(el.textContent).not.toContain('search.card.next');
+      expect(el.textContent).not.toContain('cyber.card.when');
       expect(el.textContent).not.toContain('search.card.slots');
-      expect(el.textContent).toContain('search.card.price');
+      expect(el.textContent).toContain('cyber.price.label');
     }
     await render({ ...game, status: 'started' });
-    expect(el.textContent).toContain('search.card.next');
+    expect(el.textContent).toContain('cyber.card.when');
     expect(el.textContent).toContain('search.card.slots');
   });
 
@@ -156,6 +161,81 @@ describe('CyberGameCard (slot «game-card»)', () => {
     const login = el.querySelector<HTMLAnchorElement>('a[href^="/login"]');
     expect(login).not.toBeNull();
     expect(decodeURIComponent(login!.getAttribute('href')!)).toContain('returnTo=/games/6');
+  });
+
+  it('neon colour on the host is stable per game id; neighbouring games differ', async () => {
+    await render(game);
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.getAttribute('data-neon')).toBe(neonOf(5));
+    await render({ ...game, id: 6 });
+    expect(host.getAttribute('data-neon')).toBe(neonOf(6));
+    expect(neonOf(6)).not.toBe(neonOf(5));
+  });
+
+  it('has the decorative hooks of all three cyber variants, hidden from screen readers', async () => {
+    for (const g of [game, restricted]) {
+      await render(g);
+      for (const cls of [
+        'cy-spill',
+        'cy-rail',
+        'cy-clamp-l',
+        'cy-clamp-r',
+        'cy-frame',
+        'cy-beam',
+        'cy-emitter',
+        'cy-tube',
+        'cy-rivets',
+        'cy-brackets',
+      ]) {
+        const deco = el.querySelector(`.${cls}`);
+        expect(deco, cls).not.toBeNull();
+        expect(deco!.getAttribute('aria-hidden'), cls).toBe('true');
+      }
+    }
+  });
+
+  it('cover is a cyber attachment named after the game; no cover — no attachment', async () => {
+    await render(game);
+    const att = el.querySelector('nri-cy-attachment')!;
+    expect(att.querySelector('button')!.getAttribute('aria-label')).toBe('cyber.attachment.label');
+    expect(att.querySelector('img')!.getAttribute('src')).toBe(game.coverUrl);
+    await render({ ...game, coverUrl: null });
+    expect(el.querySelector('nri-cy-attachment')).toBeNull();
+  });
+
+  it('seat pips light up the free seats; many seats — text only', async () => {
+    await render(game);
+    expect(el.querySelectorAll('.pips b')).toHaveLength(5);
+    expect(el.querySelectorAll('.pips b.on')).toHaveLength(2);
+    await render({ ...game, maxPlayers: 12, freeSlots: 7 });
+    expect(el.querySelector('.pips')).toBeNull();
+    expect(el.textContent).toContain('search.card.slotsValue');
+  });
+
+  it('free game shows a «free» price sign', async () => {
+    await render({ ...game, priceUah: null });
+    const price = el.querySelector('.price')!;
+    expect(price.classList).toContain('free');
+    expect(price.textContent).toContain('cyber.price.free');
+  });
+
+  it('marks beyond two collapse into «+N» (all still read by screen readers)', async () => {
+    const base = toGameCardVm(game, null, { guest: false, genreKey: () => null });
+    const extra: BadgeVm[] = Array.from({ length: 4 }, (_, i) => ({
+      kind: 'status',
+      value: 'x',
+      labelKey: `mark.${i}`,
+      icon: null,
+    }));
+    fixture.componentRef.setInput('game', {
+      ...(base as FullGameCardVm),
+      badges: [...base.badges, ...extra],
+    });
+    fixture.detectChanges();
+    // fit — окремо; у рядку: 18+ і mark.0, «+3» (mark.1…3 — лише для читачів екрана).
+    expect(el.querySelector('.more')!.textContent).toContain('+3');
+    expect(el.querySelector('.marks .nri-visually-hidden')!.textContent).toContain('mark.3');
+    expect(el.querySelector('.fit')!.textContent).toContain('search.fit.partial');
   });
 
   describe('session time zone', () => {
