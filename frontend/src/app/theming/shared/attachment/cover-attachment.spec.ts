@@ -115,6 +115,8 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
     expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
     // Не всередині посилання на гру — клік по вкладенню не може бути переходом.
     expect(host.closest('a')).toBeNull();
+    // Хост позначено для спільного правила карток — дизайн не дописує свій селектор.
+    expect(host.hasAttribute('data-card-interactive')).toBe(true);
   });
 
   it('keyboard: Tab focus only shows the ring; Enter brings it forward, blur sends it back', () => {

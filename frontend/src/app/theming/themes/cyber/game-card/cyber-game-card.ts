@@ -78,7 +78,7 @@ export class CyberGameCard implements GameCardSlot {
 
   private readonly router = inject(Router);
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
-  /** Перехід уже почався — повторний (подвійний) клік нічого не робить. */
+  /** Перехід триває — повторний (подвійний) клік нічого не робить. */
   private navigating = false;
 
   protected onCardClick(event: MouseEvent): void {
@@ -86,13 +86,10 @@ export class CyberGameCard implements GameCardSlot {
     event.preventDefault();
     if (this.navigating) return;
     this.navigating = true;
-    // Перехід скасовано (guard) чи впав — наступний клік пробує знову.
-    this.router.navigateByUrl(this.gameUrl()).then(
-      (ok) => {
-        if (!ok) this.navigating = false;
-      },
-      () => (this.navigating = false),
-    );
+    // Перехід завершився (успішно, скасовано guard-ом чи впав) — наступний клік пробує знову:
+    // картка може пережити перехід (повторне використання маршруту, та сама адреса).
+    const done = () => (this.navigating = false);
+    this.router.navigateByUrl(this.gameUrl()).then(done, done);
   }
 
   /** «Діоди» місць: світяться вільні (декор; число — у тексті поруч). */

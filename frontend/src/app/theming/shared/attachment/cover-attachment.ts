@@ -20,6 +20,8 @@ import { Directive, ElementRef, computed, inject, input, signal } from '@angular
 @Directive({
   selector: '[nriCoverAttachment]',
   host: {
+    // Клік по вкладенню — не «відкрити гру» (спільне правило карток, ../card-click.ts).
+    'data-card-interactive': '',
     '[class.front]': 'front()',
     '[class.dismissed]': 'dismissed()',
     '[class.failed]': 'failed()',

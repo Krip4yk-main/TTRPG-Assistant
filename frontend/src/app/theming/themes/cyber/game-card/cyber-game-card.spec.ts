@@ -306,6 +306,15 @@ describe('CyberGameCard (slot «game-card»)', () => {
       expect(navigate).toHaveBeenCalledTimes(2);
     });
 
+    it('after a finished navigation the surviving card opens the game again', async () => {
+      await render(game);
+      click(el.querySelector('.facts')!);
+      await Promise.resolve();
+      await Promise.resolve();
+      click(el.querySelector('.facts')!);
+      expect(navigate).toHaveBeenCalledTimes(2);
+    });
+
     it('restricted card opens the game; its login link does not', async () => {
       await render(restricted, true);
       click(el.querySelector('a[href^="/login"]')!);
