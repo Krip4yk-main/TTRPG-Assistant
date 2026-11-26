@@ -1,11 +1,18 @@
 // Дизайн «Голо-ринок» (кібер-родина, макет docs/design-concepts/cyberpunk/cyber-c-holo.html):
-// окремий бандл `theme-holo-market.css` (`inject: false` в angular.json). Поки що — основа:
-// палітра макета (токени --cy-*) на спільних темних поверхнях кібер-родини
-// (../cyber/cyber-base.less), без власного декору й заголовкового шрифту (Jura — разом із
-// виглядом варіанта: розмитий нічний ринок, голо-панелі зі зрізаними кутами, проєктори).
-// Material — holo-market-material.scss.
+// окремий бандл `theme-holo-market.css` (`inject: false` в angular.json), який підключає
+// ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — заголовковий шрифт (Jura,
+// @fontsource: лише кирилиця й латиниця), токени --cy-* і вигляд варіанта: розмитий нічний
+// ринок з українськими вивісками (маленький inline SVG, без растрових файлів), шапка з ціановою
+// лінією, великий заголовок з хроматичним краєм, картки — напівпрозорі голо-панелі зі
+// зрізаними кутами й хроматичною рамкою, проєктор зі світловим конусом під карткою,
+// обкладинка — ч/б голо-прев'ю, повернуте в 3D за панеллю (кольорове й наперед при наведенні).
+// Рядка статистики з макета («Нових за добу / Найближча / Майстрів онлайн») немає: таких даних
+// у DTO пошуку немає, а нових API дизайн не додає.
+// Спільні темні поверхні сайту — ../cyber/cyber-base.less; Material — holo-market-material.scss.
 
-// Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини.
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця): текст і підписи кібер-родини,
+// заголовки — Jura (500 — Material, 600 — дрібні заголовки, 700 — логотип, заголовок сторінки,
+// назви карток, ціна).
 @import (css) '@fontsource/golos-text/cyrillic-400.css';
 @import (css) '@fontsource/golos-text/latin-400.css';
 @import (css) '@fontsource/golos-text/cyrillic-500.css';
@@ -16,41 +23,62 @@
 @import (css) '@fontsource/jetbrains-mono/latin-500.css';
 @import (css) '@fontsource/jetbrains-mono/cyrillic-700.css';
 @import (css) '@fontsource/jetbrains-mono/latin-700.css';
+@import (css) '@fontsource/jura/cyrillic-500.css';
+@import (css) '@fontsource/jura/latin-500.css';
+@import (css) '@fontsource/jura/cyrillic-600.css';
+@import (css) '@fontsource/jura/latin-600.css';
+@import (css) '@fontsource/jura/cyrillic-700.css';
+@import (css) '@fontsource/jura/latin-700.css';
 @import '../cyber/cyber-base.less';
 
 @hm: ~":root[data-theme='holo-market']";
 
-// Контраст (WCAG): скло панелі #0B1220, оверлей #101A2A, стіна #070914.
-//   Текст #EAF7FA — 17.1 на склі; #CFE6EC (описи) — 14.4; #9DBFCB (підписи) — 9.6 / 8.9 /
-//   10.2 на стіні. Межа полів #4F7584 — 3.8 / 3.5 (≥ 3:1).
-//   Ціан #5EF2FF — 13.9 на склі; #04161B на ціані — 13.8. Рожевий текст #FF9CCF — 9.7;
-//   #1A0610 на #FF9CCF — 10.1. Стани й неони карток — типові (.cy-neon-tokens()), ≥ 6.9 на склі.
+// Контраст (WCAG, відносна яскравість). Поверхні: стіна #070914; ринок за нею притемнений
+// (сцена — 70% непрозорості, вуаль ≥ 38%): найсвітліше місце під текстом на стіні (розмита
+// бурштинова вивіска) ≈ #4A3A20. Голо-панель картки — скло rgba(9,26,38,.9) поверх
+// притемненого (brightness .5) фону й рамки кольору гри: найгірше ≈ #152126 угорі, з
+// відтінком неону внизу ≈ #2D2A21 (бурштин) … #193036 (ціан). Непрозора оцінка скла
+// --cy-panel #0A1824, оверлей #0F2230, поле #050C14, смуга шапки над вивіскою ≈ #1F1C19.
+//   Текст #EAF7FA — 15.0 на склі картки / 14.8 оверлей / 12.3 з відтінком / 9.4 на стіні;
+//   #CFE2E8 (описи) — 12.3 скло / 12.2 оверлей; підзаголовок #D6E8EE — 8.1 на стіні.
+//   #9DBFCB (підписи) — 8.4 скло / 8.3 оверлей / ≥ 6.9 з відтінком / 8.7 смуга / 5.3 стіна.
+//   Межа полів #4F7584 — 3.3 скло / 3.3 оверлей / 3.9 поле (≥ 3:1).
+//   Ціан #5EF2FF — 12.2 на склі; #04161B на ціані — 13.8 (filled, активний пункт меню).
+//   Рожевий текст #FF9CCF — 8.5; #1A0610 на #FF5CB4 — 6.9.
+//   Текст системи (70% неону + білий): рожевий #FF8DCB — 7.8, ціан #8EF6FF — 13.1, фіолет
+//     #C8AFFF — 8.6, бурштин #FFD280 — 11.6, лайм #D7FF80 — 14.5, червоний #FF97A1 — 8.0.
+//   Ціна #FFE1A6 — 13.0 на склі; «без плати» / «підходить розкладу» #E5FFB5 — 15.1.
+//   Підпис «ПРЕВ'Ю» #04141A на неоні гри — ≥ 6.6 (декор, aria-hidden).
+//   Заголовок сторінки #F2FEFF — 14.2 на стіні (хроматичний край — тінь великого заголовка,
+//     не фон). Сканлайни карток — 3.5% світлого, під текстом (z-index −1) і лише біля верхнього
+//     й нижнього країв; рамка, конус, проєктор, світіння — декор поза текстом.
 
 @{hm} {
-  --cy-font-display: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
+  --cy-font-display: 'Jura', 'Golos Text', 'Segoe UI', system-ui, sans-serif;
 
   --cy-wall: #070914;
   --cy-wall-deep: #070914;
-  --cy-bar: rgba(6, 10, 20, 0.92);
+  --cy-bar: rgba(6, 10, 20, 0.86);
   --cy-bar-line: rgba(94, 242, 255, 0.42);
 
-  --cy-panel: #0b1220;
-  --cy-glass: linear-gradient(rgba(11, 18, 32, 0.94), rgba(7, 12, 22, 0.96));
+  --cy-panel: #0a1824;
+  --cy-glass: linear-gradient(rgba(9, 26, 38, 0.93), rgba(6, 16, 26, 0.95));
   --cy-glass-line: rgba(94, 242, 255, 0.3);
-  --cy-panel-raised: #142033;
-  --cy-overlay: #101a2a;
+  --cy-panel-raised: #112636;
+  --cy-overlay: #0f2230;
   --cy-overlay-line: rgba(94, 242, 255, 0.42);
-  --cy-field: #060b14;
+  --cy-field: #050c14;
   --cy-backdrop: rgba(2, 3, 8, 0.75);
-  --cy-blur-overlay: rgba(7, 9, 20, 0.72);
+  --cy-blur-overlay: rgba(6, 14, 22, 0.75);
 
   --cy-ink: #eaf7fa;
-  --cy-ink-soft: #cfe6ec;
+  --cy-ink-soft: #cfe2e8;
   --cy-ink-muted: #9dbfcb;
-  --cy-line: rgba(94, 242, 255, 0.16);
+  --cy-line: rgba(94, 242, 255, 0.18);
   --cy-outline: #4f7584;
 
-  --cy-neon-a: #ff9ccf;
+  // Перший неон — рожевий (CTA, «Скинути»), другий — ціан (логотип, фокус, посилання).
+  --cy-neon-a: #ff5cb4;
   --cy-neon-a-core: #ffe0f0;
   --cy-neon-a-text: #ff9ccf;
   --cy-on-neon-a: #1a0610;
@@ -63,5 +91,556 @@
   --cy-mark-glow: rgba(94, 242, 255, 0.8);
 
   .cy-neon-tokens();
+
+  // Шість кольорів голограм — з макета (колір, серцевина, текст системи).
+  --cy-neon-pink: #ff5cb4;
+  --cy-neon-pink-core: #ffe0f0;
+  --cy-neon-pink-text: #ff8dcb;
+  --cy-neon-cyan: #5ef2ff;
+  --cy-neon-cyan-core: #d8fcff;
+  --cy-neon-cyan-text: #8ef6ff;
+  --cy-neon-violet: #b18cff;
+  --cy-neon-violet-core: #ece2ff;
+  --cy-neon-violet-text: #c8afff;
+  --cy-neon-amber: #ffbf4a;
+  --cy-neon-amber-core: #fff0d2;
+  --cy-neon-amber-text: #ffd280;
+  --cy-neon-lime: #c6ff4a;
+  --cy-neon-lime-core: #f1ffd2;
+  --cy-neon-lime-text: #d7ff80;
+  --cy-neon-red: #ff6a78;
+  --cy-neon-red-core: #ffdde1;
+  --cy-neon-red-text: #ff97a1;
+
   .cy-base();
+
+  // Зрізані кути (голо-панелі, табличка ціни, активний пункт меню).
+  --hm-cut: 16px;
+
+  // Квадратніші поля й кнопки Material (як у макеті).
+  --mat-form-field-outlined-container-shape: 2px;
+  --mat-button-filled-container-shape: 2px;
+  --mat-button-outlined-container-shape: 2px;
+  --mat-button-protected-container-shape: 2px;
+
+  // Проміжки сітки вміщують проєктор під карткою й обкладинку над наступним рядом.
+  --nri-card-grid-gap: 3.5rem 1.75rem;
+
+  // ---- Нічний ринок за склом (лише CSS + маленький inline SVG) ----
+  // Сцена (будинки з вікнами, ятки з тентами й гірляндами, світні вивіски «ШАУРМА»,
+  // «ЗАПЧАСТИНИ», «ГРИБИ»…) — фіксований шар на розмір вікна, розмитий усередині SVG і
+  // притемнений; над ним — вуаль, віньєтка й ледь помітні сканлайни (теж фіксовані, під
+  // усім вмістом). Без зменшеного руху сцена зрідка ледь мерехтить.
+  .cy-wall {
+    // Повернуте прев'ю крайньої картки не дає горизонтального скролу (clip — не контейнер
+    // прокрутки: липка шапка й фільтри працюють).
+    overflow-x: clip;
+    background-color: var(--cy-wall);
+
+    &::before,
+    &::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    &::before {
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1440' height='900' viewBox='0 0 1440 900'%3E%3Cdefs%3E%3Cfilter id='b' x='-5%25' y='-5%25' width='110%25' height='110%25'%3E%3CfeGaussianBlur stdDeviation='2.2'/%3E%3C/filter%3E%3Cfilter id='g' x='-40%25' y='-90%25' width='180%25' height='280%25'%3E%3CfeGaussianBlur stdDeviation='7'/%3E%3C/filter%3E%3CradialGradient id='w'%3E%3Cstop offset='0' stop-color='%23ffb35a' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23ffb35a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='c'%3E%3Cstop offset='0' stop-color='%235ef2ff' stop-opacity='.35'/%3E%3Cstop offset='1' stop-color='%235ef2ff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cpattern id='a' width='56' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 0h28l4 40H4z' fill='%235a3e12'/%3E%3Cpath d='M28 0h28l4 40H32z' fill='%2322180a'/%3E%3C/pattern%3E%3Cpattern id='t' width='52' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 0h26l4 40H4z' fill='%23124854'/%3E%3Cpath d='M26 0h26l4 40H30z' fill='%23081e24'/%3E%3C/pattern%3E%3Cpattern id='r' width='52' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 0h26l4 40H4z' fill='%235a1820'/%3E%3Cpath d='M26 0h26l4 40H30z' fill='%23240a0c'/%3E%3C/pattern%3E%3Cpattern id='l' width='160' height='60' patternUnits='userSpaceOnUse'%3E%3Ccircle cx='30' cy='20' r='3' fill='%23ffd28a'/%3E%3Ccircle cx='30' cy='20' r='10' fill='%23ffb35a' opacity='.16'/%3E%3Ccircle cx='110' cy='34' r='3' fill='%23ffd28a'/%3E%3Ccircle cx='110' cy='34' r='10' fill='%23ffb35a' opacity='.16'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='1440' height='900' fill='%23070914'/%3E%3Cg filter='url(%23b)'%3E%3Crect y='30' width='1440' height='420' fill='%230b0c16'/%3E%3Cg opacity='.3'%3E%3Crect x='88' y='56' width='13' height='13' fill='%23ffcf8a'/%3E%3Crect x='400' y='54' width='9' height='13' fill='%23ffe7b0'/%3E%3Crect x='669' y='48' width='10' height='10' fill='%23ff9ccf'/%3E%3Crect x='638' y='120' width='12' height='11' fill='%237fe9ff'/%3E%3Crect x='909' y='83' width='10' height='11' fill='%237fe9ff'/%3E%3Crect x='1062' y='104' width='11' height='9' fill='%23ffe7b0'/%3E%3Crect x='1299' y='117' width='11' height='8' fill='%237fe9ff'/%3E%3Crect x='217' y='79' width='6' height='14' fill='%237fe9ff'/%3E%3Crect x='1375' y='70' width='8' height='9' fill='%23ff9ccf'/%3E%3Crect x='820' y='40' width='8' height='12' fill='%23ffcf8a'/%3E%3C/g%3E%3Cg fill='url(%23w)'%3E%3Cellipse cx='110' cy='310' rx='170' ry='120'/%3E%3Cellipse cx='350' cy='310' rx='150' ry='120'/%3E%3Cellipse cx='600' cy='310' rx='170' ry='120'/%3E%3Cellipse cx='1100' cy='310' rx='160' ry='120'/%3E%3Cellipse cx='250' cy='700' rx='190' ry='130'/%3E%3Cellipse cx='1150' cy='700' rx='180' ry='130'/%3E%3C/g%3E%3Cg fill='url(%23c)'%3E%3Cellipse cx='860' cy='300' rx='170' ry='120'/%3E%3Cellipse cx='1340' cy='300' rx='150' ry='110'/%3E%3Cellipse cx='700' cy='700' rx='200' ry='130'/%3E%3C/g%3E%3Crect y='250' width='1440' height='200' fill='%2307070d' opacity='.5'/%3E%3Crect y='250' width='1440' height='60' fill='url(%23l)'/%3E%3Crect x='-20' y='210' width='250' height='40' fill='url(%23a)'/%3E%3Crect x='240' y='210' width='218' height='40' fill='url(%23t)'/%3E%3Crect x='474' y='210' width='256' height='40' fill='url(%23a)'/%3E%3Crect x='738' y='210' width='238' height='40' fill='url(%23r)'/%3E%3Crect x='984' y='210' width='230' height='40' fill='url(%23a)'/%3E%3Crect x='1222' y='210' width='240' height='40' fill='url(%23t)'/%3E%3Crect y='648' width='1440' height='190' fill='%2307070d' opacity='.5'/%3E%3Crect y='648' width='1440' height='60' fill='url(%23l)'/%3E%3Crect x='60' y='608' width='380' height='40' fill='url(%23r)'/%3E%3Crect x='470' y='608' width='460' height='40' fill='url(%23t)'/%3E%3Crect x='960' y='608' width='420' height='40' fill='url(%23a)'/%3E%3Cg font-family='sans-serif' font-weight='700' font-size='20' text-anchor='middle'%3E%3Cg fill='none' stroke-width='3' filter='url(%23g)' opacity='.8'%3E%3Crect x='90' y='156' width='110' height='38' stroke='%23ff5cb4'/%3E%3Crect x='261' y='156' width='162' height='38' stroke='%23ffbf4a'/%3E%3Crect x='528' y='156' width='97' height='38' stroke='%235ef2ff'/%3E%3Crect x='790' y='150' width='186' height='38' stroke='%23ff4a5c'/%3E%3Crect x='1040' y='156' width='120' height='38' stroke='%23ffbf4a'/%3E%3Crect x='1270' y='150' width='120' height='38' stroke='%235ef2ff'/%3E%3Crect x='120' y='556' width='130' height='38' stroke='%23b18cff'/%3E%3Crect x='560' y='556' width='130' height='38' stroke='%23ffbf4a'/%3E%3Crect x='1050' y='556' width='150' height='38' stroke='%23c6ff4a'/%3E%3C/g%3E%3Cg fill='%230a0a12' stroke-width='2'%3E%3Crect x='90' y='156' width='110' height='38' stroke='%23ff5cb4'/%3E%3Crect x='261' y='156' width='162' height='38' stroke='%23ffbf4a'/%3E%3Crect x='528' y='156' width='97' height='38' stroke='%235ef2ff'/%3E%3Crect x='790' y='150' width='186' height='38' stroke='%23ff4a5c'/%3E%3Crect x='1040' y='156' width='120' height='38' stroke='%23ffbf4a'/%3E%3Crect x='1270' y='150' width='120' height='38' stroke='%235ef2ff'/%3E%3Crect x='120' y='556' width='130' height='38' stroke='%23b18cff'/%3E%3Crect x='560' y='556' width='130' height='38' stroke='%23ffbf4a'/%3E%3Crect x='1050' y='556' width='150' height='38' stroke='%23c6ff4a'/%3E%3C/g%3E%3Ctext x='145' y='182' fill='%23ff5cb4'%3E%D0%A8%D0%90%D0%A3%D0%A0%D0%9C%D0%90%3C/text%3E%3Ctext x='342' y='182' fill='%23ffbf4a'%3E%D0%97%D0%90%D0%9F%D0%A7%D0%90%D0%A1%D0%A2%D0%98%D0%9D%D0%98%3C/text%3E%3Ctext x='576' y='182' fill='%235ef2ff'%3E%D0%93%D0%A0%D0%98%D0%91%D0%98%3C/text%3E%3Ctext x='883' y='176' fill='%23ff4a5c'%3E%D0%9B%D0%9E%D0%9A%D0%A8%D0%98%D0%9D%D0%90 24/7%3C/text%3E%3Ctext x='1100' y='182' fill='%23ffbf4a'%3E%D0%90%D0%9F%D0%A2%D0%95%D0%9A%D0%90%3C/text%3E%3Ctext x='1330' y='176' fill='%235ef2ff'%3E%D0%A0%D0%95%D0%9C%D0%9E%D0%9D%D0%A2%3C/text%3E%3Ctext x='185' y='582' fill='%23b18cff'%3E%D0%94%D0%A0%D0%A3%D0%9A 3D%3C/text%3E%3Ctext x='625' y='582' fill='%23ffbf4a'%3E%D0%9A%D0%9E%D0%9C%D0%86%D0%9A%D0%A1%D0%98%3C/text%3E%3Ctext x='1125' y='582' fill='%23c6ff4a'%3E%D0%92%D0%90%D0%A0%D0%95%D0%9D%D0%98%D0%9A%D0%98%3C/text%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
+        center top / cover no-repeat;
+      opacity: 0.7;
+    }
+
+    // Вуаль: темніша пляма за заголовком сторінки (угорі ліворуч), рівне притемнення,
+    // віньєтка, сканлайни.
+    &::after {
+      background:
+        radial-gradient(
+          ellipse 760px 230px at 330px 170px,
+          rgba(4, 6, 12, 0.8),
+          rgba(4, 6, 12, 0.45) 55%,
+          transparent 100%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(5, 7, 14, 0.5),
+          rgba(5, 7, 14, 0.38) 30%,
+          rgba(5, 7, 14, 0.38) 75%,
+          rgba(5, 7, 14, 0.46)
+        ),
+        radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(0, 0, 0, 0.5) 100%),
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cy-wall::before {
+      animation: hm-flicker 9s steps(1) infinite;
+    }
+  }
+
+  // ---- Шапка: напівпрозора смуга з ціановою лінією й світінням ----
+  .top.cy-bar {
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 18px rgba(94, 242, 255, 0.15);
+  }
+
+  .top .brand {
+    color: #eafdff;
+    font: 700 1.375rem/1 var(--cy-font-display);
+    letter-spacing: 0.02em;
+
+    &:hover {
+      color: #eafdff;
+    }
+  }
+
+  .top .mark {
+    filter: drop-shadow(0 0 5px var(--cy-mark-glow));
+  }
+
+  // Активний пункт — ціанова плашка зі зрізаними кутами.
+  .top .nav-link.active {
+    border-radius: 0;
+    background: #5ef2ff;
+    color: #04161b;
+    box-shadow: none;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+
+  .top .avatar {
+    background: rgba(94, 242, 255, 0.12);
+    color: #eafdff;
+    font-family: var(--cy-font-display);
+    font-weight: 700;
+  }
+
+  // ---- Заголовок сторінки: великий Jura з хроматичним краєм (без пластини) ----
+  .cy-sign-title {
+    color: #f2feff;
+    font-weight: 700;
+    font-size: clamp(2rem, 4.2vw, 3.625rem);
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+    text-shadow:
+      -2px 0 rgba(255, 70, 150, 0.5),
+      2px 0 rgba(60, 230, 255, 0.55),
+      0 0 26px rgba(94, 242, 255, 0.4);
+  }
+
+  nri-cy-page-header .lead {
+    margin-top: 10px;
+    color: #d6e8ee;
+  }
+
+  // ---- Панелі сайту: скло зі зрізаними кутами ----
+  // Тінь панелі зрізаний контур однаково обрізає — замість неї тонка межа.
+  .cy-glass,
+  .nri-page:not(.nri-board),
+  .nri-page.nri-board .nri-panel {
+    border-radius: 0;
+    clip-path: polygon(
+      var(--hm-cut) 0,
+      100% 0,
+      100% calc(100% - var(--hm-cut)),
+      calc(100% - var(--hm-cut)) 100%,
+      0 100%,
+      0 var(--hm-cut)
+    );
+  }
+
+  // Панель фільтрів пошуку: темне скло над ринком (без неонової трубки — замість неї
+  // зрізані кути).
+  .nri-page.nri-board .nri-panel {
+    --hm-cut: 18px;
+
+    background: rgba(7, 18, 28, 0.9);
+
+    &::before {
+      display: none;
+    }
+  }
+
+  // ---- Голо-панель картки (пошук і «Мої ігри») ----
+  // Напівпрозоре скло зі зрізаними кутами й відтінком кольору гри знизу; позаду — рамка-
+  // градієнт з хроматичним краєм (.cy-frame), під карткою — світловий конус (.cy-beam) і
+  // проєктор (.cy-emitter). Сканлайни — у .cy-brackets під текстом, лише біля країв.
+  [data-neon] > .cy-glass {
+    border: 0;
+    background:
+      linear-gradient(0deg, color-mix(in srgb, var(--cy-n) 12%, transparent), transparent 40%),
+      linear-gradient(180deg, rgba(9, 26, 38, 0.9), rgba(6, 16, 26, 0.92));
+    box-shadow: none;
+
+    .cy-tube {
+      display: none;
+    }
+  }
+
+  // Рамка: градієнт кольору гри під панеллю (виступає на 1px) з червоно-ціановим зсувом.
+  // Фільтр — на хості рамки, контур — на псевдоелементі (інакше clip-path обрізав би тінь).
+  .cy-frame {
+    position: absolute;
+    inset: -1px;
+    z-index: 1;
+    display: block;
+    opacity: 0.9;
+    filter: drop-shadow(-2px 0 0 rgba(255, 60, 140, 0.5))
+      drop-shadow(2px 0 0 rgba(60, 230, 255, 0.55));
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        160deg,
+        var(--cy-n),
+        rgba(94, 242, 255, 0.25) 40%,
+        rgba(94, 242, 255, 0.15) 70%,
+        var(--cy-n)
+      );
+      clip-path: polygon(
+        var(--hm-cut) 0,
+        100% 0,
+        100% calc(100% - var(--hm-cut)),
+        calc(100% - var(--hm-cut)) 100%,
+        0 100%,
+        0 var(--hm-cut)
+      );
+    }
+  }
+
+  // Сканлайни й кутики-приціли (верхній правий, нижній лівий).
+  .cy-brackets {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    display: block;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(150, 240, 255, 0.035) 0 1px,
+      transparent 1px 3px
+    );
+    mask-image: linear-gradient(180deg, #000, transparent 16%, transparent 84%, #000);
+    pointer-events: none;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border: 0 solid var(--cy-n, var(--cy-neon-b));
+      opacity: 0.9;
+    }
+
+    &::before {
+      top: 7px;
+      right: 7px;
+      border-width: 2px 2px 0 0;
+    }
+
+    &::after {
+      bottom: 7px;
+      left: 7px;
+      border-width: 0 0 2px 2px;
+    }
+  }
+
+  // Світловий конус від проєктора до нижнього краю панелі.
+  .cy-beam {
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+    z-index: 0;
+    display: block;
+    width: min(300px, 90%);
+    height: 26px;
+    background: linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--cy-n) 60%, transparent),
+      color-mix(in srgb, var(--cy-n) 8%, transparent)
+    );
+    clip-path: polygon(43% 100%, 57% 100%, 100% 0, 0 0);
+    opacity: 0.8;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  // Проєктор: металевий брусок зі світною лінзою й зеленим діодом живлення.
+  .cy-emitter {
+    position: absolute;
+    bottom: -32px;
+    left: 50%;
+    z-index: 2;
+    display: block;
+    width: 90px;
+    height: 10px;
+    margin-left: -45px;
+    border-radius: 2px;
+    background: linear-gradient(#4a5462, #161b24);
+    box-shadow:
+      0 2px 6px #000,
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 6px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #c6ff4a;
+      box-shadow: 0 0 4px #c6ff4a;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      right: 28px;
+      left: 28px;
+      height: 3px;
+      border-radius: 2px;
+      background: #fff;
+      box-shadow:
+        0 0 6px var(--cy-n),
+        0 0 14px var(--cy-n);
+    }
+  }
+
+  [data-neon]:is(:hover, :focus-within) {
+    > .cy-frame {
+      opacity: 1;
+      filter: drop-shadow(-3px 0 0 rgba(255, 60, 140, 0.7))
+        drop-shadow(3px 0 0 rgba(60, 230, 255, 0.75)) drop-shadow(0 0 10px var(--cy-n));
+    }
+
+    > .cy-beam {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :is(.cy-frame, .cy-beam) {
+      transition:
+        opacity var(--nri-transition),
+        filter var(--nri-transition);
+    }
+  }
+
+  // ---- Вміст картки ----
+  :is(nri-cy-game-card, nri-cy-my-game-item) .title {
+    color: #f3feff;
+    font-weight: 700;
+    font-size: 1.35rem;
+    line-height: 1.17;
+    letter-spacing: 0.01em;
+  }
+
+  [data-neon] .facts {
+    border-top-color: rgba(94, 242, 255, 0.2);
+  }
+
+  // «Діоди» місць — ромби.
+  [data-neon] .pips {
+    b {
+      border-color: rgba(157, 191, 203, 0.5);
+      border-radius: 1px;
+      transform: rotate(45deg) scale(0.8);
+    }
+
+    .on {
+      border-color: var(--cy-n);
+    }
+  }
+
+  // Мітки й ініціал майстра — прямокутні.
+  :is(nri-cy-game-card, nri-cy-my-game-item) :is(.badge, .status, .nri-seen-badge) {
+    border-radius: 2px;
+  }
+
+  nri-cy-game-card .gm .initial {
+    border: 1px solid color-mix(in srgb, var(--cy-n) 70%, transparent);
+    border-radius: 2px;
+    background: rgba(94, 242, 255, 0.08);
+    color: #eafdff;
+    font-weight: 700;
+  }
+
+  // «Підходить вашому розкладу» — смуга з лаймовим краєм і ромбом (частковий — бурштин).
+  nri-cy-game-card .fit .badge.fit {
+    padding: 5px 10px;
+    border: 0;
+    border-left: 3px solid #c6ff4a;
+    border-radius: 0;
+    background: rgba(198, 255, 74, 0.1);
+    color: #e5ffb5;
+
+    &::before {
+      border-radius: 0;
+      background: #c6ff4a;
+      box-shadow: 0 0 8px #c6ff4a;
+      transform: rotate(45deg);
+    }
+
+    &[data-fit='partial'] {
+      border-left-color: #ffbf4a;
+      background: rgba(255, 191, 74, 0.1);
+      color: #ffe1a6;
+
+      &::before {
+        background: #ffbf4a;
+        box-shadow: 0 0 8px #ffbf4a;
+      }
+    }
+  }
+
+  // Ціна — бурштинова табличка зі зрізаними кутами, безкоштовна — лайм.
+  nri-cy-game-card .price {
+    padding: 6px 14px;
+    border: 1px solid #ffbf4a;
+    border-radius: 0;
+    background: rgba(255, 191, 74, 0.1);
+    color: #ffe1a6;
+    font: 700 1rem/1.2 var(--cy-font-display);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+
+    &.free {
+      border-color: #c6ff4a;
+      background: rgba(198, 255, 74, 0.1);
+      color: #e5ffb5;
+    }
+  }
+
+  // ---- Обкладинка: ч/б голо-прев'ю, повернуте в 3D за верхнім правим кутом панелі ----
+  // Наперед (наведення / клік / Enter) — кольорове, вирівнюється, виїжджає на панель і
+  // збільшується, з хроматичним краєм і світінням кольору гри.
+  nri-cy-attachment {
+    top: -36px;
+    right: -30px;
+    width: 160px;
+    height: 112px;
+
+    .attach {
+      border: 1px solid color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 70%, transparent);
+      border-radius: 0;
+      background: var(--cy-field);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 35%, transparent);
+      opacity: 0.85;
+      transform: perspective(500px) rotateY(-24deg) rotateZ(4deg);
+      transform-origin: 100% 50%;
+
+      img {
+        filter: grayscale(1) brightness(0.85) contrast(1.1);
+      }
+
+      // Рядки голограми й відсвіт кольору гри.
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
+          linear-gradient(
+            color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 22%, transparent),
+            color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 22%, transparent)
+          );
+        pointer-events: none;
+      }
+    }
+
+    // Підпис «ОБКЛАДИНКА» — плашка кольору гри вгорі ліворуч.
+    .cap {
+      position: absolute;
+      top: 5px;
+      left: 6px;
+      z-index: 2;
+      display: block;
+      padding: 1px 4px;
+      background: var(--cy-n, var(--cy-neon-b));
+      color: #04141a;
+      font: 700 0.5625rem/1.4 var(--cy-font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+  }
+
+  .hm-attachment-front() {
+    box-shadow:
+      -3px 0 0 rgba(255, 60, 140, 0.75),
+      3px 0 0 rgba(60, 230, 255, 0.75),
+      0 14px 30px rgba(0, 0, 0, 0.6),
+      0 0 30px color-mix(in srgb, var(--cy-n, var(--cy-neon-b)) 45%, transparent);
+    opacity: 1;
+    transform: translate(-46px, 26px) scale(1.16);
+
+    img {
+      filter: none;
+    }
+
+    &::after {
+      background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+    }
+  }
+
+  nri-cy-attachment.front .attach {
+    .hm-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-cy-attachment:hover:not(.dismissed) .attach {
+      .hm-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-cy-attachment .attach {
+      transition:
+        transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        opacity 350ms,
+        box-shadow 350ms;
+
+      img {
+        transition: filter 350ms;
+      }
+    }
+  }
+
+  // Широкий екран: скло ще й розмиває ринок позаду (на вузькому — лише щільне скло).
+  @media (min-width: 600px) {
+    [data-neon] > .cy-glass,
+    .nri-page.nri-board .nri-panel {
+      backdrop-filter: blur(8px) brightness(0.6);
+    }
+  }
+}
+
+// Сцена ринку зрідка ледь пригасає (≈ 0.3 с із 9 с) — несправна лампа над ятками.
+@keyframes hm-flicker {
+  0%,
+  71%,
+  74%,
+  100% {
+    opacity: 0.7;
+  }
+
+  72% {
+    opacity: 0.6;
+  }
+
+  73% {
+    opacity: 0.66;
+  }
+}
+
+@media (max-width: 599.98px) {
+  // Вузький екран: прев'ю не виходить за поля сторінки (без горизонтального скролу).
+  @{hm} nri-cy-attachment {
+    right: -8px;
+  }
 }

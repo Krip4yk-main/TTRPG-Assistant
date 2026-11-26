@@ -1,7 +1,7 @@
 // Material для дизайну «Голо-ринок» (бандл `theme-holo-market`): спільний темний Material
-// кібер-родини (../cyber/cyber-material.scss); заголовковий шрифт дизайну — разом із його виглядом.
+// кібер-родини (../cyber/cyber-material.scss) з заголовковим шрифтом дизайну (Jura).
 @use '../cyber/cyber-material' as cy;
 
 :root[data-theme='holo-market'] {
-  @include cy.material("'Golos Text', 'Segoe UI', system-ui, sans-serif");
+  @include cy.material("'Jura', 'Golos Text', 'Segoe UI', system-ui, sans-serif");
 }
