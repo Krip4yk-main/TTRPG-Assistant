@@ -23,8 +23,8 @@ function fakeThemes(available: ThemeId[], current: ThemeId = 'quest-board') {
     select: vi.fn(async (id: ThemeId) => {
       theme.set(id);
     }),
-    saveUiPrefs: vi.fn(async (prefs: UiPrefsDto) => {
-      uiPrefs.set(prefs);
+    saveUiPrefs: vi.fn(async (prefs: Partial<UiPrefsDto>) => {
+      uiPrefs.set({ ...uiPrefs(), ...prefs });
     }),
   };
 }
@@ -129,6 +129,24 @@ describe('ThemePicker («Вигляд»)', () => {
     fixture.detectChanges();
     expect(tearSwitch(el)?.getAttribute('aria-checked')).toBe('true');
     expect(el.querySelector('[role="alert"]')?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
+  });
+
+  it('«Магіпанк»: перемикач анімації конверта, зберігає лише sendAnimation', async () => {
+    const themes = fakeThemes(['quest-board', 'magicpunk'], 'magicpunk');
+    const fixture = await render(themes);
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.textContent).toContain(uk.account.theme.sendAnimation);
+    expect(el.textContent).toContain(uk.account.theme.sendAnimationHint);
+    expect(el.textContent).not.toContain(uk.account.theme.tearAnimation);
+    const sw = el.querySelector<HTMLButtonElement>(
+      'mat-slide-toggle[data-option="sendAnimation"] button[role="switch"]',
+    )!;
+    expect(sw.getAttribute('aria-checked')).toBe('true');
+    sw.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(themes.saveUiPrefs).toHaveBeenCalledWith({ sendAnimation: false });
+    expect(sw.getAttribute('aria-checked')).toBe('false');
   });
 
   it('у «Нічного міста» власних налаштувань немає — лише картки', async () => {

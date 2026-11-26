@@ -1,14 +1,7 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { ThemeId } from '@nri/shared';
+import type { ThemeId, UiPrefsDto } from '@nri/shared';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { toApiError } from '../../../core/api/api-error';
 import { THEME_REGISTRY } from '../../../theming/theme.registry';
@@ -16,8 +9,9 @@ import { ThemeService } from '../../../theming/theme.service';
 
 /**
  * Розділ «Вигляд» налаштувань акаунта: картки доступних дизайнів (мініатюра й назва) — коли є
- * з чого вибирати, і власні налаштування чинного дизайну (для «Дошки» — анімація відривання
- * оголошення). Розділ показується, якщо є хоч щось із цього. Вибір позначається одразу
+ * з чого вибирати, і власні налаштування чинного дизайну — перемикачі (для «Дошки» — анімація
+ * відривання оголошення, для «Магіпанку» — конверт надісланої заявки; підписи —
+ * `account.theme.<налаштування>` і `<налаштування>Hint`). Розділ показується, якщо є хоч щось із цього. Вибір позначається одразу
  * (оптимістично) і застосовується без перезавантаження; помилка збереження — повідомлення й
  * попередній стан.
  */
@@ -45,27 +39,29 @@ export class ThemePicker {
     () => this.registry[this.themes.theme()].options ?? [],
   );
   protected readonly visible = computed(() => this.picker() || this.designOptions().length > 0);
-  protected readonly tearAnimation = computed(() => this.themes.uiPrefs().tearAnimation);
+  protected readonly prefs = computed(() => this.themes.uiPrefs());
   protected readonly prefsBusy = signal(false);
-  private readonly tearToggle = viewChild<MatSlideToggle>('tearToggle');
   protected readonly selected = computed(() => this.pending() ?? this.themes.theme());
   protected readonly busy = computed(() => this.pending() !== null);
   protected readonly errorKey = signal<string | null>(null);
 
-  protected async setTearAnimation(on: boolean): Promise<void> {
+  protected async setOption(
+    key: keyof UiPrefsDto,
+    on: boolean,
+    toggle: MatSlideToggle,
+  ): Promise<void> {
     // Поки зберігається, перемикач лише «вимкнений» на вигляд (disabledInteractive — фокус
     // лишається на ньому).
     if (this.prefsBusy()) return;
     this.errorKey.set(null);
     this.prefsBusy.set(true);
     try {
-      await this.themes.saveUiPrefs({ ...this.themes.uiPrefs(), tearAnimation: on });
+      await this.themes.saveUiPrefs({ [key]: on });
     } catch (err) {
       const { code } = toApiError(err);
       if (code !== 'UNAUTHENTICATED') this.errorKey.set(`errors.${code}`);
       // Перемикач уже переключився під пальцем — повертаємо збережений стан.
-      const toggle = this.tearToggle();
-      if (toggle) toggle.checked = this.tearAnimation();
+      toggle.checked = this.prefs()[key];
     } finally {
       this.prefsBusy.set(false);
     }

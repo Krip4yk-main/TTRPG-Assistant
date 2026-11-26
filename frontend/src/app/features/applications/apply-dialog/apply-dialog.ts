@@ -37,6 +37,7 @@ import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
 import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
+import { ThemeService } from '../../../theming/theme.service';
 
 /** Дані гри, потрібні для заявки. */
 export interface ApplyDialogData {
@@ -58,7 +59,10 @@ const FIELD_CODES = new Set<ErrorCode>(['WARNINGS_NOT_ACCEPTED', 'ANSWERS_REQUIR
 /**
  * Діалог заявки на гру: погодження з попередженнями (обов'язкове, якщо вони є), відповіді
  * на анкету майстра (обов'язкові), повідомлення й власні обмеження (≤ 10). Запит іде звідси,
- * тож помилки API видно в самому діалозі; закривається з `ApplyDialogResult`.
+ * тож помилки API видно в самому діалозі; закривається з `ApplyDialogResult`. Після успіху
+ * діалог спершу програє ефект чинного дизайну `applicationSent`, якщо він є (напр. конверт
+ * «Магіпанку»; декоративний, обмежений у часі), і лише тоді закривається — повідомлення про
+ * успіх показує сторінка, як і без ефекту.
  */
 @Component({
   selector: 'nri-apply-dialog',
@@ -84,6 +88,7 @@ export class ApplyDialog {
   private readonly api = inject(ApplicationsApi);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly themes = inject(ThemeService);
 
   protected readonly limits = {
     answer: APPLICATION_ANSWER_MAX,
@@ -127,6 +132,11 @@ export class ApplyDialog {
   /** Помилка поля від сервера (на випадок розбіжності з клієнтською перевіркою). */
   protected readonly serverField = signal<ErrorCode | null>(null);
   protected readonly submitted = signal(false);
+
+  constructor() {
+    // Чанк ефекту — наперед, поки гравець заповнює форму.
+    this.themes.preloadEffect('applicationSent');
+  }
 
   protected get answers(): FormArray<FormControl<string>> {
     return this.form.controls.answers;
@@ -195,6 +205,7 @@ export class ApplyDialog {
           constraints: v.constraints.map((c) => c.trim()),
         }),
       );
+      await this.playSent();
       this.ref.close({ status: 'applied', application });
     } catch (err) {
       const apiError = toApiError(err);
@@ -218,6 +229,17 @@ export class ApplyDialog {
 
   protected cancel(): void {
     this.ref.close();
+  }
+
+  /**
+   * Ефект надсилання (якщо є): заявку вже прийнято, тож діалог не закривається Escape чи
+   * кліком поза ним, поки ефект грає, — інакше успіх загубився б. Ефект ніколи не відхиляється.
+   */
+  private async playSent(): Promise<void> {
+    this.ref.disableClose = true;
+    const host = this.host.nativeElement;
+    const surface = host.closest<HTMLElement>('.mat-mdc-dialog-surface') ?? host;
+    await this.themes.playEffect('applicationSent', surface);
   }
 
   /** Фокус на елементі після рендеру (перший збіг). */

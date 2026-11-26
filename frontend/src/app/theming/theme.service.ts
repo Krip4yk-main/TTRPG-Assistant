@@ -13,6 +13,7 @@ import {
   type ThemeId,
   type UiPrefsDto,
   type UpdateThemeRequest,
+  type UpdateUiPrefsRequest,
 } from '@nri/shared';
 import {
   EMPTY,
@@ -27,7 +28,13 @@ import { runtimeConfig } from '../../environments/runtime-config';
 import { AuthStore } from '../core/auth/auth.store';
 import { SocketService } from '../core/realtime/socket.service';
 import type { ThemeSlots } from './slots';
-import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
+import {
+  THEME_REGISTRY,
+  type ThemeDefinition,
+  type ThemeEffect,
+  type ThemeEffectDef,
+  type ThemeEffectName,
+} from './theme.registry';
 
 /** Кеш останнього чинного дизайну (лише підказка для інлайн-скрипту index.html). */
 export const THEME_STORAGE_KEY = 'nri.theme';
@@ -40,6 +47,11 @@ export const THEME_LINK_ID = 'nri-theme-style';
  * «зависла»): довше старий дизайн лишатися не повинен.
  */
 export const STYLE_WAIT_MS = 3000;
+/**
+ * Найдовше очікування декоративного ефекту (разом із завантаженням його чанка): далі викликач
+ * іде своїм шляхом, а ефект переривається (`AbortSignal`) і прибирає себе.
+ */
+export const EFFECT_TIMEOUT_MS = 2500;
 
 /**
  * Чинний дизайн: вибір користувача, якщо він дозволений ролі (`MeDto.uiTheme` уже враховує
@@ -73,6 +85,8 @@ export class ThemeService {
    * прибирається — наступний apply пробує ще раз.
    */
   private readonly chunks = new Map<ThemeDefinition['loadSlots'], Promise<ThemeSlots>>();
+  /** Чанки ефектів (так само: невдале завантаження прибирається з кешу). */
+  private readonly effectChunks = new Map<ThemeEffectDef['load'], Promise<ThemeEffect>>();
 
   readonly theme = this.current.asReadonly();
   /** Компоненти слотів чинного дизайну; `null` — ще вантажаться або чанк не завантажився. */
@@ -140,6 +154,60 @@ export class ThemeService {
     return this.apply(this.effective());
   }
 
+  /**
+   * Наперед завантажити чанк ефекту чинного дизайну (якщо ефект увімкнений), щоб у мить події
+   * він стартував без затримки. Збій завантаження — тихо (повториться в `playEffect`).
+   */
+  preloadEffect(name: ThemeEffectName): void {
+    const def = this.activeEffect(name);
+    if (def) this.loadEffect(def).catch(() => undefined);
+  }
+
+  /**
+   * Програти декоративний ефект чинного дизайну на `source` і дочекатися його кінця. Немає
+   * ефекту, вимкнений налаштуванням чи `prefers-reduced-motion: reduce` — завершується одразу.
+   * Ніколи не відхиляється: збій ефекту — тихо, довше за `EFFECT_TIMEOUT_MS` — ефект
+   * переривається, і викликач іде далі.
+   */
+  async playEffect(name: ThemeEffectName, source: HTMLElement): Promise<void> {
+    const def = this.activeEffect(name);
+    if (!def) return;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), EFFECT_TIMEOUT_MS);
+    });
+    try {
+      const run = this.loadEffect(def).then((effect) =>
+        abort.signal.aborted ? undefined : effect(source, abort.signal),
+      );
+      if ((await Promise.race([run, timeout])) === 'timeout') abort.abort();
+    } catch {
+      // Ефект декоративний: його збій не заважає основній дії.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Ефект чинного дизайну, якщо він увімкнений (налаштування вигляду, зменшений рух). */
+  private activeEffect(name: ThemeEffectName): ThemeEffectDef | null {
+    const def = this.registry[this.current()].effects?.[name];
+    if (!def) return null;
+    if (def.pref && !this.uiPrefs()[def.pref]) return null;
+    const media = this.doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)');
+    return media?.matches ? null : def;
+  }
+
+  private loadEffect(def: ThemeEffectDef): Promise<ThemeEffect> {
+    let chunk = this.effectChunks.get(def.load);
+    if (!chunk) {
+      chunk = def.load();
+      this.effectChunks.set(def.load, chunk);
+      chunk.catch(() => this.effectChunks.delete(def.load));
+    }
+    return chunk;
+  }
+
   /** Обрати дизайн: зберігає в профілі й застосовує без перезавантаження. */
   async select(id: ThemeId): Promise<void> {
     const body: UpdateThemeRequest = { theme: id };
@@ -147,8 +215,8 @@ export class ThemeService {
     await this.apply(effectiveTheme(me));
   }
 
-  /** Зберегти налаштування вигляду в профілі (усі пристрої). */
-  async saveUiPrefs(prefs: UiPrefsDto): Promise<void> {
+  /** Зберегти змінені налаштування вигляду в профілі (усі пристрої); решта — як були. */
+  async saveUiPrefs(prefs: UpdateUiPrefsRequest): Promise<void> {
     await this.write(this.http.patch<MeDto>('/api/me/ui-prefs', prefs));
   }
 

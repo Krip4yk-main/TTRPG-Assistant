@@ -3,6 +3,26 @@ import type { ThemeId, UiPrefsDto } from '@nri/shared';
 import { runtimeConfig } from '../../environments/runtime-config';
 import type { ThemeSlots } from './slots';
 
+/**
+ * Декоративний ефект дизайну (напр. «Магіпанк» запечатує надіслану заявку в конверт).
+ * `source` — елемент, з якого ефект починається (його можна сховати: після ефекту викликач
+ * його прибирає). Проміс завершується, коли ефект скінчився і викликач може йти далі (хвіст
+ * ефекту — напр. пил, що осідає, — може догорати й після). `signal` спрацьовує, якщо
+ * викликач більше не чекає (тайм-аут): ефект має одразу прибрати все своє.
+ */
+export type ThemeEffect = (source: HTMLElement, signal: AbortSignal) => Promise<void>;
+
+/** Події, на які дизайн може відповісти ефектом. */
+export type ThemeEffectName = 'applicationSent';
+
+/** Ефект дизайну в реєстрі. */
+export interface ThemeEffectDef {
+  /** Налаштування вигляду, що вмикає ефект (`false` — ефекту немає). */
+  pref?: keyof UiPrefsDto;
+  /** Лінивий чанк ефекту. */
+  load: () => Promise<ThemeEffect>;
+}
+
 /** Опис дизайну в реєстрі. */
 export interface ThemeDefinition {
   id: ThemeId;
@@ -17,6 +37,8 @@ export interface ThemeDefinition {
   loadSlots: () => Promise<ThemeSlots>;
   /** Власні налаштування дизайну в розділі «Вигляд» (ключі `UiPrefsDto`). */
   options?: (keyof UiPrefsDto)[];
+  /** Декоративні ефекти дизайну (немає — поведінка звичайна). */
+  effects?: Partial<Record<ThemeEffectName, ThemeEffectDef>>;
 }
 
 /**
@@ -37,6 +59,7 @@ function theme(
   colorScheme: ThemeDefinition['colorScheme'],
   loadSlots: ThemeDefinition['loadSlots'],
   options: ThemeDefinition['options'] = [],
+  effects: ThemeDefinition['effects'] = {},
 ): ThemeDefinition {
   return {
     id,
@@ -46,6 +69,7 @@ function theme(
     styleHref: themeStyleHref(id),
     loadSlots,
     options,
+    effects,
   };
 }
 
@@ -75,7 +99,15 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
   dungeon: theme('dungeon', 'dark', loadSceneSlots),
   'gothic-gloom': theme('gothic-gloom', 'dark', loadSceneSlots),
-  magicpunk: theme('magicpunk', 'dark', loadSceneSlots),
+  // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (власне
+  // налаштування — анімація надсилання; ефект — окремий лінивий чанк).
+  magicpunk: theme('magicpunk', 'dark', loadSceneSlots, ['sendAnimation'], {
+    applicationSent: {
+      pref: 'sendAnimation',
+      load: () =>
+        import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
+    },
+  }),
   'brass-steam': theme('brass-steam', 'dark', loadSceneSlots),
 };
 

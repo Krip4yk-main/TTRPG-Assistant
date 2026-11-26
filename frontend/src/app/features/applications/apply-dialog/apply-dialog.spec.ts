@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { ApplicationDto } from '@nri/shared';
+import { ThemeService } from '../../../theming/theme.service';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
 
 const data: ApplyDialogData = {
@@ -31,7 +32,13 @@ describe('ApplyDialog', () => {
   let fixture: ComponentFixture<ApplyDialog>;
   let http: HttpTestingController;
   let close: ReturnType<typeof vi.fn>;
+  let ref: { close: ReturnType<typeof vi.fn>; disableClose?: boolean };
   let el: HTMLElement;
+  /** Ефекти дизайну: справжній ThemeService покритий своїм спеком (вимкнення, тайм-аут). */
+  let themes: {
+    preloadEffect: ReturnType<typeof vi.fn>;
+    playEffect: ReturnType<typeof vi.fn<(name: string, source: HTMLElement) => Promise<void>>>;
+  };
 
   const settle = async () => {
     fixture.detectChanges();
@@ -41,6 +48,8 @@ describe('ApplyDialog', () => {
 
   async function create(d: ApplyDialogData = data) {
     close = vi.fn();
+    ref = { close };
+    themes = { preloadEffect: vi.fn(), playEffect: vi.fn(async () => {}) };
     await TestBed.configureTestingModule({
       imports: [ApplyDialog],
       providers: [
@@ -49,7 +58,8 @@ describe('ApplyDialog', () => {
         provideTranslateService(),
         provideRouter([{ path: '**', children: [] }]),
         { provide: MAT_DIALOG_DATA, useValue: d },
-        { provide: MatDialogRef, useValue: { close } },
+        { provide: MatDialogRef, useValue: ref },
+        { provide: ThemeService, useValue: themes },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -124,7 +134,58 @@ describe('ApplyDialog', () => {
     });
     req.flush(created, { status: 201, statusText: 'Created' });
     await settle();
+    // Без ефекту дизайну (playEffect завершується одразу) — закривається одразу ж.
+    await vi.waitFor(() =>
+      expect(close).toHaveBeenCalledWith({ status: 'applied', application: created }),
+    );
+  });
+
+  it('preloads the design «sent» effect when opened', async () => {
+    await create();
+    expect(themes.preloadEffect).toHaveBeenCalledWith('applicationSent');
+    expect(themes.playEffect).not.toHaveBeenCalled();
+  });
+
+  it('on success plays the design effect once, then closes (no Escape while it plays)', async () => {
+    await create();
+    let finish!: () => void;
+    themes.playEffect.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http
+      .expectOne('/api/games/7/applications')
+      .flush(created, { status: 201, statusText: 'Created' });
+    await settle();
+    expect(themes.playEffect).toHaveBeenCalledTimes(1);
+    expect(themes.playEffect.mock.calls[0]![0]).toBe('applicationSent');
+    expect(themes.playEffect.mock.calls[0]![1]).toBeInstanceOf(HTMLElement);
+    expect(ref.disableClose).toBe(true);
+    expect(close).not.toHaveBeenCalled();
+    finish();
+    await settle();
+    expect(close).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledWith({ status: 'applied', application: created });
+  });
+
+  it('an API error plays no effect and keeps the form filled', async () => {
+    await create();
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http
+      .expectOne('/api/games/7/applications')
+      .flush({ error: { code: 'GM_BLACKLISTED' } }, { status: 403, statusText: 'Forbidden' });
+    await settle();
+    expect(themes.playEffect).not.toHaveBeenCalled();
+    expect(ref.disableClose).toBeFalsy();
+    expect(el.querySelector<HTMLTextAreaElement>('textarea.answer')!.value).toBe('Багато');
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('a game without warnings needs no consent', async () => {

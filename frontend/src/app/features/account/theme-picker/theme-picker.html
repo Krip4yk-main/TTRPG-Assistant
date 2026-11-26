@@ -26,19 +26,20 @@
         }
       </ul>
     }
-    @if (designOptions().includes('tearAnimation')) {
+    @for (key of designOptions(); track key) {
       <div class="design-option">
         <mat-slide-toggle
-          #tearToggle
-          [checked]="tearAnimation()"
+          #toggle
+          [checked]="prefs()[key]"
           [disabled]="prefsBusy()"
           disabledInteractive
-          aria-describedby="tear-animation-hint"
-          (change)="setTearAnimation($event.checked)"
-          >{{ 'account.theme.tearAnimation' | translate }}</mat-slide-toggle
+          [attr.data-option]="key"
+          [aria-describedby]="'ui-pref-' + key + '-hint'"
+          (change)="setOption(key, $event.checked, toggle)"
+          >{{ 'account.theme.' + key | translate }}</mat-slide-toggle
         >
-        <p id="tear-animation-hint" class="nri-muted option-hint">
-          {{ 'account.theme.tearAnimationHint' | translate }}
+        <p [id]="'ui-pref-' + key + '-hint'" class="nri-muted option-hint">
+          {{ 'account.theme.' + key + 'Hint' | translate }}
         </p>
       </div>
     }

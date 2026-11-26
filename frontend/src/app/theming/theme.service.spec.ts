@@ -7,8 +7,9 @@ import { AuthStore } from '../core/auth/auth.store';
 import { SocketService } from '../core/realtime/socket.service';
 import { FALLBACK_SLOTS } from './fallback/fallback-slots';
 import type { ThemeSlots } from './slots';
-import { THEME_REGISTRY, type ThemeDefinition } from './theme.registry';
+import { THEME_REGISTRY, type ThemeDefinition, type ThemeEffect } from './theme.registry';
 import {
+  EFFECT_TIMEOUT_MS,
   STYLE_WAIT_MS,
   THEME_LINK_ID,
   THEME_STORAGE_KEY,
@@ -517,6 +518,116 @@ describe('ThemeService', () => {
       await service.init();
       meChanged.next({ scope: 'appearance' });
       http().expectNone('/api/me');
+    });
+  });
+
+  describe('decorative effects (applicationSent)', () => {
+    /** «Нічне місто» з ефектом за налаштуванням `sendAnimation`. */
+    const withEffect = (effect: ThemeEffect) => {
+      const load = vi.fn(() => Promise.resolve(effect));
+      const reg = registry();
+      reg['night-city'] = {
+        ...reg['night-city'],
+        effects: { applicationSent: { pref: 'sendAnimation', load } },
+      };
+      return { reg, load };
+    };
+    const start = async (reg: Record<ThemeId, ThemeDefinition>, me: MeDto = user) => {
+      setup(reg);
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      auth.setMe(me);
+      await service.init();
+    };
+    const source = () => document.createElement('div');
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it('runs the active design effect once on the source and waits for it', async () => {
+      let finish!: () => void;
+      const effect = vi.fn<ThemeEffect>(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const { reg, load } = withEffect(effect);
+      await start(reg);
+      const el = source();
+      let done = false;
+      const played = service.playEffect('applicationSent', el).then(() => (done = true));
+      await vi.waitFor(() => expect(effect).toHaveBeenCalledTimes(1));
+      expect(effect.mock.calls[0]![0]).toBe(el);
+      expect(done).toBe(false);
+      finish();
+      await played;
+      expect(done).toBe(true);
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it('preloadEffect loads the chunk once; playEffect reuses it', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      const { reg, load } = withEffect(effect);
+      await start(reg);
+      service.preloadEffect('applicationSent');
+      await service.playEffect('applicationSent', source());
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(effect).toHaveBeenCalledTimes(1);
+    });
+
+    it('a design without the effect resolves at once', async () => {
+      await start(registry());
+      await expect(service.playEffect('applicationSent', source())).resolves.toBeUndefined();
+    });
+
+    it('preference off → no effect (chunk not even loaded)', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      const { reg, load } = withEffect(effect);
+      await start(reg, { ...user, uiPrefs: { tearAnimation: true, sendAnimation: false } });
+      service.preloadEffect('applicationSent');
+      await service.playEffect('applicationSent', source());
+      expect(load).not.toHaveBeenCalled();
+      expect(effect).not.toHaveBeenCalled();
+    });
+
+    it('prefers-reduced-motion: reduce → no effect', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      const { reg, load } = withEffect(effect);
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((q: string) => ({ matches: q === '(prefers-reduced-motion: reduce)' })),
+      );
+      await start(reg);
+      await service.playEffect('applicationSent', source());
+      expect(load).not.toHaveBeenCalled();
+      expect(effect).not.toHaveBeenCalled();
+    });
+
+    it('a failing effect never rejects', async () => {
+      const { reg } = withEffect(() => Promise.reject(new Error('boom')));
+      await start(reg);
+      await expect(service.playEffect('applicationSent', source())).resolves.toBeUndefined();
+    });
+
+    it('a hanging effect is aborted after EFFECT_TIMEOUT_MS and the caller goes on', async () => {
+      let signal: AbortSignal | undefined;
+      const { reg } = withEffect((_el, s) => {
+        signal = s;
+        return new Promise<void>(() => {});
+      });
+      await start(reg);
+      vi.useFakeTimers();
+      let done = false;
+      const played = service.playEffect('applicationSent', source()).then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(EFFECT_TIMEOUT_MS - 1);
+      expect(done).toBe(false);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await played;
+      expect(done).toBe(true);
+      expect(signal?.aborted).toBe(true);
     });
   });
 });
