@@ -125,7 +125,8 @@ describe('findCommonTimes', () => {
       people: [ny],
       top: 1000,
     }).regular.find((c) => c.weekday === TUE && c.startMin === H(19));
-    expect(tue19).toBeUndefined(); // нікого «може» — не пропонується
+    // Лише 2 з 4 тижнів — не більшість → «не може», нікого «може» — не пропонується.
+    expect(tue19).toBeUndefined();
     expect(r.regular).toEqual([]);
     expect(r.oneOff.map((c) => c.startsAt).sort()).toEqual([
       '2027-03-09T17:00:00.000Z', // 19:00 Kyiv = 12:00 NY
@@ -133,6 +134,60 @@ describe('findCommonTimes', () => {
       '2027-03-23T16:00:00.000Z',
       '2027-03-30T16:00:00.000Z', // 19:00 Kyiv (EEST) = 12:00 NY
     ]);
+  });
+
+  it('autumn: one week shifted by the US/EU DST gap is a per-week miss, not a veto', () => {
+    // ЄС переходить на зимовий час 31.10.2027, США — 07.11: вт 02.11 різниця 6 год, не 7.
+    const ny = person({
+      userId: 1,
+      timezone: 'America/New_York',
+      slots: [{ weekday: TUE, startMin: H(12), endMin: H(16) }],
+    });
+    const from = new Date('2027-10-17T21:00:00Z'); // пн 18.10 00:00 Kyiv (EEST)
+    const r = run([ny], { from, to: new Date(from.getTime() + 28 * DAY) });
+    expect(r.regular[0]).toMatchObject({
+      weekday: TUE,
+      startMin: H(19),
+      weeks: 4,
+      can: 1,
+      statuses: [{ userId: 1, status: 'can', weeksCan: 3, outsideSlotsWeeks: 1 }],
+    });
+    // 02.11 о 19:00 Kyiv = 13:00 NY — поза слотом; разовий кандидат того тижня — 18:00 Kyiv.
+    expect(r.oneOff.map((c) => c.startsAt)).not.toContain('2027-11-02T17:00:00.000Z');
+    expect(r.oneOff.map((c) => c.startsAt)).toContain('2027-11-02T16:00:00.000Z');
+  });
+
+  it('spring DST night: the session overruns the slots that week only', () => {
+    // Сб 23:00 Kyiv, 4 год: зазвичай до 03:00, у ніч 27→28.03 — до 04:00 (03:00 → 04:00).
+    const night = person({
+      userId: 1,
+      slots: [
+        { weekday: 5, startMin: H(23), endMin: 1440 },
+        { weekday: 6, startMin: 0, endMin: H(3) },
+      ],
+    });
+    const r = run([night]);
+    expect(r.regular).toHaveLength(1);
+    expect(r.regular[0]).toMatchObject({
+      weekday: 5,
+      startMin: H(23),
+      weeks: 4,
+      statuses: [{ userId: 1, status: 'can', weeksCan: 3, outsideSlotsWeeks: 1 }],
+    });
+    expect(r.oneOff.map((c) => c.startsAt)).not.toContain('2027-03-27T21:00:00.000Z');
+    expect(r.oneOff).toHaveLength(3);
+  });
+
+  it('regular picks do not overlap across midnight', () => {
+    const p = person({
+      userId: 1,
+      slots: [
+        { weekday: 0, startMin: H(22), endMin: 1440 },
+        { weekday: 1, startMin: 0, endMin: H(4) },
+      ],
+    });
+    // Пн 22:00 … вт 00:00 — усі вміщуються (4 год), але перетинаються між собою.
+    expect(run([p]).regular.map((c) => [c.weekday, c.startMin])).toEqual([[0, H(22)]]);
   });
 
   it('empty calendar → unknown, never can; nothing to propose without any «can» (RF 5)', () => {
@@ -182,6 +237,7 @@ describe('findCommonTimes', () => {
       userId: 1,
       status: 'can',
       weeksCan: 3,
+      outsideSlotsWeeks: 0,
     });
     const half = person({ userId: 1, slots, busyDates: ['2027-03-16', '2027-03-23'] });
     expect(run([half]).regular).toEqual([]);
@@ -222,7 +278,12 @@ describe('findCommonTimes', () => {
       [1, H(19)],
       [2, H(19)],
     ]);
-    expect(r.regular[1]!.statuses[2]).toEqual({ userId: 3, status: 'unknown', weeksCan: 0 });
+    expect(r.regular[1]!.statuses[2]).toEqual({
+      userId: 3,
+      status: 'unknown',
+      weeksCan: 0,
+      outsideSlotsWeeks: 0,
+    });
     expect(r.regular).toHaveLength(5);
   });
 
@@ -246,11 +307,17 @@ describe('regularStatus', () => {
     status,
     outsideSlots,
   });
-  it('outside slots in any week → cannot; otherwise majority', () => {
+  it('majority of weeks; outside-slot weeks count as misses and are reported', () => {
     expect(regularStatus([v('can'), v('cannot', true)]).status).toBe('cannot');
+    expect(regularStatus([v('can'), v('can'), v('can'), v('cannot', true)])).toEqual({
+      status: 'can',
+      weeksCan: 3,
+      outsideSlotsWeeks: 1,
+    });
     expect(regularStatus([v('can'), v('can'), v('cannot')])).toEqual({
       status: 'can',
       weeksCan: 2,
+      outsideSlotsWeeks: 0,
     });
     expect(regularStatus([v('can'), v('cannot')]).status).toBe('cannot');
     expect(regularStatus([v('unknown'), v('unknown')]).status).toBe('unknown');

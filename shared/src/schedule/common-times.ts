@@ -207,23 +207,37 @@ function counts(statuses: readonly { status: CommonTimeStatus }[]) {
 }
 
 /**
- * Статус учасника для регулярного кандидата з `n` сесій:
- * - хоч одна сесія поза тижневими слотами (з урахуванням DST і поясу) → «не може»;
- * - інакше більшість: «може», якщо може на > половині сесій; «не може», якщо не може на
- *   ≥ половині; інакше «невідомо» (лише для учасника без календаря). Разові винятки —
- *   зайнята дата, сесія іншої гри, подія календаря — знімають лише свій тиждень
- *   (`weeksCan < weeks`), а не весь кандидат.
+ * Статус учасника для регулярного кандидата з `n` сесій — більшість тижнів: «може», якщо може
+ * на > половині сесій; «не може», якщо не може на ≥ половині; інакше «невідомо» (лише для
+ * учасника без календаря, у якого конфлікти — меншість тижнів). Кожен тиждень оцінено окремо:
+ * разові винятки (зайнята дата, сесія іншої гри, подія календаря) і тижні, коли сесія
+ * виходить за тижневі слоти (зсув DST між поясами, ніч переходу), знімають лише свій тиждень
+ * (`weeksCan < weeks`); `outsideSlotsWeeks` — скільки тижнів саме поза слотами.
  */
 export function regularStatus(verdicts: readonly CommonTimeVerdict[]): {
   status: CommonTimeStatus;
   weeksCan: number;
+  outsideSlotsWeeks: number;
 } {
   const n = verdicts.length;
   const c = counts(verdicts);
-  if (verdicts.some((v) => v.outsideSlots)) return { status: 'cannot', weeksCan: c.can };
-  if (c.can * 2 > n) return { status: 'can', weeksCan: c.can };
-  if (c.cannot * 2 >= n && c.cannot > 0) return { status: 'cannot', weeksCan: c.can };
-  return { status: 'unknown', weeksCan: c.can };
+  const outsideSlotsWeeks = verdicts.filter((v) => v.outsideSlots).length;
+  const base = { weeksCan: c.can, outsideSlotsWeeks };
+  if (c.can * 2 > n) return { status: 'can', ...base };
+  if (c.cannot * 2 >= n && c.cannot > 0) return { status: 'cannot', ...base };
+  return { status: 'unknown', ...base };
+}
+
+const WEEK_MIN = 7 * 1440;
+
+/** Регулярні кандидати перетинаються в тижневому циклі (зокрема через північ і нд → пн). */
+function weeklyClash(
+  a: { weekday: number; startMin: number },
+  b: { weekday: number; startMin: number },
+  durationMinutes: number,
+): boolean {
+  const d = Math.abs(a.weekday * 1440 + a.startMin - (b.weekday * 1440 + b.startMin)) % WEEK_MIN;
+  return Math.min(d, WEEK_MIN - d) < durationMinutes;
 }
 
 /**
@@ -308,12 +322,7 @@ export function findCommonTimes(input: CommonTimesInput): CommonTimesResult {
       return { c, t: p.start.getTime(), sum: statuses.reduce((s, x) => s + x.weeksCan, 0) };
     });
     all.sort((a, b) => b.c.can - a.c.can || a.c.cannot - b.c.cannot || b.sum - a.sum || a.t - b.t);
-    regular = pickTop(
-      all,
-      top,
-      (a, b) =>
-        a.weekday === b.weekday && Math.abs(a.startMin - b.startMin) < input.durationMinutes,
-    );
+    regular = pickTop(all, top, (a, b) => weeklyClash(a, b, input.durationMinutes));
   }
   return { regular, oneOff };
 }

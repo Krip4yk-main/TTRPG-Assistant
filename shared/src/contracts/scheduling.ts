@@ -31,11 +31,21 @@ interface CandidateCounts {
   unknown: number;
 }
 
+/**
+ * Статус учасника для регулярного кандидата — за більшістю тижнів горизонту: `can` — може
+ * на > половині сесій; `cannot` — не може на ≥ половині; `unknown` — немає календаря і
+ * відомі конфлікти (сесії інших ігор, зайняті дати) — меншість тижнів.
+ */
 export interface RegularCandidateStatusDto {
   userId: number;
   status: CommonTimeStatus;
   /** Скільки з `weeks` сесій учасник може (решта — не може або невідомо). */
   weeksCan: number;
+  /**
+   * Скільки з `weeks` сесій виходять за тижневі слоти учасника — зазвичай тижні, коли зсув
+   * DST між поясами (або ніч переходу) зсуває сесію відносно його слотів.
+   */
+  outsideSlotsWeeks: number;
 }
 
 /**
@@ -73,6 +83,11 @@ export interface CommonTimesDto {
   from: string;
   to: string;
   participants: CommonTimesParticipantDto[];
+  /**
+   * Ні в кого з учасників немає календаря (`participants[].hasCalendar` усі `false`) — тоді
+   * списки кандидатів порожні: варто попросити групу заповнити календарі.
+   */
+  noCalendars: boolean;
   /** Для разових ігор (oneshot) — завжди `[]`. */
   regular: RegularCandidateDto[];
   oneOff: OneOffCandidateDto[];

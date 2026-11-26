@@ -126,11 +126,13 @@ export async function computeCommonTimes(
   opts: { top?: number; now?: Date } = {},
 ): Promise<CommonTimesDto> {
   const participants = await loadParticipants(deps, game);
+  // Кандидат, що починається біля кінця вікна, триває ще `durationMinutes` — зайнятість
+  // потрібна до `to + durationMinutes`.
   const busy = await collectBusy(
     deps,
     participants.map((p) => p.userId),
     window.from,
-    window.to,
+    new Date(window.to.getTime() + game.durationMinutes * 60_000),
     { excludeGameId: game.id, now: opts.now },
   );
   const people: CommonTimesPerson[] = participants.map((p) => {
@@ -164,6 +166,7 @@ export async function computeCommonTimes(
       isGm: p.isGm,
       hasCalendar: people[i]!.hasCalendar,
     })),
+    noCalendars: people.every((p) => !p.hasCalendar),
     ...found,
   };
 }

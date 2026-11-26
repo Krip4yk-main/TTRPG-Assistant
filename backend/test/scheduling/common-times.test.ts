@@ -5,6 +5,11 @@ import { createApp } from '../../src/app.js';
 import { availabilityBusyDates, availabilitySlots, users } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
+import {
+  computeCommonTimes,
+  getCommonTimes,
+  loadGmGame,
+} from '../../src/scheduling/common-times.service.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
@@ -60,6 +65,14 @@ const get = async (gameId: number, cookie: string, query = '') => {
   return res;
 };
 
+/**
+ * Фіксоване «зараз»: північ (Kyiv) за добу до першої сесії — вікно не залежить від часу
+ * запуску тестів (рівно 4 вівторки/середи/… у 4 тижнях).
+ */
+const NOW = zonedToUtc({ ...kyivAt(1).date, hour: 0, minute: 0 }, KYIV);
+const ct = (gameId: number, gmId: number, query: Record<string, string> = {}) =>
+  getCommonTimes(deps, gmId, gameId, query, NOW);
+
 const find = (dto: CommonTimesDto, weekday: number, startMin: number) =>
   dto.regular.find((c) => c.weekday === weekday && c.startMin === startMin);
 
@@ -96,9 +109,10 @@ describe('GET /api/games/:id/common-times', () => {
     // 18:00–22:00 Warsaw = 19:00–23:00 Kyiv.
     await slots(p, [{ weekday: W, startMin: H(18), endMin: H(22) }]);
 
-    const res = await get(id, gm.cookie);
-    expect(res.status).toBe(200);
-    const dto = res.body as CommonTimesDto;
+    expect((await get(id, gm.cookie)).status).toBe(200);
+    const dto = await ct(id, gm.id);
+    expect(dto.from).toBe(NOW.toISOString());
+    expect(dto.noCalendars).toBe(false);
     expect(dto.timezone).toBe(KYIV);
     expect(dto.durationMinutes).toBe(240);
     expect(Date.parse(dto.to) - Date.parse(dto.from)).toBe(28 * DAY);
@@ -136,11 +150,16 @@ describe('GET /api/games/:id/common-times', () => {
     await slots(gm, wide);
     await slots(p, wide);
 
-    const dto = (await get(id, gm.cookie)).body as CommonTimesDto;
+    const dto = await ct(id, gm.id);
     // 19:00 щотижня зайнято іншою грою → «не може»; 15:00 (до неї) — обидва можуть.
     const c19 = find(dto, W, H(19));
     if (c19) {
-      expect(c19.statuses[1]).toEqual({ userId: p.id, status: 'cannot', weeksCan: 0 });
+      expect(c19.statuses[1]).toEqual({
+        userId: p.id,
+        status: 'cannot',
+        weeksCan: 0,
+        outsideSlotsWeeks: 0,
+      });
     }
     expect(dto.regular[0]).toMatchObject({ weekday: W, can: 2, cannot: 0 });
     expect(dto.regular[0]!.startMin + 240).toBeLessThanOrEqual(H(19));
@@ -157,8 +176,13 @@ describe('GET /api/games/:id/common-times', () => {
     const d = first.date;
     const iso = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
     await db.insert(availabilityBusyDates).values({ userId: p.id, date: iso });
-    const after = (await get(id, gm.cookie)).body as CommonTimesDto;
-    expect(after.regular[0]!.statuses[1]).toEqual({ userId: p.id, status: 'can', weeksCan: 3 });
+    const after = await ct(id, gm.id);
+    expect(after.regular[0]!.statuses[1]).toEqual({
+      userId: p.id,
+      status: 'can',
+      weeksCan: 3,
+      outsideSlotsWeeks: 0,
+    });
     expect(
       after.oneOff.some((c) => {
         const z = toZoned(new Date(c.startsAt), 'Europe/Kyiv');
@@ -175,7 +199,7 @@ describe('GET /api/games/:id/common-times', () => {
       { kind: 'oneshot', recurrence: 'none', weekdays: [], startsAt: first.startsAt },
       true,
     );
-    const o = (await get(one, gm.cookie)).body as CommonTimesDto;
+    const o = await ct(one, gm.id);
     expect(o.regular).toEqual([]);
     expect(o.oneOff.length).toBeGreaterThan(0);
 
@@ -187,12 +211,47 @@ describe('GET /api/games/:id/common-times', () => {
 
     const weekOf = kyivAt(14).date;
     const q = `${weekOf.year}-${String(weekOf.month).padStart(2, '0')}-${String(weekOf.day).padStart(2, '0')}`;
-    const w = (await get(id, gm.cookie, `?weekOf=${q}`)).body as CommonTimesDto;
+    const w = await ct(id, gm.id, { weekOf: q });
     expect(Date.parse(w.to) - Date.parse(w.from)).toBeLessThanOrEqual(7 * DAY + 3_600_000);
     const fromLocal = toZoned(new Date(w.from), KYIV);
     expect([fromLocal.weekday, fromLocal.hour, fromLocal.minute]).toEqual([0, 0, 0]);
     expect(w.oneOff).toHaveLength(1);
     expect(w.regular).toHaveLength(1);
     expect(w.regular[0]).toMatchObject({ weekday: W, startMin: H(19), weeks: 1 });
+  });
+
+  it('nobody has a calendar → empty lists and noCalendars', async () => {
+    const gm = await userWithAge(30, 'gm');
+    const p = await userWithAge(25, 'p');
+    const id = await campaign(gm);
+    await join(gm, id, p);
+    const dto = await ct(id, gm.id);
+    expect(dto.noCalendars).toBe(true);
+    expect(dto.participants.every((x) => !x.hasCalendar)).toBe(true);
+    expect(dto.regular).toEqual([]);
+    expect(dto.oneOff).toEqual([]);
+  });
+
+  it('a candidate near the window end sees another game starting after the window', async () => {
+    const gm = await userWithAge(30, 'gm');
+    const otherGm = await userWithAge(30, 'other');
+    const p = await userWithAge(25, 'p');
+    const id = await campaign(gm, { startsAt: kyivAt(9).startsAt });
+    // Інша гра — 19:00 Kyiv у день `first`; вікно закінчується о 18:00 того ж дня.
+    const other = await campaign(otherGm, { title: 'Інша гра' });
+    await join(otherGm, other, p);
+    await join(gm, id, p);
+    await slots(gm, [{ weekday: W, startMin: H(17) + 30, endMin: H(21) + 30 }]);
+    await slots(p, [{ weekday: W, startMin: H(12), endMin: 1440 }]);
+    const to = new Date(Date.parse(first.startsAt) - 3_600_000);
+    const from = new Date(to.getTime() - 5 * 3_600_000);
+    const game = await loadGmGame(deps, gm.id, id);
+    const dto = await computeCommonTimes(deps, game, { from, to }, { now: NOW });
+    // 17:30–21:30 перетинає 19:00 іншої гри, хоч та починається вже після `to`.
+    const late = dto.oneOff.find(
+      (c) => c.startsAt === new Date(to.getTime() - 1_800_000).toISOString(),
+    );
+    expect(late).toMatchObject({ can: 1, cannot: 1 });
+    expect(late!.statuses[1]).toEqual({ userId: p.id, status: 'cannot' });
   });
 });
