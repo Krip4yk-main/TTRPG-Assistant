@@ -208,11 +208,8 @@ describe('resume', () => {
 
     const pastMonday = new Date(Date.parse(mondayKyiv()) - 2 * WEEK).toISOString();
     const past = await resume(id, gm.cookie, { startsAt: pastMonday, recruit: false });
-    expect(past.status).toBe(400);
-    expect(past.body.error).toEqual({
-      code: 'VALIDATION',
-      details: { reason: 'STARTS_AT_IN_PAST' },
-    });
+    expect(past.status).toBe(422);
+    expect(past.body.error.code).toBe('GAME_IN_PAST');
 
     const tuesday = new Date(Date.parse(mondayKyiv(1)) + DAY).toISOString();
     const wrongDay = await resume(id, gm.cookie, { startsAt: tuesday, recruit: false });
@@ -279,7 +276,39 @@ describe('resume', () => {
     });
   });
 
-  it('resume from a recruiting pause → started (startedAt stamped); recruit → showWhenFull and visible in search', async () => {
+  it('GM-cancelled sessions stay cancelled after resume; a cancelled slot at the new startsAt is freed', async () => {
+    const { gm, id } = await runningCampaign();
+    const old = await sessionsOf(id);
+    // Майстер сам скасував третій понеділок (до паузи) і другий — обидва поза паузою.
+    const third = old.find((s) => s.ruleStartsAt?.toISOString() === mondayKyiv(2))!;
+    const second = old.find((s) => s.ruleStartsAt?.toISOString() === mondayKyiv(1))!;
+    for (const s of [third, second]) {
+      const r = await call('post', `/api/sessions/${s.id}/cancel`, gm.cookie, {
+        reason: 'Майстер у відрядженні',
+      });
+      expect(r.status).toBe(200);
+    }
+    await pause(id, gm.cookie);
+    // Відновлення раніше за третій понеділок — рівно на другий (теж скасований вручну).
+    const res = await resume(id, gm.cookie, { startsAt: mondayKyiv(1), recruit: false });
+    expect(res.status).toBe(200);
+
+    const after = await sessionsOf(id);
+    const at = (iso: string) => after.filter((s) => s.startsAt.toISOString() === iso);
+    expect(at(mondayKyiv(2)).map((s) => [s.id, s.status, s.cancelReason])).toEqual([
+      [third.id, 'cancelled', 'Майстер у відрядженні'],
+    ]);
+    // Новий `startsAt` — перша сесія: слот ручного скасування звільнено, сесія створена.
+    const first = at(mondayKyiv(1));
+    expect(first.find((s) => s.status === 'scheduled')).toBeTruthy();
+    expect(first.find((s) => s.id === second.id)).toMatchObject({
+      status: 'cancelled',
+      ruleStartsAt: null,
+    });
+    expect(res.body.nextSessionAt).toBe(mondayKyiv(1));
+  });
+
+  it('resume from a recruiting pause → started (startedAt stamped, BELOW_MIN_PLAYERS); recruit → showWhenFull and visible in search', async () => {
     const { gm, id } = await runningCampaign({ status: 'recruiting' });
     await pause(id, gm.cookie);
     const res = await resume(id, gm.cookie, { startsAt: mondayKyiv(2), recruit: true });
@@ -288,6 +317,8 @@ describe('resume', () => {
       status: 'started',
       showWhenFull: true,
       startedAt: expect.any(String),
+      // 1 учасник при minPlayers = 2 — як у `start`.
+      warning: 'BELOW_MIN_PLAYERS',
     });
     const search = await call('post', '/api/games/search', undefined, {});
     expect(search.body.items.map((g: { id: number }) => g.id)).toContain(id);

@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, or } from 'drizzle-orm';
 import { CAMPAIGN_PAUSED_REASON, expandOccurrences, SESSION_WINDOW_DAYS } from '@nri/shared';
 import type { Db } from '../db/client.js';
 import { games, gameSessions, notes } from '../db/schema/index.js';
@@ -219,10 +219,12 @@ export async function replaceRuleSessions(
 /**
  * Відновлення кампейну після паузи (викликати в транзакції, що вже змінила рядок гри на
  * `started` з новим `startsAt`): правило перезапускається від нового `startsAt`.
- * - майбутні сесії, скасовані паузою (`campaign_paused`), без нотаток видаляються — їх
- *   замінює новий розклад; з нотатками лишаються скасованими;
- * - усі майбутні скасовані сесії звільняють слот (`rule_starts_at = NULL`), інакше новий
- *   слот на ту саму хвилину не створився б (UNIQUE) і перша сесія після паузи «зникла б»;
+ * - майбутні сесії, скасовані паузою (`campaign_paused`), без нотаток видаляються — зокрема
+ *   ручні й перенесені (вони були `scheduled` на момент паузи); їх замінює новий розклад.
+ *   З нотатками — лишаються скасованими й звільняють слот (`rule_starts_at = NULL`);
+ * - сесії, які майстер скасував сам до паузи, лишаються скасованими зі своїм слотом: новий
+ *   розклад їх не «воскрешає». Виняток — скасована сесія рівно на новому `startsAt`: її слот
+ *   звільняється, інакше перша сесія після паузи не створилась би (UNIQUE);
  * - матеріалізуються сесії нового правила від `now`.
  */
 export async function restartRuleAfterPause(tx: Tx, game: GameRow, now: Date): Promise<void> {
@@ -251,7 +253,18 @@ export async function restartRuleAfterPause(tx: Tx, game: GameRow, now: Date): P
     const gone = paused.map((p) => p.id).filter((id) => !keep.has(id));
     if (gone.length) await tx.delete(gameSessions).where(inArray(gameSessions.id, gone));
   }
-  await tx.update(gameSessions).set({ ruleStartsAt: null }).where(future);
+  await tx
+    .update(gameSessions)
+    .set({ ruleStartsAt: null })
+    .where(
+      and(
+        future,
+        or(
+          eq(gameSessions.cancelReason, CAMPAIGN_PAUSED_REASON),
+          eq(gameSessions.ruleStartsAt, game.startsAt),
+        ),
+      ),
+    );
   await materializeForRow(tx, game, now, now);
 }
 

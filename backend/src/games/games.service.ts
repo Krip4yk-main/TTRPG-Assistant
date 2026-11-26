@@ -807,8 +807,10 @@ async function pauseGame(
  * «Відновити» / «Оголосити донабір» (`POST /api/games/:id/resume`, тіло
  * `{ startsAt, recruit }`): `paused` → `started`, `showWhenFull = recruit`. Правило розкладу
  * (дні тижня, частота, тривалість) лишається, перезапускається від `startsAt`: ціла хвилина,
- * у майбутньому (інакше 400 `VALIDATION` `{ reason: 'STARTS_AT_IN_PAST' }`), день тижня — з
- * `weekdays` у поясі гри (інакше 400 `VALIDATION` з issue по `weekdays`).
+ * у майбутньому (інакше 422 `GAME_IN_PAST`, як у публікації й зміні розкладу), день тижня — з
+ * `weekdays` у поясі гри (інакше 400 `VALIDATION` з issue по `weekdays`). Пауза, що почалась
+ * у `recruiting` (`startedAt` ще немає), — це й старт гри: як і `start`, з меншою за мінімум
+ * кількістю учасників у відповіді `warning: 'BELOW_MIN_PLAYERS'`.
  */
 async function resumeGame(
   deps: AppDeps,
@@ -822,9 +824,9 @@ async function resumeGame(
   if (seen.status !== 'paused') throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
   if (new Date(input.startsAt) <= now) {
-    throw new AppError(400, 'VALIDATION', { reason: 'STARTS_AT_IN_PAST' });
+    throw new AppError(422, 'GAME_IN_PAST');
   }
-  const startsAt = await db.transaction(async (tx) => {
+  const { startsAt, belowMin } = await db.transaction(async (tx) => {
     const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
     if (!row || row.status !== 'paused') throw new AppError(409, 'GAME_INVALID_TRANSITION');
     // Та сама перевірка, що при створенні: день `startsAt` має входити в `weekdays` правила.
@@ -843,7 +845,9 @@ async function resumeGame(
     };
     await tx.update(games).set(set).where(eq(games.id, id));
     await restartRuleAfterPause(tx, { ...row, ...set }, now);
-    return next.startsAt;
+    // Пауза з набору: відновлення — перший старт гри (попередження, як у `start`).
+    const belowMin = row.startedAt === null && (await activeCount(tx, id)) < row.minPlayers;
+    return { startsAt: next.startsAt, belowMin };
   });
   await logEvent(db, {
     type: 'game.resumed',
@@ -855,7 +859,8 @@ async function resumeGame(
   await markOwnChange(deps, userId, 'game', [id]);
   await markGameSessionsViewed(deps, userId, id);
   sessionsChanged(deps, id);
-  return gmView(deps, id);
+  const view = await gmView(deps, id);
+  return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
 }
 
 /** Закриття адміністрацією (вкладка «Мертві ігри»): хто й що ще записати в транзакції переходу. */
