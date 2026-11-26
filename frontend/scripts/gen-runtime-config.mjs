@@ -26,8 +26,6 @@ const fileVars = existsSync(envFile) ? parseEnv(readFileSync(envFile, 'utf8')) :
 const get = (key) => process.env[key] ?? fileVars[key] ?? '';
 
 /**
- * Версія бандлів стилів дизайнів (`theme-<id>.css?v=…`): хеш вихідних стилів дизайнів
- * (`src/styles/**
  * Версія бандлів стилів дизайнів (`theme-<id>.css?v=…`): хеш усіх вихідних стилів, з яких
  * збираються бандли (`src/styles/**` і `src/app/theming/themes/**` — разом зі спільними
  * `font-face.less`, `scene/**` і вкладеними файлами ефектів), та версій пакетів, що потрапляють
