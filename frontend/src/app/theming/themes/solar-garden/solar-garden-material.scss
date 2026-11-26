@@ -1,0 +1,40 @@
+// Material для дизайну «Сонячний сад» (бандл `theme-solar-garden`): спільний Material родини
+// сцени (../scene/scene-material.scss) у СВІТЛІЙ схемі — уся сторінка світла, тож поля, кнопки,
+// прапорці й оверлеї (меню, списки, діалоги, датапікер, автодоповнення) беруть кремові ролі з
+// токенів --sc-* (solar-garden.less) без локальних схем. Тут — лише форма (пігулки й заокруглені
+// поля, як у макеті) і світле сповіщення-снекбар (типово M3 малює його «інверсним» темним).
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='solar-garden'] {
+  @include sc.material(light);
+
+  // Кнопки — «пігулки», поля — заокруглені (12px), як у макеті.
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 999px,
+      outlined-container-shape: 999px,
+      protected-container-shape: 999px,
+      text-container-shape: 999px,
+    )
+  );
+  @include mat.form-field-overrides(
+    (
+      outlined-container-shape: 12px,
+    )
+  );
+
+  // Снекбар — кремовий папір із зеленою межею (текст #1D2E24 — 14.1, дія #2F6B3C — 6.3).
+  @include mat.snack-bar-overrides(
+    (
+      container-color: var(--sc-overlay),
+      supporting-text-color: var(--sc-ink),
+      button-color: var(--sc-neon-b-text),
+    )
+  );
+
+  .mat-mdc-snack-bar-container .mdc-snackbar__surface {
+    border: 1px solid #b9d3a8;
+    box-shadow: var(--nri-shadow-lg);
+  }
+}

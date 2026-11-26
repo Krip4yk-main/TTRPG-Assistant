@@ -14,6 +14,7 @@ export const THEME_IDS = [
   'gothic-gloom',
   'magicpunk',
   'brass-steam',
+  'solar-garden',
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -30,6 +31,7 @@ export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   'gothic-gloom': 'everyone',
   magicpunk: 'everyone',
   'brass-steam': 'everyone',
+  'solar-garden': 'everyone',
 };
 
 /** Дизайни, доступні ролі. */

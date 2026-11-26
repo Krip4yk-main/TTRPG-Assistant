@@ -10,6 +10,7 @@ const ALL = [
   'gothic-gloom',
   'magicpunk',
   'brass-steam',
+  'solar-garden',
 ];
 
 describe('themes', () => {
