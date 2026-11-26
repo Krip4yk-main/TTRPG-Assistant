@@ -6,6 +6,8 @@ import {
   type SearchGameCardDto,
 } from '@nri/shared';
 import { formatDateTime, viewerTimeZone } from '../i18n/dates';
+import type { ViewMode } from '../view-mode/view-mode.store';
+import { toSeatsVm, type SeatsVm } from './seats.vm';
 
 /**
  * Бейдж (позначка) для слотів дизайну. `kind` + `value` — семантика (дизайн за ними обирає
@@ -69,6 +71,8 @@ export interface FullGameCardVm extends GameCardVmBase {
   nextSession: string | null;
   freeSlots: number;
   maxPlayers: number;
+  /** Місця за видом (гравцю — зайняті, майстру — вільні): текст і заповнення індикатора. */
+  seats: SeatsVm;
   /** Ціна за сесію; `null` — безкоштовно. */
   priceUah: number | null;
   /** Рядок «система · тип · жанр». */
@@ -84,6 +88,8 @@ export interface GameCardVmOptions {
   guest: boolean;
   /** Ключ i18n жанру за id (з каталогу). */
   genreKey: (id: number) => string | null;
+  /** «Вид гравця / майстра» — які місця показувати; типово — гравця. */
+  viewMode?: ViewMode;
 }
 
 function ageBadge(age: AgeRating): BadgeVm {
@@ -97,7 +103,7 @@ function ageBadge(age: AgeRating): BadgeVm {
 export function toGameCardVm(
   game: SearchGameCardDto | RestrictedGameDto,
   me: MeDto | null,
-  { guest, genreKey }: GameCardVmOptions,
+  { guest, genreKey, viewMode = 'player' }: GameCardVmOptions,
 ): GameCardVm {
   const gm = (rating: number | null, showRating: boolean): GmSignatureVm => ({
     publicId: game.gm.publicId,
@@ -169,6 +175,7 @@ export function toGameCardVm(
     nextSession,
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
+    seats: toSeatsVm(game.freeSlots, game.maxPlayers, viewMode),
     priceUah: game.priceUah,
     systemLine: [{ text: systemName }, { key: kindKey }, ...(genre ? [{ key: genre }] : [])],
     whereLine: [

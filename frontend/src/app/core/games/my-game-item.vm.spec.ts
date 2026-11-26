@@ -112,4 +112,22 @@ describe('toMyGameItemVm', () => {
     expect(v.nextSession).toBeTruthy();
     expect(vm({ ...card(3, 'started'), nextSessionAt: null }).nextSession).toBeNull();
   });
+
+  it('seats follow the view: taken for players (default), free for GMs', () => {
+    const g = card(3, 'started');
+    expect(toMyGameItemVm(g, { me: null, seen: null }).seats).toEqual({
+      mode: 'taken',
+      count: 1,
+      max: 5,
+      fill: 0.2,
+      textKey: 'search.card.seatsTaken',
+    });
+    expect(toMyGameItemVm(g, { me: null, seen: null, viewMode: 'gm' }).seats).toEqual({
+      mode: 'free',
+      count: 4,
+      max: 5,
+      fill: 0.8,
+      textKey: 'search.card.seatsFree',
+    });
+  });
 });

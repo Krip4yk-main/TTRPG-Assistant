@@ -34,7 +34,7 @@
       </p>
       <p>
         {{ 'search.card.slots' | translate }}:
-        {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+        {{ g.seats.textKey | translate: { count: g.seats.count, max: g.seats.max } }}
       </p>
     }
     <p>

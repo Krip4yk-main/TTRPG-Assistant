@@ -92,10 +92,14 @@ export class SceneGameCard implements GameCardSlot {
     this.router.navigateByUrl(this.gameUrl()).then(done, done);
   }
 
-  /** «Діоди» місць: світяться вільні (декор; число — у тексті поруч). */
+  /**
+   * Позначки місць (декор; число — у тексті поруч): «заповнені» (`.on`) — перші `seats.count`,
+   * тобто те, що каже текст за видом (гравцю — зайняті, майстру — вільні). Бандли дизайнів лише
+   * малюють `.on` / не `.on`, без власної логіки.
+   */
   protected readonly pips = computed<boolean[]>(() => {
     const g = this.game();
-    if (g.restricted || g.maxPlayers > MAX_PIPS) return [];
-    return Array.from({ length: g.maxPlayers }, (_, i) => i < g.freeSlots);
+    if (g.restricted || g.seats.max > MAX_PIPS) return [];
+    return Array.from({ length: g.seats.max }, (_, i) => i < g.seats.count);
   });
 }

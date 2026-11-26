@@ -67,10 +67,11 @@ describe('SceneGameCard (slot «game-card»)', () => {
   });
 
   // Картка отримує view-model, як від контейнера `nri-game-card` (той самий шлях даних).
-  const render = async (g: object, guest = false) => {
+  const render = async (g: object, guest = false, viewMode: 'player' | 'gm' = 'player') => {
     const vm = toGameCardVm(g as SearchGameCardDto, TestBed.inject(AuthStore).me(), {
       guest,
       genreKey: () => null,
+      viewMode,
     });
     fixture.componentRef.setInput('game', vm);
     fixture.detectChanges();
@@ -234,13 +235,31 @@ describe('SceneGameCard (slot «game-card»)', () => {
     expect(el.querySelector('nri-sc-attachment')).toBeNull();
   });
 
-  it('seat pips light up the free seats; many seats — text only', async () => {
+  it('seat pips fill with what the text says: taken for players, free for GMs', async () => {
     await render(game);
+    const pips = el.querySelector<HTMLElement>('.pips')!;
     expect(el.querySelectorAll('.pips b')).toHaveLength(5);
-    expect(el.querySelectorAll('.pips b.on')).toHaveLength(2);
+    expect(el.querySelectorAll('.pips b.on')).toHaveLength(3); // 3 з 5 зайняті
+    expect(pips.dataset['seats']).toBe('taken');
+    expect(pips.style.getPropertyValue('--sc-seats-fill')).toBe('0.6');
+    expect(el.textContent).toContain('search.card.seatsTaken');
+
+    await render(game, false, 'gm');
+    expect(el.querySelectorAll('.pips b.on')).toHaveLength(2); // 2 з 5 вільні
+    expect(el.querySelector<HTMLElement>('.pips')!.dataset['seats']).toBe('free');
+    expect(el.textContent).toContain('search.card.seatsFree');
+
+    await render({ ...game, freeSlots: 5 });
+    expect(el.querySelectorAll('.pips b.on')).toHaveLength(0); // нікого — порожньо
+    expect(el.querySelector<HTMLElement>('.pips')!.style.getPropertyValue('--sc-seats-fill')).toBe(
+      '0',
+    );
+  });
+
+  it('many seats — text only, no pips', async () => {
     await render({ ...game, maxPlayers: 12, freeSlots: 7 });
     expect(el.querySelector('.pips')).toBeNull();
-    expect(el.textContent).toContain('search.card.slotsValue');
+    expect(el.textContent).toContain('search.card.seatsTaken');
   });
 
   it('free game shows a «free» price sign', async () => {

@@ -98,14 +98,19 @@
           <dt>{{ 'search.card.slots' | translate }}</dt>
           <dd class="seats">
             @if (pips().length > 0) {
-              <span class="pips" aria-hidden="true">
+              <span
+                class="pips"
+                aria-hidden="true"
+                [attr.data-seats]="g.seats.mode"
+                [style.--sc-seats-fill]="g.seats.fill"
+              >
                 @for (on of pips(); track $index) {
                   <b [class.on]="on"></b>
                 }
               </span>
             }
             <span class="seats-text">{{
-              'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers }
+              g.seats.textKey | translate: { count: g.seats.count, max: g.seats.max }
             }}</span>
           </dd>
         </div>

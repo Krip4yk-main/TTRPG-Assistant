@@ -130,7 +130,7 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(text).toContain('D&D 5e');
       expect(text).toContain('Київ');
       expect(text).toContain('19:00'); // найближча сесія
-      expect(text).toContain('2 з 5 вільні');
+      expect(text).toContain('3 з 5 зайняті'); // вид гравця — зайняті місця
       expect(text).toContain('150 грн');
       expect(text).toContain('18+');
       expect(text).toContain('Триває');
@@ -157,6 +157,17 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(none.querySelector('img')).toBeNull();
     });
 
+    it('seats follow the view: players see taken, GMs — free', async () => {
+      const gmVm = toGameCardVm(game, null, {
+        guest: false,
+        genreKey: () => null,
+        viewMode: 'gm',
+      });
+      const gmText = (await mount(slots['game-card'], { game: gmVm })).nativeElement.textContent;
+      expect(gmText).toContain('2 з 5 вільні');
+      expect(gmText).not.toContain('зайняті');
+    });
+
     it('free game says so; no rating yet is stated', async () => {
       const vm = cardVm({ ...game, priceUah: null, gmRating: null });
       const text = (await mount(slots['game-card'], { game: vm })).nativeElement.textContent;
@@ -170,6 +181,7 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(text).toContain('Завершена');
       expect(text).not.toContain('19:00');
       expect(text).not.toContain('вільні');
+      expect(text).not.toContain('зайняті');
     });
 
     it('restricted card: title, age, GM, login invite — and nothing else', async () => {
@@ -262,6 +274,7 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       expect(text).toContain('D&D 5e');
       expect(text).toContain('19:00');
       expect(text).toContain('Оновлено');
+      expect(text).toContain('3 з 5 зайняті'); // вид гравця — зайняті місця
       expect(el.querySelector('a[href="/games/5/applications"]')).not.toBeNull();
       expect(text).toContain('Нових: 3');
       expect(el.querySelector('a[href="/games/5/edit"]')).not.toBeNull();
@@ -277,6 +290,14 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       ).action.subscribe((e) => emitted.push(e));
       el.querySelector<HTMLButtonElement>('button[data-action="start"]')!.click();
       expect(emitted).toEqual([{ action: 'start' }]);
+    });
+
+    it('seats in the GM view: free of capacity', async () => {
+      const item = toMyGameItemVm(myGame(), { me: null, seen: null, viewMode: 'gm' });
+      const text = (await mount(slots['my-game-item'], { item, busy: false })).nativeElement
+        .textContent as string;
+      expect(text).toContain('2 з 5 вільні');
+      expect(text).not.toContain('зайняті');
     });
 
     it('stale/dead/suspicious flags with «All ok» and «Close» actions', async () => {

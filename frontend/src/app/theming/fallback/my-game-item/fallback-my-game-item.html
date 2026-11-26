@@ -26,7 +26,10 @@
       {{ 'games.my.noNextSession' | translate }}
     }
   </p>
-  <p>{{ 'games.my.slots' | translate: { free: game.freeSlots, max: game.maxPlayers } }}</p>
+  <p>
+    {{ 'search.card.slots' | translate }}:
+    {{ game.seats.textKey | translate: { count: game.seats.count, max: game.seats.max } }}
+  </p>
   @if (game.applications; as apps) {
     <p>
       <a class="applications-link" [routerLink]="apps.link">{{

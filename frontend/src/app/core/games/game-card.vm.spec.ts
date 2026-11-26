@@ -1,6 +1,11 @@
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { browserZone } from '../i18n/dates';
-import { toGameCardVm, type FullGameCardVm, type RestrictedGameCardVm } from './game-card.vm';
+import {
+  toGameCardVm,
+  type FullGameCardVm,
+  type GameCardVmOptions,
+  type RestrictedGameCardVm,
+} from './game-card.vm';
 
 const game: SearchGameCardDto = {
   id: 5,
@@ -35,7 +40,7 @@ const restricted: RestrictedGameDto = {
 };
 
 const opts = { guest: false, genreKey: (id: number) => `genres.g${id}` };
-const full = (g: object, o = opts) =>
+const full = (g: object, o: GameCardVmOptions = opts) =>
   toGameCardVm(g as SearchGameCardDto, null, o) as FullGameCardVm;
 
 describe('toGameCardVm', () => {
@@ -115,6 +120,31 @@ describe('toGameCardVm', () => {
     vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
     expect(full(game).nextSession).toContain('19:00');
     expect(full(game).nextSession).not.toMatch(/GMT|EET/);
+  });
+
+  it('seats: players see taken of capacity, GMs — free; fill follows the shown count', () => {
+    expect(full(game).seats).toEqual({
+      mode: 'taken',
+      count: 3,
+      max: 5,
+      fill: 0.6,
+      textKey: 'search.card.seatsTaken',
+    });
+    expect(full(game, { ...opts, viewMode: 'player' }).seats.count).toBe(3);
+    expect(full(game, { ...opts, viewMode: 'gm' }).seats).toEqual({
+      mode: 'free',
+      count: 2,
+      max: 5,
+      fill: 0.4,
+      textKey: 'search.card.seatsFree',
+    });
+    // Ніхто не записався — порожньо гравцю, повно майстру; усі місця зайняті — навпаки.
+    expect(full({ ...game, freeSlots: 5 }).seats).toMatchObject({ count: 0, fill: 0 });
+    expect(full({ ...game, freeSlots: 0 }).seats).toMatchObject({ count: 5, fill: 1 });
+    expect(full({ ...game, freeSlots: 0 }, { ...opts, viewMode: 'gm' }).seats.fill).toBe(0);
+    // Розсинхрон даних не дає від'ємних чи більших за місткість чисел.
+    expect(full({ ...game, freeSlots: 9 }).seats).toMatchObject({ count: 0, fill: 0 });
+    expect(full({ ...game, freeSlots: -1 }).seats).toMatchObject({ count: 5, fill: 1 });
   });
 
   it('a blocked GM is flagged', () => {

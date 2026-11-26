@@ -1,7 +1,9 @@
 import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
 import { formatDateTime, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
+import type { ViewMode } from '../view-mode/view-mode.store';
 import type { LinePart } from './game-card.vm';
+import { toSeatsVm, type SeatsVm } from './seats.vm';
 
 /** Дії-переходи, доступні в кожному статусі (редагування — окремо). */
 const ACTIONS: Record<GameStatus, GameAction[]> = {
@@ -59,6 +61,8 @@ export interface MyGameItemVm {
   nextSession: string | null;
   freeSlots: number;
   maxPlayers: number;
+  /** Місця за видом (гравцю — зайняті, майстру — вільні): текст і заповнення індикатора. */
+  seats: SeatsVm;
   /** Посилання на заявки (крім чернетки) і кількість нових; `null` — без посилання. */
   applications: { link: (string | number)[]; pending: number } | null;
   actions: MyGameActionVm[];
@@ -72,6 +76,8 @@ export interface MyGameActionEvent {
 export interface MyGameItemVmOptions {
   me: MeDto | null;
   seen: SeenBadge | null;
+  /** «Вид гравця / майстра» — які місця показувати; типово — гравця. */
+  viewMode?: ViewMode;
 }
 
 /** Позначки гри в порядку важливості. */
@@ -89,7 +95,7 @@ export function deadFlags(game: Pick<MyGameCardDto, 'staleness' | 'suspicious'>)
  */
 export function toMyGameItemVm(
   game: MyGameCardDto,
-  { me, seen }: MyGameItemVmOptions,
+  { me, seen, viewMode = 'player' }: MyGameItemVmOptions,
 ): MyGameItemVm {
   const actions: MyGameActionVm[] = [];
   if (game.staleness !== 'ok') {
@@ -164,6 +170,7 @@ export function toMyGameItemVm(
     nextSession,
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
+    seats: toSeatsVm(game.freeSlots, game.maxPlayers, viewMode),
     applications: HAS_APPLICATIONS.has(game.status)
       ? { link: ['/games', game.id, 'applications'], pending: game.pendingApplications }
       : null,

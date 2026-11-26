@@ -98,7 +98,7 @@
       @if (g.showSchedule) {
         <dt>{{ 'search.card.slots' | translate }}</dt>
         <dd>
-          {{ 'search.card.slotsValue' | translate: { free: g.freeSlots, max: g.maxPlayers } }}
+          {{ g.seats.textKey | translate: { count: g.seats.count, max: g.seats.max } }}
         </dd>
       }
     </dl>

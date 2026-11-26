@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { GamesApi } from '../../../core/games/games.api';
+import { ViewModeStore } from '../../../core/view-mode/view-mode.store';
 import { ViewsService } from '../../../core/views/views.service';
 import {
   toMyGameItemVm,
@@ -62,6 +63,7 @@ interface Message {
 export class MyGames {
   private readonly api = inject(GamesApi);
   private readonly auth = inject(AuthStore);
+  private readonly viewMode = inject(ViewModeStore);
   private readonly dialog = inject(MatDialog);
 
   protected readonly games = signal<MyGameCardDto[] | null>(null);
@@ -75,10 +77,11 @@ export class MyGames {
   /** Рядки для слоту: гра + її view-model. */
   protected readonly items = computed<{ game: MyGameCardDto; vm: MyGameItemVm }[] | null>(() => {
     const me = this.auth.me();
+    const viewMode = this.viewMode.mode();
     return (
       this.games()?.map((game) => ({
         game,
-        vm: toMyGameItemVm(game, { me, seen: this.seen.badge(game.id) }),
+        vm: toMyGameItemVm(game, { me, seen: this.seen.badge(game.id), viewMode }),
       })) ?? null
     );
   });

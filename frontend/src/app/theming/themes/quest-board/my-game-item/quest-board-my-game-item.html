@@ -26,7 +26,7 @@
     <dd [nriTruncateTooltip]="next">{{ next }}</dd>
     <dt>{{ 'search.card.slots' | translate }}</dt>
     <dd>
-      {{ 'search.card.slotsValue' | translate: { free: game.freeSlots, max: game.maxPlayers } }}
+      {{ game.seats.textKey | translate: { count: game.seats.count, max: game.seats.max } }}
     </dd>
   </dl>
   @if (game.applications; as apps) {

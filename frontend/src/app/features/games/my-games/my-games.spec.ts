@@ -9,6 +9,7 @@ import type { MeDto, MyGameCardDto } from '@nri/shared';
 import { MyGames } from './my-games';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { ViewModeStore } from '../../../core/view-mode/view-mode.store';
 import { ViewsService } from '../../../core/views/views.service';
 import { provideThemeSlots } from '../../../theming/theme-testing';
 import { SCENE_SLOTS } from '../../../theming/themes/scene/slots';
@@ -136,6 +137,18 @@ describe('MyGames', () => {
     const req = http.expectOne('/api/me/views');
     expect(req.request.body).toEqual({ entityType: 'game', ids: [3] });
     req.flush(null);
+  });
+
+  it('seats follow «Вид гравця / Вид майстра»: taken for players, free for GMs', async () => {
+    const store = TestBed.inject(ViewModeStore);
+    store.setMode('player');
+    await settle();
+    expect(article(1).textContent).toContain('search.card.seatsTaken');
+    store.setMode('gm');
+    await settle();
+    expect(article(1).textContent).toContain('search.card.seatsFree');
+    expect(article(1).textContent).not.toContain('search.card.seatsTaken');
+    store.setMode('player');
   });
 
   it('marks its layout with the theme-agnostic hooks (board page, card grid)', () => {

@@ -3,6 +3,7 @@ import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { toGameCardVm } from '../../../core/games/game-card.vm';
+import { ViewModeStore } from '../../../core/view-mode/view-mode.store';
 import { Slot } from '../../../theming/slot';
 
 /**
@@ -19,6 +20,7 @@ import { Slot } from '../../../theming/slot';
 export class GameCard {
   private readonly auth = inject(AuthStore);
   private readonly catalog = inject(CatalogStore);
+  private readonly viewMode = inject(ViewModeStore);
 
   readonly game = input.required<SearchGameCardDto | RestrictedGameDto>();
   /** Гість бачить на обмеженій картці заклик увійти. */
@@ -28,6 +30,7 @@ export class GameCard {
     toGameCardVm(this.game(), this.auth.me(), {
       guest: this.guest(),
       genreKey: (id) => this.catalog.genreKey(id),
+      viewMode: this.viewMode.mode(),
     }),
   );
 }
