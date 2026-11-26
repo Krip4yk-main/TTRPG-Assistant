@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { CyberGameCard } from './cyber-game-card';
@@ -236,6 +236,83 @@ describe('CyberGameCard (slot «game-card»)', () => {
     expect(el.querySelector('.more')!.textContent).toContain('+3');
     expect(el.querySelector('.marks .nri-visually-hidden')!.textContent).toContain('mark.3');
     expect(el.querySelector('.fit')!.textContent).toContain('search.fit.partial');
+  });
+
+  describe('whole card opens the game', () => {
+    let navigate: ReturnType<typeof vi.fn<(url: unknown) => Promise<boolean>>>;
+
+    beforeEach(() => {
+      navigate = vi.fn<(url: unknown) => Promise<boolean>>(async () => true);
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockImplementation((url) => navigate(url));
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    const click = (target: Element, init: MouseEventInit = {}) => {
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init });
+      target.dispatchEvent(ev);
+      return ev;
+    };
+
+    it('a click on the card body navigates once (a double click too)', async () => {
+      await render(game);
+      const ev = click(el.querySelector('.facts')!);
+      expect(ev.defaultPrevented).toBe(true);
+      click(el.querySelector('.desc')!);
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(navigate).toHaveBeenCalledWith('/games/5');
+    });
+
+    it('a click on the title link navigates once (link and card do not both navigate)', async () => {
+      await render(game);
+      const link = el.querySelector<HTMLAnchorElement>('h2 a.open')!;
+      expect(link.getAttribute('href')).toBe('/games/5');
+      const ev = click(link);
+      expect(ev.defaultPrevented).toBe(true); // браузер сам не переходить
+      expect(navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it('a click on the cover attachment never navigates', async () => {
+      await render(game);
+      const att = el.querySelector('nri-cy-attachment')!;
+      click(att.querySelector('button')!);
+      click(att);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('GM link, modifier / middle clicks and selecting card text do not open the game', async () => {
+      await render(game);
+      click(el.querySelector('a[href="/users/zzzzzzzzzz"]')!);
+      click(el.querySelector('.facts')!, { ctrlKey: true });
+      click(el.querySelector('.facts')!, { button: 1 });
+      const desc = el.querySelector('.desc')!;
+      document.body.appendChild(el);
+      document.getSelection()!.selectAllChildren(desc);
+      click(desc);
+      document.getSelection()!.removeAllRanges();
+      el.remove();
+      // Посилання майстра переходить само (RouterLink) — але не на гру.
+      const urls = navigate.mock.calls.map(([u]) => String(u));
+      expect(urls).toEqual(['/users/zzzzzzzzzz']);
+    });
+
+    it('a failed or cancelled navigation lets the next click try again', async () => {
+      await render(game);
+      navigate.mockResolvedValueOnce(false);
+      click(el.querySelector('.facts')!);
+      await Promise.resolve();
+      await Promise.resolve();
+      click(el.querySelector('.facts')!);
+      expect(navigate).toHaveBeenCalledTimes(2);
+    });
+
+    it('restricted card opens the game; its login link does not', async () => {
+      await render(restricted, true);
+      click(el.querySelector('a[href^="/login"]')!);
+      expect(navigate.mock.calls.map(([u]) => String(u))).not.toContain('/games/6');
+      click(el.querySelector('.restricted-text')!);
+      expect(navigate).toHaveBeenCalledWith('/games/6');
+    });
   });
 
   describe('session time zone', () => {

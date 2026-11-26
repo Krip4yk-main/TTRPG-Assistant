@@ -22,17 +22,12 @@ import { TruncateTooltip } from '../../../../shared/truncate-tooltip/truncate-to
 import { LinePipe } from '../../../../core/i18n/line.pipe';
 import { ThemeService } from '../../../theme.service';
 import { noticeTilt, paperVariant } from '../paper';
+import { isCardOpenClick } from '../../../shared/card-click';
 
 /** Скільки бейджів-штампів видно в рядку (решта — «+N»): рядок не переноситься. */
 const MAX_STAMPS = 3;
 /** Тривалість анімації відривання (як у `qb-tear` з quest-board.less), мс. */
 export const TEAR_MS = 520;
-/**
- * Інтерактивні елементи всередині оголошення мають власну дію — клік по них не відкриває гру.
- * Вкладка-обкладинка — уся (і місце, звідки картинка виїхала наперед), а не лише її кнопка.
- */
-const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"], nri-qb-attachment';
-
 /**
  * Оголошення, що зараз відривається (одне на сторінку): клік по іншому, поки триває анімація,
  * нічого не робить — інакше перейшли б обидва.
@@ -113,18 +108,9 @@ export class QuestBoardGameCard implements GameCardSlot {
   }
 
   protected onCardClick(event: MouseEvent): void {
-    // Середня кнопка й клік з модифікатором — звична поведінка посилання (нова вкладка тощо).
-    if (event.defaultPrevented || event.button !== 0) return;
-    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    const target = event.target as Element;
-    const interactive = target.closest(INTERACTIVE);
-    if (interactive && !interactive.classList.contains('open')) return;
     // Користувач виділяє текст цього оголошення (лише коли анімацію вимкнено — інакше текст
-    // не виділяється) — не перехід. Виділення деінде на сторінці кліку не заважає.
-    if (!interactive && !this.tearEnabled()) {
-      const sel = document.getSelection();
-      if (sel?.toString() && sel.anchorNode && this.host.contains(sel.anchorNode)) return;
-    }
+    // не виділяється) — не перехід. Вкладка-обкладинка й інші інтерактивні елементи — теж ні.
+    if (!isCardOpenClick(event, this.host, { respectSelection: !this.tearEnabled() })) return;
     event.preventDefault();
     this.open();
   }

@@ -1,5 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { BadgeVm, GameCardVm } from '../../../../core/games/game-card.vm';
@@ -10,6 +17,7 @@ import { CyberBadge } from '../badge/cyber-badge';
 import { CyberGmSignature } from '../gm-signature/cyber-gm-signature';
 import { CyberAttachment } from '../attachment/cyber-attachment';
 import { neonOf } from '../neon';
+import { isCardOpenClick } from '../../../shared/card-click';
 
 /** Скільки міток видно в рядку системи (решта — «+N»): рядок не переноситься. */
 const MAX_MARKS = 2;
@@ -29,6 +37,11 @@ const MAX_PIPS = 8;
  * світла на стіні й гвинти світлового короба; «Голо-ринок» — рамка зі зрізаними кутами,
  * кутики, проєктор і світловий конус. Розмір картки сталий: довгі рядки — «…» з підказкою.
  * Обмежена картка — лише назва, вік і майстер під «завісою».
+ *
+ * Уся картка клікабельна — відкриває сторінку гри (як посилання-назва, яке лишається головною
+ * дією для клавіатури й дає звичне «відкрити в новій вкладці»; його клік спливає сюди ж).
+ * Клік по обкладинці, інших посиланнях і кнопках, з модифікатором чи після виділення тексту
+ * картки гру не відкриває (спільне правило `isCardOpenClick`); без анімації відривання.
  */
 @Component({
   selector: 'nri-cy-game-card',
@@ -45,7 +58,7 @@ const MAX_PIPS = 8;
   templateUrl: './cyber-game-card.html',
   styleUrl: './cyber-game-card.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[attr.data-neon]': 'neon()' },
+  host: { '[attr.data-neon]': 'neon()', '(click)': 'onCardClick($event)' },
 })
 export class CyberGameCard implements GameCardSlot {
   readonly game = input.required<GameCardVm>();
@@ -61,6 +74,27 @@ export class CyberGameCard implements GameCardSlot {
     const fit = this.fit();
     return this.game().badges.filter((b) => b !== fit);
   });
+  protected readonly gameUrl = computed(() => `/games/${this.game().id}`);
+
+  private readonly router = inject(Router);
+  private readonly host: HTMLElement = inject(ElementRef).nativeElement;
+  /** Перехід уже почався — повторний (подвійний) клік нічого не робить. */
+  private navigating = false;
+
+  protected onCardClick(event: MouseEvent): void {
+    if (!isCardOpenClick(event, this.host, { respectSelection: true })) return;
+    event.preventDefault();
+    if (this.navigating) return;
+    this.navigating = true;
+    // Перехід скасовано (guard) чи впав — наступний клік пробує знову.
+    this.router.navigateByUrl(this.gameUrl()).then(
+      (ok) => {
+        if (!ok) this.navigating = false;
+      },
+      () => (this.navigating = false),
+    );
+  }
+
   /** «Діоди» місць: світяться вільні (декор; число — у тексті поруч). */
   protected readonly pips = computed<boolean[]>(() => {
     const g = this.game();
