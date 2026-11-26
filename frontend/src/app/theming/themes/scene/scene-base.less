@@ -32,12 +32,23 @@
 //             --sc-amber / -amber-text / -amber-line / -amber-fill / --sc-on-amber (частковий
 //             збіг, «Нове», попередження), --sc-red / -red-text / -red-fill / --sc-on-red (вік,
 //             помилки, небезпечні дії). Типові значення станів і кольорів картки — міксин
-//             .sc-neon-tokens() (кібер-набір; дизайн викликає його й за потреби перевизначає).
+//             .sc-neon-tokens() (типовий темний набір; дизайн викликає його й за потреби
+//             перевизначає).
 //   Картки:   --sc-neon-<колір> / -<колір>-core / -<колір>-text для шести варіантів картки
 //             (pink, cyan, violet, amber, lime, red — імена варіантів; не кібер-дизайн кладе в
 //             них свої кольори): основа ставить їх як --sc-n / --sc-n-core / --sc-n-text на
 //             елементі з [data-neon] (стабільно за id гри, див. neon.ts); --sc-card-height —
 //             висота картки пошуку й «Моїх ігор».
+//   Тіні:     необов'язкові --sc-shadow-panel (тінь панелі на стіні: .sc-glass, сторінка) і
+//             --sc-glass-highlight (внутрішній відблиск верхньої кромки .sc-glass) — типові
+//             (темна схема) теж у правилі :where, як шрифти; --nri-shadow-md / -lg — після
+//             виклику .sc-base() (типові — чорні тіні для темної стіни).
+//
+// Світлий дизайн (або світла панель на темному) окремо перевіряє те, що основа малює в темному
+// стилі: неонову трубку панелі фільтрів (`.nri-page.nri-board .nri-panel::before` — колір
+// --sc-neon-b-core зі світінням) — перевизначити або сховати (`content: none`); виділення
+// тексту `::selection` (фон --sc-neon-b, текст --sc-on-neon-b) — перевизначити, якщо пара не
+// читається; тіні — токенами вище.
 //
 // Схема (світла / темна): `.sc-base(@scheme)` — dark (типово) або light; той самий параметр —
 // у `sc.material($scheme)` (scene-material.scss). Схема задає color-scheme (нативні select,
@@ -75,9 +86,12 @@
 // @scheme — dark | light (color-scheme сторінки; див. шапку).
 .sc-base(@scheme: dark) {
   // Типові шрифти тексту й підписів — з нульовою специфічністю: токен дизайну завжди сильніший.
+  // Так само — типові тіні панелей (темна стіна).
   :where(&) {
     --sc-font-body: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
     --sc-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    --sc-shadow-panel: 0 24px 40px rgba(0, 0, 0, 0.55);
+    --sc-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   // ---- Токени застосунку з токенів дизайну ----
@@ -196,9 +210,7 @@
     background: var(--sc-glass);
     border: 1px solid var(--sc-glass-line);
     border-radius: var(--nri-radius-md);
-    box-shadow:
-      0 24px 40px rgba(0, 0, 0, 0.55),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-shadow: var(--sc-shadow-panel), var(--sc-glass-highlight);
     color: var(--sc-ink);
   }
 
@@ -239,7 +251,7 @@
     background: var(--sc-glass);
     border: 1px solid var(--sc-glass-line);
     border-radius: var(--nri-radius-md);
-    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--sc-shadow-panel);
   }
 
   // Сторінки-дошки: картки висять прямо на стіні; панелі й повідомлення — окремі панелі.
@@ -405,7 +417,8 @@
 // Локальна схема ділянки (див. шапку): світла паперова картка на темному дизайні або навпаки.
 // Викликати на корені ділянки ПІСЛЯ перевизначення там токенів ділянки (--sc-ink, -ink-soft,
 // -ink-muted, --sc-line, --sc-outline, --sc-panel, --sc-panel-raised, --sc-field, --sc-overlay
-// і за потреби акцентів --sc-neon-b… / станів). Заново виводить із них --nri-* і --mat-sys-*
+// і за потреби акцентів --sc-neon-b… / станів --sc-red… — небезпечні дії й помилки теж
+// виводяться заново). Заново виводить із них --nri-* і --mat-sys-*
 // (поля, кнопки, прапорці Material усередині ділянки), а також color-scheme, скролбари й
 // список нативного <select>. Спливні оверлеї Material (меню, списки, діалоги, датапікер)
 // рендеряться поза ділянкою — у схемі сторінки.
@@ -425,7 +438,10 @@
   --nri-accent: var(--sc-neon-a);
   --nri-on-accent: var(--sc-on-neon-a);
   --nri-accent-text: var(--sc-neon-a-text);
+  --nri-danger: var(--sc-red);
+  --nri-on-danger: var(--sc-on-red);
   --nri-danger-text: var(--sc-red-text);
+  --nri-danger-surface: var(--sc-red-fill);
   --nri-success-text: var(--sc-lime-text);
   --nri-focus-ring: var(--sc-neon-b);
 
@@ -448,6 +464,9 @@
   --mat-sys-on-secondary-container: var(--sc-on-neon-b);
   --mat-sys-tertiary: var(--sc-neon-a-text);
   --mat-sys-error: var(--sc-red-text);
+  --mat-sys-on-error: var(--sc-on-red);
+  --mat-sys-error-container: var(--sc-red);
+  --mat-sys-on-error-container: var(--sc-on-red);
   // Токени компонентів, які scene-material.scss задає прямо з --sc-* (не через --mat-sys-*).
   --mat-button-outlined-outline-color: var(--sc-outline);
   --mat-form-field-select-option-text-color: var(--sc-ink);
