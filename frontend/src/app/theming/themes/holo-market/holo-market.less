@@ -33,6 +33,15 @@
 
 @hm: ~":root[data-theme='holo-market']";
 
+// Діагональ зрізаного кута (1.5px) у квадраті 8×8 — від верхнього правого до нижнього лівого
+// кута квадрата (межа таблички там, де clip-path обрізає рамку); колір — --hm-sign.
+@hm-cut-edge: linear-gradient(
+  to bottom right,
+  transparent calc(50% - 0.75px),
+  var(--hm-sign) calc(50% - 0.75px) calc(50% + 0.75px),
+  transparent calc(50% + 0.75px)
+);
+
 // Контраст (WCAG, відносна яскравість). Поверхні: стіна #070914; ринок за нею притемнений
 // (сцена — 70% непрозорості, вуаль ≥ 38%): найсвітліше місце під текстом на стіні (розмита
 // бурштинова вивіска) ≈ #4A3A20. Голо-панель картки — скло rgba(9,26,38,.9) поверх
@@ -181,6 +190,8 @@
   }
 
   // ---- Шапка: напівпрозора смуга з ціановою лінією й світінням ----
+  // backdrop-filter робить .top контейнером для position: fixed нащадків шапки (у ній таких
+  // немає: меню й підказки — оверлеї CDK у <body>).
   .top.cy-bar {
     backdrop-filter: blur(10px);
     box-shadow: 0 0 18px rgba(94, 242, 255, 0.15);
@@ -279,6 +290,8 @@
   }
 
   // Рамка: градієнт кольору гри під панеллю (виступає на 1px) з червоно-ціановим зсувом.
+  // z-index 1 — під панеллю картки, бо спільна розкладка дає .panel z-index 2
+  // (cyber-game-card.less / cyber-my-game-item.less): міняти разом.
   // Фільтр — на хості рамки, контур — на псевдоелементі (інакше clip-path обрізав би тінь).
   .cy-frame {
     position: absolute;
@@ -500,20 +513,48 @@
     }
   }
 
-  // Ціна — бурштинова табличка зі зрізаними кутами, безкоштовна — лайм.
+  // Ціна — бурштинова табличка зі зрізаними кутами, безкоштовна — лайм. Компактна (підпис
+  // майстра поруч має лишатися читабельним); межа на зрізах — діагоналі фоном (clip-path
+  // обрізає саму рамку).
   nri-cy-game-card .price {
-    padding: 6px 14px;
-    border: 1px solid #ffbf4a;
+    --hm-sign: #ffbf4a;
+
+    padding: 5px 10px;
+    border: 1px solid var(--hm-sign);
     border-radius: 0;
-    background: rgba(255, 191, 74, 0.1);
+    background:
+      @hm-cut-edge top left / 8px 8px no-repeat border-box,
+      @hm-cut-edge bottom right / 8px 8px no-repeat border-box,
+      rgba(255, 191, 74, 0.1);
     color: #ffe1a6;
-    font: 700 1rem/1.2 var(--cy-font-display);
+    font: 700 0.875rem/1.2 var(--cy-font-display);
+    letter-spacing: 0;
     clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 
     &.free {
-      border-color: #c6ff4a;
-      background: rgba(198, 255, 74, 0.1);
+      --hm-sign: #c6ff4a;
+
+      background:
+        @hm-cut-edge top left / 8px 8px no-repeat border-box,
+        @hm-cut-edge bottom right / 8px 8px no-repeat border-box,
+        rgba(198, 255, 74, 0.1);
       color: #e5ffb5;
+    }
+  }
+
+  // Підпис майстра: роль («майстер · ★ 4,5» / «майстер · ще немає рейтингу») — до двох
+  // рядків з «…» (повний текст — у підказці), щоб не обрізатися поруч із ціною.
+  nri-cy-game-card .gm .role {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.3;
+    white-space: normal;
+
+    // «ще немає рейтингу» (nri-gm-rating) теж переноситься.
+    .none {
+      font-size: inherit;
+      white-space: normal;
     }
   }
 
@@ -611,9 +652,9 @@
     }
   }
 
-  // Широкий екран: скло ще й розмиває ринок позаду (на вузькому — лише щільне скло).
+  // Широкий екран: панель фільтрів ще й розмиває ринок позаду (на вузькому — лише щільне
+  // скло). Картки — без розмиття: їх багато, а фон за ними фіксований і мерехтить.
   @media (min-width: 600px) {
-    [data-neon] > .cy-glass,
     .nri-page.nri-board .nri-panel {
       backdrop-filter: blur(8px) brightness(0.6);
     }

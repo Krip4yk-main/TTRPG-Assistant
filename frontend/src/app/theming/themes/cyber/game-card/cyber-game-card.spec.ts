@@ -2,7 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
-import { provideTranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
+import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { CyberGameCard } from './cyber-game-card';
 import { browserZone } from '../../../../core/i18n/dates';
@@ -140,6 +142,27 @@ describe('CyberGameCard (slot «game-card»)', () => {
     await render(game);
     expect(el.querySelector('.gm-rating')).toBeNull();
     expect(el.querySelector('.gm .none')!.textContent).toContain('ratings.gmRating.none');
+  });
+
+  it('the GM role line tooltip is the full visible text, with or without a rating', async () => {
+    TestBed.inject(TranslateService).setTranslation('uk', {
+      cyber: {
+        gmRole: {
+          plain: 'майстер',
+          rated: 'майстер · ★ {{rating}}',
+          none: 'майстер · ще немає рейтингу',
+        },
+      },
+    });
+    TestBed.inject(TranslateService).use('uk');
+    const tip = () =>
+      fixture.debugElement.query(By.css('.gm .role')).injector.get(MatTooltip).message;
+    await render({ ...game, gmRating: 4.5 });
+    expect(tip()).toBe('майстер · ★ 4,5');
+    await render(game);
+    expect(tip()).toBe('майстер · ще немає рейтингу');
+    await render(restricted);
+    expect(tip()).toBe('майстер');
   });
 
   it('a blocked GM is labelled «Account blocked» on full and restricted cards', async () => {

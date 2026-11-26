@@ -18,15 +18,10 @@
         <nri-blocked-badge />
       }
     </span>
-    <!-- Один рядок з «…»: без рейтингу «майстер · ще немає рейтингу» на вузькій картці не
-         вміщається (повний текст — у підказці). -->
-    @let none = g.showRating && g.rating === null;
-    <small
-      class="role"
-      [nriTruncateTooltip]="
-        none ? ('cyber.gm' | translate) + ' · ' + ('ratings.gmRating.none' | translate) : ''
-      "
-    >
+    <!-- Рядок «майстер · ★ рейтинг» обрізається «…», коли не вміщається (у «Голо-ринку» —
+         до двох рядків); підказка — той самий текст повністю, з рейтингом і без. -->
+    @let tip = roleTip();
+    <small class="role" [nriTruncateTooltip]="tip.key | translate: tip.params">
       <span aria-hidden="true">{{ 'cyber.gm' | translate }}</span>
       @if (g.showRating) {
         <span aria-hidden="true">·</span>
