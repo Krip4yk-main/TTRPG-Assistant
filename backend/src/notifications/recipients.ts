@@ -76,6 +76,8 @@ export const NOTIFY_RULES: Partial<Record<EventType, Rule>> = {
   'member.banned': { category: 'members', to: 'member', actorIsEventUser: true },
   'session.rescheduled': { category: 'sessions', to: 'participants', actorIsEventUser: true },
   'session.cancelled': { category: 'sessions', to: 'participants', actorIsEventUser: true },
+  // Додаткова разова сесія (застосування голосування за час).
+  'session.created': { category: 'sessions', to: 'participants', actorIsEventUser: true },
   'game.started': { category: 'games', to: 'participants', actorIsEventUser: true },
   'game.finished': { category: 'games', to: 'participants', actorIsEventUser: true },
   'game.cancelled': { category: 'games', to: 'participants', actorIsEventUser: true },
@@ -109,6 +111,8 @@ function ruleFor(ev: EventRow): Rule | null {
   // Автоскасування сесій разом із грою (завершення, скасування, нове правило) не сповіщають
   // окремо: учасники вже отримують сповіщення про саму гру — інакше по одному на кожну сесію.
   if (ev.type === 'session.cancelled' && p.auto === true) return null;
+  // Голосування закрилось разом із грою (завершення/скасування) — майстру підсумок не потрібен.
+  if (ev.type === 'poll.closed' && p.reason === 'game_closed') return null;
   // Бан того, хто не був ні учасником, ні автором заявки, нічого в нього не забрав —
   // без сповіщення (інакше майстер міг би слати сповіщення будь-кому).
   if (

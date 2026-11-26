@@ -260,6 +260,13 @@
       "when": 1795721236287,
       "tag": "0036_plan12_polls",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1795722250066,
+      "tag": "0037_plan12_polls_fixes",
+      "breakpoints": true
     }
   ]
 }

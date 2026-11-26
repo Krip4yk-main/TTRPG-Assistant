@@ -54,6 +54,7 @@ export const NOTIFICATION_TYPES = [
   'member.banned',
   'session.rescheduled',
   'session.cancelled',
+  'session.created',
   'session.reminder',
   'game.started',
   'game.finished',

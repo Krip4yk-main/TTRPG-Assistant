@@ -55,6 +55,8 @@ export const ERROR_CODES = [
   'POLL_OPEN',
   'POLL_LIMIT',
   'POLL_NO_WINNER',
+  'POLL_APPLY_CONFIRM',
+  'POLL_APPLY_PENDING',
   'INTERNAL',
 ] as const;
 

@@ -12,13 +12,17 @@ import {
 } from 'drizzle-orm/mysql-core';
 import type { PollCloseReason, PollKind, PollStatus, PollVoteValue, Weekday } from '@nri/shared';
 import { games } from './games.js';
-import { gameSessions } from './sessions.js';
 import { users } from './users.js';
 
 // Значення enum-ів — тут (drizzle-kit не вантажить ESM @nri/shared), збіг перевіряє `satisfies`.
 const POLL_KINDS = ['regular', 'one_off'] as const satisfies PollKind[];
 const POLL_STATUSES = ['open', 'closed'] as const satisfies PollStatus[];
-const POLL_CLOSE_REASONS = ['all_voted', 'deadline', 'gm'] as const satisfies PollCloseReason[];
+const POLL_CLOSE_REASONS = [
+  'all_voted',
+  'deadline',
+  'gm',
+  'game_closed',
+] as const satisfies PollCloseReason[];
 const POLL_VOTE_VALUES = ['yes', 'no', 'maybe'] as const satisfies PollVoteValue[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
@@ -40,7 +44,9 @@ export const polls = mysqlTable(
     kind: mysqlEnum('kind', POLL_KINDS).notNull(),
     status: mysqlEnum('status', POLL_STATUSES).notNull().default('open'),
     closeReason: mysqlEnum('close_reason', POLL_CLOSE_REASONS),
-    sessionId: id('session_id').references(() => gameSessions.id, { onDelete: 'set null' }),
+    // Без FK: намір «перенести саме цю сесію» має пережити її видалення (заміна правила) —
+    // застосування тоді відмовляє 409, а не створює нову сесію мовчки.
+    sessionId: id('session_id'),
     durationMinutes: smallint('duration_minutes').notNull(),
     closesAt: datetime('closes_at', { fsp: 3 }).notNull(),
     createdAt: datetime('created_at', { fsp: 3 })
@@ -48,6 +54,11 @@ export const polls = mysqlTable(
       .default(sql`CURRENT_TIMESTAMP(3)`),
     closedAt: datetime('closed_at', { fsp: 3 }),
     appliedAt: datetime('applied_at', { fsp: 3 }),
+    /**
+     * Застосування триває (захоплено умовним `UPDATE`); фіналізація ставить `applied_*` і
+     * знімає позначку. Позначка, старша `POLL_APPLY_STALE_MS`, вважається покинутою (збій).
+     */
+    applyingAt: datetime('applying_at', { fsp: 3 }),
     // Без FK: варіант і сесія — довідково (сесію можуть видалити заміною правила).
     appliedOptionId: id('applied_option_id'),
     appliedSessionId: id('applied_session_id'),

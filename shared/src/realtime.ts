@@ -5,11 +5,18 @@ export const SESSION_REVOKED_EVENT = 'session.revoked';
  * Пінг «дані гри змінилися — перезапитайте API». Рівно `{gameId, scope}`, без даних гри
  * (видимість лишається на сервері). Кімнати:
  * - `details` — у `game:<id>` (усі, хто дивиться видиму гру);
- * - `sessions`, `members` — у `game-members:<id>` (майстер і активні учасники);
+ * - `sessions`, `members`, `polls` (голосування за час) — у `game-members:<id>` (майстер і
+ *   активні учасники);
  * - `applications` — лише в особисті кімнати майстра й заявника.
  */
 export const GAME_CHANGED_EVENT = 'game.changed';
-export const GAME_CHANGE_SCOPES = ['details', 'sessions', 'members', 'applications'] as const;
+export const GAME_CHANGE_SCOPES = [
+  'details',
+  'sessions',
+  'members',
+  'applications',
+  'polls',
+] as const;
 export type GameChangeScope = (typeof GAME_CHANGE_SCOPES)[number];
 export interface GameChangedPing {
   gameId: number;

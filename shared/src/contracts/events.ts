@@ -41,6 +41,7 @@ export const EVENT_TYPES = [
   // сесії
   'session.rescheduled',
   'session.cancelled',
+  'session.created',
   'session.done',
   // голосування за час (Plan 12)
   'poll.created',

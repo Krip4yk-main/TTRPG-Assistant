@@ -45,8 +45,8 @@ export const outboxBackoffMs = (attempts: number): number =>
   OUTBOX_BACKOFF_BASE_MS * 2 ** (attempts - 1);
 
 /**
- * Кнопки за типом сповіщення: заявка — майстру «Затвердити/Відхилити»; нагадування — RSVP
- * (лише учасникам: майстер на власну сесію не відповідає, `recipientIsGm` — без кнопок).
+ * Кнопки за типом сповіщення: заявка — майстру «Затвердити/Відхилити»; нагадування й нова
+ * разова сесія — RSVP (лише учасникам: майстер на власну сесію не відповідає, `recipientIsGm` — без кнопок).
  */
 export function buttonsFor(
   n: Pick<OutboxSource, 'type' | 'payload'>,
@@ -70,7 +70,8 @@ export function buttonsFor(
       })),
     );
   }
-  if (n.type === 'session.reminder' && p.sessionId !== undefined && !recipientIsGm) {
+  const rsvpTypes = ['session.reminder', 'session.created'];
+  if (rsvpTypes.includes(n.type) && p.sessionId !== undefined && !recipientIsGm) {
     return [
       { action: 'rsvp', sessionId: p.sessionId, value: 'going' },
       { action: 'rsvp', sessionId: p.sessionId, value: 'not_going' },
@@ -110,7 +111,10 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
   const reminderGameIds = [
     ...new Set(
       rows.flatMap((r) =>
-        r.type === 'session.reminder' && r.payload.gameId !== undefined ? [r.payload.gameId] : [],
+        (r.type === 'session.reminder' || r.type === 'session.created') &&
+        r.payload.gameId !== undefined
+          ? [r.payload.gameId]
+          : [],
       ),
     ),
   ];

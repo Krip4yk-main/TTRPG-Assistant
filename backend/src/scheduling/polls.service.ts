@@ -1,4 +1,17 @@
-import { and, asc, count, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import {
   nextWeeklyStart,
   pollApplySchema,
@@ -28,6 +41,7 @@ import { logEvent } from '../events/events.service.js';
 import { changeScheduleRule } from '../games/games.service.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
+import { emitGameChanged } from '../realtime/game-rooms.js';
 import { materializeSessions } from '../sessions/materialize.js';
 import { createManualSession, rescheduleSession } from '../sessions/sessions.service.js';
 import { loadGmGame } from './common-times.service.js';
@@ -276,6 +290,7 @@ export async function createPoll(
       })),
     },
   });
+  pollsChanged(deps, gameId);
   return pollDto(deps, pollId, userId);
 }
 
@@ -308,11 +323,12 @@ export async function getPoll(deps: AppDeps, userId: number, pollId: number): Pr
 
 /**
  * Відповіді учасника (`PUT /api/polls/:id/votes`, також Telegram-кнопки). Лише активний
- * учасник гри (не майстер; колишній — 403 `NOT_A_MEMBER`); голосування відкрите й дедлайн не
- * настав (інакше 409 `POLL_CLOSED`); варіанти — цього голосування (інакше 400). Відповідь
- * змінюється до закриття. Транзакція тримає S-блокування рядка голосування, тож закриття
- * (`UPDATE … WHERE status='open'`) не проскочить між перевіркою й записом. Після запису —
- * спроба закрити «всі проголосували».
+ * учасник гри (не майстер; колишній — 403 `NOT_A_MEMBER`); голосування відкрите, дедлайн не
+ * настав і гра ще набирає, іде чи на паузі (інакше 409 `POLL_CLOSED`; голосування завершеної
+ * чи скасованої гри одразу закривається як `game_closed`); варіанти — цього голосування
+ * (інакше 400). Відповідь змінюється до закриття. Транзакція тримає S-блокування рядків гри й
+ * голосування, тож закриття (`UPDATE … WHERE status='open'`) і перехід гри не проскочать між
+ * перевіркою й записом. Після запису — спроба закрити «всі проголосували».
  */
 export async function vote(
   deps: AppDeps,
@@ -325,27 +341,43 @@ export async function vote(
   const p = await loadPollRow(deps, pollId);
   const { isGm } = await loadViewableGame(deps, userId, p.gameId);
   if (isGm) throw new AppError(403, 'NOT_A_MEMBER');
-  await deps.db.transaction(async (tx) => {
-    const [row] = await tx.select().from(polls).where(eq(polls.id, pollId)).for('share');
-    if (!row || row.status !== 'open' || row.closesAt <= now) {
-      throw new AppError(409, 'POLL_CLOSED');
-    }
-    const valid = new Set(
-      (
-        await tx
-          .select({ id: pollOptions.id })
-          .from(pollOptions)
-          .where(eq(pollOptions.pollId, pollId))
-      ).map((o) => o.id),
-    );
-    if (input.votes.some((v) => !valid.has(v.optionId))) {
-      throw new AppError(400, 'VALIDATION', { reason: 'UNKNOWN_OPTION', path: ['votes'] });
-    }
-    await tx
-      .insert(pollVotes)
-      .values(input.votes.map((v) => ({ optionId: v.optionId, userId, pollId, value: v.value })))
-      .onDuplicateKeyUpdate({ set: { value: sql`VALUES(${pollVotes.value})` } });
-  });
+  let gameEnded = false;
+  try {
+    await deps.db.transaction(async (tx) => {
+      const [g] = await tx
+        .select({ status: games.status })
+        .from(games)
+        .where(eq(games.id, p.gameId))
+        .for('share');
+      if (!g || !POLL_GAME_STATUSES.includes(g.status)) {
+        gameEnded = true;
+        throw new AppError(409, 'POLL_CLOSED');
+      }
+      const [row] = await tx.select().from(polls).where(eq(polls.id, pollId)).for('share');
+      if (!row || row.status !== 'open' || row.closesAt <= now) {
+        throw new AppError(409, 'POLL_CLOSED');
+      }
+      const valid = new Set(
+        (
+          await tx
+            .select({ id: pollOptions.id })
+            .from(pollOptions)
+            .where(eq(pollOptions.pollId, pollId))
+        ).map((o) => o.id),
+      );
+      if (input.votes.some((v) => !valid.has(v.optionId))) {
+        throw new AppError(400, 'VALIDATION', { reason: 'UNKNOWN_OPTION', path: ['votes'] });
+      }
+      await tx
+        .insert(pollVotes)
+        .values(input.votes.map((v) => ({ optionId: v.optionId, userId, pollId, value: v.value })))
+        .onDuplicateKeyUpdate({ set: { value: sql`VALUES(${pollVotes.value})` } });
+    });
+  } catch (err) {
+    if (gameEnded) await closePoll(deps, pollId, 'game_closed', null, now);
+    throw err;
+  }
+  pollsChanged(deps, p.gameId);
   if (await allVoted(deps, p.id, p.gameId)) await closePoll(deps, p.id, 'all_voted', null, now);
   return pollDto(deps, pollId, userId);
 }
@@ -379,8 +411,9 @@ async function allVoted(deps: AppDeps, pollId: number, gameId: number): Promise<
 
 /**
  * Закриває відкрите голосування умовним `UPDATE`: лише той, хто його змінив, пише подію
- * `poll.closed` (майстру — сповіщення з підсумком, якщо закрилось само). Повторний чи
- * паралельний виклик — no-op. Повертає, чи закрив саме цей виклик.
+ * `poll.closed` (майстру — сповіщення з підсумком, якщо закрилось само; `game_closed` — без
+ * сповіщення) і пінгує `polls`. Повторний чи паралельний виклик — no-op. Повертає, чи закрив
+ * саме цей виклик.
  */
 export async function closePoll(
   deps: AppDeps,
@@ -410,6 +443,7 @@ export async function closePoll(
       ...(winner ? { winnerStartsAt: winner.startsAt } : {}),
     },
   });
+  pollsChanged(deps, p.gameId);
   return true;
 }
 
@@ -426,13 +460,20 @@ export async function closePollByGm(
 }
 
 /**
- * Джоб `polls.close` (щохвилини): закриває відкриті голосування, чий дедлайн настав
- * (`deadline`), і ті, де вже відповіли всі активні учасники (`all_voted` — напр. після виходу
- * учасника, що не голосував). Ідемпотентно: закриття — умовний `UPDATE`, повторний прохід
- * чи паралельний воркер нічого не дублює.
+ * Джоб `polls.close` (щохвилини): закриває відкриті голосування завершених чи скасованих ігор
+ * (`game_closed`), ті, чий дедлайн настав (`deadline`), і ті, де вже відповіли всі активні
+ * учасники (`all_voted` — напр. після виходу учасника, що не голосував). Ідемпотентно:
+ * закриття — умовний `UPDATE`, повторний прохід чи паралельний воркер нічого не дублює.
  */
 export async function runPollsClose(deps: AppDeps, now: Date = new Date()): Promise<number> {
   let closed = 0;
+  const ended = await deps.db
+    .select({ id: polls.id })
+    .from(polls)
+    .innerJoin(games, eq(games.id, polls.gameId))
+    .where(and(eq(polls.status, 'open'), notInArray(games.status, POLL_GAME_STATUSES)))
+    .limit(CLOSE_BATCH);
+  for (const p of ended) if (await closePoll(deps, p.id, 'game_closed', null, now)) closed++;
   const due = await deps.db
     .select({ id: polls.id })
     .from(polls)
@@ -459,34 +500,55 @@ export async function runPollsClose(deps: AppDeps, now: Date = new Date()): Prom
 
 // ---------- застосування ----------
 
+/** Позначка «застосування триває», старша за це, вважається покинутою (збій процесу). */
+export const POLL_APPLY_STALE_MS = 5 * 60_000;
+
+/** Що саме застосувати — вирішено до захоплення (усі відмови — без побічних ефектів). */
+type ApplyPlan =
+  | { kind: 'schedule'; weekday: Weekday; startMin: number; weekdays: Weekday[] }
+  | { kind: 'reschedule'; sessionId: number; startsAt: string }
+  | { kind: 'oneshot'; startsAt: string }
+  | { kind: 'new_session'; startsAt: string };
+
 /**
  * `POST /api/polls/:id/apply` — лише майстер, лише закрите голосування; варіант — `optionId`
- * або переможець (немає — 409 `POLL_NO_WINNER`). Застосовує наявними сервісами (їхні перевірки
- * й події): `regular` — нове правило розкладу (`changeScheduleRule`: щотижня або раз на два
- * тижні, якщо гра вже так, один день — день варіанта, перша сесія — найближча майбутня);
- * `one_off` — перенесення цільової сесії (`rescheduleSession`), для ваншота без неї — його
- * єдиної сесії, для кампейну без неї — нова разова сесія (`createManualSession`).
- * Ідемпотентно: `applied_at` ставиться умовним `UPDATE` до виклику сервісу (повтор чи
- * паралельний запит повертає поточний стан), а помилка сервісу його знімає.
+ * або переможець (немає — 409 `POLL_NO_WINNER`); кампейн на паузі — 409 `GAME_PAUSED`
+ * (спершу відновлення). Застосовує наявними сервісами (їхні перевірки й події):
+ * - `regular` — нове правило розкладу (`changeScheduleRule`): щотижня або раз на два тижні,
+ *   якщо гра вже так; дні — `weekdays` (мають містити день варіанта) або, якщо в грі ≤ 1 дня,
+ *   день варіанта; кілька днів без `weekdays` — 409 `POLL_APPLY_CONFIRM` з
+ *   `details.currentWeekdays`. У правила один час початку — час варіанта стає часом усіх днів.
+ *   Перша сесія — найближча майбутня в день варіанта.
+ * - `one_off` з цільовою сесією — її перенесення (`rescheduleSession`); сесії вже немає чи вона
+ *   не запланована — 409 `SESSION_INVALID_STATE`, якщо не передано `asNewSession: true`.
+ * - `one_off` без цілі — для ваншота його єдина сесія, для кампейну нова разова сесія
+ *   (`createManualSession`, подія `session.created`).
+ *
+ * Ідемпотентність і паралельність: захоплення — умовний `UPDATE` (`applying_at`, лише якщо
+ * `applied_at IS NULL` і немає свіжого захоплення); паралельний виклик під час застосування —
+ * 409 `POLL_APPLY_PENDING`; після — поточний результат. Фіналізація одним `UPDATE` пише
+ * `applied_at`, варіант і сесію разом, тож результат ніколи не буває «напівзаписаним».
+ * Помилка сервісу знімає захоплення. Лишається вікно збою: процес упав після сервісу, але до
+ * фіналізації — через `POLL_APPLY_STALE_MS` захоплення вважається покинутим, і повтор виконає
+ * сервіс удруге (новий розклад/перенесення ідемпотентні за змістом; разова сесія кампейну
+ * може задублюватись).
  */
 export async function applyPoll(
   deps: AppDeps,
   userId: number,
   pollId: number,
   body: unknown,
+  now: Date = new Date(),
 ): Promise<PollApplyResultDto> {
   const input = pollApplySchema.parse(body ?? {});
   const p = await loadPollRow(deps, pollId);
   const game = await loadGmGame(deps, userId, p.gameId);
-  const resultOf = (row: PollRow, dto: PollDto): PollApplyResultDto => ({
-    poll: dto,
-    applied:
-      row.kind === 'regular' || row.appliedSessionId === null
-        ? { kind: 'schedule' }
-        : { kind: 'session', sessionId: row.appliedSessionId },
-  });
-  if (p.appliedAt) return resultOf(p, await pollDto(deps, pollId, userId));
+  if (p.appliedAt) return resultOf(deps, p, userId);
   if (p.status !== 'closed') throw new AppError(409, 'POLL_OPEN');
+  if (p.applyingAt && p.applyingAt.getTime() > now.getTime() - POLL_APPLY_STALE_MS) {
+    throw new AppError(409, 'POLL_APPLY_PENDING');
+  }
+  if (game.status === 'paused') throw new AppError(409, 'GAME_PAUSED');
   const dto = await pollDto(deps, pollId, userId);
   const optionId = input.optionId ?? dto.winnerOptionId;
   if (optionId === null) throw new AppError(409, 'POLL_NO_WINNER');
@@ -497,70 +559,144 @@ export async function applyPoll(
   if (!option) {
     throw new AppError(400, 'VALIDATION', { reason: 'UNKNOWN_OPTION', path: ['optionId'] });
   }
+  const plan = await planApply(deps, game, p, option, input);
   const [claim] = await deps.db
     .update(polls)
-    .set({ appliedAt: new Date(), appliedOptionId: optionId })
-    .where(and(eq(polls.id, pollId), eq(polls.status, 'closed'), isNull(polls.appliedAt)));
+    .set({ applyingAt: now })
+    .where(
+      and(
+        eq(polls.id, pollId),
+        eq(polls.status, 'closed'),
+        isNull(polls.appliedAt),
+        or(
+          isNull(polls.applyingAt),
+          lt(polls.applyingAt, new Date(now.getTime() - POLL_APPLY_STALE_MS)),
+        ),
+      ),
+    );
   if (claim.affectedRows !== 1) {
     const fresh = await loadPollRow(deps, pollId);
-    return resultOf(fresh, await pollDto(deps, pollId, userId));
+    if (fresh.appliedAt) return resultOf(deps, fresh, userId);
+    throw new AppError(409, 'POLL_APPLY_PENDING');
   }
-  let sessionId: number | null = null;
+  let sessionId: number | null;
   try {
-    sessionId = await applyOption(deps, userId, game, p, option);
+    sessionId = await runPlan(deps, userId, game, plan);
   } catch (err) {
-    await deps.db
-      .update(polls)
-      .set({ appliedAt: null, appliedOptionId: null })
-      .where(eq(polls.id, pollId));
+    await deps.db.update(polls).set({ applyingAt: null }).where(eq(polls.id, pollId));
     throw err;
   }
-  if (sessionId !== null) {
-    await deps.db.update(polls).set({ appliedSessionId: sessionId }).where(eq(polls.id, pollId));
-  }
-  const fresh = await loadPollRow(deps, pollId);
-  return resultOf(fresh, await pollDto(deps, pollId, userId));
+  await deps.db
+    .update(polls)
+    .set({
+      appliedAt: new Date(),
+      appliedOptionId: optionId,
+      appliedSessionId: sessionId,
+      applyingAt: null,
+    })
+    .where(eq(polls.id, pollId));
+  pollsChanged(deps, p.gameId);
+  return resultOf(deps, await loadPollRow(deps, pollId), userId);
 }
 
-/** Виконує варіант; повертає сесію (разовий варіант) або `null` (новий розклад). */
-async function applyOption(
+async function resultOf(deps: AppDeps, row: PollRow, userId: number): Promise<PollApplyResultDto> {
+  return {
+    poll: await pollDto(deps, row.id, userId),
+    applied:
+      row.appliedSessionId === null
+        ? { kind: 'schedule' }
+        : { kind: 'session', sessionId: row.appliedSessionId },
+  };
+}
+
+/** Перевірки до захоплення: що застосовувати, або відмова (409/400) без побічних ефектів. */
+async function planApply(
   deps: AppDeps,
-  userId: number,
   game: GameRow,
   poll: PollRow,
   option: OptionRow,
-): Promise<number | null> {
+  input: { weekdays?: Weekday[]; asNewSession?: boolean },
+): Promise<ApplyPlan> {
   if (poll.kind === 'regular') {
     const weekday = option.weekday as Weekday;
-    const startsAt = nextWeeklyStart(game.timezone, weekday, option.startMin ?? 0, new Date());
-    await changeScheduleRule(
-      deps,
-      userId,
-      game.id,
-      {
-        startsAt: startsAt.toISOString(),
-        recurrence: game.recurrence === 'biweekly' ? 'biweekly' : 'weekly',
-        weekdays: [weekday],
-      },
-      'schedule',
-    );
-    return null;
+    const current = game.weekdays as Weekday[];
+    let weekdays = input.weekdays;
+    if (weekdays) {
+      if (!weekdays.includes(weekday)) {
+        throw new AppError(400, 'VALIDATION', {
+          reason: 'WEEKDAYS_MISSING_OPTION',
+          path: ['weekdays'],
+        });
+      }
+    } else if (current.length <= 1) {
+      weekdays = [weekday];
+    } else {
+      throw new AppError(409, 'POLL_APPLY_CONFIRM', { currentWeekdays: current });
+    }
+    return { kind: 'schedule', weekday, startMin: option.startMin ?? 0, weekdays };
   }
   const startsAt = option.startsAt.toISOString();
-  let target = poll.sessionId;
-  if (target === null && game.kind === 'oneshot') {
-    // Ваншот: його єдина запланована сесія (матеріалізуємо, якщо ще немає).
-    await materializeSessions(deps, game.id);
+  if (poll.sessionId !== null) {
     const [s] = await deps.db
-      .select({ id: gameSessions.id })
+      .select({ gameId: gameSessions.gameId, status: gameSessions.status })
       .from(gameSessions)
-      .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'scheduled')))
-      .orderBy(asc(gameSessions.startsAt))
-      .limit(1);
-    if (!s) throw new AppError(409, 'SESSION_INVALID_STATE');
-    target = s.id;
+      .where(eq(gameSessions.id, poll.sessionId));
+    if (s && s.gameId === game.id && s.status === 'scheduled') {
+      return { kind: 'reschedule', sessionId: poll.sessionId, startsAt };
+    }
+    // Намір був перенести саме цю сесію — без явної згоди нову не створюємо.
+    if (!input.asNewSession) throw new AppError(409, 'SESSION_INVALID_STATE');
   }
-  if (target === null) return (await createManualSession(deps, userId, game.id, startsAt)).id;
-  await rescheduleSession(deps, userId, target, { startsAt });
-  return target;
+  return game.kind === 'oneshot'
+    ? { kind: 'oneshot', startsAt }
+    : { kind: 'new_session', startsAt };
+}
+
+/** Виконує план; повертає сесію (разовий варіант) або `null` (новий розклад). */
+async function runPlan(
+  deps: AppDeps,
+  userId: number,
+  game: GameRow,
+  plan: ApplyPlan,
+): Promise<number | null> {
+  switch (plan.kind) {
+    case 'schedule': {
+      const startsAt = nextWeeklyStart(game.timezone, plan.weekday, plan.startMin, new Date());
+      await changeScheduleRule(
+        deps,
+        userId,
+        game.id,
+        {
+          startsAt: startsAt.toISOString(),
+          recurrence: game.recurrence === 'biweekly' ? 'biweekly' : 'weekly',
+          weekdays: plan.weekdays,
+        },
+        'schedule',
+      );
+      return null;
+    }
+    case 'reschedule':
+      await rescheduleSession(deps, userId, plan.sessionId, { startsAt: plan.startsAt });
+      return plan.sessionId;
+    case 'oneshot': {
+      // Ваншот: його єдина запланована сесія (матеріалізуємо, якщо ще немає).
+      await materializeSessions(deps, game.id);
+      const [s] = await deps.db
+        .select({ id: gameSessions.id })
+        .from(gameSessions)
+        .where(and(eq(gameSessions.gameId, game.id), eq(gameSessions.status, 'scheduled')))
+        .orderBy(asc(gameSessions.startsAt))
+        .limit(1);
+      if (!s) throw new AppError(409, 'SESSION_INVALID_STATE');
+      await rescheduleSession(deps, userId, s.id, { startsAt: plan.startsAt });
+      return s.id;
+    }
+    case 'new_session':
+      return (await createManualSession(deps, userId, game.id, plan.startsAt)).id;
+  }
+}
+
+/** Голосування гри змінились: пінг `polls` майстру й активним учасникам. */
+function pollsChanged(deps: AppDeps, gameId: number): void {
+  emitGameChanged(deps, gameId, 'polls', 'members');
 }

@@ -32,6 +32,7 @@
     "session": {
       "rescheduled": "🗓️ Сесію гри «{game}» перенесено: було {from}, тепер {when}.",
       "cancelled": "❌ Сесію гри «{game}» ({when}) скасовано.",
+      "created": "🗓️ У грі «{game}» додано сесію: {when}. Чи будеш?",
       "reminder": "⏰ Нагадування: сесія гри «{game}» почнеться {offset} — {when}.",
       "reminder_nooffset": "⏰ Нагадування: сесія гри «{game}» — {when}."
     },

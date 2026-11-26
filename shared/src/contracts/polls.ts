@@ -19,8 +19,11 @@ export type PollKind = (typeof POLL_KINDS)[number];
 export const POLL_STATUSES = ['open', 'closed'] as const;
 export type PollStatus = (typeof POLL_STATUSES)[number];
 
-/** Чому закрито: проголосували всі активні учасники, настав дедлайн, закрив майстер. */
-export const POLL_CLOSE_REASONS = ['all_voted', 'deadline', 'gm'] as const;
+/**
+ * Чому закрито: проголосували всі активні учасники, настав дедлайн, закрив майстер, гру
+ * завершено чи скасовано (`game_closed` — без сповіщення майстру).
+ */
+export const POLL_CLOSE_REASONS = ['all_voted', 'deadline', 'gm', 'game_closed'] as const;
 export type PollCloseReason = (typeof POLL_CLOSE_REASONS)[number];
 
 /** «Можу / не можу / якщо треба». */
@@ -80,6 +83,14 @@ export const pollCreateSchema = z
       .strict(),
   ])
   .superRefine((p, ctx) => {
+    // Разові варіанти — після дедлайну: інакше сесія могла б настати до кінця голосування.
+    if (p.kind === 'one_off' && p.options.some((o) => o.startsAt <= p.closesAt)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['options'],
+        message: 'Options must start after closesAt',
+      });
+    }
     const keys = p.options.map((o) =>
       'startsAt' in o ? o.startsAt : `${o.weekday}:${o.startMin}`,
     );
@@ -111,9 +122,27 @@ export const pollVotesSchema = z
   });
 export type PollVotesInput = z.input<typeof pollVotesSchema>;
 
-/** Тіло `POST /api/polls/:id/apply`: без `optionId` — переможець. */
+/**
+ * Тіло `POST /api/polls/:id/apply`: без `optionId` — переможець.
+ * `weekdays` (лише `regular`) — дні нового правила; мають містити день варіанта. Правило має
+ * один час початку для всіх днів. Якщо в грі зараз кілька днів і `weekdays` не передано —
+ * 409 `POLL_APPLY_CONFIRM` з `details.currentWeekdays` (майстер обирає: замінити дні днем
+ * варіанта чи додати його до наявних — з часом варіанта для всіх днів).
+ * `asNewSession` (лише `one_off` з цільовою сесією) — цільової сесії вже немає чи вона не
+ * запланована: створити нову разову сесію (без нього — 409 `SESSION_INVALID_STATE`).
+ */
 export const pollApplySchema = z
-  .object({ optionId: z.number().int().positive().optional() })
+  .object({
+    optionId: z.number().int().positive().optional(),
+    weekdays: z
+      .array(z.number().int().min(0).max(6))
+      .min(1)
+      .max(7)
+      .refine((a) => new Set(a).size === a.length, 'Duplicate weekdays')
+      .transform((a) => [...a].sort((x, y) => x - y) as Weekday[])
+      .optional(),
+    asNewSession: z.boolean().optional(),
+  })
   .strict();
 export type PollApplyInput = z.input<typeof pollApplySchema>;
 

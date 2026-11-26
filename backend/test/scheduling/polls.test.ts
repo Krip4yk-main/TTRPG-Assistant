@@ -169,7 +169,7 @@ describe('polls: permissions (RF 2)', () => {
     await bad(oneOffBody({ closesAt: deadline(-1) }), 400);
     await bad(
       oneOffBody({ options: [{ startsAt: kyivAt(-2).iso }, { startsAt: kyivAt(5).iso }] }),
-      422,
+      400, // раніше дедлайну (і в минулому)
     );
     await bad(oneOffBody({ sessionId: 999_999 }), 400);
     await bad(
@@ -523,5 +523,207 @@ describe('polls: Telegram buttons (RF 2)', () => {
     expect((await db.select().from(pollVotes).where(eq(pollVotes.userId, a.id)))[0]!.value).toBe(
       'yes',
     );
+  });
+});
+
+describe('polls: review fixes', () => {
+  const regularBody = (weekday: Weekday, startMin = 20 * 60) => ({
+    kind: 'regular',
+    options: [
+      { weekday, startMin },
+      { weekday: ((weekday + 1) % 7) as Weekday, startMin },
+    ],
+    closesAt: deadline(),
+  });
+
+  it('multi-day campaign: apply asks to confirm the days; weekdays must include the option day', async () => {
+    const second = ((first.weekday + 3) % 7) as Weekday;
+    const { gm, a, b, gameId } = await group({ weekdays: [first.weekday, second].sort() });
+    const target = ((first.weekday + 1) % 7) as Weekday;
+    const poll = await createPoll(gm, gameId, regularBody(target));
+    await votes(a, poll, ['yes', 'no']);
+    await votes(b, poll, ['yes', 'no']);
+    const ask = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {});
+    expect(ask.status).toBe(409);
+    expect(ask.body.error.code).toBe('POLL_APPLY_CONFIRM');
+    expect(ask.body.error.details).toEqual({ currentWeekdays: [first.weekday, second].sort() });
+    expect(await pollRow(poll.id)).toMatchObject({ appliedAt: null, applyingAt: null });
+    const wrong = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {
+      weekdays: [first.weekday, second],
+    });
+    expect(wrong.status).toBe(400);
+    // «Додатково»: наявні дні + день варіанта, один час для всіх.
+    const days = [first.weekday, second, target];
+    const ok = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, { weekdays: days });
+    expect(ok.status).toBe(200);
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.weekdays).toEqual([...days].sort((x, y) => x - y));
+    const z = toZoned(g!.startsAt, KYIV);
+    expect([z.weekday, z.hour, z.minute]).toEqual([target, 20, 0]);
+  });
+
+  it('a new campaign session notifies members (session.created) with RSVP buttons', async () => {
+    const { gm, a, b, gameId } = await group();
+    await db.insert(authIdentities).values({ userId: a.id, provider: 'telegram', subject: '9101' });
+    const poll = await createPoll(gm, gameId);
+    await votes(a, poll, ['yes', 'no']);
+    await votes(b, poll, ['yes', 'no']);
+    await dispatchEvents(deps);
+    await db.delete(telegramOutbox);
+    const res = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {});
+    const sessionId = res.body.applied.sessionId as number;
+    await dispatchEvents(deps);
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.type, 'session.created'))
+      .orderBy(asc(notifications.userId));
+    expect(rows.map((r) => r.userId)).toEqual([a.id, b.id]);
+    expect(rows[0]).toMatchObject({ category: 'sessions', entityId: sessionId });
+    expect(rows[0]!.payload).toMatchObject({ sessionId, startsAt: poll.options[0]!.startsAt });
+    const [out] = await db.select().from(telegramOutbox);
+    expect(out!.buttons).toEqual([
+      { action: 'rsvp', sessionId, value: 'going' },
+      { action: 'rsvp', sessionId, value: 'not_going' },
+    ]);
+  });
+
+  it('a reschedule poll whose session is gone → 409 unless asNewSession', async () => {
+    const { gm, a, b, gameId } = await group();
+    await call('get', `/api/games/${gameId}/sessions`, gm.cookie);
+    const [s] = await db
+      .select()
+      .from(gameSessions)
+      .where(eq(gameSessions.gameId, gameId))
+      .orderBy(asc(gameSessions.startsAt));
+    const poll = await createPoll(gm, gameId, oneOffBody({ sessionId: s!.id }));
+    await votes(a, poll, ['yes', 'no']);
+    await votes(b, poll, ['yes', 'no']);
+    const c = await call('post', `/api/sessions/${s!.id}/cancel`, gm.cookie, { reason: 'Хворію' });
+    expect(c.status).toBe(200);
+    const refused = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {});
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('SESSION_INVALID_STATE');
+    expect(await pollRow(poll.id)).toMatchObject({ appliedAt: null, applyingAt: null });
+    const forced = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {
+      asNewSession: true,
+    });
+    expect(forced.status).toBe(200);
+    expect(forced.body.applied.sessionId).not.toBe(s!.id);
+    const [created] = await db
+      .select()
+      .from(gameSessions)
+      .where(eq(gameSessions.id, forced.body.applied.sessionId));
+    expect(created).toMatchObject({ origin: 'manual' });
+  });
+
+  it('paused campaign: create and vote allowed, apply → GAME_PAUSED', async () => {
+    const { gm, a, b, gameId } = await group();
+    expect((await call('post', `/api/games/${gameId}/start`, gm.cookie)).status).toBe(200);
+    const pause = await call('post', `/api/games/${gameId}/pause`, gm.cookie, {
+      reason: 'vacation',
+    });
+    expect(pause.status).toBe(200);
+    const poll = await createPoll(gm, gameId, regularBody(first.weekday));
+    expect((await votes(a, poll, ['yes', 'no'])).status).toBe(200);
+    expect((await votes(b, poll, ['yes', 'no'])).status).toBe(200);
+    const res = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {});
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('GAME_PAUSED');
+  });
+
+  it('cancelled game: voting refused and closes the poll; the job closes the rest silently', async () => {
+    const { gm, a, gameId } = await group();
+    const p1 = await createPoll(gm, gameId);
+    const p2 = await createPoll(gm, gameId);
+    expect((await call('post', `/api/games/${gameId}/cancel`, gm.cookie)).status).toBe(200);
+    const late = await votes(a, p1, ['yes', 'yes']);
+    expect(late.status).toBe(409);
+    expect(late.body.error.code).toBe('POLL_CLOSED');
+    expect(await pollRow(p1.id)).toMatchObject({ status: 'closed', closeReason: 'game_closed' });
+    expect(await runPollsClose(deps)).toBe(1);
+    expect((await pollRow(p2.id)).closeReason).toBe('game_closed');
+    await dispatchEvents(deps);
+    const gmPoll = (
+      await db.select().from(notifications).where(eq(notifications.userId, gm.id))
+    ).filter((n) => n.type === 'poll.closed');
+    expect(gmPoll).toEqual([]);
+  });
+
+  it('concurrent apply never reports a wrong result; a fresh claim blocks, a stale one is taken over', async () => {
+    const { gm, a, b, gameId } = await group();
+    const poll = await createPoll(gm, gameId);
+    await votes(a, poll, ['yes', 'no']);
+    await votes(b, poll, ['yes', 'no']);
+    await db.update(polls).set({ applyingAt: new Date() }).where(eq(polls.id, poll.id));
+    const pending = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {});
+    expect(pending.status).toBe(409);
+    expect(pending.body.error.code).toBe('POLL_APPLY_PENDING');
+    await db
+      .update(polls)
+      .set({ applyingAt: new Date(Date.now() - 10 * 60_000) })
+      .where(eq(polls.id, poll.id));
+    const [r1, r2] = await Promise.all([
+      call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {}),
+      call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {}),
+    ]);
+    const oks = [r1, r2].filter((r) => r.status === 200);
+    expect(oks.length).toBeGreaterThanOrEqual(1);
+    for (const r of [r1, r2]) {
+      if (r.status === 200) expect(r.body.applied.kind).toBe('session');
+      else expect(r.body.error.code).toBe('POLL_APPLY_PENDING');
+    }
+    const manual = await db
+      .select()
+      .from(gameSessions)
+      .where(and(eq(gameSessions.gameId, gameId), eq(gameSessions.origin, 'manual')));
+    expect(manual).toHaveLength(1);
+    expect(await pollRow(poll.id)).toMatchObject({ applyingAt: null });
+  });
+
+  it('one-off options must start after the deadline', async () => {
+    const { gm, gameId } = await group();
+    const r = await call(
+      'post',
+      `/api/games/${gameId}/polls`,
+      gm.cookie,
+      oneOffBody({ closesAt: deadline(5.5) }),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  it('live updates: «polls» ping to the members room on create, vote, close and apply', async () => {
+    const pings: { room: string; payload: unknown }[] = [];
+    const hub = {
+      toRoom: (room: string, _e: string, payload: unknown) => pings.push({ room, payload }),
+      toUser: () => {},
+      joinRoom: () => {},
+      leaveRoom: () => {},
+      disconnectUser: () => {},
+      disconnectSession: () => {},
+    };
+    const rt = { ...deps, realtime: hub } as unknown as typeof deps;
+    const svc = await import('../../src/scheduling/polls.service.js');
+    const { gm, a, b, gameId } = await group();
+    const polled = () =>
+      pings.filter(
+        (p) =>
+          p.room === `game-members:${gameId}` && (p.payload as { scope: string }).scope === 'polls',
+      ).length;
+    const poll = await svc.createPoll(rt, gm.id, gameId, oneOffBody());
+    expect(polled()).toBe(1);
+    await svc.vote(rt, a.id, poll.id, {
+      votes: poll.options.map((o) => ({ optionId: o.id, value: 'yes' })),
+    });
+    expect(polled()).toBe(2);
+    await svc.vote(rt, b.id, poll.id, {
+      votes: poll.options.map((o) => ({ optionId: o.id, value: 'no' })),
+    });
+    expect(polled()).toBe(4); // голос + закриття «всі проголосували»
+    await svc.applyPoll(rt, gm.id, poll.id, {});
+    expect(polled()).toBe(5);
+    const p2 = await svc.createPoll(rt, gm.id, gameId, oneOffBody());
+    await svc.closePollByGm(rt, gm.id, p2.id);
+    expect(polled()).toBe(7);
   });
 });

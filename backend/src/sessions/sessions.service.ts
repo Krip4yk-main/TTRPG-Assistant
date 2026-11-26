@@ -219,6 +219,7 @@ export async function rescheduleSession(
  * Додаткова разова сесія кампейну (`origin='manual'`, без слоту правила) — застосування
  * разового голосування за час без цільової сесії (Plan 12). Лише майстер (перевіряє
  * викликач), гра набирає чи йде, час — ціла хвилина в майбутньому; тривалість — з гри.
+ * Подія `session.created` — учасникам сповіщення з RSVP-кнопками в Telegram.
  */
 export async function createManualSession(
   deps: AppDeps,
@@ -245,6 +246,13 @@ export async function createManualSession(
       })
       .$returningId();
     return res!.id;
+  });
+  await logEvent(deps.db, {
+    type: 'session.created',
+    userId,
+    entityType: 'session',
+    entityId: sessionId,
+    payload: { gameId, startsAt: startsAt.toISOString() },
   });
   await afterGmSessionChange(deps, userId, gameId, sessionId);
   return reload(deps, userId, sessionId);
