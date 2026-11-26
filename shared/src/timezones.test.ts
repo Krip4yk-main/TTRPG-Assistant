@@ -15,7 +15,13 @@ describe('timezones', () => {
   });
 
   it('блокує пояси за містами Росії, але не Сімферополь і Мінськ', () => {
-    for (const tz of ['Europe/Moscow', 'W-SU', 'Europe/Kaliningrad', 'Asia/Vladivostok']) {
+    for (const tz of [
+      'Europe/Moscow',
+      'W-SU',
+      'europe/moscow',
+      'Europe/Kaliningrad',
+      'Asia/Vladivostok',
+    ]) {
       expect(isBlockedTimezone(tz)).toBe(true);
     }
     for (const tz of ['Europe/Simferopol', 'Europe/Minsk', 'Europe/Kyiv', 'Europe/Kiev']) {
@@ -50,5 +56,13 @@ describe('timezones', () => {
     expect(ianaTimezone.safeParse('Europe/Moscow').success).toBe(false);
     expect(ianaTimezone.safeParse('Asia/Kamchatka').success).toBe(false);
     expect(ianaTimezone.safeParse('Not/AZone').success).toBe(false);
+    // Інше написання не обходить блокування й нормалізацію.
+    expect(ianaTimezone.safeParse('europe/moscow').success).toBe(false);
+    expect(ianaTimezone.safeParse('EUROPE/MOSCOW').success).toBe(false);
+    expect(ianaTimezone.parse('europe/kiev')).toBe('Europe/Kyiv');
+    expect(ianaTimezone.parse('europe/warsaw')).toBe('Europe/Warsaw');
+    expect(ianaTimezone.parse('Asia/Kolkata')).toBe('Asia/Kolkata');
+    expect(ianaTimezone.parse('UTC')).toBe('UTC');
+    expect(ianaTimezone.safeParse('W-SU').success).toBe(false);
   });
 });

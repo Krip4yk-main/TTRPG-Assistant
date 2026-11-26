@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BLOCKED_TIMEZONES, normalizeTimezone } from '../timezones.js';
+import { canonicalTimezone, isBlockedTimezone } from '../timezones.js';
 
 /** Календарна дата `YYYY-MM-DD`, що реально існує. */
 export const isoDate = z
@@ -17,13 +17,6 @@ export const isoDate = z
  */
 export const ianaTimezone = z
   .string()
-  .transform(normalizeTimezone)
-  .refine((tz) => {
-    try {
-      new Intl.DateTimeFormat('en', { timeZone: tz });
-      return true;
-    } catch {
-      return false;
-    }
-  }, 'Invalid IANA timezone')
-  .refine((tz) => !BLOCKED_TIMEZONES.has(tz), 'Timezone not allowed');
+  .transform((tz) => canonicalTimezone(tz) ?? tz)
+  .refine((tz) => canonicalTimezone(tz) !== null, 'Invalid IANA timezone')
+  .refine((tz) => !isBlockedTimezone(tz), 'Timezone not allowed');

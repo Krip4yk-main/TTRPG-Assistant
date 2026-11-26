@@ -44,9 +44,47 @@ export function normalizeTimezone(tz: string): string {
   return RENAMED[tz] ?? tz;
 }
 
-/** Чи заблокований пояс для вибору (з урахуванням нормалізації назви). */
+/** Як пояс розуміє `Intl` (псевдоніми розгорнуті); `null` — пояс невідомий. */
+function resolvedZone(tz: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en', { timeZone: tz }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
+let byLowerCase: Map<string, string> | null = null;
+
+/** Написання поясу з переліку `Intl` без урахування регістру (`europe/warsaw` → `Europe/Warsaw`). */
+function properCase(tz: string): string {
+  if (!byLowerCase) {
+    byLowerCase = new Map();
+    try {
+      for (const name of Intl.supportedValuesOf('timeZone'))
+        byLowerCase.set(name.toLowerCase(), name);
+    } catch {
+      // Немає переліку — лишаємо написання як є.
+    }
+  }
+  return byLowerCase.get(tz.toLowerCase()) ?? tz;
+}
+
+/**
+ * Назва поясу для збереження: правильний регістр (`europe/warsaw` → `Europe/Warsaw`) і
+ * правильні назви (`Europe/Kyiv`); `null` — пояс невідомий. Інші назви не переписуються
+ * (`Asia/Kolkata` лишається `Asia/Kolkata`, хоч рушій може знати її як `Asia/Calcutta`).
+ */
+export function canonicalTimezone(tz: string): string | null {
+  return resolvedZone(tz) === null ? null : normalizeTimezone(properCase(tz));
+}
+
+/** Чи заблокований пояс для вибору (будь-яке написання й псевдоніми, напр. `W-SU`). */
 export function isBlockedTimezone(tz: string): boolean {
-  return BLOCKED_TIMEZONES.has(normalizeTimezone(tz));
+  const resolved = resolvedZone(tz);
+  return (
+    BLOCKED_TIMEZONES.has(canonicalTimezone(tz) ?? normalizeTimezone(tz)) ||
+    (resolved !== null && BLOCKED_TIMEZONES.has(resolved))
+  );
 }
 
 /**
@@ -65,6 +103,5 @@ export function selectableTimezones(source: readonly string[]): string[] {
 /** Пояс для підстановки за замовчуванням: нормалізований, а заблокований → `Europe/Kyiv`. */
 export function safeDefaultTimezone(tz: string | null | undefined): string {
   if (!tz) return DEFAULT_TIMEZONE;
-  const name = normalizeTimezone(tz);
-  return BLOCKED_TIMEZONES.has(name) ? DEFAULT_TIMEZONE : name;
+  return isBlockedTimezone(tz) ? DEFAULT_TIMEZONE : (canonicalTimezone(tz) ?? DEFAULT_TIMEZONE);
 }

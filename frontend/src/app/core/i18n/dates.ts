@@ -5,7 +5,14 @@ import {
   NativeDateAdapter,
   provideNativeDateAdapter,
 } from '@angular/material/core';
-import { dayNumber, fromDayNumber, toZoned, zonedToUtc, type Weekday } from '@nri/shared';
+import {
+  dayNumber,
+  fromDayNumber,
+  toZoned,
+  weekdayOf,
+  zonedToUtc,
+  type Weekday,
+} from '@nri/shared';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -157,25 +164,36 @@ export function utcToZonedInput(iso: string, timeZone: string): { date: Date; ti
 
 /**
  * Тижневий розклад гри (дні тижня й час у поясі гри) — у поясі глядача: кожен день
- * переводиться окремо, бо в іншому поясі сесія може припасти на сусідній день. Дні —
- * без повторів, від понеділка; час — першої сесії.
+ * переводиться окремо, бо в іншому поясі сесія може припасти на сусідній день. Рахується
+ * для найближчого тижня від `now` (не від першої сесії), щоб літній/зимовий час був
+ * поточним. Дні — без повторів, від понеділка; час — найближчої з цих сесій.
  */
 export function weeklyInZone(
   startsAt: string,
   gameTz: string,
   weekdays: readonly Weekday[],
   viewerTz: string,
+  now: Date = new Date(),
 ): { weekdays: Weekday[]; time: string } {
   try {
     const first = toZoned(new Date(startsAt), gameTz);
-    const base = dayNumber(first.year, first.month, first.day);
+    const today = toZoned(now, gameTz);
+    const base = Math.max(
+      dayNumber(first.year, first.month, first.day),
+      dayNumber(today.year, today.month, today.day),
+    );
+    const baseDay = fromDayNumber(base);
+    const baseWeekday = weekdayOf(baseDay.year, baseDay.month, baseDay.day);
     const out = new Set<Weekday>();
+    let earliest: Date | null = null;
     for (const d of weekdays) {
-      const day = fromDayNumber(base + ((d - first.weekday + 7) % 7));
+      const day = fromDayNumber(base + ((d - baseWeekday + 7) % 7));
       const at = zonedToUtc({ ...day, hour: first.hour, minute: first.minute }, gameTz);
       out.add(toZoned(at, viewerTz).weekday);
+      if (!earliest || at < earliest) earliest = at;
     }
-    return { weekdays: [...out].sort((a, b) => a - b), time: formatTime(startsAt, viewerTz) };
+    const timeAt = earliest ? earliest.toISOString() : startsAt;
+    return { weekdays: [...out].sort((a, b) => a - b), time: formatTime(timeAt, viewerTz) };
   } catch {
     return { weekdays: [...weekdays], time: formatTime(startsAt, gameTz) };
   }
