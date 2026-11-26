@@ -359,3 +359,97 @@ describe('commonTimesQuerySchema', () => {
     expect(commonTimesQuerySchema.safeParse({ x: '1' }).success).toBe(false);
   });
 });
+
+describe('import-only participants (iCal without weekly slots)', () => {
+  it('«can» only within 09:00–24:00 of their own zone; a night candidate is not ranked first', () => {
+    const gm = person({
+      userId: 1,
+      slots: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ weekday: d as 0, startMin: 0, endMin: 1440 })),
+    });
+    // Лише імпорт, жодних подій: раніше «може» цілодобово — і нічний 00:00 вигравав (раніший час).
+    const imp = person({ userId: 2, hasCalendar: true });
+    const day = new Date('2027-03-15T22:00:00Z'); // вт 00:00 Kyiv
+    const dto = findCommonTimes({
+      timezone: KYIV,
+      durationMinutes: 120,
+      from: day,
+      to: new Date(day.getTime() + DAY),
+      people: [gm, imp],
+      regular: false,
+    });
+    const first = dto.oneOff[0]!;
+    expect(first.can).toBe(2);
+    // 09:00 Kyiv — найраніший час, коли обоє «можуть».
+    expect(first.startsAt).toBe('2027-03-16T07:00:00.000Z');
+    for (const c of dto.oneOff) {
+      const local = new Date(Date.parse(c.startsAt) + 2 * 3_600_000).getUTCHours();
+      if (local < 9) expect(c.statuses[1]!.status).toBe('unknown');
+    }
+
+    const [v] = evaluateGrid(
+      [
+        {
+          start: new Date('2027-03-16T06:30:00Z'),
+          end: new Date('2027-03-16T08:30:00Z'),
+          startMin: 0,
+        },
+        {
+          start: new Date('2027-03-16T07:00:00Z'),
+          end: new Date('2027-03-16T09:00:00Z'),
+          startMin: 0,
+        },
+        {
+          start: new Date('2027-03-16T20:00:00Z'),
+          end: new Date('2027-03-16T22:00:00Z'),
+          startMin: 0,
+        },
+        {
+          start: new Date('2027-03-16T21:00:00Z'),
+          end: new Date('2027-03-16T23:00:00Z'),
+          startMin: 0,
+        },
+      ] as never,
+      [imp],
+    );
+    // 08:30–10:30 — починається до 09:00; 09:00–11:00 — так; 22:00–24:00 — так; 23:00–01:00 — ні.
+    expect(v!.map((x) => x.status)).toEqual(['unknown', 'can', 'can', 'unknown']);
+    // Події з імпорту однаково «не може», зокрема й уночі.
+    const busyNight = person({
+      userId: 3,
+      hasCalendar: true,
+      busy: [{ start: new Date('2027-03-16T00:00:00Z'), end: new Date('2027-03-16T02:00:00Z') }],
+    });
+    const [b] = evaluateGrid(
+      [
+        {
+          start: new Date('2027-03-16T00:30:00Z'),
+          end: new Date('2027-03-16T01:30:00Z'),
+          startMin: 0,
+        },
+      ] as never,
+      [busyNight],
+    );
+    expect(b![0]!.status).toBe('cannot');
+  });
+
+  it('the waking window follows the participant zone, not the game zone', () => {
+    const ny = person({ userId: 2, hasCalendar: true, timezone: 'America/New_York' });
+    // 16:00 Kyiv = 10:00 New York (березень 2027: NY уже на літньому, UTC-4; Kyiv UTC+2).
+    const [v] = evaluateGrid(
+      [
+        {
+          start: new Date('2027-03-16T14:00:00Z'),
+          end: new Date('2027-03-16T16:00:00Z'),
+          startMin: 0,
+        },
+        {
+          start: new Date('2027-03-16T07:00:00Z'),
+          end: new Date('2027-03-16T09:00:00Z'),
+          startMin: 0,
+        },
+      ] as never,
+      [ny],
+    );
+    expect(v!.map((x) => x.status)).toEqual(['can', 'unknown']);
+  });
+});

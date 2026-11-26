@@ -170,6 +170,10 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
       text: p.note || null,
     };
   }
+  // Нагадування про календар тому, хто підключив лише імпорт iCal (як у боті).
+  if (n.type === 'calendar.empty' && p.hasImport === true) {
+    view.key = 'notifications.calendar.empty_imported';
+  }
   // «Не буду» кількох учасників одним сповіщенням — «X та ще N» (як у боті).
   if (n.type === 'session.rsvp_declined' && (p.count ?? 0) > 0) {
     view.key = 'notifications.session.rsvp_declined_many';

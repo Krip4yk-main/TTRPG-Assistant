@@ -153,6 +153,9 @@ describe('notificationView', () => {
     expect(String(lookup(many.key))).toContain('{{count}}');
     const cal = String(lookup('notifications.calendar.empty'));
     expect(cal).toContain('можете, не можете, чи це невідомо');
+    const imported = notificationView(dto('calendar.empty', { hasImport: true }), 'UTC');
+    expect(imported.key).toBe('notifications.calendar.empty_imported');
+    expect(String(lookup(imported.key))).toContain('звичні години');
   });
 
   it('schedule notifications: own icons, translated texts for every new type', () => {

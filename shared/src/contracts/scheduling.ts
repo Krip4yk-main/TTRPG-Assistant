@@ -9,6 +9,13 @@ export const COMMON_TIMES_MAX_WEEKS = 8;
 export const COMMON_TIMES_TOP = 5;
 /** Крок сітки кандидатів (хв, у поясі гри). */
 export const COMMON_TIMES_STEP_MINUTES = 30;
+/**
+ * Учасник з імпортованим календарем (iCal), але без тижневих слотів: імпорт знає лише, коли
+ * він зайнятий, а не коли зазвичай грає. Тож «може» він лише в типовий «час неспання»
+ * 09:00–24:00 свого поясу акаунта (якщо немає подій і сесій інших ігор); поза ним —
+ * «невідомо», інакше нічні варіанти виходили б нагору підбору.
+ */
+export const IMPORT_ONLY_WAKING_WINDOW = { startMin: 9 * 60, endMin: 24 * 60 } as const;
 
 /**
  * Статус учасника для кандидата: `unknown` — у нього немає календаря (ні тижневих слотів,
@@ -21,7 +28,10 @@ export interface CommonTimesParticipantDto {
   userId: number;
   nickname: string | null;
   isGm: boolean;
-  /** Є тижневі слоти або імпортований календар; інакше статус зазвичай `unknown`. */
+  /**
+   * Є тижневі слоти або імпортований календар; інакше статус зазвичай `unknown`. Лише імпорт
+   * без слотів — «може» тільки в `IMPORT_ONLY_WAKING_WINDOW` (09:00–24:00 його поясу).
+   */
   hasCalendar: boolean;
 }
 

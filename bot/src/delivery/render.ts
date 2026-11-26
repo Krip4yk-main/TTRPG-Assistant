@@ -122,6 +122,9 @@ export function renderNotification(
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
     }
+    // Нагадування про календар тому, хто підключив лише імпорт iCal: «додай звичні години».
+    if (kind === 'calendar.empty' && params.hasImport === true)
+      key = 'notify.calendar.empty_imported';
     // «Не буду» кількох учасників одним сповіщенням — «X та ще N».
     if (kind === 'session.rsvp_declined' && (params.count ?? 0) > 0) {
       key = 'notify.session.rsvp_declined_many';

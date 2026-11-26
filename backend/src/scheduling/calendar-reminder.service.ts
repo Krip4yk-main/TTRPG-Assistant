@@ -41,8 +41,11 @@ type DbLike = Db | Tx;
 
 /**
  * **Точка розширення** «у користувача немає даних календаря» — умова для `userId` (колонки
- * зовнішнього запиту): немає тижневих слотів і не підключено імпорт iCal — і вибірка
- * кандидатів, і перевірка в момент надсилання. Зайняті дати календарем не вважаються (як і в
+ * зовнішнього запиту): немає тижневих слотів — і вибірка кандидатів, і перевірка в момент
+ * надсилання. Підключений імпорт iCal нагадування **не** скасовує: імпорт знає лише
+ * зайнятість, а не звичні години гри (у підборі такий учасник «може» лише в 09:00–24:00 свого
+ * поясу, див. `IMPORT_ONLY_WAKING_WINDOW`), тож йому йде варіант тексту «додайте звичні
+ * години» (`params.hasImport`). Зайняті дати календарем не вважаються (як і в
  * підборі: без слотів учасник для майстра «невідомо»).
  */
 export function noCalendarData(db: DbLike, userId: AnyMySqlColumn): SQL[] {
@@ -52,16 +55,6 @@ export function noCalendarData(db: DbLike, userId: AnyMySqlColumn): SQL[] {
         .select({ x: sql`1` })
         .from(availabilitySlots)
         .where(eq(availabilitySlots.userId, userId)),
-    ),
-    // Підключений імпорт iCal (навіть ще не синхронізований чи «зламаний») — календар є:
-    // користувач уже зробив дію, нагадування про порожній календар йому ні до чого. Підбір
-    // часу суворіший (`importedBusyForUsers`): там рахується лише успішно синхронізований і
-    // не «зламаний» імпорт — інакше майстер бачив би «може» без даних.
-    notExists(
-      db
-        .select({ x: sql`1` })
-        .from(calendarImports)
-        .where(eq(calendarImports.userId, userId)),
     ),
   ];
 }
@@ -136,11 +129,19 @@ export async function runCalendarReminders(
             .ignore()
             .values({ userId, gameId: g.gameId, sentAt: now });
           if (ins.affectedRows === 0) return undefined;
+          const [imp] = await tx
+            .select({ userId: calendarImports.userId })
+            .from(calendarImports)
+            .where(eq(calendarImports.userId, userId));
           return createOptionalNotification(deps, tx, {
             userId,
             type: 'calendar.empty',
             category: 'schedule',
-            params: { gameId: g.gameId, gameTitle: g.gameTitle },
+            params: {
+              gameId: g.gameId,
+              gameTitle: g.gameTitle,
+              ...(imp ? { hasImport: true } : {}),
+            },
             entityType: 'game',
             entityId: g.gameId,
           });

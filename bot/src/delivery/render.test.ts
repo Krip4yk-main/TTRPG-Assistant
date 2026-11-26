@@ -524,6 +524,13 @@ describe('smart reschedule and calendar reminder', () => {
     expect(r.text).toContain('Детальніше: https://nri.example/calendar');
   });
 
+  it('calendar.empty with an import only: suggests adding usual hours', () => {
+    const r = render('calendar.empty', { gameId: 12, gameTitle: 'Гра', hasImport: true });
+    expect(r.text).toContain('звичні години');
+    expect(r.text).toContain('майстер гри «Гра»');
+    expect(r.text).toContain('Детальніше: https://nri.example/calendar');
+  });
+
   it('calendar.import_broken: no params, links to the calendar', () => {
     const r = render('calendar.import_broken', {});
     expect(r.text).toContain('автооновлення зупинено');

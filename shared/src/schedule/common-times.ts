@@ -2,6 +2,7 @@ import { normalizeSlots, type AvailabilityDto } from '../contracts/availability.
 import {
   COMMON_TIMES_STEP_MINUTES,
   COMMON_TIMES_TOP,
+  IMPORT_ONLY_WAKING_WINDOW,
   type CommonTimeStatus,
   type OneOffCandidateDto,
   type RegularCandidateDto,
@@ -25,6 +26,13 @@ import {
 const MINUTE = 60_000;
 const DAY = 86_400_000;
 
+/** «Час неспання» як тижневі слоти — для учасників лише з імпортом (без власних слотів). */
+const WAKING_SLOTS = ([0, 1, 2, 3, 4, 5, 6] as const).map((weekday) => ({
+  weekday,
+  startMin: IMPORT_ONLY_WAKING_WINDOW.startMin,
+  endMin: IMPORT_ONLY_WAKING_WINDOW.endMin,
+}));
+
 /** Учасник підбору: календар у його власному поясі + уже зібрані зайняті проміжки. */
 export interface CommonTimesPerson {
   userId: number;
@@ -36,7 +44,8 @@ export interface CommonTimesPerson {
   busy: readonly BusyInterval[];
   /**
    * Чи є в учасника календар: тижневі слоти АБО імпортована зайнятість. Без календаря
-   * учасник ніколи не «може» — лише «не може» (відомий конфлікт) або «невідомо».
+   * учасник ніколи не «може» — лише «не може» (відомий конфлікт) або «невідомо». Календар
+   * без слотів (лише імпорт) — «може» тільки в `IMPORT_ONLY_WAKING_WINDOW` свого поясу.
    */
   hasCalendar: boolean;
 }
@@ -165,7 +174,8 @@ export interface CommonTimeVerdict {
  *
  * «Не може»: дата відрізка — зайнята дата; перетин із `busy`; є тижневі слоти, але сесія
  * (розбита по днях у поясі учасника) не вміщується в них. Інакше «може», якщо є календар,
- * або «невідомо».
+ * або «невідомо». Календар без слотів (лише імпорт): поза 09:00–24:00 його поясу —
+ * «невідомо», а не «може» (`IMPORT_ONLY_WAKING_WINDOW`).
  */
 export function evaluateGrid(
   points: readonly GridPoint[],
@@ -184,6 +194,7 @@ export function evaluateGrid(
     const parts = partsFor(person.timezone);
     const slots = normalizeSlots(person.slots);
     const hasSlots = slots.length > 0;
+    const wakingOnly = !hasSlots && person.hasCalendar;
     const busyDates = new Set(person.busyDates);
     const isBusy = busyChecker(person.busy);
     return points.map((p, i): CommonTimeVerdict => {
@@ -193,6 +204,9 @@ export function evaluateGrid(
       }
       if (hasSlots && !segmentsFitSlots(segs, slots)) {
         return { status: 'cannot', outsideSlots: true };
+      }
+      if (wakingOnly && !segmentsFitSlots(segs, WAKING_SLOTS)) {
+        return { status: 'unknown', outsideSlots: false };
       }
       return { status: person.hasCalendar ? 'can' : 'unknown', outsideSlots: false };
     });

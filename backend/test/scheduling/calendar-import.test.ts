@@ -509,7 +509,7 @@ describe('imported busy in the finder and the reminder', () => {
     if (one) expect(one.statuses.find((s) => s.userId === p.id)!.status).toBe('cannot');
   });
 
-  it('a connected import counts as having a calendar for the empty-calendar reminder', async () => {
+  it('an import without weekly slots still gets the reminder, with the «usual hours» text', async () => {
     const gm = await userWithAge(30, 'gm');
     const p = await userWithAge(25, 'p');
     const q = await userWithAge(25, 'q');
@@ -529,6 +529,14 @@ describe('imported busy in the finder and the reminder', () => {
       );
     }
     await connect(p.id);
-    expect(await runCalendarReminders(deps, new Date(Date.now() + 25 * HOUR))).toEqual([q.id]);
+    const sent = await runCalendarReminders(deps, new Date(Date.now() + 25 * HOUR));
+    expect(sent.sort()).toEqual([p.id, q.id].sort());
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.type, 'calendar.empty'));
+    const byUser = new Map(rows.map((r) => [r.userId, r.payload]));
+    expect(byUser.get(p.id)).toMatchObject({ gameId, hasImport: true });
+    expect(byUser.get(q.id)).not.toHaveProperty('hasImport');
   });
 });

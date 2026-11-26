@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { and, asc, eq } from 'drizzle-orm';
-import { toZoned, zonedToUtc, type PollDto, type Weekday } from '@nri/shared';
+import { nextWeeklyStart, toZoned, zonedToUtc, type PollDto, type Weekday } from '@nri/shared';
 import { createApp } from '../../src/app.js';
 import {
   authIdentities,
@@ -283,6 +283,39 @@ describe('polls: voting and closing (RF 4)', () => {
       await db.select().from(notifications).where(eq(notifications.userId, gm.id))
     ).filter((n) => n.type === 'poll.closed');
     expect(gmPollNotes.map((n) => n.entityId)).toEqual([poll.id]);
+  });
+});
+
+describe('polls: regular winner date at close', () => {
+  it('the GM notification uses the next occurrence after closing, not the one captured at creation', async () => {
+    const { gm, a, gameId } = await group();
+    const poll = await createPoll(gm, gameId, {
+      kind: 'regular',
+      options: [
+        { weekday: 1, startMin: 19 * 60 },
+        { weekday: 3, startMin: 19 * 60 },
+      ],
+      closesAt: deadline(),
+    });
+    await votes(a, poll, ['yes', 'no']);
+    // Голосування тривало довго: знята при створенні дата вже минула.
+    const stale = new Date(Math.floor((Date.now() - 3 * DAY) / 1000) * 1000);
+    await db.update(pollOptions).set({ startsAt: stale }).where(eq(pollOptions.pollId, poll.id));
+    const now = new Date();
+    await db
+      .update(polls)
+      .set({ closesAt: new Date(now.getTime() - 1000) })
+      .where(eq(polls.id, poll.id));
+    expect(await runPollsClose(deps, now)).toBe(1);
+    const [ev] = await closedEvents(poll.id);
+    const winnerAt = (ev!.payload as { winnerStartsAt: string }).winnerStartsAt;
+    expect(Date.parse(winnerAt)).toBeGreaterThan(now.getTime());
+    expect(winnerAt).toBe(nextWeeklyStart(KYIV, 1, 19 * 60, now).toISOString());
+    await dispatchEvents(deps);
+    const [n] = (
+      await db.select().from(notifications).where(eq(notifications.userId, gm.id))
+    ).filter((x) => x.type === 'poll.closed');
+    expect(n!.payload).toMatchObject({ startsAt: winnerAt });
   });
 });
 

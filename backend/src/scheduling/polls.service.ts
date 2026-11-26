@@ -431,6 +431,13 @@ export async function closePoll(
   const [game] = await deps.db.select().from(games).where(eq(games.id, p.gameId));
   const dto = (await toDtos(deps, game!, [p], game!.gmUserId, now))[0]!;
   const winner = dto.options.find((o) => o.id === dto.winnerOptionId);
+  // Регулярний варіант: `startsAt` знято при створенні й до закриття міг минути — у
+  // сповіщенні майстру показуємо найближчу сесію переможця після моменту закриття.
+  const winnerStartsAt = !winner
+    ? undefined
+    : winner.weekday !== null && winner.startMin !== null
+      ? nextWeeklyStart(game!.timezone, winner.weekday, winner.startMin, now).toISOString()
+      : winner.startsAt;
   await logEvent(deps.db, {
     type: 'poll.closed',
     userId: actorId,
@@ -440,7 +447,7 @@ export async function closePoll(
       gameId: p.gameId,
       kind: p.kind,
       reason,
-      ...(winner ? { winnerStartsAt: winner.startsAt } : {}),
+      ...(winnerStartsAt ? { winnerStartsAt } : {}),
     },
   });
   pollsChanged(deps, p.gameId);

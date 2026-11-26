@@ -144,6 +144,11 @@ export interface NotificationParams {
   note?: string | null;
   /** Відновлення з донабором (`game.resumed`). */
   recruit?: boolean;
+  /**
+   * `calendar.empty`: у користувача підключено імпорт iCal, але немає тижневих слотів —
+   * текст пропонує додати звичні години гри (імпорт знає лише зайнятість).
+   */
+  hasImport?: boolean;
   /** Голосування за час (`poll.*`). */
   pollId?: number;
   pollKind?: PollKind;
