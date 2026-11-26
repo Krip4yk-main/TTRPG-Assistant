@@ -720,7 +720,7 @@ describe('polls: review fixes', () => {
       'post',
       `/api/games/${gameId}/polls`,
       gm.cookie,
-      oneOffBody({ closesAt: deadline(5.5) }),
+      oneOffBody({ closesAt: kyivAt(5, 20).iso }),
     );
     expect(r.status).toBe(400);
   });
