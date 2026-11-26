@@ -74,6 +74,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   'night-city': theme('night-city', 'dark', loadSceneSlots),
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
   dungeon: theme('dungeon', 'dark', loadSceneSlots),
+  'gothic-gloom': theme('gothic-gloom', 'dark', loadSceneSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

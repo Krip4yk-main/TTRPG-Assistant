@@ -1,0 +1,20 @@
+// Material для дизайну «Готичний морок» (бандл `theme-gothic-gloom`): спільний Material родини
+// сцени (../scene/scene-material.scss) у темній схемі; шрифти — токени --sc-font-* дизайну
+// (gothic-gloom.less). Обрані прапорці — червоний віск, як у макеті (#D2463A на полі #0D0C0F —
+// 4.3, іконка ≥ 3; галочка #FFF4DC на воску — 4.1), решта primary — золото.
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='gothic-gloom'] {
+  @include sc.material(dark);
+
+  @include mat.checkbox-overrides(
+    (
+      selected-icon-color: #d2463a,
+      selected-focus-icon-color: #d2463a,
+      selected-hover-icon-color: #e1584a,
+      selected-pressed-icon-color: #d2463a,
+      selected-checkmark-color: #fff4dc,
+    )
+  );
+}

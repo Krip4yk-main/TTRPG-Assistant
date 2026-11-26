@@ -1,0 +1,970 @@
+// Дизайн «Готичний морок» (родина сцени, макет docs/design-concepts/themes2/grimdark-gothic.html):
+// окремий бандл `theme-gothic-gloom.css` (`inject: false` в angular.json), який підключає
+// ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — шрифти (Cormorant SC —
+// заголовки, Alegreya — текст, IBM Plex Mono — дані й підписи «дата-планшета»; @fontsource: лише
+// кирилиця й латиниця), токени --sc-* і вигляд: неф собору з чорненої сталі (стрілчасті вікна з
+// ледь червоним склом, пілястри, клепані балки), шапка — сталева смуга з позолоченою й
+// кривавою лініями, заголовок сторінки — звичайний текст з ініціалом-буквицею (червоне поле в
+// золотій рамці) і свічками праворуч, панель фільтрів — сталевий аналой із золотим фронтоном,
+// картки — сталеві панелі в золотій рамці з кутиками й фронтоном з червоним каменем; у частини
+// карток — червона воскова печатка з двома пергаментними стрічками на лівому верхньому куті.
+// Коли / Де / Місця — на зеленому «дата-планшеті», «Підходить» — пергаментна стрічка зі свічкою,
+// ціна — золота табличка / «без плати» в золотому контурі, обкладинка — вітраж у стрілчастій
+// арці з золотою рамою (у спокої — сепія, наперед — тепле світло; поведінка — спільна
+// CoverAttachment). Темна схема; спільні слоти, поверхні сайту й токени —
+// ../scene/scene-base.less; Material — gothic-gloom-material.scss. Без назв, символів і
+// термінів чужих франшиз — лише загальна готична естетика.
+// Гачки декору сцени (карта — у шапці scene-base.less):
+//   sc-d1 — дві пергаментні стрічки печатки (::before / ::after); sc-d4 — воскова печатка (над
+//     стрічками); обидва — лише у варіантів violet і lime (третина карток, стабільно за id гри).
+//   sc-d2 — золотий фронтон з червоним каменем над верхнім краєм панелі; sc-d3 — не вживається
+//     (панель не обрізана — тінь на ній самій).
+//   sc-accent — верхні золоті кутики панелі (::before / ::after; і в порожньому стані);
+//     sc-p1 — нижні золоті кутики; sc-p2 — не вживається.
+//   sc-s1 — не вживається; буквиця — `.sc-sign-title::first-letter` (текст заголовка лишається
+//     звичайним); свічки — `nri-sc-page-header .page-header::after` (широкий екран, сторінка без
+//     кнопок дій).
+//   data-neon (варіант картки): колір рядка системи (золото, кістка, рожеве золото, світле
+//     золото, патина, червоне золото) і печатка (violet, lime).
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця). Грані оголошено тут, а не імпортом
+// файлів підмножин @fontsource (`cyrillic-600.css` тощо): у тих файлах немає unicode-range, тож
+// кирилична й латинська грані однієї ваги — дві грані на весь Unicode, і Chrome інколи бере
+// літеру не з тієї (у заголовку «і» малювалась чужим гліфом). Тут кожна грань має свій діапазон.
+@gg-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+@gg-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+.gg-face(@pkg; @family; @weight; @style: normal) {
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @gg-cyr;
+  }
+
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @gg-lat;
+  }
+}
+
+.gg-face(alegreya; 'Alegreya'; 400);
+.gg-face(alegreya; 'Alegreya'; 400; italic);
+.gg-face(alegreya; 'Alegreya'; 500);
+.gg-face(alegreya; 'Alegreya'; 500; italic);
+.gg-face(alegreya; 'Alegreya'; 700);
+.gg-face(cormorant-sc; 'Cormorant SC'; 500);
+.gg-face(cormorant-sc; 'Cormorant SC'; 600);
+.gg-face(cormorant-sc; 'Cormorant SC'; 700);
+.gg-face(ibm-plex-mono; 'IBM Plex Mono'; 500);
+.gg-face(ibm-plex-mono; 'IBM Plex Mono'; 600);
+@import '../scene/scene-base.less';
+
+@gg: ~":root[data-theme='gothic-gloom']";
+
+// Текстури й декор (data-URI SVG). Плитки без швів: область фільтра = плитка (x/y 0,
+// width/height 1), stitchTiles, baseFrequency × розмір плитки — ціле.
+//   Неф 240×600 (без фільтрів): стрілчасте вікно до балки, імпости, роза, пілястра навпіл на
+//     лівому й правому краях (на стику плиток — одна пілястра зі світлом посередині, градієнти
+//     сходяться в одному кольорі), клепана балка на всю ширину (заклепки кожні 60px і через стик).
+//   Сталь 200×200: 0.9 × 200 = 180. Пергамент 60×60: 0.1 × 60 = 6, 0.4 × 60 = 24.
+//   Свічки 160×130, лоза буквиці 88×88, знак печатки 26×26 — без фільтрів, без повтору.
+@gg-nave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='600'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%235a1414' stop-opacity='.5'/%3E%3Cstop offset='.45' stop-color='%232a0c10' stop-opacity='.3'/%3E%3Cstop offset='1' stop-color='%232a0c10' stop-opacity='.05'/%3E%3C/linearGradient%3E%3ClinearGradient id='a' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23211f25'/%3E%3Cstop offset='1' stop-color='%230c0b0e'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%230c0b0e'/%3E%3Cstop offset='1' stop-color='%23211f25'/%3E%3C/linearGradient%3E%3ClinearGradient id='r' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2329272d'/%3E%3Cstop offset='.5' stop-color='%2319181c'/%3E%3Cstop offset='1' stop-color='%230b0a0c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='240' height='600' fill='%230e0d10'/%3E%3Cg opacity='.85'%3E%3Cpath d='M44 566V250Q44 120 120 62Q196 120 196 250V566Z' fill='url(%23g)' stroke='%2327232a' stroke-width='5'/%3E%3Cpath d='M44 566V250Q44 120 120 62Q196 120 196 250V566' fill='none' stroke='%23000' stroke-width='1.5' transform='translate(0 4)'/%3E%3Cpath d='M120 172V566M62 300H178M62 420H178' stroke='%231e1b20' stroke-width='4'/%3E%3Cpath d='M64 566V290Q64 220 116 186M176 566V290Q176 220 124 186' fill='none' stroke='%231e1b20' stroke-width='3'/%3E%3Ccircle cx='120' cy='134' r='26' fill='none' stroke='%2327232a' stroke-width='4'/%3E%3Cpath d='M120 108v52M94 134h52M102 116l36 36M138 116l-36 36' stroke='%2327232a' stroke-width='2'/%3E%3Crect x='0' y='0' width='16' height='600' fill='url(%23a)'/%3E%3Crect x='224' y='0' width='16' height='600' fill='url(%23b)'/%3E%3Crect x='0' y='566' width='240' height='22' fill='url(%23r)'/%3E%3Cg fill='%2336323a'%3E%3Ccircle cx='20' cy='577' r='3'/%3E%3Ccircle cx='80' cy='577' r='3'/%3E%3Ccircle cx='140' cy='577' r='3'/%3E%3Ccircle cx='200' cy='577' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+@gg-steel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .58 0 0 0 0 .62 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+@gg-parch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='p' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.1 0.4' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .35 0 0 0 0 .2 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='60' height='60' filter='url(%23p)'/%3E%3C/svg%3E");
+@gg-candles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='130' viewBox='0 0 160 130'%3E%3Cdefs%3E%3ClinearGradient id='w' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23b9ab8c'/%3E%3Cstop offset='.4' stop-color='%23efe5cb'/%3E%3Cstop offset='.7' stop-color='%23cfc19f'/%3E%3Cstop offset='1' stop-color='%238f8268'/%3E%3C/linearGradient%3E%3CradialGradient id='f' cx='.5' cy='.72' r='.6'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='.25' stop-color='%23ffe08a'/%3E%3Cstop offset='.6' stop-color='%23ff9a2a'/%3E%3Cstop offset='1' stop-color='%23ff9a2a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%23ffbe5a' stop-opacity='.3'/%3E%3Cstop offset='1' stop-color='%23ffbe5a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='34' cy='62' r='34' fill='url(%23h)'/%3E%3Ccircle cx='70' cy='34' r='40' fill='url(%23h)'/%3E%3Ccircle cx='107' cy='80' r='30' fill='url(%23h)'/%3E%3Cpath d='M34 56q-6-10 0-22q6 12 0 22z' fill='url(%23f)'/%3E%3Crect x='26' y='66' width='16' height='64' rx='2' fill='url(%23w)'/%3E%3Cpath d='M34 66v-8' stroke='%232a2016' stroke-width='1.4'/%3E%3Crect x='31' y='72' width='3' height='18' rx='1.5' fill='%23f6edd6' opacity='.8'/%3E%3Cpath d='M70 28q-7-12 0-26q7 14 0 26z' fill='url(%23f)'/%3E%3Crect x='60' y='38' width='20' height='92' rx='2' fill='url(%23w)'/%3E%3Cpath d='M70 38v-9' stroke='%232a2016' stroke-width='1.4'/%3E%3Crect x='66' y='44' width='4' height='20' rx='2' fill='%23f6edd6' opacity='.8'/%3E%3Cpath d='M107 78q-5-9 0-19q5 10 0 19z' fill='url(%23f)'/%3E%3Crect x='100' y='86' width='14' height='44' rx='2' fill='url(%23w)'/%3E%3Cpath d='M107 86v-7' stroke='%232a2016' stroke-width='1.3'/%3E%3C/svg%3E");
+@gg-vine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88' fill='none' stroke='%23f1d58a' stroke-opacity='.5' stroke-width='1.2'%3E%3Cpath d='M6 82C14 60 8 40 18 26S40 8 44 6M82 6C74 28 80 48 70 62S48 80 44 82'/%3E%3Ccircle cx='18' cy='26' r='3'/%3E%3Ccircle cx='70' cy='62' r='3'/%3E%3Cpath d='M10 50c6-2 9 2 8 6M78 38c-6 2-9-2-8-6'/%3E%3C/svg%3E");
+@gg-emblem: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26' fill='none' stroke='%235d0c0c' stroke-width='2'%3E%3Ccircle cx='13' cy='13' r='11'/%3E%3Ccircle cx='13' cy='13' r='3.5'/%3E%3Cpath d='M13 2v7.5M13 16.5V24M2 13h7.5M16.5 13H24'/%3E%3C/svg%3E");
+
+// Контраст (WCAG, відносна яскравість). Поверхні: сталь картки / панелі #1E1C21 (найсвітліше,
+// вгорі) … #141316, оверлей #222026, поле #0D0C0F, смуга шапки #1F1D22 … #141317, стіна під
+// текстом — найсвітліше червоне скло вікна ≈ #3A1214 … темна #0E0D10.
+//   Текст #ECE2CC — 13.1 сталь / 12.5 оверлей / 15.2 поле / 13.0 шапка / 12.8 скло;
+//   описи #CFC5AD — 9.8 сталь / 9.4 оверлей; підписи #B3A78C — 7.1 сталь / 6.8 оверлей / 8.2
+//   поле / 6.9 скло.
+//   Межа полів #8A7D68 — 4.2 сталь / 4.0 оверлей / 4.8 поле (≥ 3:1 для контурів).
+//   Золото #D4AC55 (primary: фокус, посилання, filled-кнопки, позначки) — 7.9 сталь / 7.5
+//     оверлей / 9.1 поле / 7.7 скло; #1A1206 на золоті — 8.7. Текст посилань #F1D58A — 11.8
+//     сталь / 11.2 оверлей.
+//   Зелений планшет: #7DFFA0 на #07130B — 15.1; мітки #5FD884 — 10.5; #04140A на зеленому — 15.0.
+//   Віск #D2463A (обрані прапорці) — 4.3 на полі (іконка ≥ 3); галочка #FFF4DC на воску — 4.1
+//     (іконка). Небезпечні кнопки #B5302A, текст #FFF6F2 — 5.8; червоний текст #FF9A8C — 8.2
+//     сталь / 7.9 оверлей. Вік #FFC9BF на червоній заливці (≈ #3A1A1C) — 10.7.
+//   «Підходить»: #3A2410 на пергаменті #D6C193 … #ECDFBA — 8.3 … 10.5; частковий збіг #4A2A0C
+//     на старому пергаменті #D9B98A — 6.9.
+//   Рядок системи (варіанти, на сталі #1E1C21): золото #D9B45A — 8.5, кістка #D8CCB0 — 10.6,
+//     рожеве золото #E0A58A — 8.0, світле золото #F1D58A — 11.8, патина #9FC7A8 — 9.0, червоне
+//     золото #E89A8A — 7.6.
+//   Ціна: #1D1406 на золоті #FBE9B0 … #B6872C — 15+ … 5.6; «без плати» #ECE2CC на #2C2A30 …
+//     #1A181C — 11.0 … 13.7.
+//   Заголовок #ECE2CC на стіні — 12.8+; буквиця — золото на червоному полі (декоративна велика
+//     літера, частина звичайного тексту h1: #F1D58A на #8E1B1B — 6.6).
+//   Скло, свічки, печатка, стрічки, фронтони, кутики — декор, не фон тексту.
+
+@{gg} {
+  --sc-font-display: 'Cormorant SC', Georgia, 'Times New Roman', serif;
+  --sc-font-body: 'Alegreya', Georgia, 'Times New Roman', serif;
+  --sc-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --sc-wall: #0e0d10;
+  --sc-wall-deep: #0b0a0c;
+  --sc-bar: linear-gradient(#1f1d22, #141317);
+  --sc-bar-line: #000;
+
+  --sc-panel: #1a181d;
+  --sc-glass: linear-gradient(180deg, #1e1c21, #141316);
+  --sc-glass-line: #000;
+  --sc-panel-raised: #232127;
+  --sc-overlay: #222026;
+  --sc-overlay-line: #5a4a30;
+  --sc-field: #0d0c0f;
+  --sc-backdrop: rgba(5, 4, 6, 0.8);
+  --sc-blur-overlay: rgba(18, 17, 20, 0.8);
+
+  --sc-ink: #ece2cc;
+  --sc-ink-soft: #cfc5ad;
+  --sc-ink-muted: #b3a78c;
+  --sc-line: rgba(236, 226, 204, 0.12);
+  --sc-outline: #8a7d68;
+
+  // Перший акцент — зелень дата-планшета (лічильники; текст акценту — світле золото, напр.
+  // заголовки розділів форм), другий — золото (primary:
+  // фокус, посилання, filled-кнопки).
+  --sc-neon-a: #7dffa0;
+  --sc-neon-a-core: #d4ffe0;
+  --sc-neon-a-text: #f1d58a;
+  --sc-on-neon-a: #04140a;
+  --sc-neon-b: #d4ac55;
+  --sc-neon-b-core: #f1d58a;
+  --sc-neon-b-text: #f1d58a;
+  --sc-neon-b-glow: rgba(241, 213, 138, 0.3);
+  --sc-on-neon-b: #1a1206;
+  --sc-mark: #c9a14a;
+  --sc-mark-glow: rgba(241, 213, 138, 0.25);
+
+  .sc-neon-tokens();
+
+  // Стани: зелень планшета (збіг розкладу, набір), золото (частковий збіг, «Нове»), віск (вік,
+  // помилки).
+  --sc-lime: #7dffa0;
+  --sc-lime-text: #a8ffc0;
+  --sc-lime-line: rgba(125, 255, 160, 0.5);
+  --sc-lime-fill: rgba(30, 90, 50, 0.3);
+  --sc-amber: #d4ac55;
+  --sc-amber-text: #f1d58a;
+  --sc-amber-line: rgba(212, 172, 85, 0.55);
+  --sc-amber-fill: rgba(212, 172, 85, 0.12);
+  --sc-on-amber: #1a1206;
+  --sc-red: #b5302a;
+  --sc-red-text: #ff9a8c;
+  --sc-red-fill: rgba(142, 27, 27, 0.35);
+  --sc-on-red: #fff6f2;
+
+  // Шість варіантів картки: колір — підкреслення назви, текст — рядок системи.
+  --sc-neon-pink: #d4ac55;
+  --sc-neon-pink-core: #f1d58a;
+  --sc-neon-pink-text: #d9b45a;
+  --sc-neon-cyan: #d8ccb0;
+  --sc-neon-cyan-core: #f3ead8;
+  --sc-neon-cyan-text: #d8ccb0;
+  --sc-neon-violet: #d98a6a;
+  --sc-neon-violet-core: #f2c7ab;
+  --sc-neon-violet-text: #e0a58a;
+  --sc-neon-amber: #f1d58a;
+  --sc-neon-amber-core: #fbecc0;
+  --sc-neon-amber-text: #f1d58a;
+  --sc-neon-lime: #7fae8a;
+  --sc-neon-lime-core: #cfe6d4;
+  --sc-neon-lime-text: #9fc7a8;
+  --sc-neon-red: #c8634a;
+  --sc-neon-red-core: #f2b8a6;
+  --sc-neon-red-text: #e89a8a;
+
+  .sc-base();
+
+  --sc-shadow-panel: 0 22px 36px rgba(0, 0, 0, 0.65);
+  --sc-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --nri-shadow-md: 0 14px 24px rgba(0, 0, 0, 0.65);
+  --nri-shadow-lg: 0 24px 40px rgba(0, 0, 0, 0.7);
+  --nri-radius-sm: 0;
+  --nri-radius-md: 0;
+  --nri-radius-lg: 2px;
+  // Шапка 68px + межа 1px + кривава лінія під нею.
+  --nri-header-height: 72px;
+
+  // Alegreya і Cormorant SC типово мають старовинні цифри («3» майже як «з» — «1 з 4» читалося б
+  // «1 3 4») — по всьому сайту цифри рівної висоти.
+  body {
+    font-variant-numeric: lining-nums;
+  }
+
+  ::selection {
+    background: #d4ac55;
+    color: #1a1206;
+  }
+
+  // ---- Стіна: неф собору з чорненої сталі (лише CSS і data-URI SVG) ----
+  // Згори вниз: тепле світло свічок праворуч угорі (фіксованого розміру, згасає до прозорого),
+  // рідкий відсвіт нижче (повтор кожні 2200px, пляма не торкається меж повтору), затемнення
+  // згори (до прозорого), віньєтка на всю стіну, неф.
+  .sc-wall {
+    // Повернуті вкладення, печатки й свічки не дають горизонтального скролу (clip — не контейнер
+    // прокрутки: липка шапка й фільтри працюють).
+    overflow-x: clip;
+    background-color: var(--sc-wall);
+    background-image:
+      radial-gradient(
+        circle 460px at calc(100% - 230px) 230px,
+        rgba(255, 170, 70, 0.15),
+        transparent 70%
+      ),
+      radial-gradient(circle 520px at 10% 1100px, rgba(255, 150, 60, 0.08), transparent 70%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent),
+      radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0, 0, 0, 0.5)), @gg-nave;
+    background-repeat: no-repeat, repeat-y, no-repeat, no-repeat, repeat;
+    background-size:
+      100% 900px,
+      100% 2200px,
+      100% 280px,
+      100% 100%,
+      240px 600px;
+  }
+
+  // ---- Шапка: сталева смуга із золотою й кривавою лініями ----
+  .top.sc-bar {
+    border-bottom: 1px solid #000;
+    box-shadow:
+      0 1px 0 #7a5a1c,
+      0 2px 0 rgba(0, 0, 0, 0.8),
+      0 8px 18px rgba(0, 0, 0, 0.6);
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      bottom: -5px;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #8e1b1b 15%, #8e1b1b 85%, transparent);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+  }
+
+  .bottom.sc-bar {
+    border-top: 1px solid #000;
+    box-shadow: 0 -1px 0 #7a5a1c;
+  }
+
+  .top .brand {
+    font-weight: 700;
+    font-size: 1.45rem;
+    letter-spacing: 0.02em;
+  }
+
+  .top .nav-link {
+    border-radius: 0;
+    color: #bdb196;
+    font: 600 1.0625rem/1.2 var(--sc-font-display);
+    letter-spacing: 0.02em;
+
+    &:hover {
+      color: var(--sc-ink);
+    }
+
+    &.active {
+      background: none;
+      color: #f1d58a;
+      box-shadow: inset 0 -2px 0 #c9a14a;
+    }
+  }
+
+  // Аватар — медальйон у золотому обідку.
+  .top .avatar {
+    border: 2px solid #c9a14a;
+    background: radial-gradient(circle at 40% 35%, #2c2a30, #121114);
+    color: #f1d58a;
+    font: 700 1.125rem/1 var(--sc-font-display);
+    box-shadow:
+      0 0 0 3px #141317,
+      0 0 0 4px #7a5a1c;
+  }
+
+  // ---- Заголовок сторінки: ініціал-буквиця, звичайний заголовок, свічки ----
+  // Заголовок — звичайний текст h1; перша літера — буквиця (червоне поле з золотою лозою в
+  // золотій рамці) засобами ::first-letter, без зміни тексту.
+  .sc-sign {
+    padding: 0;
+  }
+
+  .sc-sign-title {
+    padding-top: 0.42em;
+    color: var(--sc-ink);
+    font-size: clamp(2rem, 4.2vw, 3.875rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    text-shadow:
+      0 2px 0 #000,
+      0 0 30px rgba(255, 170, 70, 0.12);
+
+    &::first-letter {
+      float: left;
+      margin: -0.42em 0.32em 0 0;
+      padding: 0.08em 0.2em 0.12em;
+      border: 3px solid #c9a14a;
+      background:
+        @gg-vine 50% 50% / 88% 88% no-repeat,
+        radial-gradient(circle at 50% 45%, #b72a22, #6e1212 70%, #3e0909);
+      color: #f1d58a;
+      font-size: 1.35em;
+      font-weight: 700;
+      line-height: 1;
+      text-shadow:
+        0 2px 0 rgba(0, 0, 0, 0.6),
+        0 0 10px rgba(255, 210, 120, 0.25);
+    }
+  }
+
+  nri-sc-page-header .lead {
+    color: #bdb196;
+    font-size: 1.125rem;
+    font-style: italic;
+  }
+
+  // Три свічки праворуч від заголовка (лише широкий екран і сторінка без кнопок дій: інакше
+  // заступили б їх).
+  @media (min-width: 1100px) {
+    nri-sc-page-header .page-header:not(:has(.header-actions)) {
+      position: relative;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: -24px;
+        right: 48px;
+        z-index: -1;
+        width: 160px;
+        height: 130px;
+        background: @gg-candles 0 0 / 100% 100% no-repeat;
+        pointer-events: none;
+      }
+    }
+  }
+
+  // ---- Панелі сайту: чорнена сталь у тонкій золотій рамці ----
+  .nri-page:not(.nri-board) {
+    border: 1px solid #000;
+    border-radius: 0;
+    box-shadow:
+      inset 0 0 0 5px #17161a,
+      inset 0 0 0 6px rgba(201, 161, 74, 0.45),
+      var(--sc-shadow-panel);
+  }
+
+  // Декор усередині панелей з z-index -1 — над фоном панелі, під текстом.
+  .sc-glass {
+    isolation: isolate;
+    border-radius: 0;
+  }
+
+  // Верхні золоті кутики (картки, порожній стан).
+  .sc-accent,
+  .sc-p1 {
+    position: absolute;
+    right: 9px;
+    left: 9px;
+    z-index: -1;
+    display: block;
+    height: 16px;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    pointer-events: none;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      box-sizing: border-box;
+      border: 0 solid #c9a14a;
+    }
+
+    &::before {
+      left: 0;
+      border-left-width: 2px;
+    }
+
+    &::after {
+      right: 0;
+      border-right-width: 2px;
+    }
+  }
+
+  .sc-accent {
+    top: 9px;
+
+    &::before,
+    &::after {
+      top: 0;
+      border-top-width: 2px;
+    }
+  }
+
+  // Нижні золоті кутики.
+  .sc-p1 {
+    bottom: 9px;
+
+    &::before,
+    &::after {
+      bottom: 0;
+      border-bottom-width: 2px;
+    }
+  }
+
+  // Порожній стан і банер — та сама сталь у золотій рамці.
+  nri-sc-empty-state .note,
+  .connection-banner.sc-glass {
+    border: 1px solid #000;
+    box-shadow:
+      inset 0 0 0 5px #19171b,
+      inset 0 0 0 6px rgba(201, 161, 74, 0.5),
+      var(--sc-shadow-panel);
+  }
+
+  // Панель фільтрів пошуку: сталевий аналой із золотим фронтоном і червоним каменем (замість
+  // неонової трубки основи).
+  .nri-page.nri-board .nri-panel {
+    padding: 30px 20px 22px;
+    border: 1px solid #000;
+    border-radius: 0;
+    background: linear-gradient(180deg, #1c1a1f, #131215);
+    box-shadow:
+      inset 0 0 0 5px #17161a,
+      inset 0 0 0 6px rgba(201, 161, 74, 0.55),
+      0 22px 40px rgba(0, 0, 0, 0.6);
+
+    &::before {
+      top: -15px;
+      right: auto;
+      left: 50%;
+      width: 46px;
+      height: 24px;
+      margin-left: -23px;
+      border-radius: 0;
+      background: linear-gradient(180deg, #f1d58a, #c9a14a 50%, #7a5a1c);
+      box-shadow: none;
+      clip-path: polygon(0 100%, 8% 55%, 22% 28%, 50% 0, 78% 28%, 92% 55%, 100% 100%);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      width: 10px;
+      height: 10px;
+      margin-left: -5px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ff7a6a, #a3201f 60%, #4a0808);
+      pointer-events: none;
+    }
+  }
+
+  // ---- Картка (пошук і «Мої ігри»): сталь у золотій рамці ----
+  [data-neon] > .sc-glass {
+    padding-top: 30px;
+    border: 1px solid #000;
+    border-radius: 0;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% 0%, rgba(255, 180, 90, 0.07), transparent 60%),
+      @gg-steel 0 0 / 200px 200px,
+      var(--sc-glass);
+    box-shadow:
+      inset 0 0 0 5px #19171b,
+      inset 0 0 0 6px rgba(201, 161, 74, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 22px 36px rgba(0, 0, 0, 0.65);
+  }
+
+  // Наведення / фокус — яскравіша позолота й тепле світло.
+  [data-neon]:is(:hover, :focus-within) > .sc-glass {
+    box-shadow:
+      inset 0 0 0 5px #19171b,
+      inset 0 0 0 6px #f1d58a,
+      inset 0 0 40px rgba(255, 170, 70, 0.07),
+      0 26px 44px rgba(0, 0, 0, 0.7),
+      0 0 0 1px #7a5a1c,
+      0 0 30px rgba(255, 170, 70, 0.12);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-neon] > .sc-glass {
+      transition: box-shadow 300ms;
+    }
+  }
+
+  // Фронтон над верхнім краєм панелі (форма — на ::before, тінь — на самому гачку).
+  .sc-d2 {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    z-index: 3;
+    display: block;
+    width: 38px;
+    height: 20px;
+    margin-left: -19px;
+    filter: drop-shadow(0 2px 2px #000);
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #f1d58a, #c9a14a 55%, #7a5a1c);
+      clip-path: polygon(0 100%, 8% 55%, 22% 28%, 50% 0, 78% 28%, 92% 55%, 100% 100%);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 14px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ff8a7a, #a3201f 60%, #3e0707);
+    }
+  }
+
+  // Печатка: дві пергаментні стрічки (sc-d1) під восковою печаткою (sc-d4) на лівому верхньому
+  // куті — лише в частини карток.
+  [data-neon='violet'],
+  [data-neon='lime'] {
+    > .sc-d1,
+    > .sc-d4 {
+      display: block;
+    }
+  }
+
+  // Стрічки звисають назовні від кута (поворот униз-ліворуч) — у полях панелі, не на тексті.
+  .sc-d1 {
+    position: absolute;
+    top: 4px;
+    left: -16px;
+    z-index: 3;
+    width: 22px;
+    height: 100px;
+    filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.6));
+    transform: rotate(9deg);
+    transform-origin: 11px 0;
+    pointer-events: none;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      width: 12px;
+      background:
+        repeating-linear-gradient(180deg, rgba(74, 36, 16, 0.5) 0 5px, transparent 5px 9px) 50%
+          18px / 1.5px calc(100% - 32px) no-repeat,
+        @gg-parch 0 0 / 60px 60px,
+        linear-gradient(90deg, #cdbb92, #eadcb6 50%, #c8b48a);
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 70% 93%, 40% 100%, 0 95%);
+    }
+
+    &::before {
+      left: 0;
+      height: 96px;
+      transform: rotate(4deg);
+    }
+
+    &::after {
+      left: 10px;
+      height: 74px;
+      transform: rotate(-7deg);
+    }
+  }
+
+  .sc-d4 {
+    position: absolute;
+    top: -26px;
+    left: -28px;
+    z-index: 4;
+    width: 52px;
+    height: 52px;
+    border-radius: 47% 53% 50% 50% / 52% 48% 52% 48%;
+    background: radial-gradient(circle at 36% 30%, #e1584a, #a3201f 42%, #6a1010 80%, #3a0606);
+    box-shadow:
+      0 3px 6px rgba(0, 0, 0, 0.7),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 2px 2px rgba(255, 190, 170, 0.25);
+    transform: rotate(-8deg);
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.55),
+        0 1px 0 rgba(255, 170, 150, 0.25);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 13px;
+      background: @gg-emblem 0 0 / 100% 100% no-repeat;
+      filter: drop-shadow(0 1px 0 rgba(255, 160, 140, 0.35));
+    }
+  }
+
+  // ---- Текст картки ----
+  :is(nri-sc-game-card, nri-sc-my-game-item) .sys {
+    font: 700 0.875rem/1.4 var(--sc-font-display);
+    letter-spacing: 0.03em;
+    text-transform: none;
+  }
+
+  :is(nri-sc-game-card, nri-sc-my-game-item) .title {
+    color: var(--sc-ink);
+    font-weight: 700;
+    font-size: 1.3125rem;
+    line-height: 1.18;
+    letter-spacing: 0.005em;
+  }
+
+  nri-sc-game-card .title {
+    margin: 8px 0 7px;
+  }
+
+  nri-sc-game-card .desc {
+    color: var(--sc-ink-soft);
+    font-size: 0.90625rem;
+    line-height: 1.42;
+  }
+
+  // Дата-планшет: зелений моноширинний текст на чорно-зеленому склі з рядками розгортки (у
+  // фоні — під текстом).
+  :is(nri-sc-game-card, nri-sc-my-game-item) .facts {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 1px solid #2a3b2e;
+    background:
+      repeating-linear-gradient(0deg, rgba(125, 255, 160, 0.035) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #07130b, #040b06);
+    box-shadow:
+      inset 0 0 14px rgba(0, 0, 0, 0.8),
+      0 0 0 2px #0f0e11,
+      0 0 0 3px #3b342b;
+    color: #7dffa0;
+    font: 500 0.75rem/1.6 var(--sc-font-mono);
+
+    dt {
+      width: 48px;
+      color: #5fd884;
+      font: 500 0.6875rem/1.6 var(--sc-font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      text-shadow: 0 0 6px rgba(125, 255, 160, 0.25);
+    }
+  }
+
+  nri-sc-my-game-item .facts {
+    gap: 0 12px;
+  }
+
+  // Місця — сегменти індикатора: вільні світяться.
+  [data-neon] .pips {
+    gap: 3px;
+
+    b {
+      width: 7px;
+      height: 10px;
+      border: 1px solid #3c7a4e;
+      border-radius: 0;
+    }
+
+    .on {
+      border-color: #7dffa0;
+      background: #7dffa0;
+      box-shadow: 0 0 4px rgba(125, 255, 160, 0.6);
+    }
+  }
+
+  // Ініціал майстра — медальйон у золотому обідку.
+  nri-sc-game-card .gm .initial {
+    width: 34px;
+    height: 34px;
+    border: 1.5px solid #c9a14a;
+    background: radial-gradient(circle at 40% 35%, #2c2a30, #0f0e11);
+    color: #f1d58a;
+    font: 700 1.0625rem/1 var(--sc-font-display);
+    box-shadow:
+      0 0 0 2px #141316,
+      0 0 0 3px #7a5a1c;
+  }
+
+  nri-sc-game-card .gm .name {
+    font-weight: 700;
+  }
+
+  // Ціна — золота табличка; без плати — сталева в золотому контурі.
+  nri-sc-game-card .price {
+    padding: 6px 13px 7px;
+    border: 1px solid #5a3f10;
+    border-radius: 0;
+    background: linear-gradient(170deg, #fbe9b0, #e2b85a 40%, #b6872c 70%, #efd18a);
+    color: #1d1406;
+    font: 700 1rem/1 var(--sc-font-display);
+    letter-spacing: 0.02em;
+    box-shadow:
+      0 2px 0 #000,
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+
+    &.free {
+      border-color: #c9a14a;
+      background: linear-gradient(#2c2a30, #1a181c);
+      color: var(--sc-ink);
+      box-shadow:
+        0 2px 0 #000,
+        inset 0 0 0 2px #1a181c,
+        inset 0 0 0 3px rgba(201, 161, 74, 0.4);
+    }
+  }
+
+  // ---- Бейджі ----
+  // «Підходить вашому розкладу» — пергаментна стрічка з ластівчиним хвостом і свічкою; частковий
+  // збіг — старіший пергамент і тьмяніший вогник.
+  .badge.fit {
+    padding: 3px 18px 3px 10px;
+    border: 0;
+    border-radius: 0;
+    background:
+      @gg-parch 0 0 / 60px 60px,
+      linear-gradient(90deg, #d6c193, #ecdfba 50%, #d2bd8e);
+    color: #3a2410;
+    font: italic 500 0.875rem/1.3 var(--sc-font-body);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
+
+    &::before {
+      content: '';
+      flex: none;
+      width: 6px;
+      height: 15px;
+      border-radius: 0;
+      background:
+        radial-gradient(3px 4.5px at 50% 4.5px, #fff 0 20%, #ffd36a 45%, #ff8a1e 80%, transparent) 0
+          0 / 100% 9px no-repeat,
+        linear-gradient(#8f8268, #efe5cb) 50% 100% / 4px 6px no-repeat;
+      box-shadow: none;
+    }
+
+    &[data-fit='partial'] {
+      background:
+        @gg-parch 0 0 / 60px 60px,
+        linear-gradient(90deg, #cfae7e, #dfc394 50%, #c9a676);
+      color: #4a2a0c;
+
+      &::before {
+        background:
+          radial-gradient(3px 4.5px at 50% 4.5px, #ffe7b0 0 20%, #e0a050 55%, transparent) 0 0 /
+            100% 9px no-repeat,
+          linear-gradient(#8f8268, #efe5cb) 50% 100% / 4px 6px no-repeat;
+        box-shadow: none;
+      }
+    }
+  }
+
+  // Вік і скасована гра — віск.
+  .badge:is(.age, .status[data-status='cancelled']) {
+    padding: 4px 6px;
+    border-color: #d2463a;
+    border-radius: 0;
+    background: rgba(163, 32, 31, 0.3);
+    color: #ffc9bf;
+    font: 600 0.6875rem/1 var(--sc-font-mono);
+  }
+
+  nri-sc-my-game-item .status {
+    border-radius: 0;
+    font-family: var(--sc-font-mono);
+    font-weight: 600;
+  }
+
+  .nri-seen-badge {
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(#f1d58a, #c9a14a);
+    color: #1a1206;
+    font-weight: 600;
+  }
+
+  // ---- Обкладинка: вітраж у стрілчастій арці в золотій рамі ----
+  // Рама — ::before (арка), скло — знімок з тією самою аркою, свинцеві переплети й відблиск —
+  // ::after. Наперед (наведення / клік / Enter) — виходить на панель, вирівнюється, збільшується,
+  // сепія зникає, тепле світло.
+  nri-sc-attachment {
+    top: -34px;
+    right: -20px;
+    width: 120px;
+    height: 158px;
+
+    .attach {
+      background: none;
+      filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.7)) brightness(0.85);
+      transform: rotate(7deg);
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(160deg, #f1d58a, #c9a14a 40%, #7a5a1c 80%, #c9a14a);
+        clip-path: path('M0 158 V58 Q0 16 60 0 Q120 16 120 58 V158 Z');
+      }
+
+      img {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        z-index: 1;
+        width: 110px;
+        height: 148px;
+        background: #000;
+        filter: brightness(0.55) saturate(0.3) sepia(0.45);
+        clip-path: path('M0 148 V54 Q0 15 55 0 Q110 15 110 54 V148 Z');
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        z-index: 2;
+        width: 110px;
+        height: 148px;
+        background:
+          linear-gradient(
+            90deg,
+            transparent 54px,
+            rgba(28, 20, 10, 0.85) 54px 56px,
+            transparent 56px
+          ),
+          linear-gradient(
+            180deg,
+            transparent 62px,
+            rgba(28, 20, 10, 0.85) 62px 64px,
+            transparent 64px
+          ),
+          linear-gradient(
+            180deg,
+            transparent 104px,
+            rgba(28, 20, 10, 0.85) 104px 106px,
+            transparent 106px
+          ),
+          repeating-linear-gradient(45deg, transparent 0 15px, rgba(28, 20, 10, 0.35) 15px 16px),
+          repeating-linear-gradient(-45deg, transparent 0 15px, rgba(28, 20, 10, 0.35) 15px 16px),
+          radial-gradient(circle 30px at 30% 30%, rgba(170, 40, 40, 0.22), transparent),
+          radial-gradient(circle 34px at 75% 70%, rgba(40, 70, 150, 0.2), transparent),
+          linear-gradient(200deg, rgba(255, 230, 180, 0.22), transparent 45%),
+          linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 40%);
+        clip-path: path('M0 148 V54 Q0 15 55 0 Q110 15 110 54 V148 Z');
+        pointer-events: none;
+      }
+    }
+
+    .cap {
+      position: absolute;
+      right: 0;
+      bottom: 9px;
+      left: 0;
+      z-index: 3;
+      display: block;
+      color: #f1d58a;
+      font: 600 0.53125rem/1 var(--sc-font-mono);
+      letter-spacing: 0.12em;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow: 0 1px 2px #000;
+    }
+  }
+
+  .gg-attachment-front() {
+    filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.75))
+      drop-shadow(0 0 14px rgba(255, 180, 80, 0.35));
+    transform: translate(-50px, 34px) rotate(-2deg) scale(1.22);
+
+    img {
+      filter: brightness(1.04) sepia(0.12);
+    }
+
+    &::after {
+      opacity: 0.55;
+    }
+  }
+
+  nri-sc-attachment.front .attach {
+    .gg-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-sc-attachment:hover:not(.dismissed) .attach {
+      .gg-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-sc-attachment .attach {
+      transition:
+        transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 350ms;
+
+      img {
+        transition: filter 350ms;
+      }
+
+      &::after {
+        transition: opacity 350ms;
+      }
+    }
+  }
+}
+
+// Вузький екран: печатка й вкладення не виходять за поля сторінки (без горизонтального скролу),
+// буквиця менша.
+@media (max-width: 599.98px) {
+  @{gg} .sc-d4 {
+    left: -14px;
+  }
+
+  @{gg} .sc-d1 {
+    left: -6px;
+  }
+
+  @{gg} nri-sc-attachment {
+    right: -6px;
+  }
+
+  @{gg} .sc-sign-title::first-letter {
+    border-width: 2px;
+  }
+}

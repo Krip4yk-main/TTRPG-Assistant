@@ -86,6 +86,16 @@
                 "input": "src/app/theming/themes/dungeon/dungeon-material.scss",
                 "bundleName": "theme-dungeon",
                 "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/gothic-gloom/gothic-gloom.less",
+                "bundleName": "theme-gothic-gloom",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/gothic-gloom/gothic-gloom-material.scss",
+                "bundleName": "theme-gothic-gloom",
+                "inject": false
               }
             ]
           },

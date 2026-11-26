@@ -28,7 +28,14 @@ const base = {
   identities: [] as MeDto['identities'],
 } satisfies Partial<MeDto>;
 
-const ALL: ThemeId[] = ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon'];
+const ALL: ThemeId[] = [
+  'quest-board',
+  'neon-signs',
+  'holo-market',
+  'night-city',
+  'dungeon',
+  'gothic-gloom',
+];
 const user: MeDto = {
   ...base,
   role: 'user',
@@ -63,6 +70,7 @@ function registry(
     'holo-market': def('holo-market', scene),
     'night-city': def('night-city', scene),
     dungeon: def('dungeon', scene),
+    'gothic-gloom': def('gothic-gloom', scene),
   };
 }
 

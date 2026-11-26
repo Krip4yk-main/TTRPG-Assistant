@@ -11,6 +11,7 @@ export const THEME_IDS = [
   'holo-market',
   'night-city',
   'dungeon',
+  'gothic-gloom',
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -24,6 +25,7 @@ export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   'holo-market': 'everyone',
   'night-city': 'everyone',
   dungeon: 'everyone',
+  'gothic-gloom': 'everyone',
 };
 
 /** Дизайни, доступні ролі. */
