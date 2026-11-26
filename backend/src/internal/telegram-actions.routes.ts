@@ -5,6 +5,7 @@ import type { AppDeps } from '../app.js';
 import { approveApplication, rejectApplication } from '../applications/applications.service.js';
 import { authIdentities, gameApplications, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { pollIdOfOption, vote } from '../scheduling/polls.service.js';
 import { setRsvp } from '../sessions/rsvp.js';
 
 type Decision = 'approved' | 'rejected';
@@ -65,10 +66,19 @@ export function telegramActionsRouter(deps: AppDeps): Router {
   router.post('/', async (req, res) => {
     const input = telegramActionSchema.parse(req.body);
     const userId = await actorOf(deps, input.telegramId);
-    const result: TelegramActionResult['result'] =
-      input.action === 'rsvp'
-        ? await setRsvp(deps, userId, input.id, { status: input.value })
-        : await decide(deps, userId, input.id, input.action);
+    let result: TelegramActionResult['result'];
+    if (input.action === 'rsvp') {
+      result = await setRsvp(deps, userId, input.id, { status: input.value });
+    } else if (input.action === 'vote') {
+      // `id` — варіант голосування; членство, відкритість і належність варіанта перевіряє `vote`.
+      const value = input.value as 'yes' | 'no' | 'maybe';
+      await vote(deps, userId, await pollIdOfOption(deps, input.id), {
+        votes: [{ optionId: input.id, value }],
+      });
+      result = `vote_${value}`;
+    } else {
+      result = await decide(deps, userId, input.id, input.action);
+    }
     res.json({ ok: true, result } satisfies TelegramActionResult);
   });
   return router;

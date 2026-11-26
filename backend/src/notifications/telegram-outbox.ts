@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import {
   defaultNotificationPrefs,
+  POLL_VOTE_VALUES,
   telegramOutboxClaimSchema,
   telegramOutboxFailedSchema,
   type NotificationCategory,
@@ -57,6 +58,17 @@ export function buttonsFor(
       { action: 'approve', applicationId: p.applicationId },
       { action: 'reject', applicationId: p.applicationId },
     ];
+  }
+  // Нове голосування за час — по рядку кнопок «можу / не можу / якщо треба» на кожен варіант.
+  if (n.type === 'poll.created' && p.pollOptions?.length && !recipientIsGm) {
+    return p.pollOptions.flatMap((o) =>
+      POLL_VOTE_VALUES.map((value): TelegramButton => ({
+        action: 'vote',
+        optionId: o.id,
+        n: o.n,
+        value,
+      })),
+    );
   }
   if (n.type === 'session.reminder' && p.sessionId !== undefined && !recipientIsGm) {
     return [

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { PauseReason } from './games.js';
+import type { PollCloseReason, PollKind } from './polls.js';
 import type { SanctionType } from './moderation.js';
 
 /** Категорії сповіщень; Telegram вмикається/вимикається для кожної окремо. */
@@ -11,8 +12,17 @@ export const NOTIFICATION_CATEGORIES = [
   'games',
   'ratings',
   'moderation',
+  'schedule',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+/**
+ * Категорії, які можна вимкнути й на сайті (не лише в Telegram): «Розклад» — голосування за
+ * час, нагадування про календар, пропозиції перенесення (Plan 12). Вимкнена — сповіщення цієї
+ * категорії не створюються взагалі (ні на сайті, ні в Telegram).
+ */
+export const SITE_OPTIONAL_CATEGORIES = ['schedule'] as const;
+export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
 
 /**
  * Типи сповіщень (`notifications.type`): доменні події, що когось сповіщають,
@@ -27,7 +37,10 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * «мертвою»), `game.suspicious` (накладання сесій), `game.closed_by_admin`. Пауза кампейну:
  * `game.paused` (учасникам: `pauseReason`, `note`), `game.resumed` (учасникам: `startsAt` першої
  * сесії, `recruit` — оголошено донабір), `game.long_pause` (не з подій, майстру: кампейн на паузі
- * понад 90 днів). Текст — `notifications.<type>`.
+ * понад 90 днів). Голосування за час (категорія `schedule`): `poll.created` (учасникам: `pollId`,
+ * `pollKind`, `pollOptions`, дедлайн `closesAt`; у Telegram — кнопки відповіді), `poll.closed`
+ * (майстру, коли закрилось само: `closeReason`, `startsAt` переможця або без нього). Текст —
+ * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -63,6 +76,8 @@ export const NOTIFICATION_TYPES = [
   'sanction.imposed',
   'sanction.lifted',
   'appeal.decided',
+  'poll.created',
+  'poll.closed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -118,7 +133,24 @@ export interface NotificationParams {
   note?: string | null;
   /** Відновлення з донабором (`game.resumed`). */
   recruit?: boolean;
+  /** Голосування за час (`poll.*`). */
+  pollId?: number;
+  pollKind?: PollKind;
+  /** Варіанти голосування (`poll.created`) — для тексту в Telegram. */
+  pollOptions?: NotificationPollOption[];
+  /** Чому закрилось голосування (`poll.closed`). */
+  closeReason?: PollCloseReason;
   actor?: NotificationActor | null;
+}
+
+/**
+ * Варіант голосування в сповіщенні: id (для Telegram-кнопок), номер 1…6 і час (ISO UTC; для
+ * `regular` — перша сесія).
+ */
+export interface NotificationPollOption {
+  id: number;
+  n: number;
+  startsAt: string;
 }
 
 /** Сповіщення (`GET /api/me/notifications`). */
@@ -163,10 +195,19 @@ const telegramPrefsShape = Object.fromEntries(
   NOTIFICATION_CATEGORIES.map((c) => [c, z.boolean()]),
 ) as Record<NotificationCategory, z.ZodBoolean>;
 
-/** Тіло `PUT /api/me/notification-prefs` — повна заміна налаштувань. */
+const sitePrefsShape = Object.fromEntries(
+  SITE_OPTIONAL_CATEGORIES.map((c) => [c, z.boolean()]),
+) as Record<SiteOptionalCategory, z.ZodBoolean>;
+
+/**
+ * Тіло `PUT /api/me/notification-prefs` — повна заміна налаштувань. `site` (і ключ `schedule`
+ * у `telegram`) можна не передавати — тоді лишається збережене значення (сумісність зі
+ * старими клієнтами).
+ */
 export const notificationPrefsInputSchema = z
   .object({
-    telegram: z.object(telegramPrefsShape).strict(),
+    telegram: z.object({ ...telegramPrefsShape, schedule: z.boolean().optional() }).strict(),
+    site: z.object(sitePrefsShape).strict().optional(),
     /** Порожній список — нагадування вимкнено; дублікати прибираються. */
     reminderOffsets: z
       .array(z.union(REMINDER_OFFSETS.map((o) => z.literal(o))))
@@ -179,6 +220,8 @@ export type NotificationPrefsInput = z.input<typeof notificationPrefsInputSchema
 /** `GET/PUT /api/me/notification-prefs`. */
 export interface NotificationPrefsDto {
   telegram: Record<NotificationCategory, boolean>;
+  /** Сповіщення на сайті для категорій, які можна вимкнути (`SITE_OPTIONAL_CATEGORIES`). */
+  site: Record<SiteOptionalCategory, boolean>;
   /** За спаданням (раніше нагадування — першим). */
   reminderOffsets: ReminderOffset[];
 }
@@ -186,6 +229,10 @@ export interface NotificationPrefsDto {
 export const defaultNotificationPrefs = (): NotificationPrefsDto => ({
   telegram: Object.fromEntries(NOTIFICATION_CATEGORIES.map((c) => [c, true])) as Record<
     NotificationCategory,
+    boolean
+  >,
+  site: Object.fromEntries(SITE_OPTIONAL_CATEGORIES.map((c) => [c, true])) as Record<
+    SiteOptionalCategory,
     boolean
   >,
   reminderOffsets: [...DEFAULT_REMINDER_OFFSETS],
@@ -209,6 +256,9 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   }
   if (p.gameId === undefined) return '/';
   switch (type) {
+    case 'poll.created':
+    case 'poll.closed':
+      return p.pollId !== undefined ? `/games/${p.gameId}?poll=${p.pollId}` : `/games/${p.gameId}`;
     case 'rating.session_open':
     case 'rating.final_open':
     case 'rating.member_left':

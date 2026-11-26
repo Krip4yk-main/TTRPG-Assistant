@@ -11,7 +11,12 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
-import type { NotificationCategory, NotificationParams, TelegramButton } from '@nri/shared';
+import type {
+  NotificationCategory,
+  NotificationParams,
+  SiteOptionalCategory,
+  TelegramButton,
+} from '@nri/shared';
 import { gameSessions } from './sessions.js';
 import { users } from './users.js';
 
@@ -24,6 +29,7 @@ const NOTIFICATION_CATEGORIES = [
   'games',
   'ratings',
   'moderation',
+  'schedule',
 ] as const satisfies NotificationCategory[];
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
@@ -76,6 +82,8 @@ export const notificationPrefs = mysqlTable('notification_prefs', {
   // зі значеннями за замовчуванням (`getPrefs`, `enqueueTelegram`).
   telegram: json('telegram').$type<Partial<Record<NotificationCategory, boolean>>>().notNull(),
   reminderOffsets: json('reminder_offsets').$type<number[]>().notNull(),
+  /** Сповіщення на сайті для категорій, що вимикаються (`SITE_OPTIONAL_CATEGORIES`); NULL — усі ввімкнено. */
+  site: json('site').$type<Partial<Record<SiteOptionalCategory, boolean>>>(),
   updatedAt: datetime('updated_at')
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`)

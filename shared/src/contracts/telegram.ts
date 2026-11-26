@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import type { NotificationParams } from './notifications.js';
+import { POLL_VOTE_VALUES, type PollVoteValue } from './polls.js';
 
 /**
  * Кнопка Telegram-сповіщення — структуровані дані; `callback_data` будує бот
- * (`a:<applicationId>:ok|no`, `r:<sessionId>:y|n`, ≤ 64 байт).
+ * (`a:<applicationId>:ok|no`, `r:<sessionId>:y|n`, `v:<optionId>:y|n|m`, ≤ 64 байт).
+ * `vote` — відповідь на варіант голосування за час; `n` — номер варіанта (1…6) для підпису,
+ * кнопки одного варіанта — окремий рядок клавіатури.
  */
 export type TelegramButton =
   | { action: 'approve' | 'reject'; applicationId: number }
-  | { action: 'rsvp'; sessionId: number; value: 'going' | 'not_going' };
+  | { action: 'rsvp'; sessionId: number; value: 'going' | 'not_going' }
+  | { action: 'vote'; optionId: number; n: number; value: PollVoteValue };
 
 /** Рядок `telegram_outbox`, виданий боту (`POST /api/internal/telegram/outbox/claim`). */
 export interface TelegramOutboxItem {
@@ -58,7 +62,7 @@ export const telegramOutboxFailedSchema = z
 export type TelegramOutboxFailedInput = z.input<typeof telegramOutboxFailedSchema>;
 
 /** Дії з кнопок Telegram-сповіщень. */
-export const TELEGRAM_ACTIONS = ['approve', 'reject', 'rsvp'] as const;
+export const TELEGRAM_ACTIONS = ['approve', 'reject', 'rsvp', 'vote'] as const;
 export type TelegramAction = (typeof TELEGRAM_ACTIONS)[number];
 
 /** Тіло `POST /api/internal/telegram/action` (бот → бекенд). */
@@ -67,17 +71,23 @@ export const telegramActionSchema = z
     telegramId: z.union([z.string().regex(/^\d{1,20}$/), z.number().int().positive()]),
     action: z.enum(TELEGRAM_ACTIONS),
     id: z.number().int().positive(),
-    value: z.enum(['going', 'not_going']).optional(),
+    /** `rsvp` — going/not_going; `vote` — yes/no/maybe (id — варіант голосування). */
+    value: z.enum(['going', 'not_going', ...POLL_VOTE_VALUES]).optional(),
   })
   .strict()
-  .refine((b) => (b.action === 'rsvp') === (b.value !== undefined), {
-    message: 'value is required for rsvp only',
-    path: ['value'],
-  });
+  .refine(
+    (b) =>
+      b.action === 'rsvp'
+        ? b.value === 'going' || b.value === 'not_going'
+        : b.action === 'vote'
+          ? (POLL_VOTE_VALUES as readonly string[]).includes(b.value ?? '')
+          : b.value === undefined,
+    { message: 'value must match the action', path: ['value'] },
+  );
 export type TelegramActionInput = z.input<typeof telegramActionSchema>;
 
 /** Успішна відповідь `POST /api/internal/telegram/action`. */
 export interface TelegramActionResult {
   ok: true;
-  result: 'approved' | 'rejected' | 'going' | 'not_going';
+  result: 'approved' | 'rejected' | 'going' | 'not_going' | 'vote_yes' | 'vote_no' | 'vote_maybe';
 }

@@ -28,3 +28,4 @@ export * from './contracts/moderation.js';
 export * from './contracts/dead-games.js';
 export * from './contracts/scheduling.js';
 export * from './schedule/common-times.js';
+export * from './contracts/polls.js';

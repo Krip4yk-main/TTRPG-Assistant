@@ -22,6 +22,11 @@ import {
   RATING_DEADLINE_JOB,
   sendRatingDeadlines,
 } from '../ratings/ratings.reminders.js';
+import {
+  POLLS_CLOSE_EVERY_MS,
+  POLLS_CLOSE_JOB,
+  runPollsClose,
+} from '../scheduling/polls.service.js';
 import { DAILY_AT_UTC, DAILY_JOB, runDaily } from './daily.js';
 import { purgeFinishedJobs } from './queue.js';
 import { registerHandler, registerRecurring } from './registry.js';
@@ -78,4 +83,10 @@ export function registerJobs(): void {
     await runLongPauseReminders(deps, job.runAt);
   });
   registerRecurring(LONG_PAUSE_JOB, { dailyAtUtc: LONG_PAUSE_AT_UTC });
+
+  // Голосування за час: закриття за дедлайном / «всі проголосували»; ідемпотентно (умовний UPDATE).
+  registerHandler(POLLS_CLOSE_JOB, async (deps, _payload, job) => {
+    await runPollsClose(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(POLLS_CLOSE_JOB, { everyMs: POLLS_CLOSE_EVERY_MS });
 }

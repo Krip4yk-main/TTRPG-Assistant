@@ -56,7 +56,7 @@ export async function handleCallback(
     telegramId: q.from.id,
     action: parsed.action,
     id: parsed.id,
-    ...(parsed.action === 'rsvp' ? { value: parsed.value } : {}),
+    ...(parsed.action === 'rsvp' || parsed.action === 'vote' ? { value: parsed.value } : {}),
   });
   if (!outcome.ok) {
     const key = `actions.errors.${outcome.code}`;
@@ -66,6 +66,10 @@ export async function handleCallback(
   }
   const status = t(`actions.done.${outcome.result}`);
   await ctx.answerCallbackQuery({ text: status });
+  if (parsed.action === 'vote') {
+    await markVote(ctx, q.data!, log);
+    return;
+  }
   const original = q.message?.text;
   if (original === undefined) return;
   const suffix = `\n\n${status}`;
@@ -82,6 +86,42 @@ export async function handleCallback(
     });
   } catch (err) {
     // Дію виконано; невдале редагування (повідомлення видалено тощо) — не помилка для користувача.
+    log(`callback edit failed (${err instanceof Error ? err.name : 'unknown'})`);
+  }
+}
+
+/** Позначка обраної відповіді на кнопці голосування. */
+export const VOTE_MARK = '✔️ ';
+
+/**
+ * Голосування: текст лишається, у клавіатурі позначається обрана відповідь (`VOTE_MARK`) у
+ * рядку цього варіанта (з інших кнопок рядка позначка знімається). Та сама відповідь удруге —
+ * без редагування (Telegram відхилив би «not modified»).
+ */
+async function markVote(ctx: CallbackCtx, data: string, log: (msg: string) => void): Promise<void> {
+  const q = ctx.callbackQuery;
+  const markup = q.message?.reply_markup;
+  const text = q.message?.text;
+  if (!markup || text === undefined) return;
+  const prefix = data.slice(0, data.lastIndexOf(':') + 1);
+  let changed = false;
+  const inline_keyboard = markup.inline_keyboard.map((row) => {
+    if (!row.some((b) => 'callback_data' in b && b.callback_data === data)) return row;
+    return row.map((b) => {
+      if (!('callback_data' in b) || !b.callback_data?.startsWith(prefix)) return b;
+      const base = b.text.startsWith(VOTE_MARK) ? b.text.slice(VOTE_MARK.length) : b.text;
+      const next = b.callback_data === data ? `${VOTE_MARK}${base}` : base;
+      if (next !== b.text) changed = true;
+      return { ...b, text: next };
+    });
+  });
+  if (!changed) return;
+  try {
+    await ctx.editMessageText(text, {
+      reply_markup: { inline_keyboard },
+      link_preview_options: { is_disabled: true },
+    });
+  } catch (err) {
     log(`callback edit failed (${err instanceof Error ? err.name : 'unknown'})`);
   }
 }

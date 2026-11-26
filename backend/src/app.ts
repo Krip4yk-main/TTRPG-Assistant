@@ -26,7 +26,7 @@ import {
 import { gameMembersRouter } from './members/members.routes.js';
 import { blacklistRouter } from './members/blacklist.routes.js';
 import { gameSessionsRouter, sessionsRouter } from './sessions/sessions.routes.js';
-import { gameSchedulingRouter } from './scheduling/scheduling.routes.js';
+import { gameSchedulingRouter, pollsRouter } from './scheduling/scheduling.routes.js';
 import { gameNotesRouter, sessionNotesRouter } from './notes/notes.routes.js';
 import { notificationsRouter } from './notifications/notifications.routes.js';
 import { notificationPrefsRouter } from './notifications/prefs.routes.js';
@@ -110,6 +110,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/games', gamesRouter(deps));
   app.use('/api/applications', applicationsRouter(deps));
   app.use('/api/sessions', sessionsRouter(deps));
+  app.use('/api/polls', pollsRouter(deps));
   app.use('/api/complaints', complaintsRouter(deps));
   app.use('/api/admin/complaints', adminComplaintsRouter(deps));
   app.use('/api/admin/log', adminLogRouter(deps));

@@ -215,6 +215,41 @@ export async function rescheduleSession(
   return reload(deps, userId, sessionId);
 }
 
+/**
+ * Додаткова разова сесія кампейну (`origin='manual'`, без слоту правила) — застосування
+ * разового голосування за час без цільової сесії (Plan 12). Лише майстер (перевіряє
+ * викликач), гра набирає чи йде, час — ціла хвилина в майбутньому; тривалість — з гри.
+ */
+export async function createManualSession(
+  deps: AppDeps,
+  userId: number,
+  gameId: number,
+  startsAtIso: string,
+): Promise<SessionDto> {
+  const { startsAt: iso } = rescheduleSessionInputSchema.parse({ startsAt: startsAtIso });
+  const startsAt = new Date(iso);
+  if (startsAt <= new Date()) throw new AppError(422, 'GAME_IN_PAST');
+  const sessionId = await deps.db.transaction(async (tx) => {
+    const [game] = await tx.select().from(games).where(eq(games.id, gameId)).for('share');
+    if (!game) throw new AppError(404, 'NOT_FOUND');
+    if (game.gmUserId !== userId) throw new AppError(403, 'FORBIDDEN');
+    if (!isRunning(game)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
+    const [res] = await tx
+      .insert(gameSessions)
+      .values({
+        gameId,
+        startsAt,
+        durationMinutes: game.durationMinutes,
+        origin: 'manual',
+        ruleStartsAt: null,
+      })
+      .$returningId();
+    return res!.id;
+  });
+  await afterGmSessionChange(deps, userId, gameId, sessionId);
+  return reload(deps, userId, sessionId);
+}
+
 /** Скасування окремої сесії з причиною. */
 export async function cancelSession(
   deps: AppDeps,

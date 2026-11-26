@@ -50,6 +50,7 @@ const CATEGORY_ICONS: Record<NotificationCategory, string> = {
   games: 'casino',
   ratings: 'star',
   moderation: 'shield',
+  schedule: 'how_to_vote',
 };
 
 const isType = (t: string): t is NotificationType =>

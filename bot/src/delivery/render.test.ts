@@ -378,6 +378,71 @@ describe('formatWhen', () => {
   });
 });
 
+describe('poll notifications', () => {
+  const options = [
+    { id: 41, n: 1, startsAt: '2026-11-27T17:00:00.000Z' },
+    { id: 42, n: 2, startsAt: '2026-11-28T16:30:00.000Z' },
+  ];
+  const buttons: TelegramButton[] = options.flatMap((o) =>
+    (['yes', 'no', 'maybe'] as const).map((value): TelegramButton => ({
+      action: 'vote',
+      optionId: o.id,
+      n: o.n,
+      value,
+    })),
+  );
+  const poll: NotificationParams = {
+    gameId: 12,
+    gameTitle: 'Прокляття Страда',
+    pollId: 9,
+    pollKind: 'one_off',
+    pollOptions: options,
+    closesAt: '2026-11-26T20:00:00.000Z',
+  };
+
+  it('poll.created: options in the viewer zone, deadline, one keyboard row per option', () => {
+    const r = render('poll.created', poll, buttons);
+    expect(r.text.split('\n')[0]).toContain('«Прокляття Страда»');
+    expect(r.text).toContain('1) пт, 27 листопада о 19:00');
+    expect(r.text).toContain('2) сб, 28 листопада о 18:30');
+    expect(r.text).toContain('Відповісти можна до чт, 26 листопада о 22:00.');
+    expect(r.text).toContain('Детальніше: https://nri.example/games/12?poll=9');
+    expect(r.keyboard).toEqual([
+      [
+        { text: '1 · ✅ можу', callback_data: 'v:41:y' },
+        { text: '❌ не можу', callback_data: 'v:41:n' },
+        { text: '🤔 якщо треба', callback_data: 'v:41:m' },
+      ],
+      [
+        { text: '2 · ✅ можу', callback_data: 'v:42:y' },
+        { text: '❌ не можу', callback_data: 'v:42:n' },
+        { text: '🤔 якщо треба', callback_data: 'v:42:m' },
+      ],
+    ]);
+    const tz = renderNotification('poll.created', poll, buttons, {
+      siteUrl: SITE,
+      timeZone: 'Europe/Warsaw',
+    });
+    expect(tz.text).toContain('1) пт, 27 листопада о 18:00');
+  });
+
+  it('regular poll and closed variants', () => {
+    const regular = render('poll.created', { ...poll, pollKind: 'regular' });
+    expect(regular.text).toContain('новий регулярний час');
+    expect(regular.text).toContain('1) щотижня, починаючи з пт, 27 листопада о 19:00');
+    const won = { gameId: 12, gameTitle: 'Г', pollId: 9, startsAt: options[0]!.startsAt };
+    expect(render('poll.closed', { ...won, closeReason: 'all_voted' }).text).toContain(
+      'Усі гравці гри «Г» відповіли',
+    );
+    expect(render('poll.closed', { ...won, closeReason: 'deadline' }).text).toContain(
+      'Час голосування в грі «Г» минув. Найзручніший варіант — пт, 27 листопада о 19:00.',
+    );
+    const none = render('poll.closed', { gameId: 12, gameTitle: 'Г', closeReason: 'deadline' });
+    expect(none.text).toContain('жоден варіант не підійшов');
+    expect(none.keyboard).toBeUndefined();
+  });
+});
+
 describe('callback data', () => {
   it('round-trips and stays within 64 bytes even for huge ids', () => {
     const big = Number.MAX_SAFE_INTEGER;
@@ -398,8 +463,32 @@ describe('callback data', () => {
     }
   });
 
+  it('poll votes: v:<optionId>:y|n|m round-trips within 64 bytes', () => {
+    const big = Number.MAX_SAFE_INTEGER;
+    for (const value of ['yes', 'no', 'maybe'] as const) {
+      const data = encodeCallback({ action: 'vote', optionId: big, n: 6, value });
+      expect(Buffer.byteLength(data)).toBeLessThanOrEqual(CALLBACK_DATA_MAX_BYTES);
+      expect(parseCallback(data)).toEqual({ action: 'vote', id: big, value });
+    }
+    expect(encodeCallback({ action: 'vote', optionId: 7, n: 1, value: 'maybe' })).toBe('v:7:m');
+  });
+
   it('rejects foreign or malformed data', () => {
-    for (const d of ['', 'a:1:y', 'r:1:ok', 'a:0:ok', 'a:-1:ok', 'a:01:ok', 'x:1:ok', 'a:1:ok:x']) {
+    for (const d of [
+      '',
+      'a:1:y',
+      'r:1:ok',
+      'r:1:m',
+      'v:1:ok',
+      'v:0:y',
+      'v:1:x',
+      'v:1:y:2',
+      'a:0:ok',
+      'a:-1:ok',
+      'a:01:ok',
+      'x:1:ok',
+      'a:1:ok:x',
+    ]) {
       expect(parseCallback(d), d).toBeNull();
     }
   });

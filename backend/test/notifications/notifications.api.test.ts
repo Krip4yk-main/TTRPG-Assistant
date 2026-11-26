@@ -144,7 +144,9 @@ describe('/api/me/notification-prefs', () => {
         games: true,
         ratings: true,
         moderation: true,
+        schedule: true,
       },
+      site: { schedule: true },
       reminderOffsets: [1440, 60],
     });
     const put = await call('put', '/api/me/notification-prefs', u.cookie, {
@@ -152,7 +154,12 @@ describe('/api/me/notification-prefs', () => {
       reminderOffsets: [15, 2880, 15],
     });
     expect(put.status).toBe(200);
-    expect(put.body).toEqual({ telegram, reminderOffsets: [2880, 15] });
+    // Старий клієнт без `schedule`/`site`: вони лишаються збереженими (за замовчуванням — увімкнено).
+    expect(put.body).toEqual({
+      telegram: { ...telegram, schedule: true },
+      site: { schedule: true },
+      reminderOffsets: [2880, 15],
+    });
     expect((await call('get', '/api/me/notification-prefs', u.cookie)).body).toEqual(put.body);
     const off = await call('put', '/api/me/notification-prefs', u.cookie, {
       telegram,
@@ -175,9 +182,36 @@ describe('/api/me/notification-prefs', () => {
       .values({ userId: u.id, telegram: legacy, reminderOffsets: [60] });
     const res = await call('get', '/api/me/notification-prefs', u.cookie);
     expect(res.body).toEqual({
-      telegram: { ...legacy, ratings: true, moderation: true },
+      telegram: { ...legacy, ratings: true, moderation: true, schedule: true },
+      site: { schedule: true },
       reminderOffsets: [60],
     });
+  });
+
+  it('«Розклад»: toggled for Telegram and the site; omitted keys keep the saved value', async () => {
+    const u = await userWithAge(25);
+    const off = await call('put', '/api/me/notification-prefs', u.cookie, {
+      telegram: { ...telegram, schedule: false },
+      site: { schedule: false },
+      reminderOffsets: [60],
+    });
+    expect(off.status).toBe(200);
+    expect(off.body.telegram.schedule).toBe(false);
+    expect(off.body.site).toEqual({ schedule: false });
+    const legacy = await call('put', '/api/me/notification-prefs', u.cookie, {
+      telegram,
+      reminderOffsets: [60],
+    });
+    expect(legacy.body.telegram.schedule).toBe(false);
+    expect(legacy.body.site).toEqual({ schedule: false });
+    for (const site of [{ schedule: 'no' }, { games: false }, {}]) {
+      const bad = await call('put', '/api/me/notification-prefs', u.cookie, {
+        telegram,
+        site,
+        reminderOffsets: [],
+      });
+      expect(bad.status, JSON.stringify(site)).toBe(400);
+    }
   });
 
   it('validation: allowed offsets only, ≤ 5, strict shape', async () => {

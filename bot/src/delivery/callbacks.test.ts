@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ActionOutcome } from '../api/backend-client.js';
 import uk from '../i18n/uk.json' with { type: 'json' };
 import { makeT } from '../i18n/t.js';
-import { handleCallback, type CallbackCtx } from './callbacks.js';
+import { handleCallback, VOTE_MARK, type CallbackCtx } from './callbacks.js';
 
 const t = makeT();
 const TEXT = '📜 Нова заявка на гру «Гра» від Гравець.\n\nДетальніше: https://s/x';
@@ -148,5 +148,83 @@ describe('handleCallback', () => {
     const text = (ctx.editMessageText.mock.calls[0] as unknown[])[0] as string;
     expect(text.length).toBeLessThanOrEqual(4096);
     expect(text.endsWith('\n\n✅ Затверджено')).toBe(true);
+  });
+});
+
+describe('handleCallback — poll votes', () => {
+  const POLL_TEXT = '🗳️ Голосування\n\n1) пт\n2) сб';
+  const row = (id: number, n: number) => [
+    { text: `${n} · ✅ можу`, callback_data: `v:${id}:y` },
+    { text: '❌ не можу', callback_data: `v:${id}:n` },
+    { text: '🤔 якщо треба', callback_data: `v:${id}:m` },
+  ];
+  const KB = { inline_keyboard: [row(41, 1), row(42, 2)] };
+  type Edit = [string, { reply_markup: typeof KB }];
+
+  it('sends the vote as the presser and marks the chosen answer in that option row only', async () => {
+    const { ctx, client } = setup(
+      'v:42:m',
+      { ok: true, result: 'vote_maybe' },
+      { text: POLL_TEXT, reply_markup: KB },
+    );
+    await handleCallback(ctx, client, t);
+    expect(client.telegramAction).toHaveBeenCalledWith({
+      telegramId: 777,
+      action: 'vote',
+      id: 42,
+      value: 'maybe',
+    });
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: '🤔 Записано: якщо треба' });
+    const [text, other] = ctx.editMessageText.mock.calls[0] as unknown as Edit;
+    expect(text).toBe(POLL_TEXT);
+    expect(other.reply_markup.inline_keyboard[0]).toEqual(row(41, 1));
+    expect(other.reply_markup.inline_keyboard[1]!.map((b) => b.text)).toEqual([
+      '2 · ✅ можу',
+      '❌ не можу',
+      `${VOTE_MARK}🤔 якщо треба`,
+    ]);
+  });
+
+  it('changing the answer moves the mark; the same answer again does not edit', async () => {
+    const marked = {
+      inline_keyboard: [
+        row(41, 1),
+        row(42, 2).map((b, i) => (i === 2 ? { ...b, text: `${VOTE_MARK}${b.text}` } : b)),
+      ],
+    };
+    const msg = { text: POLL_TEXT, reply_markup: marked };
+    const again = setup('v:42:m', { ok: true, result: 'vote_maybe' }, msg);
+    await handleCallback(again.ctx, again.client, t);
+    expect(again.ctx.editMessageText).not.toHaveBeenCalled();
+    const change = setup('v:42:y', { ok: true, result: 'vote_yes' }, msg);
+    await handleCallback(change.ctx, change.client, t);
+    const [, other] = change.ctx.editMessageText.mock.calls[0] as unknown as Edit;
+    expect(other.reply_markup.inline_keyboard[1]!.map((b) => b.text)).toEqual([
+      `${VOTE_MARK}2 · ✅ можу`,
+      '❌ не можу',
+      '🤔 якщо треба',
+    ]);
+  });
+
+  it('backend refusal (closed poll, not a member) → translated answer, no edit', async () => {
+    for (const [code, msg] of [
+      ['POLL_CLOSED', uk.actions.errors.POLL_CLOSED],
+      ['NOT_A_MEMBER', uk.actions.errors.NOT_A_MEMBER],
+    ] as const) {
+      const { ctx, client } = setup('v:41:y', { ok: false, code } as ActionOutcome, {
+        text: POLL_TEXT,
+        reply_markup: KB,
+      });
+      await handleCallback(ctx, client, t);
+      expect(ctx.answerCallbackQuery).toHaveBeenCalledWith({ text: msg });
+      expect(ctx.editMessageText).not.toHaveBeenCalled();
+    }
+  });
+
+  it('malformed vote data → silent answer, backend not called', async () => {
+    const { ctx, client } = setup('v:41:x', { ok: true, result: 'vote_yes' });
+    await handleCallback(ctx, client, t);
+    expect(client.telegramAction).not.toHaveBeenCalled();
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith();
   });
 });

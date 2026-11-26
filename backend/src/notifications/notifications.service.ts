@@ -5,6 +5,8 @@ import {
   notificationLink,
   notificationPrefsInputSchema,
   notificationsQuerySchema,
+  SITE_OPTIONAL_CATEGORIES,
+  type NotificationCategory,
   type NotificationDto,
   type NotificationPrefsDto,
   type NotificationsPage,
@@ -39,6 +41,31 @@ export async function afterNotificationsCreated(
   await enqueueTelegram(tx, rows);
 }
 
+const isSiteOptional = (c: NotificationCategory): boolean =>
+  (SITE_OPTIONAL_CATEGORIES as readonly string[]).includes(c);
+
+/**
+ * Прибирає сповіщення категорій, які одержувач вимкнув на сайті (`prefs.site`, напр. «Розклад»):
+ * такі не створюються взагалі — ні на сайті, ні в Telegram. Один запит, лише якщо є такі категорії.
+ */
+export async function dropSiteMuted<T extends Pick<NewNotification, 'userId' | 'category'>>(
+  tx: DbLike,
+  list: T[],
+): Promise<T[]> {
+  const optional = list.filter((n) => isSiteOptional(n.category));
+  if (optional.length === 0) return list;
+  const rows = await tx
+    .select({ userId: notificationPrefs.userId, site: notificationPrefs.site })
+    .from(notificationPrefs)
+    .where(inArray(notificationPrefs.userId, [...new Set(optional.map((n) => n.userId))]));
+  const site = new Map(rows.map((r) => [r.userId, r.site ?? {}]));
+  return list.filter(
+    (n) =>
+      !isSiteOptional(n.category) ||
+      (site.get(n.userId) as Record<string, boolean> | undefined)?.[n.category] !== false,
+  );
+}
+
 const toInsert = (n: NewNotification) => ({
   eventId: n.eventId,
   userId: n.userId,
@@ -57,8 +84,9 @@ const toInsert = (n: NewNotification) => ({
 export async function insertEventNotifications(
   deps: Pick<AppDeps, 'env'>,
   tx: DbLike,
-  list: NewNotification[],
+  planned: NewNotification[],
 ): Promise<NotificationRow[]> {
+  const list = await dropSiteMuted(tx, planned);
   if (list.length === 0) return [];
   const eventIds = [...new Set(list.map((n) => n.eventId!))];
   const existing = new Set(
@@ -96,6 +124,19 @@ export async function createNotification(
   const [row] = await tx.select().from(notifications).where(eq(notifications.id, res!.id));
   await afterNotificationsCreated(deps, [row!], tx);
   return row!;
+}
+
+/**
+ * Як `createNotification`, але для категорій, що вимикаються на сайті (`SITE_OPTIONAL_CATEGORIES`):
+ * одержувач вимкнув категорію — `null`, нічого не створено.
+ */
+export async function createOptionalNotification(
+  deps: Pick<AppDeps, 'env'>,
+  tx: DbLike,
+  input: Omit<NewNotification, 'eventId'>,
+): Promise<NotificationRow | null> {
+  const [kept] = await dropSiteMuted(tx, [input]);
+  return kept ? createNotification(deps, tx, kept) : null;
 }
 
 /** Пінг `notification.new {id}` у `user:<id>` — лише після коміту; без realtime — нічого. */
@@ -198,6 +239,7 @@ export async function getPrefs(
   if (!row) return d;
   return {
     telegram: { ...d.telegram, ...row.telegram },
+    site: { ...d.site, ...(row.site ?? {}) },
     reminderOffsets: row.reminderOffsets as ReminderOffset[],
   };
 }
@@ -208,11 +250,20 @@ export async function putPrefs(
   body: unknown,
 ): Promise<NotificationPrefsDto> {
   const input = notificationPrefsInputSchema.parse(body);
+  // Не передані `site` / `telegram.schedule` (старий клієнт) — лишаються збереженими.
+  const current = await getPrefs(deps, userId);
+  const telegram = { ...current.telegram, ...stripUndefined(input.telegram) };
+  const site = input.site ?? current.site;
   await deps.db
     .insert(notificationPrefs)
-    .values({ userId, telegram: input.telegram, reminderOffsets: input.reminderOffsets })
+    .values({ userId, telegram, site, reminderOffsets: input.reminderOffsets })
     .onDuplicateKeyUpdate({
-      set: { telegram: input.telegram, reminderOffsets: input.reminderOffsets },
+      set: { telegram, site, reminderOffsets: input.reminderOffsets },
     });
   return getPrefs(deps, userId);
 }
+
+const stripUndefined = <T extends object>(o: T): { [K in keyof T]: Exclude<T[K], undefined> } =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as {
+    [K in keyof T]: Exclude<T[K], undefined>;
+  };

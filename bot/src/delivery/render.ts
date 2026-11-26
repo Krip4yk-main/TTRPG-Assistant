@@ -122,7 +122,30 @@ export function renderNotification(
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
     }
+    // Голосування за час: окремий текст для регулярного; закриття — за причиною й переможцем.
+    if (kind === 'poll.created' && params.pollKind === 'regular')
+      key = 'notify.poll.created_regular';
+    if (kind === 'poll.closed') {
+      key = !params.startsAt
+        ? 'notify.poll.closed_nowinner'
+        : params.closeReason === 'all_voted' || params.closeReason === 'deadline'
+          ? `notify.poll.closed_${params.closeReason}`
+          : 'notify.poll.closed';
+    }
     parts.push(t(key, vars));
+    if (kind === 'poll.created') {
+      const optionKey =
+        params.pollKind === 'regular' ? 'notify.poll.option_regular' : 'notify.poll.option';
+      const lines = (params.pollOptions ?? []).map((o) =>
+        t(optionKey, {
+          n: String(o.n),
+          when: formatWhen(o.startsAt, tz) ?? t('notify.unknownTime'),
+        }),
+      );
+      if (lines.length) parts.push('', ...lines);
+      const closes = formatWhen(params.closesAt, tz);
+      if (closes) parts.push('', t('notify.poll.until', { closes }));
+    }
     // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
     const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;
     if (closes) parts.push(t('notify.rating.until', { closes }));
@@ -151,11 +174,26 @@ export function renderNotification(
   let text = parts.join('\n');
   if (text.length > TELEGRAM_TEXT_MAX) text = `${text.slice(0, TELEGRAM_TEXT_MAX - 1)}…`;
 
-  const row = (buttons ?? []).map((b): InlineButton => ({
-    text: buttonText(b, t),
-    callback_data: encodeCallback(b),
-  }));
-  return { text, keyboard: row.length ? [row] : undefined };
+  // Кнопки голосування — по рядку на варіант; решта — один рядок.
+  const rows: InlineButton[][] = [];
+  const voteRow = new Map<number, InlineButton[]>();
+  const plain: InlineButton[] = [];
+  for (const b of buttons ?? []) {
+    const btn = { text: buttonText(b, t), callback_data: encodeCallback(b) };
+    if (b.action !== 'vote') {
+      plain.push(btn);
+      continue;
+    }
+    let row = voteRow.get(b.optionId);
+    if (!row) {
+      row = [];
+      voteRow.set(b.optionId, row);
+      rows.push(row);
+    }
+    row.push(btn);
+  }
+  if (plain.length) rows.unshift(plain);
+  return { text, keyboard: rows.length ? rows : undefined };
 }
 
 function offsetPhrase(offsetMin: number | undefined, t: Translate): string {
@@ -173,5 +211,7 @@ function buttonText(b: TelegramButton, t: Translate): string {
       return t('notify.buttons.reject');
     case 'rsvp':
       return t(b.value === 'going' ? 'notify.buttons.going' : 'notify.buttons.notGoing');
+    case 'vote':
+      return t(`notify.buttons.vote.${b.value}`, { n: String(b.n) });
   }
 }

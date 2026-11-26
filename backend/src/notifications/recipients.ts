@@ -1,6 +1,11 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
   PAUSE_REASONS,
+  POLL_CLOSE_REASONS,
+  POLL_KINDS,
+  type NotificationPollOption,
+  type PollCloseReason,
+  type PollKind,
   type EventType,
   type PauseReason,
   type NotificationActor,
@@ -83,6 +88,11 @@ export const NOTIFY_RULES: Partial<Record<EventType, Rule>> = {
   // Пауза й відновлення кампейну: активним учасникам (майстер — автор дії, собі не шле).
   'game.paused': { category: 'games', to: 'participants', actorIsEventUser: true },
   'game.resumed': { category: 'games', to: 'participants', actorIsEventUser: true },
+  // Голосування за час (категорія «Розклад», вимикається й на сайті): нове — учасникам (майстер —
+  // автор); закрилось само (усі проголосували / дедлайн, `user_id` NULL) — майстру. Закриття
+  // майстром (`user_id` = майстер) його ж не сповіщає.
+  'poll.created': { category: 'schedule', to: 'participants', actorIsEventUser: true },
+  'poll.closed': { category: 'schedule', to: 'gm', actorIsEventUser: true },
 };
 
 type Payload = Record<string, unknown>;
@@ -298,6 +308,33 @@ function paramsFor(
       const startsAt = str(p.startsAt);
       if (startsAt) params.startsAt = startsAt;
       params.recruit = p.recruit === true;
+      break;
+    }
+    case 'poll.created':
+    case 'poll.closed': {
+      // Знімок голосування з події: вид, дедлайн, варіанти (для Telegram-кнопок), підсумок.
+      params.pollId = num(ev.entityId) ?? num(p.pollId);
+      const kind = str(p.kind);
+      if (kind && (POLL_KINDS as readonly string[]).includes(kind)) {
+        params.pollKind = kind as PollKind;
+      }
+      const closesAt = str(p.closesAt);
+      if (closesAt) params.closesAt = closesAt;
+      if (Array.isArray(p.options)) {
+        params.pollOptions = p.options.flatMap((o): NotificationPollOption[] => {
+          const x = asPayload(o);
+          const id = num(x.id);
+          const n = num(x.n);
+          const startsAt = str(x.startsAt);
+          return id !== undefined && n !== undefined && startsAt ? [{ id, n, startsAt }] : [];
+        });
+      }
+      const reason = str(p.reason);
+      if (reason && (POLL_CLOSE_REASONS as readonly string[]).includes(reason)) {
+        params.closeReason = reason as PollCloseReason;
+      }
+      const winner = str(p.winnerStartsAt);
+      if (winner) params.startsAt = winner;
       break;
     }
     case 'game.finished':

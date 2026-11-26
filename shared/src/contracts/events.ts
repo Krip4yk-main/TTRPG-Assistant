@@ -42,6 +42,9 @@ export const EVENT_TYPES = [
   'session.rescheduled',
   'session.cancelled',
   'session.done',
+  // голосування за час (Plan 12)
+  'poll.created',
+  'poll.closed',
   // апеляції
   'appeal.created',
   // рейтинги (без оцінювача й оцінок у payload)
