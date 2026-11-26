@@ -75,7 +75,10 @@ export interface NotificationView {
   from: string | null;
   /** Ключ фрази «за годину» тощо (лише для нагадувань). */
   offset: Translatable | null;
-  /** Додатковий рядок «Причина: …»: перекладений код або текст майстра як є. */
+  /**
+   * Додатковий рядок «Причина: …»: перекладений код (`notifications.reasons.<code>`) або текст
+   * майстра як є; обидва — «код — текст» (пауза кампейну: причина зі списку й пояснення).
+   */
   reason: { code: string | null; text: string | null } | null;
   /** Подяка після завершення гри. */
   thanksKey: string | null;
@@ -137,6 +140,18 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.offset = (REMINDER_OFFSETS as readonly number[]).includes(p.offsetMin)
       ? { key: `notifications.offset.${p.offsetMin}` }
       : { key: 'notifications.offset.other', params: { n: p.offsetMin } };
+  }
+
+  // Пауза кампейну: причина зі списку й пояснення майстра (їх бачать учасники гри).
+  if (n.type === 'game.paused' && (p.pauseReason || p.note)) {
+    view.reason = {
+      code: p.pauseReason ? `pause.${p.pauseReason}` : null,
+      text: p.note || null,
+    };
+  }
+  // Відновлення з донабором — окремий текст (як у боті).
+  if (n.type === 'game.resumed' && p.recruit === true) {
+    view.key = 'notifications.game.resumed_recruit';
   }
 
   // Нагадування про дедлайн сесійного набору — з датою сесії (як у боті).

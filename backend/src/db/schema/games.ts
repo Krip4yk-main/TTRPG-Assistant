@@ -115,6 +115,13 @@ export const games = mysqlTable(
     pausedAt: datetime('paused_at'),
     pauseReason: mysqlEnum('pause_reason', PAUSE_REASONS),
     pauseNote: varchar('pause_note', { length: 300 }),
+    /** Останнє відновлення з паузи: від нього теж рахується давність гри (детектор «мертвих»). */
+    resumedAt: datetime('resumed_at'),
+    /**
+     * Останнє нагадування майстру про довгу паузу (`game.long_pause`): після 90 днів паузи —
+     * не частіше ніж раз на 30 днів. Раніше за `paused_at` — з попередньої паузи, не рахується.
+     */
+    longPauseRemindedAt: datetime('long_pause_reminded_at'),
     // «Мертві» ігри (План 7, `games/dead-games`): стан перераховує щоденний детектор.
     /** Позначено «мертвою» (> 90 днів без проведеної сесії): прихована з пошуку й sitemap. */
     deadAt: datetime('dead_at'),

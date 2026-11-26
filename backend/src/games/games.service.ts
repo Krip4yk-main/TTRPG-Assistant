@@ -842,6 +842,8 @@ async function resumeGame(
       pausedAt: null,
       pauseReason: null,
       pauseNote: null,
+      // Від відновлення рахується давність гри: довга пауза не робить її «мертвою» одразу.
+      resumedAt: now,
     };
     await tx.update(games).set(set).where(eq(games.id, id));
     await restartRuleAfterPause(tx, { ...row, ...set }, now);

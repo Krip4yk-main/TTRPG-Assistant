@@ -5,7 +5,7 @@ import { ADMIN_PAGE_DEFAULT, ADMIN_PAGE_MAX, type ModerationUserRefDto } from '.
 /**
  * «Мертві» ігри (План 7). Перевіряються ігри в статусах `recruiting`/`started`; «проведена»
  * сесія — `done`. Відлік — пізніше з: остання проведена сесія, публікація, перша не скасована
- * сесія гри.
+ * сесія гри, відновлення кампейну з паузи.
  */
 const DAY_MS = 86_400_000;
 /** Більше стількох днів без проведеної сесії — нагадування майстру. */
@@ -21,7 +21,14 @@ export const OVERLAP_MIN_INTERSECTIONS = 3;
 /** Адмін зняв «підозрілу»: позначка не повертається 4 тижні. */
 export const SUSPICIOUS_DISMISS_DAYS = 28;
 
+/** Кампейн на паузі довше за стільки днів — нагадування майстру (`game.long_pause`). */
+export const LONG_PAUSE_REMIND_DAYS = 90;
+/** Повтор нагадування про довгу паузу — не частіше ніж раз на стільки днів. */
+export const LONG_PAUSE_REPEAT_DAYS = 30;
+
 export const STALE_REMIND_MS = STALE_REMIND_DAYS * DAY_MS;
+export const LONG_PAUSE_REMIND_MS = LONG_PAUSE_REMIND_DAYS * DAY_MS;
+export const LONG_PAUSE_REPEAT_MS = LONG_PAUSE_REPEAT_DAYS * DAY_MS;
 export const STALE_DEAD_MS = STALE_DEAD_DAYS * DAY_MS;
 
 /**

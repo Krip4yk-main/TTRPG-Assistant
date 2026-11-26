@@ -116,6 +116,8 @@ export function renderNotification(
     if (kind === 'appeal.decided' && params.accepted !== undefined) {
       key = params.accepted ? 'notify.appeal.decided_accepted' : 'notify.appeal.decided_rejected';
     }
+    // Відновлення кампейну з донабором — окремий текст.
+    if (kind === 'game.resumed' && params.recruit === true) key = 'notify.game.resumed_recruit';
     // Нагадування про дедлайн сесійного набору — з датою сесії.
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
@@ -127,6 +129,14 @@ export function renderNotification(
     const withReason = ['session.cancelled', 'sanction.imposed', 'appeal.decided'];
     if (withReason.includes(kind) && params.reason) {
       parts.push(t('notify.reason', { reason: params.reason }));
+    }
+    // Пауза кампейну: причина зі списку й пояснення майстра — окремим рядком.
+    if (kind === 'game.paused') {
+      const label = params.pauseReason
+        ? lookup(dict, `notify.pauseReasons.${params.pauseReason}`)
+        : undefined;
+      const reason = [label, params.note].filter(Boolean).join(' — ');
+      if (reason) parts.push(t('notify.reason', { reason }));
     }
     if (kind === 'game.finished') {
       const thanks = params.genreSlug ? lookup(dict, `thanks.${params.genreSlug}`) : undefined;

@@ -141,7 +141,8 @@
                         | translate
                           : {
                               reason: r.code
-                                ? ('notifications.reasons.' + r.code | translate)
+                                ? ('notifications.reasons.' + r.code | translate) +
+                                  (r.text ? ' — ' + r.text : '')
                                 : r.text,
                             }
                     }}</span>

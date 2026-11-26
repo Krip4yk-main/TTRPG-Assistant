@@ -36,6 +36,8 @@ export interface StaleInput {
   lastDoneAt: Date | null;
   /** Перша сесія гри (`starts_at`; без майбутніх скасованих); без сесій — перший слот правила. */
   firstSessionAt: Date | null;
+  /** Останнє відновлення кампейну з паузи (`resumed_at`); не відновлювався — `null`. */
+  resumedAt?: Date | null;
   deadSnoozedUntil: Date | null;
   deadExemptUntilSession: boolean;
 }
@@ -43,11 +45,14 @@ export interface StaleInput {
 export type StaleVerdict = 'ok' | 'remind' | 'dead';
 
 /**
- * Від чого рахується давність: пізніше з останньої проведеної сесії, публікації й першої
- * сесії (гра, що стартує через 3 місяці, не «мертва»). `null` — немає жодної дати.
+ * Від чого рахується давність: пізніше з останньої проведеної сесії, публікації, першої
+ * сесії (гра, що стартує через 3 місяці, не «мертва») і відновлення з паузи (кампейн після
+ * довгої паузи не «мертвий» одразу). `null` — немає жодної дати.
  */
-export function staleAnchor(g: Pick<StaleInput, 'publishedAt' | 'lastDoneAt' | 'firstSessionAt'>) {
-  const times = [g.lastDoneAt, g.publishedAt, g.firstSessionAt]
+export function staleAnchor(
+  g: Pick<StaleInput, 'publishedAt' | 'lastDoneAt' | 'firstSessionAt' | 'resumedAt'>,
+) {
+  const times = [g.lastDoneAt, g.publishedAt, g.firstSessionAt, g.resumedAt ?? null]
     .filter((d): d is Date => d !== null)
     .map((d) => d.getTime());
   return times.length ? new Date(Math.max(...times)) : null;
@@ -134,7 +139,8 @@ export function staleInputOf(
   row: Pick<
     GameRow,
     'status' | 'publishedAt' | 'startsAt' | 'deadSnoozedUntil' | 'deadExemptUntilSession'
-  >,
+  > &
+    Partial<Pick<GameRow, 'resumedAt'>>,
   anchors: Anchors | undefined,
 ): StaleInput {
   return {
@@ -142,6 +148,7 @@ export function staleInputOf(
     publishedAt: row.publishedAt,
     lastDoneAt: anchors?.lastDoneAt ?? null,
     firstSessionAt: anchors?.firstSessionAt ?? row.startsAt,
+    resumedAt: row.resumedAt ?? null,
     deadSnoozedUntil: row.deadSnoozedUntil,
     deadExemptUntilSession: row.deadExemptUntilSession,
   };

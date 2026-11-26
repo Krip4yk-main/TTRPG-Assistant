@@ -246,6 +246,13 @@
       "when": 1795716306546,
       "tag": "0034_campaign_pause",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1795717319117,
+      "tag": "0035_pause_reminders",
+      "breakpoints": true
     }
   ]
 }

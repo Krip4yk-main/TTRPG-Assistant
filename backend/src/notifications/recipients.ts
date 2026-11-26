@@ -1,10 +1,12 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import type {
-  EventType,
-  NotificationActor,
-  NotificationCategory,
-  NotificationParams,
-  NotificationType,
+import {
+  PAUSE_REASONS,
+  type EventType,
+  type PauseReason,
+  type NotificationActor,
+  type NotificationCategory,
+  type NotificationParams,
+  type NotificationType,
 } from '@nri/shared';
 import type { Tx } from '../applications/applications.rules.js';
 import type { Db } from '../db/client.js';
@@ -78,6 +80,9 @@ export const NOTIFY_RULES: Partial<Record<EventType, Rule>> = {
     actorIsEventUser: true,
   },
   'game.rule_changed': { category: 'games', to: 'participants', actorIsEventUser: true },
+  // Пауза й відновлення кампейну: активним учасникам (майстер — автор дії, собі не шле).
+  'game.paused': { category: 'games', to: 'participants', actorIsEventUser: true },
+  'game.resumed': { category: 'games', to: 'participants', actorIsEventUser: true },
 };
 
 type Payload = Record<string, unknown>;
@@ -279,6 +284,22 @@ function paramsFor(
       // розкривається: звичайне сповіщення без причини.
       params.reason = str(p.reason) === 'banned_by_admin' ? null : (str(p.reason) ?? null);
       break;
+    case 'game.paused': {
+      // Причину й пояснення паузи бачать учасники (GameDto.pauseReason / pauseNote).
+      const reason = str(p.reason);
+      if (reason && (PAUSE_REASONS as readonly string[]).includes(reason)) {
+        params.pauseReason = reason as PauseReason;
+      }
+      params.note = str(p.note) || null;
+      break;
+    }
+    case 'game.resumed': {
+      // Дата першої сесії після паузи й чи оголошено донабір — знімок з події.
+      const startsAt = str(p.startsAt);
+      if (startsAt) params.startsAt = startsAt;
+      params.recruit = p.recruit === true;
+      break;
+    }
     case 'game.finished':
       // Подяка після гри — текст за жанром (`thanks.<genreSlug>`).
       params.genreSlug = game.genreSlug;

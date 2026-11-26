@@ -31,6 +31,7 @@ describe('notification contracts', () => {
       'game.dead',
       'game.suspicious',
       'game.closed_by_admin',
+      'game.long_pause',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);

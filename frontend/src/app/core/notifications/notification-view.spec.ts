@@ -115,6 +115,34 @@ describe('notificationView', () => {
     expect(left.reason).toEqual({ code: 'account_deleted', text: null });
   });
 
+  it('campaign pause: reason code + note; resume date in the viewer zone without a zone label; recruit variant', () => {
+    const paused = notificationView(
+      dto('game.paused', { pauseReason: 'study_work', note: 'Сесія' }),
+      'Europe/Kyiv',
+    );
+    expect(paused.key).toBe('notifications.game.paused');
+    expect(paused.reason).toEqual({ code: 'pause.study_work', text: 'Сесія' });
+    expect(lookup('notifications.reasons.pause.study_work')).toBe('навчання чи робота');
+    for (const r of ['vacation', 'illness', 'study_work', 'other']) {
+      expect(typeof lookup(`notifications.reasons.pause.${r}`)).toBe('string');
+    }
+    expect(
+      notificationView(dto('game.paused', { pauseReason: 'vacation', note: null }), 'UTC').reason,
+    ).toEqual({ code: 'pause.vacation', text: null });
+
+    const startsAt = '2026-11-27T17:00:00.000Z';
+    const resumed = notificationView(
+      dto('game.resumed', { startsAt, recruit: false }),
+      'America/New_York',
+    );
+    expect(resumed.key).toBe('notifications.game.resumed');
+    expect(resumed.when).toContain('12:00');
+    expect(resumed.when).not.toMatch(/GMT|EST|UTC/);
+    const recruit = notificationView(dto('game.resumed', { startsAt, recruit: true }), 'UTC');
+    expect(recruit.key).toBe('notifications.game.resumed_recruit');
+    expect(String(lookup('notifications.game.resumed_recruit'))).toContain('донабір');
+  });
+
   it('rating.*: ratee name, deadline in the viewer zone only with closesAt', () => {
     const left = notificationView(
       dto('rating.member_left', { ratee: { publicId: 'r', nickname: 'Арвен' } }),

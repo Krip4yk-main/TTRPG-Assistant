@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { PauseReason } from './games.js';
 import type { SanctionType } from './moderation.js';
 
 /** Категорії сповіщень; Telegram вмикається/вимикається для кожної окремо. */
@@ -23,8 +24,10 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * лише для накладення — її бачить сам покараний); `appeal.decided` — автору апеляції: тип
  * санкції, `accepted` і примітка (`reason`, необов'язкова). Детектор «мертвих» ігор (не з
  * подій, майстру): `game.stale_reminder` (давно не проводилась), `game.dead` (позначено
- * «мертвою»), `game.suspicious` (накладання сесій), `game.closed_by_admin`. Текст —
- * `notifications.<type>`.
+ * «мертвою»), `game.suspicious` (накладання сесій), `game.closed_by_admin`. Пауза кампейну:
+ * `game.paused` (учасникам: `pauseReason`, `note`), `game.resumed` (учасникам: `startsAt` першої
+ * сесії, `recruit` — оголошено донабір), `game.long_pause` (не з подій, майстру: кампейн на паузі
+ * понад 90 днів). Текст — `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -48,6 +51,9 @@ export const NOTIFICATION_TYPES = [
   'game.dead',
   'game.suspicious',
   'game.closed_by_admin',
+  'game.paused',
+  'game.resumed',
+  'game.long_pause',
   'rating.session_open',
   'rating.final_open',
   'rating.member_left',
@@ -106,6 +112,12 @@ export interface NotificationParams {
   accepted?: boolean;
   /** Кінець санкції (ISO UTC); `null` — назавжди (`sanction.imposed`). */
   endsAt?: string | null;
+  /** Причина паузи кампейну (`game.paused`). */
+  pauseReason?: PauseReason;
+  /** Пояснення майстра до паузи (`game.paused`); `null` — без пояснення. */
+  note?: string | null;
+  /** Відновлення з донабором (`game.resumed`). */
+  recruit?: boolean;
   actor?: NotificationActor | null;
 }
 

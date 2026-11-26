@@ -218,6 +218,33 @@ describe('renderNotification', () => {
     expect(render('session.cancelled', { ...base, reason: null }).text).not.toContain('Причина');
   });
 
+  it('campaign pause: reason and note; resume with the first session in the recipient zone; recruit variant; long pause', () => {
+    const p = render('game.paused', { ...base, pauseReason: 'vacation', note: 'До березня' });
+    expect(p.text.split('\n').slice(0, 2)).toEqual([
+      uk.notify.game.paused.replace('{game}', 'Прокляття Страда'),
+      'Причина: відпустка — До березня',
+    ]);
+    expect(render('game.paused', { ...base, pauseReason: 'illness', note: null }).text).toContain(
+      'Причина: хвороба\n',
+    );
+    expect(render('game.paused', { ...base }).text).not.toContain('Причина');
+
+    const ny = renderNotification('game.resumed', { ...base, recruit: false }, null, {
+      siteUrl: SITE,
+      timeZone: 'America/New_York',
+    });
+    expect(ny.text.split('\n')[0]).toBe(
+      '▶️ Кампейн «Прокляття Страда» продовжується! Перша сесія — пт, 27 листопада о 12:00.',
+    );
+    expect(ny.text).toContain('Детальніше: https://nri.example/games/12');
+    expect(render('game.resumed', { ...base, recruit: true }).text).toContain('донабір');
+    expect(render('game.resumed', { ...base, recruit: false }).text).not.toContain('донабір');
+
+    const long = render('game.long_pause');
+    expect(long.text).toContain('понад 90 днів');
+    expect(long.text).toContain('Детальніше: https://nri.example/games/12');
+  });
+
   it('account_deleted reason uses the dedicated variant', () => {
     const left = render('member.left', { ...base, actor: null, reason: 'account_deleted' });
     expect(left.text).toContain(

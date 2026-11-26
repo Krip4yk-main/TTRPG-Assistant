@@ -3,6 +3,11 @@ import {
   DEAD_GAMES_JOB,
   runDeadGamesDetector,
 } from '../games/dead-games/detector.js';
+import {
+  LONG_PAUSE_AT_UTC,
+  LONG_PAUSE_JOB,
+  runLongPauseReminders,
+} from '../games/dead-games/long-pause.js';
 import { DIGEST_EVERY_MS, DIGEST_JOB, sendModerationDigest } from '../moderation/digest.js';
 import {
   EXPIRE_EVERY_MS,
@@ -67,4 +72,10 @@ export function registerJobs(): void {
     await runDeadGamesDetector(deps, job.runAt);
   });
   registerRecurring(DEAD_GAMES_JOB, { dailyAtUtc: DEAD_GAMES_AT_UTC });
+
+  // Довга пауза кампейну: щодня нагадування майстру (раз на 30 днів після 90 днів паузи).
+  registerHandler(LONG_PAUSE_JOB, async (deps, _payload, job) => {
+    await runLongPauseReminders(deps, job.runAt);
+  });
+  registerRecurring(LONG_PAUSE_JOB, { dailyAtUtc: LONG_PAUSE_AT_UTC });
 }
