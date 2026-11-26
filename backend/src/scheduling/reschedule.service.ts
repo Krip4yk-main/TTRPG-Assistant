@@ -1,10 +1,10 @@
 import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, or } from 'drizzle-orm';
 import {
-  commonTimesWindow,
-  localDate,
   RSVP_DECLINE_COOLDOWN_MS,
   RSVP_DECLINE_GRACE_MS,
   RSVP_DECLINE_MAX_WAIT_MS,
+  RSVP_DECLINE_URGENT_MS,
+  SESSION_ALTERNATIVES_RADIUS_MS,
   SESSION_ALTERNATIVES_TOP,
   type NotificationActor,
   type SessionAlternativesDto,
@@ -36,8 +36,8 @@ const DAY = 86_400_000;
 /**
  * `GET /api/sessions/:id/alternatives` — лише майстер гри (невідома сесія чи прихована гра
  * для не-майстра — 404, чужа — 403 `FORBIDDEN`); сесія має бути `scheduled` (інакше 409
- * `SESSION_INVALID_STATE`). Той самий підбір (`computeCommonTimes`) на тижні сесії
- * (пн–нд у поясі гри, не раніше «зараз»), тривалість — самої сесії; до 3 разових варіантів
+ * `SESSION_INVALID_STATE`). Той самий підбір (`computeCommonTimes`) у вікні ±3 доби від
+ * початку сесії (`from` — не раніше «зараз», тож минулий час не пропонується), тривалість — самої сесії; до 3 разових варіантів
  * без поточного часу сесії й без перетину з іншими запланованими сесіями гри. Нічого не
  * змінює — перенесення робить майстер наявним `POST /api/sessions/:id/reschedule`.
  */
@@ -62,10 +62,11 @@ export async function getSessionAlternatives(
 
   const durationMinutes = session.durationMinutes;
   const durMs = durationMinutes * 60_000;
-  const window = commonTimesWindow(game.timezone, now, {
-    weeks: 1,
-    weekOf: localDate(session.startsAt, game.timezone),
-  });
+  const start = session.startsAt.getTime();
+  const window = {
+    from: new Date(Math.max(now.getTime(), start - SESSION_ALTERNATIVES_RADIUS_MS)),
+    to: new Date(start + SESSION_ALTERNATIVES_RADIUS_MS),
+  };
   // Інші заплановані сесії гри біля вікна: альтернатива не має з ними перетинатись.
   const others = (
     await deps.db
@@ -85,10 +86,8 @@ export async function getSessionAlternatives(
     start: o.startsAt.getTime(),
     end: o.startsAt.getTime() + o.durationMinutes * 60_000,
   }));
-  const current = session.startsAt.getTime();
-  const excludeOneOff = (start: Date, end: Date): boolean =>
-    start.getTime() === current ||
-    others.some((o) => start.getTime() < o.end && o.start < end.getTime());
+  const excludeOneOff = (s: Date, e: Date): boolean =>
+    s.getTime() === start || others.some((o) => s.getTime() < o.end && o.start < e.getTime());
 
   const dto = await computeCommonTimes(deps, { ...game, durationMinutes }, window, {
     top: SESSION_ALTERNATIVES_TOP,
@@ -148,15 +147,21 @@ interface PendingDecline {
  * нове «не буду» після останнього сповіщення і минула пауза `COOLDOWN` після нього. Готові —
  * кандидати, чиє «не буду» старше `GRACE` (встигли б передумати). Сесію відкладаємо, поки
  * хтось із кандидатів ще в `GRACE` (зберемо їх в одне сповіщення), але не довше `MAX_WAIT`
- * від найранішого готового.
+ * від найранішого готового. Сесія скоро (`startsAt − now ≤ URGENT`, 2 год) — без затримки й без
+ * очікування: готові всі кандидати одразу (пауза `COOLDOWN` лишається).
  */
-export function dueDeclines(rows: readonly PendingDecline[], now: Date): PendingDecline[] {
+export function dueDeclines(
+  rows: readonly PendingDecline[],
+  now: Date,
+  sessionStartsAt: Date,
+): PendingDecline[] {
   const t = now.getTime();
   const candidates = rows.filter(
     (r) =>
       (r.notifiedAt === null || r.notifiedAt < r.declinedAt) &&
       (r.notifiedAt === null || r.notifiedAt.getTime() <= t - RSVP_DECLINE_COOLDOWN_MS),
   );
+  if (sessionStartsAt.getTime() - t <= RSVP_DECLINE_URGENT_MS) return candidates;
   const ready = candidates.filter((r) => r.declinedAt.getTime() <= t - RSVP_DECLINE_GRACE_MS);
   if (ready.length === 0) return [];
   if (ready.length === candidates.length) return ready;
@@ -200,7 +205,23 @@ export async function runRsvpDeclineNotices(
         eq(sessionRsvp.userId, rsvpDeclineNotices.userId),
       ),
     )
-    .where(and(pendingWhere, lte(rsvpDeclineNotices.declinedAt, new Date(now.getTime() - RSVP_DECLINE_GRACE_MS))))
+    .innerJoin(gameSessions, eq(gameSessions.id, rsvpDeclineNotices.sessionId))
+    .where(
+      and(
+        pendingWhere,
+        // Учасники в паузі після сповіщення ще не готові — не скануємо їх щохвилини.
+        or(
+          isNull(rsvpDeclineNotices.notifiedAt),
+          lte(rsvpDeclineNotices.notifiedAt, new Date(now.getTime() - RSVP_DECLINE_COOLDOWN_MS)),
+        ),
+        // Минула затримка — або сесія скоро (тоді без затримки).
+        or(
+          lte(rsvpDeclineNotices.declinedAt, new Date(now.getTime() - RSVP_DECLINE_GRACE_MS)),
+          lte(gameSessions.startsAt, new Date(now.getTime() + RSVP_DECLINE_URGENT_MS)),
+        ),
+        gt(gameSessions.startsAt, now),
+      ),
+    )
     .orderBy(asc(rsvpDeclineNotices.declinedAt))
     .limit(DECLINE_SCAN_LIMIT);
   const sessionIds = [...new Set(rows.map((r) => r.sessionId))];
@@ -232,6 +253,13 @@ async function notifySession(
   sessionId: number,
   now: Date,
 ): Promise<NotificationRow | null | undefined> {
+  const [r] = await tx
+    .select({ session: gameSessions, game: games, gmStatus: users.status, gmBanned: users.isBanned })
+    .from(gameSessions)
+    .innerJoin(games, eq(games.id, gameSessions.gameId))
+    .innerJoin(users, eq(users.id, games.gmUserId))
+    .where(eq(gameSessions.id, sessionId));
+  if (!r) return undefined;
   const locked = await tx
     .select(pendingSelect)
     .from(rsvpDeclineNotices)
@@ -244,7 +272,7 @@ async function notifySession(
     )
     .where(and(eq(rsvpDeclineNotices.sessionId, sessionId), pendingWhere))
     .for('update');
-  const due = dueDeclines(locked, now).sort(
+  const due = dueDeclines(locked, now, r.session.startsAt).sort(
     (a, b) => a.declinedAt.getTime() - b.declinedAt.getTime(),
   );
   if (due.length === 0) return undefined;
@@ -256,13 +284,6 @@ async function notifySession(
       and(eq(rsvpDeclineNotices.sessionId, sessionId), inArray(rsvpDeclineNotices.userId, dueIds)),
     );
 
-  const [r] = await tx
-    .select({ session: gameSessions, game: games, gmStatus: users.status, gmBanned: users.isBanned })
-    .from(gameSessions)
-    .innerJoin(games, eq(games.id, gameSessions.gameId))
-    .innerJoin(users, eq(users.id, games.gmUserId))
-    .where(eq(gameSessions.id, sessionId));
-  if (!r) return null;
   const { session, game } = r;
   if (session.status !== 'scheduled' || session.startsAt <= now) return null;
   if (game.status !== 'recruiting' && game.status !== 'started') return null;

@@ -1,4 +1,16 @@
-import { and, asc, eq, inArray, isNull, lte, ne, notExists, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  notExists,
+  notInArray,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core';
 import { CALENDAR_REMINDER_DELAY_MS } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -63,6 +75,8 @@ export async function runCalendarReminders(
   const sent: number[] = [];
   const created: NotificationRow[] = [];
   let failure: unknown;
+  // Тимчасово невдалі в цьому прогоні — не вибирати їх знову (наступні пачки не голодують).
+  const skipped = new Set<number>();
   for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
     const rows = await db
       .select({
@@ -89,6 +103,7 @@ export async function runCalendarReminders(
               .where(eq(calendarReminders.userId, gameMembers.userId)),
           ),
           ...noCalendarData(db, gameMembers.userId),
+          skipped.size ? notInArray(gameMembers.userId, [...skipped]) : undefined,
         ),
       )
       .orderBy(asc(gameMembers.joinedAt), asc(gameMembers.id))
@@ -128,7 +143,19 @@ export async function runCalendarReminders(
         }
       } catch (err) {
         console.error(`calendar reminder: user ${userId} failed`, err);
-        if (isTransientDbError(err)) failure ??= err;
+        skipped.add(userId);
+        progressed++;
+        if (isTransientDbError(err)) {
+          failure ??= err;
+        } else {
+          // Постійна помилка (повтор не допоможе): позначаємо без сповіщення, щоб цей
+          // користувач не займав голову черги в кожному прогоні.
+          await db
+            .insert(calendarReminders)
+            .ignore()
+            .values({ userId, gameId: g.gameId, sentAt: now })
+            .catch((e: unknown) => console.error(`calendar reminder: mark ${userId} failed`, e));
+        }
       }
     }
     if (rows.length < BATCH || progressed === 0) break;

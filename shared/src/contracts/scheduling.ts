@@ -113,6 +113,8 @@ export type CommonTimesQuery = z.infer<typeof commonTimesQuerySchema>;
 
 /** Розумне перенесення: скільки альтернатив показати майстру на сесії. */
 export const SESSION_ALTERNATIVES_TOP = 3;
+/** Альтернативи шукаються в ±3 доби від початку сесії (не раніше «зараз»). */
+export const SESSION_ALTERNATIVES_RADIUS_MS = 3 * 86_400_000;
 /**
  * «Не буду» → сповіщення майстру не одразу: учасник має `RSVP_DECLINE_GRACE_MS`, щоб
  * передумати (повернув «буду» — сповіщення немає). Кілька «не буду» на одну сесію, що
@@ -121,6 +123,11 @@ export const SESSION_ALTERNATIVES_TOP = 3;
  */
 export const RSVP_DECLINE_GRACE_MS = 5 * 60_000;
 export const RSVP_DECLINE_MAX_WAIT_MS = 30 * 60_000;
+/**
+ * Сесія починається не пізніше ніж за 2 год — «не буду» йде без затримки й без очікування
+ * інших (на наступному тіку джоба); пауза `COOLDOWN` між повторами лишається.
+ */
+export const RSVP_DECLINE_URGENT_MS = 2 * 3_600_000;
 /** Той самий учасник про ту саму сесію — не частіше, ніж раз на 30 хв. */
 export const RSVP_DECLINE_COOLDOWN_MS = 30 * 60_000;
 /** Нагадування про порожній календар — через добу після вступу в кампейн. */
@@ -128,7 +135,7 @@ export const CALENDAR_REMINDER_DELAY_MS = 24 * 3_600_000;
 
 /**
  * `GET /api/sessions/:id/alternatives` (лише майстер гри): до 3 найкращих разових варіантів
- * на тижні сесії (пн–нд у поясі гри, не раніше «зараз»), де може найбільше учасників. Без
+ * у ±3 доби від початку сесії (не раніше «зараз»), де може найбільше учасників. Без
  * поточного часу сесії й без часу, що перетинається з іншими запланованими сесіями цієї гри.
  * Тривалість — тривалість самої сесії. Перенести — наявним `POST /api/sessions/:id/reschedule`.
  */
@@ -138,7 +145,7 @@ export interface SessionAlternativesDto {
   startsAt: string;
   timezone: string;
   durationMinutes: number;
-  /** Вікно пошуку `[from, to)` (ISO UTC); `from ≥ to` — тиждень минув, списку немає. */
+  /** Вікно пошуку `[from, to)` (ISO UTC); `from ≥ to` — вікно минуло, списку немає. */
   from: string;
   to: string;
   participants: CommonTimesParticipantDto[];

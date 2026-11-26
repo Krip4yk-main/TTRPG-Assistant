@@ -194,6 +194,38 @@ describe('smart reschedule: «не буду» → GM notification', () => {
     expect(await declinedFor(gm.id)).toHaveLength(2);
   });
 
+  it('session within 2 h: no grace, no hold — next tick; the 30-min cooldown stays', async () => {
+    const { gm, a, b, gameId } = await group('u');
+    const soon = new Date(Math.ceil((Date.now() + 90 * MIN) / MIN) * MIN);
+    const [{ id: sid } = { id: 0 }] = await db
+      .insert(gameSessions)
+      .values({ gameId, startsAt: soon, durationMinutes: 240, origin: 'manual' })
+      .$returningId();
+    await rsvp(a, sid, 'not_going');
+    const t = Date.now();
+    expect(await runRsvpDeclineNotices(deps, new Date(t))).toEqual([sid]);
+    // b щойно — не чекаємо на затримку чи інших.
+    await rsvp(b, sid, 'not_going');
+    expect(await runRsvpDeclineNotices(deps, new Date(t + 1000))).toEqual([sid]);
+    // a передумав і знову «не буду» — пауза 30 хв лишається.
+    await rsvp(a, sid, 'going');
+    await rsvp(a, sid, 'not_going');
+    expect(await runRsvpDeclineNotices(deps, new Date(t + 10 * MIN))).toEqual([]);
+    expect(await runRsvpDeclineNotices(deps, new Date(t + 31 * MIN))).toEqual([sid]);
+    const rows = await declinedFor(gm.id);
+    expect(rows.map((r) => r.payload.absentees?.map((x) => x.nickname))).toEqual([
+      ['ua'],
+      ['ub'],
+      ['ua'],
+    ]);
+    // Та сама сесія за 3 год — звичайна затримка.
+    await db.delete(rsvpDeclineNotices);
+    await db.update(gameSessions).set({ startsAt: new Date(t + 3 * HOUR) }).where(eq(gameSessions.id, sid));
+    await rsvp(b, sid, 'going');
+    await rsvp(b, sid, 'not_going');
+    expect(await runRsvpDeclineNotices(deps, new Date(t + 1000))).toEqual([]);
+  });
+
   it('category opt-out (site and Telegram), ex-members, rescheduled sessions', async () => {
     const { gm, a, b, gameId, sessionId } = await group();
     await db.insert(authIdentities).values({ userId: gm.id, provider: 'telegram', subject: '8801' });
@@ -247,6 +279,18 @@ describe('smart reschedule: «не буду» → GM notification', () => {
   });
 });
 
+/** Годинник від середи через ~2 тижні: `at(dayOffset, hour)` — `hour`:00 Kyiv. */
+function wednesdayClock() {
+  const base = new Date(Date.now() + 14 * DAY);
+  const z0 = toZoned(base, KYIV);
+  const wed = toZoned(new Date(base.getTime() + (2 - z0.weekday) * DAY), KYIV);
+  const wedNoon = zonedToUtc({ year: wed.year, month: wed.month, day: wed.day, hour: 12, minute: 0 }, KYIV);
+  return (dayOffset: number, hour: number) => {
+    const z = toZoned(new Date(wedNoon.getTime() + dayOffset * DAY), KYIV);
+    return zonedToUtc({ year: z.year, month: z.month, day: z.day, hour, minute: 0 }, KYIV);
+  };
+}
+
 describe('GET /api/sessions/:id/alternatives', () => {
   it('GM only: guest 401, member/stranger 403, unknown 404, cancelled 409', async () => {
     const { gm, a, stranger, sessionId } = await group();
@@ -266,20 +310,12 @@ describe('GET /api/sessions/:id/alternatives', () => {
     expect(c.body.error.code).toBe('SESSION_INVALID_STATE');
   });
 
-  it('top 3 in the session week, without its current time and other sessions of the game', async () => {
+  it('top 3 within ±3 days of the session, without its current time and other sessions of the game', async () => {
     const { gm, a, gameId } = await group();
-    // Лише наші сесії: середа через ~2 тижні (весь її тиждень — у майбутньому) і четвер.
+    // Лише наші сесії: середа через ~2 тижні (усе вікно — у майбутньому) і четвер.
     await db.delete(gameSessions).where(eq(gameSessions.gameId, gameId));
-    const base = new Date(Date.now() + 14 * DAY);
-    const z0 = toZoned(base, KYIV);
-    const wed = toZoned(new Date(base.getTime() + (2 - z0.weekday) * DAY), KYIV);
-    const wedNoon = zonedToUtc({ year: wed.year, month: wed.month, day: wed.day, hour: 12, minute: 0 }, KYIV);
-    /** `hour`:00 Kyiv через `dayOffset` діб від тієї середи. */
-    const at = (dayOffset: number, hour: number) => {
-      const z = toZoned(new Date(wedNoon.getTime() + dayOffset * DAY), KYIV);
-      return zonedToUtc({ year: z.year, month: z.month, day: z.day, hour, minute: 0 }, KYIV);
-    };
-    const [{ id: target }] = await db
+    const at = wednesdayClock();
+    const [{ id: target } = { id: 0 }] = await db
       .insert(gameSessions)
       .values({ gameId, startsAt: at(0, 19), durationMinutes: 240, origin: 'manual' })
       .$returningId();
@@ -299,8 +335,8 @@ describe('GET /api/sessions/:id/alternatives', () => {
     const res = await call('get', `/api/sessions/${target}/alternatives`, gm.cookie);
     expect(res.status).toBe(200);
     const dto = res.body as SessionAlternativesDto;
-    expect(dto.from).toBe(at(-2, 0).toISOString()); // пн 00:00
-    expect(dto.to).toBe(at(5, 0).toISOString()); // наступний пн 00:00
+    expect(dto.from).toBe(new Date(at(0, 19).getTime() - 3 * DAY).toISOString());
+    expect(dto.to).toBe(new Date(at(0, 19).getTime() + 3 * DAY).toISOString());
     expect(dto.startsAt).toBe(at(0, 19).toISOString());
     expect(dto.durationMinutes).toBe(240);
     expect(dto.alternatives.map((x) => x.startsAt)).toEqual([
@@ -314,7 +350,7 @@ describe('GET /api/sessions/:id/alternatives', () => {
     }
     expect(dto.participants.map((p) => p.userId)[0]).toBe(gm.id);
 
-    // Тиждень, що вже почався: вікно — від «зараз».
+    // Вікно, що вже почалось: від «зараз», минулий час не пропонується.
     const now = new Date(at(0, 12).getTime());
     const mid = await getSessionAlternatives(deps, gm.id, target, now);
     expect(mid.from).toBe(now.toISOString());
@@ -325,7 +361,38 @@ describe('GET /api/sessions/:id/alternatives', () => {
     ]);
     const late = await getSessionAlternatives(deps, gm.id, target, at(2, 13));
     expect(late.alternatives.map((x) => x.startsAt)).toEqual([at(2, 13).toISOString()]);
-    expect(late.alternatives.every((x) => Date.parse(x.startsAt) < Date.parse(late.to))).toBe(true);
+    expect(late.from).toBe(at(2, 13).toISOString());
+  });
+
+  it('a Sunday session gets alternatives in the next week too; past times never offered', async () => {
+    const { gm, a, gameId } = await group();
+    await db.delete(gameSessions).where(eq(gameSessions.gameId, gameId));
+    const at = wednesdayClock();
+    const sunday = at(4, 19);
+    const [{ id: target } = { id: 0 }] = await db
+      .insert(gameSessions)
+      .values({ gameId, startsAt: sunday, durationMinutes: 240, origin: 'manual' })
+      .$returningId();
+    const slots = (wd: Weekday, s: number, e: number) => ({ weekday: wd, startMin: s, endMin: e });
+    for (const u of [gm, a]) {
+      await db.insert(availabilitySlots).values(
+        // чт 10–14 (лише минулий четвер у вікні), сб 19–23, нд 18–23:30, пн 19–23.
+        [slots(3, H(10), H(14)), slots(5, H(19), H(23)), slots(6, H(18), H(23) + 30), slots(0, H(19), H(23))].map(
+          (s) => ({ userId: u.id, ...s }),
+        ),
+      );
+    }
+    // «Зараз» — пт 12:00: вікно сесії почалось би в чт 19:00, але минуле не пропонуємо.
+    const now = at(2, 12);
+    const dto = await getSessionAlternatives(deps, gm.id, target, now);
+    expect(dto.from).toBe(now.toISOString());
+    expect(dto.to).toBe(new Date(sunday.getTime() + 3 * DAY).toISOString());
+    expect(dto.alternatives.map((x) => x.startsAt)).toEqual([
+      at(3, 19).toISOString(), // сб
+      at(4, 18).toISOString(), // нд, на годину раніше
+      at(5, 19).toISOString(), // пн наступного тижня
+    ]);
+    for (const x of dto.alternatives) expect(Date.parse(x.startsAt)).toBeGreaterThanOrEqual(now.getTime());
   });
 });
 
