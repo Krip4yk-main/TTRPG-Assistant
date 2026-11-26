@@ -39,6 +39,12 @@ export interface ThemeDefinition {
   options?: (keyof UiPrefsDto)[];
   /** Декоративні ефекти дизайну (немає — поведінка звичайна). */
   effects?: Partial<Record<ThemeEffectName, ThemeEffectDef>>;
+  /**
+   * Шрифт заголовка-вивіски (CSS-скорочення `font` з розміром, напр. `700 1em Jura`): його
+   * грані ThemeService довантажує до показу дизайну, щоб заголовок не малювався запасним
+   * шрифтом (Chrome інколи лишає запасний гліф в окремому вузлі тексту, як-от «і» вивіски).
+   */
+  headingFont?: string;
 }
 
 /**
@@ -57,6 +63,7 @@ export function themeStyleHref(bundle: string): string {
 function theme(
   id: ThemeId,
   colorScheme: ThemeDefinition['colorScheme'],
+  headingFont: string,
   loadSlots: ThemeDefinition['loadSlots'],
   options: ThemeDefinition['options'] = [],
   effects: ThemeDefinition['effects'] = {},
@@ -66,6 +73,7 @@ function theme(
     labelKey: `theme.names.${id}`,
     preview: `themes/${id}.png`,
     colorScheme,
+    headingFont,
     styleHref: themeStyleHref(id),
     loadSlots,
     options,
@@ -87,32 +95,40 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   'quest-board': theme(
     'quest-board',
     'light',
+    '400 1em Kurale',
     () => import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
     ['tearAnimation'],
   ),
   // Родина сцени (themes/scene): окремі дизайни з одним лінивим чанком слотів (той самий
   // import — вантажиться один раз) і власним бандлом стилів кожен. Кібер-дизайни — текст
   // світлий на темному склі.
-  'neon-signs': theme('neon-signs', 'dark', loadSceneSlots),
-  'holo-market': theme('holo-market', 'dark', loadSceneSlots),
-  'night-city': theme('night-city', 'dark', loadSceneSlots),
+  'neon-signs': theme('neon-signs', 'dark', '700 1em "M PLUS Rounded 1c"', loadSceneSlots),
+  'holo-market': theme('holo-market', 'dark', '700 1em Jura', loadSceneSlots),
+  'night-city': theme('night-city', 'dark', '500 1em Unbounded', loadSceneSlots),
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
-  dungeon: theme('dungeon', 'dark', loadSceneSlots),
-  'gothic-gloom': theme('gothic-gloom', 'dark', loadSceneSlots),
+  dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots),
+  'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots),
   // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (власне
   // налаштування — анімація надсилання; ефект — окремий лінивий чанк).
-  magicpunk: theme('magicpunk', 'dark', loadSceneSlots, ['sendAnimation'], {
-    applicationSent: {
-      pref: 'sendAnimation',
-      load: () =>
-        import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
+  magicpunk: theme(
+    'magicpunk',
+    'dark',
+    '700 1em "Cormorant Unicase"',
+    loadSceneSlots,
+    ['sendAnimation'],
+    {
+      applicationSent: {
+        pref: 'sendAnimation',
+        load: () =>
+          import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
+      },
     },
-  }),
-  'brass-steam': theme('brass-steam', 'dark', loadSceneSlots),
+  ),
+  'brass-steam': theme('brass-steam', 'dark', '900 1em "Playfair Display SC"', loadSceneSlots),
   // «Сонячний сад» — світлий дизайн сцени: світла сторінка, поля й оверлеї Material.
-  'solar-garden': theme('solar-garden', 'light', loadSceneSlots),
+  'solar-garden': theme('solar-garden', 'light', '400 1em Alice', loadSceneSlots),
   // «Мальоване місто» — темний дизайн сцени (світла лише смуга верхнього міста в заголовку).
-  'painted-city': theme('painted-city', 'dark', loadSceneSlots),
+  'painted-city': theme('painted-city', 'dark', '400 1em "Yeseva One"', loadSceneSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

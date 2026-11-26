@@ -11,6 +11,7 @@ import { THEME_REGISTRY, type ThemeDefinition, type ThemeEffect } from './theme.
 import {
   EFFECT_LOAD_TIMEOUT_MS,
   EFFECT_TIMEOUT_MS,
+  FONT_WAIT_MS,
   STYLE_WAIT_MS,
   THEME_LINK_ID,
   THEME_STORAGE_KEY,
@@ -60,6 +61,7 @@ function def(id: ThemeId, loadSlots: () => Promise<ThemeSlots>): ThemeDefinition
     labelKey: `theme.names.${id}`,
     preview: `themes/${id}.png`,
     colorScheme: 'dark',
+    headingFont: `700 1em Head-${id}`,
     styleHref: `theme-${id}.css?v=1`,
     loadSlots,
   };
@@ -411,6 +413,118 @@ describe('ThemeService', () => {
     expect(meta.content).toBe('light');
     meta.remove();
   });
+  describe('heading font (no fallback glyphs in the sign)', () => {
+    let fontLoad: ReturnType<typeof vi.fn>;
+    let release: () => void;
+
+    /** `document.fonts` браузера (у jsdom його немає): `load` чекає, доки тест не «завантажить». */
+    beforeEach(() => {
+      fontLoad = vi.fn(
+        () =>
+          new Promise<FontFace[]>((resolve) => {
+            release = () => resolve([]);
+          }),
+      );
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: { load: fontLoad },
+      });
+    });
+
+    afterEach(() => {
+      delete (document as { fonts?: unknown }).fonts;
+    });
+
+    it('a switch shows the new design only once its heading font is loaded', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      const done = choose('quest-board');
+      await settleWhenAdded('theme-quest-board.css?v=1');
+      await vi.waitFor(() =>
+        expect(fontLoad).toHaveBeenCalledWith('700 1em Head-quest-board', expect.any(String)),
+      );
+      // Бандл є, шрифт ще вантажиться: показано старий дизайн цілком.
+      expect(theme()).toBe('night-city');
+      expect(service.slots()).toBe(SC_SLOTS);
+      release();
+      await done;
+      expect(theme()).toBe('quest-board');
+      expect(service.slots()).toBe(QB_SLOTS);
+      expect(links()).toEqual(['theme-quest-board.css?v=1']);
+    });
+
+    it('a hanging heading font delays the switch by at most FONT_WAIT_MS', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const done = choose('neon-signs');
+        for (let i = 0; i < 50 && links().length < 2; i++) await Promise.resolve();
+        document.head
+          .querySelectorAll(`link#${THEME_LINK_ID}`)[1]!
+          .dispatchEvent(new Event('load'));
+        await vi.advanceTimersByTimeAsync(FONT_WAIT_MS - 1);
+        expect(theme()).toBe('night-city');
+        await vi.advanceTimersByTimeAsync(1);
+        await done;
+        expect(theme()).toBe('neon-signs');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a bundle that failed to load switches at once (no font wait)', async () => {
+      setup();
+      auth.setMe(user);
+      await service.init();
+      const done = choose('holo-market');
+      await settleWhenAdded('theme-holo-market.css?v=1', 'error');
+      await done;
+      expect(theme()).toBe('holo-market');
+      expect(fontLoad).not.toHaveBeenCalled();
+    });
+
+    it('the first render waits for the cached bundle and its heading font', async () => {
+      setup();
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      auth.setMe(user);
+      let ready = false;
+      const init = service.init().then(() => (ready = true));
+      await Promise.resolve();
+      // Бандл з інлайн-скрипту ще вантажиться — шрифт із нього ще не відомий.
+      expect(fontLoad).not.toHaveBeenCalled();
+      document.head.querySelector(`link#${THEME_LINK_ID}`)!.dispatchEvent(new Event('load'));
+      await vi.waitFor(() =>
+        expect(fontLoad).toHaveBeenCalledWith('700 1em Head-night-city', expect.any(String)),
+      );
+      expect(ready).toBe(false);
+      release();
+      await init;
+      expect(service.theme()).toBe('night-city');
+      expect(links()).toEqual(['theme-night-city.css?v=1']);
+    });
+
+    it('the first render never waits longer than FONT_WAIT_MS', async () => {
+      setup();
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      auth.setMe(user);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        let ready = false;
+        const init = service.init().then(() => (ready = true));
+        await vi.advanceTimersByTimeAsync(FONT_WAIT_MS - 1);
+        expect(ready).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await init;
+        expect(service.theme()).toBe('night-city');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('me.changed ping (design changed in another session)', () => {
     const http = () => TestBed.inject(HttpTestingController);
 

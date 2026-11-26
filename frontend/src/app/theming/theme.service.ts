@@ -57,6 +57,14 @@ export const EFFECT_TIMEOUT_MS = 2500;
  * довантажиться в кеш для наступного разу).
  */
 export const EFFECT_LOAD_TIMEOUT_MS = 800;
+/**
+ * Найдовше очікування шрифту заголовка дизайну (`ThemeDefinition.headingFont`) перед показом
+ * дизайну — і при перемиканні (після бандла стилів), і при старті застосунку (разом із бандлом,
+ * який підключив інлайн-скрипт). Повільніше — дизайн показується без нього (запасний шрифт).
+ */
+export const FONT_WAIT_MS = 1000;
+/** Текст, за яким довантажуються грані шрифту заголовка: кирилиця й латиниця (цифри). */
+const HEADING_FONT_SAMPLE = 'Знайдіть свою гру 0123456789';
 
 /**
  * Чинний дизайн: вибір користувача, якщо він дозволений ролі (`MeDto.uiTheme` уже враховує
@@ -154,9 +162,19 @@ export class ThemeService {
   }
 
   /** Ініціалізатор застосунку (після `AuthStore.load()`): дизайн і слоти — до першого рендера. */
-  init(): Promise<void> {
+  async init(): Promise<void> {
     this.initialized = true;
-    return this.apply(this.effective());
+    const id = this.effective();
+    // Інлайн-скрипт index.html уже підключив бандл цього дизайну: перший рендер — після нього
+    // й шрифту заголовка (не довше `FONT_WAIT_MS`), щоб вивіска не малювалась запасним шрифтом.
+    const cached = this.themeLinks().find(
+      (l) => l.getAttribute('href') === this.registry[id].styleHref,
+    );
+    if (cached) {
+      const ready = this.whenLoaded(cached).then(() => this.headingFont(id));
+      await withTimeout(ready, FONT_WAIT_MS);
+    }
+    return this.apply(id);
   }
 
   /**
@@ -295,23 +313,61 @@ export class ThemeService {
     const { link, created } = this.setStyle(href, false);
     return new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout> | null = null;
-      const finish = () => {
-        if (timer === null) return; // уже застосовано (load + error / тайм-аут)
-        clearTimeout(timer);
-        timer = null;
+      const apply = () => {
         if (id === this.target) {
           this.applyDom(id, slots);
           this.removeLinksExcept(link);
         }
         resolve();
       };
-      timer = setTimeout(finish, STYLE_WAIT_MS);
+      // `loaded` — бандл є: спершу (не довше `FONT_WAIT_MS`) шрифт заголовка нового дизайну,
+      // інакше вивіска на мить малюється запасним шрифтом. Збій / тайм-аут бандла — одразу.
+      const finish = (loaded: boolean) => {
+        if (timer === null) return; // уже застосовано (load + error / тайм-аут)
+        clearTimeout(timer);
+        timer = null;
+        if (!loaded || id !== this.target) {
+          apply();
+          return;
+        }
+        void withTimeout(this.headingFont(id), FONT_WAIT_MS).then(apply);
+      };
+      timer = setTimeout(() => finish(false), STYLE_WAIT_MS);
       if (!created) {
-        finish(); // бандл цього дизайну вже підключено
+        finish(true); // бандл цього дизайну вже підключено
         return;
       }
-      link.addEventListener('load', finish, { once: true });
-      link.addEventListener('error', finish, { once: true });
+      link.addEventListener('load', () => finish(true), { once: true });
+      link.addEventListener('error', () => finish(false), { once: true });
+    });
+  }
+
+  /**
+   * Довантажити грані шрифту заголовка дизайну (з уже підключеного бандла). Без
+   * `document.fonts` (старий браузер, тести) чи без шрифту в реєстрі — одразу; збій — тихо.
+   */
+  private async headingFont(id: ThemeId): Promise<void> {
+    const font = this.registry[id].headingFont;
+    const fonts = this.doc.fonts as FontFaceSet | undefined;
+    if (!font || !fonts?.load) return;
+    try {
+      await fonts.load(font, HEADING_FONT_SAMPLE);
+    } catch {
+      // Шрифт декоративний: без нього заголовок малюється запасним.
+    }
+  }
+
+  /**
+   * Бандл стилів `link` завантажився (чи впав). Уже завантажений (`sheet`) — одразу; без
+   * `document.fonts` (тести, старий браузер) чекати нема чого — теж одразу.
+   */
+  private whenLoaded(link: HTMLLinkElement): Promise<void> {
+    if (link.sheet || !(this.doc.fonts as FontFaceSet | undefined)?.load) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      link.addEventListener('load', () => resolve(), { once: true });
+      link.addEventListener('error', () => resolve(), { once: true });
     });
   }
 
