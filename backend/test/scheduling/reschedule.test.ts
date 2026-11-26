@@ -127,7 +127,11 @@ describe('smart reschedule: «не буду» → GM notification', () => {
 
     const rows = await declinedFor(gm.id);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ category: 'schedule', entityType: 'session', entityId: sessionId });
+    expect(rows[0]).toMatchObject({
+      category: 'schedule',
+      entityType: 'session',
+      entityId: sessionId,
+    });
     expect(rows[0]!.payload).toMatchObject({
       gameId,
       sessionId,
@@ -220,7 +224,10 @@ describe('smart reschedule: «не буду» → GM notification', () => {
     ]);
     // Та сама сесія за 3 год — звичайна затримка.
     await db.delete(rsvpDeclineNotices);
-    await db.update(gameSessions).set({ startsAt: new Date(t + 3 * HOUR) }).where(eq(gameSessions.id, sid));
+    await db
+      .update(gameSessions)
+      .set({ startsAt: new Date(t + 3 * HOUR) })
+      .where(eq(gameSessions.id, sid));
     await rsvp(b, sid, 'going');
     await rsvp(b, sid, 'not_going');
     expect(await runRsvpDeclineNotices(deps, new Date(t + 1000))).toEqual([]);
@@ -228,7 +235,9 @@ describe('smart reschedule: «не буду» → GM notification', () => {
 
   it('category opt-out (site and Telegram), ex-members, rescheduled sessions', async () => {
     const { gm, a, b, gameId, sessionId } = await group();
-    await db.insert(authIdentities).values({ userId: gm.id, provider: 'telegram', subject: '8801' });
+    await db
+      .insert(authIdentities)
+      .values({ userId: gm.id, provider: 'telegram', subject: '8801' });
     const prefs = (await call('get', '/api/me/notification-prefs', gm.cookie)).body;
     await call('put', '/api/me/notification-prefs', gm.cookie, {
       ...prefs,
@@ -284,7 +293,10 @@ function wednesdayClock() {
   const base = new Date(Date.now() + 14 * DAY);
   const z0 = toZoned(base, KYIV);
   const wed = toZoned(new Date(base.getTime() + (2 - z0.weekday) * DAY), KYIV);
-  const wedNoon = zonedToUtc({ year: wed.year, month: wed.month, day: wed.day, hour: 12, minute: 0 }, KYIV);
+  const wedNoon = zonedToUtc(
+    { year: wed.year, month: wed.month, day: wed.day, hour: 12, minute: 0 },
+    KYIV,
+  );
   return (dayOffset: number, hour: number) => {
     const z = toZoned(new Date(wedNoon.getTime() + dayOffset * DAY), KYIV);
     return zonedToUtc({ year: z.year, month: z.month, day: z.day, hour, minute: 0 }, KYIV);
@@ -377,9 +389,12 @@ describe('GET /api/sessions/:id/alternatives', () => {
     for (const u of [gm, a]) {
       await db.insert(availabilitySlots).values(
         // чт 10–14 (лише минулий четвер у вікні), сб 19–23, нд 18–23:30, пн 19–23.
-        [slots(3, H(10), H(14)), slots(5, H(19), H(23)), slots(6, H(18), H(23) + 30), slots(0, H(19), H(23))].map(
-          (s) => ({ userId: u.id, ...s }),
-        ),
+        [
+          slots(3, H(10), H(14)),
+          slots(5, H(19), H(23)),
+          slots(6, H(18), H(23) + 30),
+          slots(0, H(19), H(23)),
+        ].map((s) => ({ userId: u.id, ...s })),
       );
     }
     // «Зараз» — пт 12:00: вікно сесії почалось би в чт 19:00, але минуле не пропонуємо.
@@ -392,7 +407,8 @@ describe('GET /api/sessions/:id/alternatives', () => {
       at(4, 18).toISOString(), // нд, на годину раніше
       at(5, 19).toISOString(), // пн наступного тижня
     ]);
-    for (const x of dto.alternatives) expect(Date.parse(x.startsAt)).toBeGreaterThanOrEqual(now.getTime());
+    for (const x of dto.alternatives)
+      expect(Date.parse(x.startsAt)).toBeGreaterThanOrEqual(now.getTime());
   });
 });
 
@@ -401,9 +417,14 @@ describe('empty-calendar reminder', () => {
     const { gm, a, b, c, gameId } = await group();
     const ex = await userWithAge(25, 'ex');
     await join(gm, gameId, ex);
-    await db.insert(availabilitySlots).values({ userId: b.id, weekday: 0, startMin: 0, endMin: 600 });
+    await db
+      .insert(availabilitySlots)
+      .values({ userId: b.id, weekday: 0, startMin: 0, endMin: 600 });
     const prefs = (await call('get', '/api/me/notification-prefs', c.cookie)).body;
-    await call('put', '/api/me/notification-prefs', c.cookie, { ...prefs, site: { schedule: false } });
+    await call('put', '/api/me/notification-prefs', c.cookie, {
+      ...prefs,
+      site: { schedule: false },
+    });
     expect((await call('post', `/api/games/${gameId}/leave`, ex.cookie, LEAVE)).status).toBe(204);
 
     expect(await runCalendarReminders(deps, new Date())).toEqual([]);
@@ -412,7 +433,10 @@ describe('empty-calendar reminder', () => {
     expect(runs.flat()).toEqual([a.id]);
     expect(await runCalendarReminders(deps, new Date(now + 3 * DAY))).toEqual([]);
 
-    const rows = await db.select().from(notifications).where(eq(notifications.type, 'calendar.empty'));
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.type, 'calendar.empty'));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ userId: a.id, category: 'schedule' });
     expect(rows[0]!.payload).toMatchObject({ gameId });
