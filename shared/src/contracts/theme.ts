@@ -15,6 +15,7 @@ export const THEME_IDS = [
   'magicpunk',
   'brass-steam',
   'solar-garden',
+  'painted-city',
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -32,6 +33,7 @@ export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   magicpunk: 'everyone',
   'brass-steam': 'everyone',
   'solar-garden': 'everyone',
+  'painted-city': 'everyone',
 };
 
 /** Дизайни, доступні ролі. */

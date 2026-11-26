@@ -67,7 +67,8 @@
       "gothic-gloom": "Готичний морок",
       "magicpunk": "Магіпанк",
       "brass-steam": "Латунь і пара",
-      "solar-garden": "Сонячний сад"
+      "solar-garden": "Сонячний сад",
+      "painted-city": "Мальоване місто"
     }
   },
   "scene": {
@@ -92,6 +93,7 @@
     },
     "invite": "Запрошення № {{id}}",
     "telegram": "Телеграма № {{id}}",
+    "graffiti": "нижче — цікавіше",
     "shell": {
       "navMenu": "Навігація"
     }

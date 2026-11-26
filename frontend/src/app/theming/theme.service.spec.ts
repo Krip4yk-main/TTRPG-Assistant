@@ -40,6 +40,7 @@ const ALL: ThemeId[] = [
   'magicpunk',
   'brass-steam',
   'solar-garden',
+  'painted-city',
 ];
 const user: MeDto = {
   ...base,
@@ -79,6 +80,7 @@ function registry(
     magicpunk: def('magicpunk', scene),
     'brass-steam': def('brass-steam', scene),
     'solar-garden': def('solar-garden', scene),
+    'painted-city': def('painted-city', scene),
   };
 }
 

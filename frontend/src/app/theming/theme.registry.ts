@@ -111,6 +111,8 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   'brass-steam': theme('brass-steam', 'dark', loadSceneSlots),
   // «Сонячний сад» — світлий дизайн сцени: світла сторінка, поля й оверлеї Material.
   'solar-garden': theme('solar-garden', 'light', loadSceneSlots),
+  // «Мальоване місто» — темний дизайн сцени (світла лише смуга верхнього міста в заголовку).
+  'painted-city': theme('painted-city', 'dark', loadSceneSlots),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */

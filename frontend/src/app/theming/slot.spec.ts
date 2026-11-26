@@ -55,6 +55,7 @@ function registry(load: () => Promise<ThemeSlots>): Record<ThemeId, ThemeDefinit
     magicpunk: { ...THEMES.magicpunk, loadSlots: load },
     'brass-steam': { ...THEMES['brass-steam'], loadSlots: load },
     'solar-garden': { ...THEMES['solar-garden'], loadSlots: load },
+    'painted-city': { ...THEMES['painted-city'], loadSlots: load },
   };
 }
 

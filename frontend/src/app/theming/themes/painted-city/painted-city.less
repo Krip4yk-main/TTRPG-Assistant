@@ -1,0 +1,1021 @@
+// Дизайн «Мальоване місто» (родина сцени, макет docs/design-concepts/themes2/painterly-undercity.html
+// і painterly-undercity-card.html): окремий бандл `theme-painted-city.css` (`inject: false` в
+// angular.json), який підключає ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут —
+// шрифти (Yeseva One — логотип, заголовки, назви карток; Alegreya Sans — текст; Oswald — мітки,
+// рядок системи, ціна; Rubik Wet Paint — лише декоративне графіті; @fontsource: лише кирилиця й
+// латиниця), токени --sc-* і вигляд. Мальовниче місто у два яруси: згори — світле «верхнє
+// місто» (кремова шапка; смуга заголовка сторінки — вохристе небо з мазками, сонячне сяйво,
+// золоті вежі з банями й шпилями, обведені чорнилом), під ним — позолочений карниз, з якого
+// стікає фарба (рожева, бірюзова, золота), і темне «нижнє місто» (стіна #121A1C з мазками пензля,
+// бірюзове й маджентове сяйво, бризки фарби). Панелі й картки — темні з товстим чорнильним
+// контуром і жорсткою зсунутою тінню без розмиття, згори — позолочена планка з вигином і
+// цвяшком. Картка: рядок системи кольором варіанта, назва — Yeseva One, «Підходить» — бірюзовий
+// мазок пензля, ціна — маджентовий мазок-наліпка («без плати» — бірюзовий), місця — крапки
+// фарби; обкладинка — наклеєна афіша зі скотчем (у спокої — тьмяна, дуотон рожевий→бірюзовий,
+// нахилена за кутом картки; наперед — відклеюється, виходить на картку, справжні кольори;
+// поведінка — спільна CoverAttachment). Material — painted-city-material.scss. Без назв,
+// символів, місць і шрифтів чужих франшиз — лише загальна естетика мальованого міста.
+//
+// Схема. Сторінка — темна (стіна, панелі, оверлеї Material: меню, списки, діалоги, датапікер,
+// автодоповнення — темні з золотою межею). Світлі ділянки (`.pc-upper()` — кремові токени +
+// `.sc-local-scheme(light)`): шапка й підвал (.sc-bar) і заголовок сторінки
+// (`nri-sc-page-header .page-header` — кнопки дій «Моїх ігор» стоять на світлій смузі неба).
+//
+// Цифри. Alegreya Sans має старовинні (різновисокі) цифри — по всьому сайту цифри рівної висоти
+// («1 з 4», а не «1 3 4»): `font-feature-settings: 'lnum'` на :root успадковується й НЕ
+// скидається скороченням `font:` (на відміну від font-variant-numeric — його в правилах цього
+// бандла з `font:` задано ще раз).
+//
+// Гачки декору сцени (карта — у шапці scene-base.less):
+//   Заголовок сторінки (лише пошук і «Мої ігри»): смуга верхнього міста (небо, мазки, сяйво,
+//     вежі) — `.page-header::before` на всю ширину вікна від шапки до низу заголовка; карниз зі
+//     стіканням фарби під нею — `sc-s1` (вивільнений з пластини: `.sc-sign` — static); графіті
+//     «нижче — цікавіше» — `.page-header::after` (текст з атрибута data-graffiti: uk.json
+//     `scene.graffiti`; декоративний, альтернативний текст порожній; ≥ 1200px, лише без кнопок дій).
+//   sc-accent — позолочена планка з вигином і цвяшком угорі картки, «Моїх ігор» і порожнього
+//     стану. Панель фільтрів і сторінки-панелі — та сама планка шарами фону (панель фільтрів
+//     прокручується, неонова трубка основи `::before` прихована).
+//   sc-p1, sc-p2, sc-d1…sc-d4 — не вживаються.
+//   Обкладинка: папір афіші з рваними краями й дуотон-підкладка — `.attach::before`, скотч —
+//     `.attach::after`, світлина — `img` (multiply над підкладкою у спокої); підпис
+//     «ОБКЛАДИНКА» (uk.json, спільний `.cap`) — чорна наліпка внизу ліворуч.
+//   Стіна: мазки пензля (дві безшовні плитки 600 і 480px), сяйва, бризки фарби (≥ 1100px).
+//   data-neon (варіант картки): колір рядка системи, сяйва вгорі картки, крапок місць і кромки
+//     наведення (фіалка, рожевий, бірюза, золото, лайм, кіновар).
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця). Грані оголошено тут, а не імпортом
+// файлів підмножин @fontsource: у тих файлах немає unicode-range, тож кирилична й латинська
+// грані однієї ваги — дві грані на весь Unicode, і Chrome інколи бере літеру не з тієї. Тут
+// кожна грань має свій діапазон.
+@pc-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+@pc-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+.pc-face(@pkg; @family; @weight; @style: normal) {
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @pc-cyr;
+  }
+
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @pc-lat;
+  }
+}
+
+.pc-face(yeseva-one; 'Yeseva One'; 400);
+.pc-face(alegreya-sans; 'Alegreya Sans'; 400);
+.pc-face(alegreya-sans; 'Alegreya Sans'; 500);
+.pc-face(alegreya-sans; 'Alegreya Sans'; 700);
+.pc-face(oswald; 'Oswald'; 500);
+.pc-face(oswald; 'Oswald'; 600);
+.pc-face(rubik-wet-paint; 'Rubik Wet Paint'; 400);
+@import '../scene/scene-base.less';
+
+@pc: ~":root[data-theme='painted-city']";
+
+// Зображення (data-URI SVG). Безшовні плитки (повторюються): мазки пензля — feTurbulence з
+// `stitchTiles='stitch'`, область фільтра = плитка (x/y 0, width/height 1), baseFrequency ×
+// розмір плитки — цілі числа (стіна 600: 0.005 × 600 = 3, 0.02 × 600 = 12; 480: 0.00625 × 480 = 3,
+// 0.025 × 480 = 12; панелі 300: 0.01 × 300 = 3, 0.06 × 300 = 18; октави лише подвоюють частоти);
+// карниз 24×28 — лише горизонтальні лінії й дуга, кінці якої сходяться на межі плитки; стікання
+// фарби 1160 і 740px — краплі цілком усередині плитки. Без повтору: вежі 840×236, бризки 90×90,
+// планка-вигин 104×24, мазок підкреслення, лінія фактів, скотч.
+@pc-wall-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.005 0.02' numOctaves='4' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.02 0 0 0 0 0.045 0 0 0 0 0.05 0 0 0 0.8 -0.36'/%3E%3C/filter%3E%3Crect width='600' height='600' filter='url(%23f)'/%3E%3C/svg%3E");
+@pc-wall-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='480'%3E%3Cfilter id='f' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.00625 0.025' numOctaves='4' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.21 0 0 0 0 0.37 0 0 0 0 0.36 0 0 0 0.6 -0.33'/%3E%3C/filter%3E%3Crect width='480' height='480' filter='url(%23f)'/%3E%3C/svg%3E");
+@pc-sky-streaks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.005 0.02' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.93 0 0 0 0 0.74 0 0 0 1.4 -0.55'/%3E%3C/filter%3E%3Crect width='600' height='600' filter='url(%23f)'/%3E%3C/svg%3E");
+@pc-panel-streaks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='f' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.01 0.06' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.22 -0.1'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23f)'/%3E%3C/svg%3E");
+@pc-skyline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='840' height='236' viewBox='0 0 840 236'%3E%3Cg fill='%23f0d39b' opacity='.8'%3E%3Cpath d='M0 236V108q14 -27 27 0V236Z'/%3E%3Cpath d='M34 236V131q16 -32 32 0V236Z'/%3E%3Cpath d='M74 236V78q11 -22 22 0V236Z'/%3E%3Cpath d='M100 236V140q16 -32 32 0V236Z'/%3E%3Cpath d='M145 236V98q10 -21 21 0V236Z'/%3E%3Cpath d='M186 236V116q18 -37 37 0V236Z'/%3E%3Cpath d='M235 236V83q12 -25 25 0V236Z'/%3E%3Cpath d='M272 236V73q13 -26 26 0V236Z'/%3E%3Cpath d='M310 236V94q14 -28 28 0V236Z'/%3E%3Cpath d='M347 236V107q14 -29 29 0V236Z'/%3E%3Cpath d='M391 236V147q11 -22 22 0V236Z'/%3E%3Cpath d='M427 236V119q20 -41 41 0V236Z'/%3E%3Cpath d='M488 236V92q14 -27 27 0V236Z'/%3E%3Cpath d='M526 236V105q18 -35 35 0V236Z'/%3E%3Cpath d='M567 236V108q18 -37 37 0V236Z'/%3E%3Cpath d='M608 236V143q14 -29 29 0V236Z'/%3E%3Cpath d='M650 236V94q18 -36 36 0V236Z'/%3E%3Cpath d='M703 236V146q16 -33 33 0V236Z'/%3E%3Cpath d='M749 236V127q16 -33 33 0V236Z'/%3E%3Cpath d='M791 236V109q14 -27 27 0V236Z'/%3E%3Cpath d='M830 236V80q10 -21 21 0V236Z'/%3E%3C/g%3E%3Cg%3E%3Cpath d='M90 236V140h40V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M87 140C87 120 106 118 110 96C114 118 133 120 133 140Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M105 172v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M105 202v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M105 232v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M170 236V86h52V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M173 86L196 8L219 86Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M191 118v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M191 148v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M191 178v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M191 208v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M280 236V118h44V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M278 118a24 25.5 0 0 1 48 0Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M302 92.5v-14' stroke='%233b2810' stroke-width='1.6'/%3E%3Ccircle cx='302' cy='76.5' r='3' fill='%23f6dc8f' stroke='%233b2810' stroke-width='1.2'/%3E%3Cpath d='M297 150v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M297 180v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M297 210v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M390 236V60h60V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M387 60C387 40 416 38 420 16C424 38 453 40 453 60Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M415 92v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M415 122v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M415 152v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M415 182v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M415 212v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M510 236V108h46V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M513 108L533 39L553 108Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M528 140v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M528 170v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M528 200v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M528 230v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M610 236V76h56V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M608 76a30 32.5 0 0 1 60 0Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M638 43.5v-14' stroke='%233b2810' stroke-width='1.6'/%3E%3Ccircle cx='638' cy='27.5' r='3' fill='%23f6dc8f' stroke='%233b2810' stroke-width='1.2'/%3E%3Cpath d='M633 108v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M633 138v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M633 168v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M633 198v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M633 228v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M730 236V126h48V236Z' fill='%23d6aa5c' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M727 126C727 106 750 104 754 82C758 104 781 106 781 126Z' fill='%23c4913f' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M749 158v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M749 188v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M749 218v-10a5 6 0 0 1 10 0v10z' fill='%23fff1c6' stroke='%233b2810' stroke-width='1'/%3E%3Cpath d='M450 150H510M450 162H510' stroke='%233b2810' stroke-width='1.6'/%3E%3Cpath d='M450 162q30 22 60 0' fill='none' stroke='%233b2810' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+@pc-skyline-far: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='840' height='236' viewBox='0 0 840 236'%3E%3Cg fill='%23f0d39b' opacity='.8'%3E%3Cpath d='M0 236V108q14 -27 27 0V236Z'/%3E%3Cpath d='M34 236V131q16 -32 32 0V236Z'/%3E%3Cpath d='M74 236V78q11 -22 22 0V236Z'/%3E%3Cpath d='M100 236V140q16 -32 32 0V236Z'/%3E%3Cpath d='M145 236V98q10 -21 21 0V236Z'/%3E%3Cpath d='M186 236V116q18 -37 37 0V236Z'/%3E%3Cpath d='M235 236V83q12 -25 25 0V236Z'/%3E%3Cpath d='M272 236V73q13 -26 26 0V236Z'/%3E%3Cpath d='M310 236V94q14 -28 28 0V236Z'/%3E%3Cpath d='M347 236V107q14 -29 29 0V236Z'/%3E%3Cpath d='M391 236V147q11 -22 22 0V236Z'/%3E%3Cpath d='M427 236V119q20 -41 41 0V236Z'/%3E%3Cpath d='M488 236V92q14 -27 27 0V236Z'/%3E%3Cpath d='M526 236V105q18 -35 35 0V236Z'/%3E%3Cpath d='M567 236V108q18 -37 37 0V236Z'/%3E%3Cpath d='M608 236V143q14 -29 29 0V236Z'/%3E%3Cpath d='M650 236V94q18 -36 36 0V236Z'/%3E%3Cpath d='M703 236V146q16 -33 33 0V236Z'/%3E%3Cpath d='M749 236V127q16 -33 33 0V236Z'/%3E%3Cpath d='M791 236V109q14 -27 27 0V236Z'/%3E%3Cpath d='M830 236V80q10 -21 21 0V236Z'/%3E%3C/g%3E%3C/svg%3E");
+@pc-cornice: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6dc8f'/%3E%3Cstop offset='.55' stop-color='%23d4a648'/%3E%3Cstop offset='1' stop-color='%238c5f1c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='24' height='28' fill='%2314100b'/%3E%3Crect y='1' width='24' height='15' fill='url(%23g)'/%3E%3Cpath d='M0 1.25H24M0 16H24' stroke='%230a0806' stroke-width='2.5'/%3E%3Cpath d='M0 6.5H24' stroke='%23fff2c4' stroke-width='1.2' opacity='.7'/%3E%3Cpath d='M0 16a12 9 0 0 0 24 0' fill='%239a6d22' stroke='%230a0806' stroke-width='2'/%3E%3C/svg%3E");
+@pc-drips-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1160' height='56' viewBox='0 0 1160 56'%3E%3Crect x='264.3' y='-4' width='11.5' height='26.1' rx='5.7' fill='%23ff4fae'/%3E%3Ccircle cx='270' cy='22.1' r='8.2' fill='%23ff4fae'/%3E%3Crect x='336.3' y='-4' width='11.3' height='16.2' rx='5.7' fill='%232fd6b9'/%3E%3Ccircle cx='342' cy='12.2' r='8.2' fill='%232fd6b9'/%3E%3Crect x='457.3' y='-4' width='9.4' height='36.8' rx='4.7' fill='%23ff4fae'/%3E%3Ccircle cx='462' cy='32.8' r='6.7' fill='%23ff4fae'/%3E%3Crect x='650.5' y='-4' width='7.1' height='41.7' rx='3.5' fill='%23e9c46a'/%3E%3Ccircle cx='654' cy='37.7' r='5.1' fill='%23e9c46a'/%3E%3Crect x='745.5' y='-4' width='8.9' height='14.9' rx='4.5' fill='%232fd6b9'/%3E%3Ccircle cx='750' cy='10.9' r='6.4' fill='%232fd6b9'/%3E%3Crect x='984.8' y='-4' width='10.4' height='41.3' rx='5.2' fill='%23ff4fae'/%3E%3Ccircle cx='990' cy='37.3' r='7.5' fill='%23ff4fae'/%3E%3Crect x='1080.9' y='-4' width='10.1' height='24.9' rx='5.1' fill='%23e9c46a'/%3E%3Ccircle cx='1086' cy='20.9' r='7.3' fill='%23e9c46a'/%3E%3C/svg%3E");
+@pc-drips-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='740' height='56' viewBox='0 0 740 56'%3E%3Crect x='122.9' y='-4' width='6.3' height='11.4' rx='3.1' fill='%23ff4fae'/%3E%3Ccircle cx='126' cy='7.4' r='4.5' fill='%23ff4fae'/%3E%3Crect x='171.4' y='-4' width='5.1' height='26.0' rx='2.6' fill='%232fd6b9'/%3E%3Ccircle cx='174' cy='22.0' r='3.7' fill='%232fd6b9'/%3E%3Crect x='195.5' y='-4' width='5.0' height='20.3' rx='2.5' fill='%23ff4fae'/%3E%3Ccircle cx='198' cy='16.3' r='3.6' fill='%23ff4fae'/%3E%3Crect x='291.2' y='-4' width='5.6' height='17.3' rx='2.8' fill='%23e9c46a'/%3E%3Ccircle cx='294' cy='13.3' r='4.1' fill='%23e9c46a'/%3E%3Crect x='315.1' y='-4' width='5.7' height='13.1' rx='2.9' fill='%232fd6b9'/%3E%3Ccircle cx='318' cy='9.1' r='4.1' fill='%232fd6b9'/%3E%3C/svg%3E");
+@pc-splat-pink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' opacity='.5'%3E%3Ccircle cx='45' cy='45' r='7' fill='%23ff4fae'/%3E%3Ccircle cx='81.9' cy='34.5' r='0.9' fill='%23ff4fae'/%3E%3Ccircle cx='75.1' cy='62.7' r='2.7' fill='%23ff4fae'/%3E%3Ccircle cx='36.0' cy='28.8' r='2.4' fill='%23ff4fae'/%3E%3Ccircle cx='23.8' cy='28.2' r='1.2' fill='%23ff4fae'/%3E%3Ccircle cx='25.8' cy='53.9' r='2.7' fill='%23ff4fae'/%3E%3Ccircle cx='83.4' cy='43.7' r='2.2' fill='%23ff4fae'/%3E%3Ccircle cx='28.7' cy='50.9' r='0.9' fill='%23ff4fae'/%3E%3Ccircle cx='68.1' cy='49.0' r='1.6' fill='%23ff4fae'/%3E%3Ccircle cx='18.3' cy='70.1' r='2.2' fill='%23ff4fae'/%3E%3Ccircle cx='29.8' cy='38.9' r='0.9' fill='%23ff4fae'/%3E%3Ccircle cx='39.0' cy='56.8' r='2.1' fill='%23ff4fae'/%3E%3Ccircle cx='74.9' cy='44.7' r='1.3' fill='%23ff4fae'/%3E%3Ccircle cx='71.4' cy='24.1' r='2.7' fill='%23ff4fae'/%3E%3Ccircle cx='72.2' cy='26.9' r='2.9' fill='%23ff4fae'/%3E%3Ccircle cx='21.1' cy='76.3' r='3.3' fill='%23ff4fae'/%3E%3Ccircle cx='62.1' cy='72.5' r='2.7' fill='%23ff4fae'/%3E%3C/svg%3E");
+@pc-splat-teal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' opacity='.5'%3E%3Ccircle cx='45' cy='45' r='10' fill='%232fd6b9'/%3E%3Ccircle cx='21.5' cy='22.1' r='2.9' fill='%232fd6b9'/%3E%3Ccircle cx='75.6' cy='33.4' r='3.2' fill='%232fd6b9'/%3E%3Ccircle cx='69.6' cy='49.5' r='3.3' fill='%232fd6b9'/%3E%3Ccircle cx='22.9' cy='15.0' r='1.1' fill='%232fd6b9'/%3E%3Ccircle cx='26.5' cy='48.7' r='2.2' fill='%232fd6b9'/%3E%3Ccircle cx='33.9' cy='39.5' r='1.4' fill='%232fd6b9'/%3E%3Ccircle cx='38.1' cy='82.0' r='2.8' fill='%232fd6b9'/%3E%3Ccircle cx='63.5' cy='73.9' r='1.2' fill='%232fd6b9'/%3E%3Ccircle cx='33.5' cy='34.5' r='0.8' fill='%232fd6b9'/%3E%3Ccircle cx='57.3' cy='32.1' r='1.4' fill='%232fd6b9'/%3E%3Ccircle cx='81.2' cy='41.0' r='1.6' fill='%232fd6b9'/%3E%3Ccircle cx='71.3' cy='38.5' r='2.6' fill='%232fd6b9'/%3E%3Ccircle cx='55.8' cy='81.8' r='2.6' fill='%232fd6b9'/%3E%3Ccircle cx='81.2' cy='37.3' r='1.6' fill='%232fd6b9'/%3E%3Ccircle cx='34.3' cy='57.7' r='1.2' fill='%232fd6b9'/%3E%3Ccircle cx='63.8' cy='53.1' r='2.4' fill='%232fd6b9'/%3E%3C/svg%3E");
+@pc-splat-gold: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' opacity='.5'%3E%3Ccircle cx='45' cy='45' r='6' fill='%23e9c46a'/%3E%3Ccircle cx='25.6' cy='49.6' r='1.2' fill='%23e9c46a'/%3E%3Ccircle cx='50.5' cy='38.9' r='2.1' fill='%23e9c46a'/%3E%3Ccircle cx='53.5' cy='38.7' r='2.2' fill='%23e9c46a'/%3E%3Ccircle cx='38.1' cy='38.8' r='1.8' fill='%23e9c46a'/%3E%3Ccircle cx='38.5' cy='23.5' r='2.7' fill='%23e9c46a'/%3E%3Ccircle cx='53.6' cy='58.0' r='1.1' fill='%23e9c46a'/%3E%3Ccircle cx='7.5' cy='43.5' r='2.3' fill='%23e9c46a'/%3E%3Ccircle cx='48.1' cy='25.0' r='2.7' fill='%23e9c46a'/%3E%3Ccircle cx='58.9' cy='55.3' r='2.6' fill='%23e9c46a'/%3E%3Ccircle cx='41.7' cy='23.8' r='1.0' fill='%23e9c46a'/%3E%3Ccircle cx='43.5' cy='59.6' r='1.5' fill='%23e9c46a'/%3E%3Ccircle cx='50.3' cy='31.6' r='3.1' fill='%23e9c46a'/%3E%3Ccircle cx='52.1' cy='38.3' r='1.8' fill='%23e9c46a'/%3E%3Ccircle cx='36.3' cy='45.5' r='1.9' fill='%23e9c46a'/%3E%3Ccircle cx='54.6' cy='38.6' r='2.4' fill='%23e9c46a'/%3E%3Ccircle cx='64.2' cy='63.3' r='3.1' fill='%23e9c46a'/%3E%3C/svg%3E");
+@pc-gild: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='24' viewBox='0 0 104 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6dc8f'/%3E%3Cstop offset='.6' stop-color='%23d4a648'/%3E%3Cstop offset='1' stop-color='%239a6d22'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M-2 -2H106V7H96C74 7 70 21 52 21C34 21 30 7 8 7H-2Z' fill='url(%23g)' stroke='%23060708' stroke-width='2.2'/%3E%3Ccircle cx='52' cy='11' r='3.2' fill='%23060708'/%3E%3Cpath d='M14 3.5H90' stroke='%23fff3c6' stroke-width='1' opacity='.75'/%3E%3C/svg%3E");
+@pc-underline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7C30 2 70 3 118 5L117 10C80 8 40 9 3 11Z' fill='%23d4a648'/%3E%3C/svg%3E");
+@pc-divider: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='4' viewBox='0 0 300 4' preserveAspectRatio='none'%3E%3Cpath d='M1 2.4C60 1 140 3 299 1.6' stroke='%23e9c46a' stroke-opacity='.45' stroke-width='1.6' fill='none'/%3E%3C/svg%3E");
+@pc-tape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='18' viewBox='0 0 50 18'%3E%3Cpath d='M3 4L46 1L48 13L5 16Z' fill='%23f0e8cd' fill-opacity='.85'/%3E%3C/svg%3E");
+
+// Контраст (WCAG, відносна яскравість).
+// Темне нижнє місто — стіна #121A1C, панель #1D272A … #161E21 (градієнт; оцінка #1A2326),
+//   картка всередині сторінки #222D30, поле #0D1214, оверлеї #1D272A.
+//   Текст #F1E8D6 — 12.5 / 13.9; назви карток #F8EEDB — 13.3; описи #D5CEBE — 9.7; підписи
+//   #B4AE9E — 6.9 (7.9 на стіні, 6.4 на #222D30); мітки фактів #9FB4AE — 7.0 (6.5 на #222D30);
+//   заголовки розділів фільтрів #F3D58E — 12.0.
+//   Межа полів #7A8985 — 5.2 на полі / 4.2 на панелі (≥ 3:1).
+//   Бірюза #35E0C2 (primary: фокус, посилання, прапорці) — 9.2 на панелі; #05201B на ній — 10.3.
+//   Маджента #FF4FAE (перший акцент) — 5.1 на панелі; #14040C на ній — 6.6.
+//   Рядки системи (колір варіанта на #1D272A): фіалка #B99BFF 6.7, рожевий #FF6DBB 5.9, бірюза
+//     #45E3C8 9.5, золото #F0C467 9.3, лайм #B9EE63 11.3, кіновар #FF7A63 6.0.
+//   «Підходить» #05201B на #35E0C2 — 10.3; частковий #2A1D05 на #E9C46A — 9.9.
+//   Вік #FFC4E2 на панелі — 10.4. «Нове» #1B140C на #E9C46A — 10.9.
+//   Ціна #16050D на #FF4FAE — 6.6; «без плати» #04201B на #35E0C2 — 10.3.
+//   Ініціал майстра #F3D58E на #0D1214 — 13.2; «майстер» #B0AA9A — 7.3; зірка #F1C75B — 10.5.
+//   Підпис обкладинки #F8EEDB на #060708 — 17.5.
+// Світле верхнє місто — шапка #F6ECD4, небо #F3DFB2 … #D9A961.
+//   Логотип і активний пункт #1B140C — 15.5; пункти навігації #4B3C27 — 9.1.
+//   Заголовок сторінки #1B140C — 13.9 … 8.5; лід #3A2C18 — 8.7 … 6.3.
+//   Primary на світлому — темна бірюза #0F6B5C: 5.5 на шапці, білий на ній — 6.4; перший
+//     акцент — темна маджента #B0186A: 5.6, білий на ній — 6.6; межа полів #6E5530 — 6.0.
+// Вежі, карниз, стікання, бризки, мазки, планка, скотч, графіті — декор, не фон тексту.
+
+@pc-ink: #060708;
+@pc-panel-bg:
+  @pc-panel-streaks 0 0 / 300px 300px,
+  linear-gradient(180deg, #1d272a, #161e21);
+// Позолочена планка (вигин із цвяшком посередині + смуга на всю ширину) — шари фону.
+@pc-gild-layers:
+  @pc-gild 50% 0 / 104px 24px no-repeat,
+  linear-gradient(180deg, #f6dc8f 0, #d4a648 4px, #9a6d22 6px, @pc-ink 6px 8px) 0 0 / 100% 8px
+    no-repeat;
+@pc-radius: 7px 4px 8px 5px;
+
+// Токени верхнього міста (шапка, підвал, смуга заголовка) — на корені світлої ділянки, потім
+// локальна світла схема. Список тримати в лад із `.sc-local-scheme()` (scene-base.less): кожен
+// токен, з якого вона виводить --nri-* / --mat-sys-*, має бути тут перевизначений.
+.pc-upper() {
+  --sc-ink: #1b140c;
+  --sc-ink-soft: #3a2c18;
+  --sc-ink-muted: #4b3c27;
+  --sc-line: rgba(27, 20, 12, 0.3);
+  --sc-outline: #6e5530;
+  --sc-panel: #f6ecd4;
+  --sc-panel-raised: #fbf3df;
+  --sc-field: #fffaf0;
+  --sc-overlay: #fffaf0;
+  --sc-blur-overlay: rgba(246, 236, 212, 0.9);
+
+  --sc-neon-a: #b0186a;
+  --sc-neon-a-core: #ff4fae;
+  --sc-neon-a-text: #b0186a;
+  --sc-on-neon-a: #fff;
+  --sc-neon-b: #0f6b5c;
+  --sc-neon-b-core: #35e0c2;
+  --sc-neon-b-text: #0f6b5c;
+  --sc-neon-b-glow: transparent;
+  --sc-on-neon-b: #fff;
+
+  --sc-lime: #0f6b5c;
+  --sc-lime-text: #0f5a4d;
+  --sc-lime-line: rgba(15, 107, 92, 0.5);
+  --sc-lime-fill: rgba(15, 107, 92, 0.12);
+  --sc-amber: #8c5f1c;
+  --sc-amber-text: #6e4a12;
+  --sc-amber-line: rgba(110, 74, 18, 0.55);
+  --sc-amber-fill: rgba(212, 166, 72, 0.2);
+  --sc-on-amber: #fff8e6;
+  --sc-red: #b0186a;
+  --sc-red-text: #9a1259;
+  --sc-red-fill: rgba(176, 24, 106, 0.1);
+  --sc-on-red: #fff;
+
+  .sc-local-scheme(light);
+
+  color: var(--sc-ink);
+}
+
+@{pc} {
+  --sc-font-display: 'Yeseva One', Georgia, 'Times New Roman', serif;
+  --sc-font-body: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --sc-font-mono: 'Oswald', 'Arial Narrow', 'Segoe UI', sans-serif;
+
+  --sc-wall: #121a1c;
+  --sc-wall-deep: #101719;
+  --sc-bar: #f6ecd4;
+  --sc-bar-line: @pc-ink;
+
+  --sc-panel: #1a2326;
+  --sc-glass: @pc-panel-bg;
+  --sc-glass-line: @pc-ink;
+  --sc-panel-raised: #222d30;
+  --sc-overlay: #1d272a;
+  --sc-overlay-line: #8f6d2c;
+  --sc-field: #0d1214;
+  --sc-backdrop: rgba(4, 7, 8, 0.72);
+  --sc-blur-overlay: rgba(22, 30, 33, 0.9);
+
+  --sc-ink: #f1e8d6;
+  --sc-ink-soft: #d5cebe;
+  --sc-ink-muted: #b4ae9e;
+  --sc-line: rgba(226, 188, 99, 0.3);
+  --sc-outline: #7a8985;
+
+  // Перший акцент — маджента; другий (primary: фокус, посилання, прапорці, filled-кнопки) —
+  // бірюза.
+  --sc-neon-a: #ff4fae;
+  --sc-neon-a-core: #ffd0e8;
+  --sc-neon-a-text: #ff7cc2;
+  --sc-on-neon-a: #14040c;
+  --sc-neon-b: #35e0c2;
+  --sc-neon-b-core: #c9fff3;
+  --sc-neon-b-text: #5eead2;
+  --sc-neon-b-glow: rgba(53, 224, 194, 0.35);
+  --sc-on-neon-b: #05201b;
+  --sc-mark: #1b140c;
+  --sc-mark-glow: transparent;
+
+  .sc-neon-tokens();
+
+  --sc-lime: #35e0c2;
+  --sc-lime-text: #7cf0da;
+  --sc-lime-line: rgba(53, 224, 194, 0.55);
+  --sc-lime-fill: rgba(53, 224, 194, 0.1);
+  --sc-amber: #e9c46a;
+  --sc-amber-text: #f3d58e;
+  --sc-amber-line: rgba(233, 196, 106, 0.55);
+  --sc-amber-fill: rgba(233, 196, 106, 0.12);
+  --sc-on-amber: #1b140c;
+  --sc-red: #ff5c8a;
+  --sc-red-text: #ffa3bf;
+  --sc-red-fill: rgba(255, 92, 138, 0.12);
+  --sc-on-red: #1a0610;
+
+  // Шість варіантів картки (колір фарби = текст рядка системи; core — світліший відтінок).
+  --sc-neon-violet: #b99bff;
+  --sc-neon-violet-core: #e6dcff;
+  --sc-neon-violet-text: #b99bff;
+  --sc-neon-pink: #ff6dbb;
+  --sc-neon-pink-core: #ffd3ea;
+  --sc-neon-pink-text: #ff6dbb;
+  --sc-neon-cyan: #45e3c8;
+  --sc-neon-cyan-core: #d2fbf3;
+  --sc-neon-cyan-text: #45e3c8;
+  --sc-neon-amber: #f0c467;
+  --sc-neon-amber-core: #fdeecb;
+  --sc-neon-amber-text: #f0c467;
+  --sc-neon-lime: #b9ee63;
+  --sc-neon-lime-core: #ecfbd2;
+  --sc-neon-lime-text: #b9ee63;
+  --sc-neon-red: #ff7a63;
+  --sc-neon-red-core: #ffdcd5;
+  --sc-neon-red-text: #ff7a63;
+
+  .sc-base(dark);
+
+  // Жорсткі зсунуті тіні без розмиття (чорнило), як у намальованому коміксі.
+  --sc-shadow-panel: 6px 7px 0 @pc-ink;
+  --sc-glass-highlight: inset 0 1px 0 rgba(255, 240, 200, 0.04);
+  --nri-shadow-md: 5px 6px 0 @pc-ink;
+  --nri-shadow-lg: 6px 7px 0 rgba(6, 7, 8, 0.9);
+  --nri-radius-sm: 5px;
+  --nri-radius-md: 7px;
+  --nri-radius-lg: 9px;
+
+  // Цифри рівної висоти (див. шапку): ознака шрифту успадковується й не скидається `font:`.
+  font-feature-settings: 'lnum' 1;
+
+  body {
+    font-variant-numeric: lining-nums;
+    font-feature-settings: 'lnum' 1;
+  }
+
+  // ---- Стіна: нижнє місто ----
+  // Згори вниз: бризки фарби (≥ 1100px, див. медіазапит), бірюзове сяйво ліворуч, маджентове —
+  // праворуч унизу, золоте — під карнизом, мазки пензля (світлі й темні плитки), колір стіни.
+  .sc-wall {
+    // Обкладинки й смуга заголовка на всю ширину вікна не дають горизонтального скролу (clip — не
+    // контейнер прокрутки: липка шапка й фільтри працюють).
+    overflow-x: clip;
+    background-color: var(--sc-wall);
+    background-image:
+      radial-gradient(
+        ellipse 700px 520px at 120px 980px,
+        rgba(47, 214, 185, 0.16),
+        transparent 70%
+      ),
+      radial-gradient(ellipse 760px 600px at 100% 88%, rgba(255, 79, 174, 0.14), transparent 70%),
+      radial-gradient(ellipse 900px 300px at 50% 380px, rgba(233, 196, 106, 0.08), transparent 70%),
+      @pc-wall-light, @pc-wall-dark;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat;
+    background-size:
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      480px 480px,
+      600px 600px;
+  }
+
+  // ---- Шапка й підвал: кремова смуга верхнього міста, чорнильна межа й золота лінія ----
+  .sc-bar {
+    .pc-upper();
+  }
+
+  .top.sc-bar {
+    border-bottom: 2.5px solid @pc-ink;
+    box-shadow:
+      0 3px 0 #d4a648,
+      0 5.5px 0 @pc-ink;
+  }
+
+  .bottom.sc-bar {
+    border-top: 2.5px solid @pc-ink;
+    box-shadow:
+      0 -3px 0 #d4a648,
+      0 -5.5px 0 @pc-ink;
+
+    a {
+      color: #1b140c;
+    }
+  }
+
+  .top .brand {
+    color: #1b140c;
+    font:
+      400 1.5rem/1 'Yeseva One',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.01em;
+
+    &:hover {
+      color: #000;
+    }
+  }
+
+  .top .mark {
+    color: #1b140c;
+    filter: none;
+  }
+
+  .top .nav-link {
+    color: #4b3c27;
+    font: 500 1rem/1.2 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+
+    &:hover {
+      color: #1b140c;
+    }
+
+    // Активний пункт — мазок золотої фарби під словом.
+    &.active {
+      background: @pc-underline no-repeat 50% 100% / 86% 10px;
+      color: #1b140c;
+      font-weight: 700;
+      box-shadow: none;
+    }
+  }
+
+  // Аватар — темний кружок із золотим обідком і літерою Yeseva One.
+  .top .avatar {
+    border: 2px solid #d4a648;
+    background: #1b140c;
+    color: #f6dc8f;
+    font: 400 1.0625rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow: none;
+  }
+
+  // ---- Заголовок сторінки: смуга верхнього міста, карниз зі стіканням фарби, графіті ----
+  // Смуга — від шапки (над заголовком — відступ сторінки-дошки) до низу заголовка, на всю ширину
+  // вікна; карниз і краплі (sc-s1) — під нею, у нижньому полі заголовка; далі — темна стіна.
+  nri-sc-page-header .page-header {
+    .pc-upper();
+
+    position: relative;
+    isolation: isolate;
+    margin-bottom: 104px;
+    padding-bottom: 26px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: calc(-1 * var(--nri-space-xl));
+      bottom: 0;
+      left: calc(50% - 50vw);
+      z-index: -1;
+      width: 100vw;
+      background-color: #e6c07e;
+      background-image:
+        @pc-skyline, @pc-sky-streaks,
+        radial-gradient(
+          ellipse 520px 260px at calc(100% - 380px) 30px,
+          rgba(255, 246, 214, 0.95),
+          transparent 70%
+        ),
+        linear-gradient(180deg, #f3dfb2 0%, #eccb8c 55%, #d9a961 100%);
+      background-repeat: no-repeat, repeat, no-repeat, no-repeat;
+      background-position:
+        right 40px bottom 0,
+        0 0,
+        0 0,
+        0 0;
+      background-size:
+        840px 236px,
+        600px 600px,
+        100% 100%,
+        100% 100%;
+      pointer-events: none;
+    }
+  }
+
+  // Пластина заголовка — без опори: карниз (sc-s1) кладеться відносно всього заголовка.
+  .sc-sign {
+    position: static;
+    padding: 0;
+  }
+
+  // Карниз (плитка 24px: золота смуга, чорнильні лінії, фестони) і краплі фарби з нього (дві
+  // плитки різної ширини — повтор не впадає в око). Краплі цілком у межах шару — без зрізу.
+  nri-sc-page-header .sc-s1 {
+    position: absolute;
+    top: 100%;
+    left: calc(50% - 50vw);
+    z-index: -1;
+    display: block;
+    width: 100vw;
+    height: 84px;
+    background-image: @pc-drips-b, @pc-drips-a, @pc-cornice;
+    background-repeat: repeat-x;
+    background-position:
+      -170px 28px,
+      40px 28px,
+      0 0;
+    background-size:
+      740px 56px,
+      1160px 56px,
+      24px 28px;
+    pointer-events: none;
+  }
+
+  .sc-sign-title {
+    color: #1b140c;
+    font:
+      400 clamp(2.25rem, 4.2vw, 3.75rem) / 1.05 'Yeseva One',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.005em;
+    text-shadow: 3px 3px 0 rgba(212, 166, 72, 0.65);
+  }
+
+  nri-sc-page-header .lead {
+    max-width: 40rem;
+    color: #3a2c18;
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  // Обведені кнопки заголовка — на кремовій підкладці (вежі не проходять під текстом).
+  nri-sc-page-header .mat-mdc-outlined-button {
+    background-color: #fffaf0;
+  }
+
+  // ---- Панелі: темна фарба, товстий чорнильний контур, жорстка тінь ----
+  .sc-glass,
+  .nri-page:not(.nri-board),
+  .nri-page.nri-board :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
+    border: 2.5px solid @pc-ink;
+    border-radius: @pc-radius;
+    background: @pc-panel-bg;
+    box-shadow: 6px 7px 0 @pc-ink;
+  }
+
+  // Сторінка-панель (форми, сторінка гри, налаштування) — з позолоченою планкою вгорі.
+  .nri-page:not(.nri-board) {
+    background: @pc-gild-layers, @pc-panel-bg;
+  }
+
+  // Картки й повідомлення всередині сторінки-панелі чи фільтрів — тонка рамка без тіні.
+  .nri-page:not(.nri-board) .nri-card,
+  .nri-page.nri-board .nri-panel .nri-notice {
+    border: 2px solid @pc-ink;
+    border-radius: 5px 3px 6px 4px;
+    background: #222d30;
+    box-shadow: 3px 3px 0 @pc-ink;
+  }
+
+  // Планка з вигином і цвяшком угорі картки / «Моїх ігор» / порожнього стану.
+  .sc-accent {
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 24px;
+    border-radius: 0;
+    background: @pc-gild-layers;
+    box-shadow: none;
+  }
+
+  // Панель фільтрів: планка — шарами фону (панель прокручується); неонова трубка основи
+  // прихована; заголовки розділів — Yeseva One золотом.
+  .nri-page.nri-board .nri-panel {
+    padding: 34px 20px 22px;
+    border-radius: @pc-radius;
+    background: @pc-gild-layers, @pc-panel-bg;
+
+    &::before {
+      content: none;
+    }
+
+    legend {
+      color: #f3d58e;
+      font:
+        400 1.125rem/1.25 'Yeseva One',
+        var(--sc-font-display);
+      font-variant-numeric: lining-nums;
+    }
+
+    // «Скинути» — маджентова плашка з чорнильним контуром і тінню.
+    .reset.mat-mdc-button {
+      border: 2.5px solid @pc-ink;
+      border-radius: 5px 3px 6px 4px;
+      background: #ff4fae;
+      color: #14040c;
+      font: 600 0.9375rem/1 var(--sc-font-mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      box-shadow: 4px 4px 0 @pc-ink;
+    }
+  }
+
+  // Обведені кнопки й поля прямо на стіні (сортування, «Показати ще») — на темній підкладці
+  // поля: мазки й сяйва не проходять під текстом.
+  .nri-page.nri-board
+    :is(.mat-mdc-outlined-button, .mdc-text-field--outlined):not(
+      :is(.sc-glass, .nri-panel, .nri-card, .nri-alert, .nri-notice, nri-sc-page-header) *
+    ) {
+    background-color: #161e21;
+  }
+
+  // Порожній стан — темна панель із планкою.
+  nri-sc-empty-state .note {
+    padding: 36px 28px 24px;
+  }
+
+  nri-sc-empty-state .message {
+    color: #f3d58e;
+    font:
+      400 1.25rem/1.3 'Yeseva One',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+  }
+
+  // ---- Картка (пошук і «Мої ігри») ----
+  // Згори — сяйво кольору варіанта (м'яко, 14%) над мазками й градієнтом панелі.
+  [data-neon] > .sc-glass {
+    background:
+      radial-gradient(
+          ellipse 70% 150px at 50% 0,
+          color-mix(in srgb, var(--sc-n, #35e0c2) 14%, transparent),
+          transparent
+        )
+        0 0 / 100% 150px no-repeat,
+      @pc-panel-bg;
+  }
+
+  nri-sc-game-card > .sc-glass {
+    padding: 30px 22px 16px;
+  }
+
+  // Наведення / фокус — кромка й сяйво кольору варіанта поверх жорсткої тіні.
+  [data-neon]:is(:hover, :focus-within) > .sc-glass {
+    box-shadow:
+      6px 7px 0 @pc-ink,
+      0 0 0 2px color-mix(in srgb, var(--sc-n, #35e0c2) 70%, transparent),
+      0 0 34px color-mix(in srgb, var(--sc-n, #35e0c2) 28%, transparent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-neon] > .sc-glass {
+      transition:
+        box-shadow 300ms,
+        transform 300ms;
+    }
+
+    [data-neon]:is(:hover, :focus-within) > .sc-glass {
+      transform: translate(-1px, -2px);
+    }
+  }
+
+  // ---- Текст картки ----
+  :is(nri-sc-game-card, nri-sc-my-game-item) .sys {
+    font: 500 0.78125rem/1.4 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.07em;
+  }
+
+  :is(nri-sc-game-card, nri-sc-my-game-item) .title {
+    color: #f8eedb;
+    font:
+      400 1.28125rem/1.2 'Yeseva One',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.005em;
+  }
+
+  nri-sc-game-card .title {
+    margin: 8px 0 6px;
+  }
+
+  nri-sc-game-card .desc {
+    color: #d5cebe;
+    font-size: 0.9375rem;
+    line-height: 1.36;
+  }
+
+  // Факти — під мазком золотої лінії; мітки — Oswald.
+  :is(nri-sc-game-card, nri-sc-my-game-item) .facts {
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 0;
+    background: @pc-divider no-repeat 0 0 / 100% 4px;
+    font-size: 0.9375rem;
+
+    dt {
+      color: #9fb4ae;
+      font: 500 0.71875rem/1.6 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.1em;
+    }
+  }
+
+  nri-sc-game-card .facts {
+    gap: 1px;
+
+    > div {
+      align-items: center;
+    }
+  }
+
+  // ---- Місця — крапки фарби (вільні — кольору варіанта з чорнильним обідком) ----
+  [data-neon] .pips {
+    gap: 5px;
+
+    b {
+      width: 10px;
+      height: 10px;
+      border: 2px solid #56625f;
+      border-radius: 50% 45% 55% 50%;
+      background: none;
+      box-shadow: none;
+    }
+
+    .on {
+      border-color: @pc-ink;
+      background: var(--sc-n, #35e0c2);
+      box-shadow: none;
+    }
+  }
+
+  // ---- Підпис майстра й ціна ----
+  nri-sc-game-card .gm .initial {
+    border: 2px solid #d4a648;
+    background: #0d1214;
+    color: #f3d58e;
+    font: 400 0.875rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow: none;
+  }
+
+  nri-sc-game-card .gm .name {
+    color: #f1e8d6;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  nri-sc-game-card .gm .role {
+    --nri-accent-text: #f1c75b;
+
+    color: #b0aa9a;
+    font-size: 0.84375rem;
+  }
+
+  // Ціна — маджентовий мазок-наліпка з рваними краями й чорнильною тінню («без плати» —
+  // бірюзовий).
+  nri-sc-game-card .price {
+    padding: 9px 14px 8px;
+    border: 0;
+    border-radius: 0;
+    background: #ff4fae;
+    color: #16050d;
+    font: 600 1rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    clip-path: polygon(
+      2% 8%,
+      22% 0,
+      52% 6%,
+      78% 0,
+      99% 4%,
+      96% 40%,
+      100% 74%,
+      94% 100%,
+      60% 94%,
+      30% 100%,
+      4% 95%,
+      0 60%
+    );
+    filter: drop-shadow(3px 3px 0 #000);
+    transform: rotate(-2deg);
+
+    &.free {
+      background: #35e0c2;
+      color: #04201b;
+    }
+  }
+
+  // ---- Бейджі ----
+  // «Підходить вашому розкладу» — бірюзовий мазок пензля; частковий збіг — золотий.
+  .badge.fit {
+    padding: 4px 14px 3px 12px;
+    border: 0;
+    border-radius: 0;
+    background: #35e0c2;
+    color: #05201b;
+    font: 600 0.8125rem/1.3 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow: none;
+    clip-path: polygon(0 12%, 4% 0, 60% 6%, 100% 0, 98% 50%, 100% 100%, 40% 92%, 3% 100%, 1% 55%);
+
+    mat-icon {
+      display: none;
+    }
+
+    &::before {
+      content: none;
+    }
+
+    &[data-fit='partial'] {
+      background: #e9c46a;
+      color: #2a1d05;
+    }
+  }
+
+  nri-sc-game-card .fit {
+    margin-top: 7px;
+  }
+
+  // Вік — маджентовий обвід олівцем, трохи навскіс; скасована гра — так само.
+  .badge:is(.age, .status[data-status='cancelled']) {
+    padding: 4px 6px 3px;
+    border: 2px solid #ff4fae;
+    border-radius: 3px;
+    background: transparent;
+    color: #ffc4e2;
+    font: 600 0.75rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.04em;
+    transform: rotate(-3deg);
+  }
+
+  nri-sc-my-game-item .status {
+    border-radius: 3px;
+    font: 600 0.75rem/1.2 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  // «Нове» / «Оновлено» — золота наліпка з чорнильним контуром і тінню.
+  .nri-seen-badge {
+    padding: 4px 6px 3px;
+    border: 2px solid @pc-ink;
+    border-radius: 2px;
+    background: #e9c46a;
+    color: #1b140c;
+    font: 600 0.75rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.04em;
+    box-shadow: 2px 2px 0 @pc-ink;
+    transform: rotate(2deg);
+  }
+
+  // ---- «Мої ігри»: та сама панель; кнопки дій — під мазком золотої лінії ----
+  nri-sc-my-game-item > .sc-glass {
+    padding-top: 30px;
+  }
+
+  nri-sc-my-game-item .actions {
+    padding-top: 10px;
+    background: @pc-divider no-repeat 0 0 / 100% 4px;
+  }
+
+  // ---- Обкладинка: наклеєна афіша зі скотчем ----
+  // У спокої — тьмяна, нахилена за верхнім правим кутом картки; світлина — сіра й контрастна,
+  // помножена на рожево-бірюзову підкладку (дуотон). Наперед (наведення / клік / Enter) —
+  // відклеюється на картку, більшає, справжні кольори, жорстка чорнильна тінь. Рвані краї — у
+  // папері-підкладці `::before` (форма не на кнопці — контур фокусу не обрізається).
+  nri-sc-attachment {
+    top: -30px;
+    right: -24px;
+    width: 154px;
+    height: 116px;
+
+    .attach {
+      overflow: visible;
+      padding: 5px 5px 9px;
+      background: none;
+      filter: brightness(0.62) saturate(0.5);
+      transform: rotate(8deg);
+
+      &:focus-visible {
+        outline: 3px solid #35e0c2;
+        outline-offset: 3px;
+      }
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(135deg, #ff4fae, #2fd6b9) 5px 5px / calc(100% - 10px) calc(100% - 14px)
+            no-repeat,
+          #efe3c6;
+        clip-path: polygon(
+          0 2%,
+          30% 0,
+          62% 3%,
+          100% 0,
+          99% 40%,
+          100% 86%,
+          88% 100%,
+          70% 94%,
+          52% 100%,
+          30% 95%,
+          12% 100%,
+          0 92%
+        );
+        pointer-events: none;
+      }
+
+      // Скотч угорі посередині.
+      &::after {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        z-index: 2;
+        width: 50px;
+        height: 18px;
+        margin-left: -25px;
+        background: @pc-tape 0 0 / 100% 100% no-repeat;
+        pointer-events: none;
+      }
+
+      img {
+        position: relative;
+        outline: 2px solid @pc-ink;
+        mix-blend-mode: multiply;
+        filter: grayscale(1) contrast(1.35);
+      }
+    }
+
+    .cap {
+      position: absolute;
+      bottom: 14px;
+      left: 10px;
+      z-index: 2;
+      display: block;
+      padding: 1px 6px;
+      background: @pc-ink;
+      color: #f8eedb;
+      font: 600 0.6875rem/1.4 var(--sc-font-mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+  }
+
+  .pc-attachment-front() {
+    filter: drop-shadow(7px 8px 0 @pc-ink);
+    transform: translate(-48px, 26px) rotate(-3deg) scale(1.16);
+
+    img {
+      mix-blend-mode: normal;
+      filter: none;
+    }
+  }
+
+  nri-sc-attachment.front .attach {
+    .pc-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-sc-attachment:hover:not(.dismissed) .attach {
+      .pc-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-sc-attachment .attach {
+      transition:
+        transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 350ms;
+    }
+  }
+}
+
+// Широкий екран: бризки фарби на полях стіни.
+@media (min-width: 1100px) {
+  @{pc} .sc-wall {
+    background-image:
+      @pc-splat-teal, @pc-splat-pink, @pc-splat-gold,
+      radial-gradient(
+        ellipse 700px 520px at 120px 980px,
+        rgba(47, 214, 185, 0.16),
+        transparent 70%
+      ),
+      radial-gradient(ellipse 760px 600px at 100% 88%, rgba(255, 79, 174, 0.14), transparent 70%),
+      radial-gradient(ellipse 900px 300px at 50% 380px, rgba(233, 196, 106, 0.08), transparent 70%),
+      @pc-wall-light, @pc-wall-dark;
+    background-repeat:
+      no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+    background-position:
+      right -6px top 720px,
+      left -14px top 1290px,
+      right 220px top 1640px,
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+    background-size:
+      90px 90px,
+      90px 90px,
+      90px 90px,
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      480px 480px,
+      600px 600px;
+  }
+}
+
+// Графіті «нижче — цікавіше» на смузі верхнього міста — лише на широкому екрані й без кнопок дій
+// (інакше заступило б їх). Текст — з атрибута (uk.json), для читачів екрана — порожній.
+@media (min-width: 1200px) {
+  @{pc} nri-sc-page-header .page-header:not(:has(.header-actions))::after {
+    content: attr(data-graffiti) / '';
+    position: absolute;
+    right: 110px;
+    bottom: -8px;
+    z-index: 1;
+    color: #ff4fae;
+    font:
+      400 2.5rem/1 'Rubik Wet Paint',
+      var(--sc-font-display);
+    white-space: nowrap;
+    text-shadow:
+      2px 2px 0 @pc-ink,
+      -1px -1px 0 @pc-ink,
+      1px -1px 0 @pc-ink,
+      -1px 1px 0 @pc-ink;
+    transform: rotate(-5deg);
+    pointer-events: none;
+  }
+}
+
+// Середня й вузька ширина: замість веж — лише далекі силуети (заголовок займає всю ширину, вежі
+// йшли б під текстом).
+@media (max-width: 899.98px) {
+  @{pc} nri-sc-page-header .page-header::before {
+    background-image:
+      @pc-skyline-far, @pc-sky-streaks,
+      radial-gradient(
+        ellipse 360px 220px at calc(100% - 60px) 20px,
+        rgba(255, 246, 214, 0.95),
+        transparent 70%
+      ),
+      linear-gradient(180deg, #f3dfb2 0%, #eccb8c 55%, #d9a961 100%);
+    background-position:
+      right -120px bottom 0,
+      0 0,
+      0 0,
+      0 0;
+  }
+}
+
+// Широкий екран: смуга не нижча за вежі («Мої ігри» з коротким заголовком інакше обрізали б їх).
+@media (min-width: 900px) {
+  @{pc} nri-sc-page-header .page-header {
+    min-height: 168px;
+  }
+}
+
+// Вузький екран: обкладинка не виходить за поля сторінки; менше місця під карнизом.
+@media (max-width: 599.98px) {
+  @{pc} nri-sc-attachment {
+    right: -6px;
+  }
+
+  @{pc} nri-sc-page-header .page-header {
+    margin-bottom: 92px;
+    padding-bottom: 20px;
+  }
+}

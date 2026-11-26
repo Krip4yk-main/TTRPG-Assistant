@@ -33,7 +33,10 @@ describe('ScenePageHeader (slot «page-header»)', () => {
       providers: [provideRouter([]), provideTranslateService()],
     }).compileComponents();
     const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('uk', { search: { title: 'Знайдіть свою гру' } });
+    translate.setTranslation('uk', {
+      search: { title: 'Знайдіть свою гру' },
+      scene: { graffiti: 'нижче — цікавіше' },
+    });
     translate.use('uk');
     const fixture = TestBed.createComponent(ScenePageHeader);
     fixture.componentRef.setInput('titleKey', 'search.title');
@@ -58,5 +61,9 @@ describe('ScenePageHeader (slot «page-header»)', () => {
     expect(h1.getAttribute('aria-label')).toBe('Знайдіть свою гру');
     expect(h1.querySelector('[aria-hidden], .nri-visually-hidden')).toBeNull();
     expect(h1.querySelector('.sc-sign-mark')!.textContent).toBe('і');
+    // Текст графіті для декору дизайну — атрибут поза заголовком (у тексті сторінки його немає).
+    const header = host.querySelector('.page-header')!;
+    expect(header.getAttribute('data-graffiti')).toBe('нижче — цікавіше');
+    expect(header.textContent).not.toContain('нижче');
   });
 });

@@ -126,6 +126,16 @@
                 "input": "src/app/theming/themes/solar-garden/solar-garden-material.scss",
                 "bundleName": "theme-solar-garden",
                 "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/painted-city/painted-city.less",
+                "bundleName": "theme-painted-city",
+                "inject": false
+              },
+              {
+                "input": "src/app/theming/themes/painted-city/painted-city-material.scss",
+                "bundleName": "theme-painted-city",
+                "inject": false
               }
             ]
           },

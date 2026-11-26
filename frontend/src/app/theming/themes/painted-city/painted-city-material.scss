@@ -1,0 +1,26 @@
+// Material для дизайну «Мальоване місто» (бандл `theme-painted-city`): спільний Material родини
+// сцени (../scene/scene-material.scss) у темній схемі — поля, меню, списки, діалоги, датапікер,
+// автодоповнення беруть темні ролі з токенів --sc-* (painted-city.less); у кремовій шапці й на
+// смузі заголовка — світлі ролі з `.sc-local-scheme(light)` (`.pc-upper()` у painted-city.less).
+// Тут — лише форма: майже прямокутні кнопки й поля з малим заокругленням, як мазки фарби макета
+// (форма — стала величина, не колір).
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='painted-city'] {
+  @include sc.material(dark);
+
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 5px,
+      outlined-container-shape: 5px,
+      protected-container-shape: 5px,
+      text-container-shape: 5px,
+    )
+  );
+  @include mat.form-field-overrides(
+    (
+      outlined-container-shape: 5px,
+    )
+  );
+}

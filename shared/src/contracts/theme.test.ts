@@ -11,6 +11,7 @@ const ALL = [
   'magicpunk',
   'brass-steam',
   'solar-garden',
+  'painted-city',
 ];
 
 describe('themes', () => {
