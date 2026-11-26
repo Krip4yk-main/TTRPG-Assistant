@@ -158,6 +158,9 @@ describe('CommonTimesDialog', () => {
         session({ id: 42, startsAt: '2030-03-14T17:00:00.000Z' }),
       ]);
     await settle();
+    expect(el.querySelector('.keeps-duration')!.textContent).toContain(
+      'scheduling.finder.keepsDuration',
+    );
     const select = el.querySelector<HTMLSelectElement>('select.move-select')!;
     expect([...select.options].map((o) => o.value)).toEqual(['41', '42']);
     select.value = '42';

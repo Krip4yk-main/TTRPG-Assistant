@@ -56,6 +56,8 @@ interface Notice {
 
 /** Завершених голосувань показуємо одразу стільки; решта — за кнопкою. */
 const CLOSED_VISIBLE = 3;
+/** Завершені й скасовані ігри: підбирати час уже нема для чого. */
+const CLOSED_STATUSES = new Set<GameStatus>(['finished', 'cancelled']);
 /** Голосування створюються й відповіді приймаються, поки гра набирає, триває чи на паузі. */
 const POLL_STATUSES = new Set<GameStatus>(['recruiting', 'started', 'paused']);
 
@@ -122,15 +124,23 @@ export class PollsPanel implements PollsPanelHandle {
     () => this.closedPolls().length - this.visibleClosed().length,
   );
   /** Учасник бачить панель, лише коли є голосування. */
-  protected readonly visible = computed(() => this.isGm() || (this.polls()?.length ?? 0) > 0);
+  protected readonly visible = computed(
+    () => this.isGm() || (this.polls()?.length ?? 0) > 0 || this.notice() !== null,
+  );
+  /** «Підібрати час» — поки гру не завершено й не скасовано. */
+  protected readonly canFind = computed(
+    () => this.isGm() && !CLOSED_STATUSES.has(this.game().status),
+  );
 
   private pollHandled: string | null = null;
   private sessionHandled: string | null = null;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.flash.dispose());
+    // Лише зміна гри перечитує голосування (не кожне оновлення об'єкта гри сторінкою).
+    const gameId = computed(() => this.game().id);
     effect(() => {
-      const id = this.game().id;
+      const id = gameId();
       untracked(() => void this.load(id));
     });
     // `?poll=` — після завантаження фокус на голосування (і розгорнути завершені, якщо треба).
@@ -197,7 +207,7 @@ export class PollsPanel implements PollsPanelHandle {
   /** «Підібрати час» (майстер). */
   protected async findTimes(): Promise<void> {
     const g = this.game();
-    if (this.busy() || !this.isGm()) return;
+    if (this.busy() || !this.canFind()) return;
     this.busy.set(true);
     this.notice.set(null);
     try {

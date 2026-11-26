@@ -123,6 +123,11 @@ describe('PollCard', () => {
     await settle();
     const pending = el.querySelector<HTMLElement>('.pending')!;
     expect(pending.textContent).toContain('scheduling.poll.weekdays.timeNote');
+    // Питання озвучується й отримує фокус: обраний варіант «замінити».
+    expect(pending.querySelector('[role="status"]')!.textContent).toContain(
+      'scheduling.poll.weekdays.title',
+    );
+    expect(document.activeElement).toBe(pending.querySelector('input[value="replace"]'));
     pending.querySelector<HTMLInputElement>('input[value="add"]')!.click();
     await settle();
     el.querySelector<HTMLButtonElement>('button.confirm-pending')!.click();
@@ -173,6 +178,7 @@ describe('PollCard', () => {
       .flush({ error: { code: 'SESSION_INVALID_STATE' } }, { status: 409, statusText: 'x' });
     await settle();
     expect(el.querySelector('.pending')!.textContent).toContain('scheduling.poll.newSession.text');
+    expect(document.activeElement).toBe(el.querySelector('button.confirm-pending'));
     el.querySelector<HTMLButtonElement>('button.confirm-pending')!.click();
     expect(http.expectOne('/api/polls/5/apply').request.body).toEqual({
       optionId: 51,

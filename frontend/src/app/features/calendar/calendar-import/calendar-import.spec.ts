@@ -144,7 +144,8 @@ describe('CalendarImport', () => {
       'calendar.import.errors.http_gone',
     );
     expect(el.querySelector('.truncated')!.textContent).toContain('calendar.import.truncated');
-    expect(el.textContent).toContain('calendar.import.lastSync');
+    // Дані зламаного імпорту видалено — без застарілої кількості подій.
+    expect(el.textContent).toContain('calendar.import.lastSyncBroken');
   });
 
   it('sync now: failure in lastError, 429 with retryAfterSec, locked until nextManualSyncAt', async () => {
@@ -191,6 +192,18 @@ describe('CalendarImport', () => {
     await settle();
     expect(el.querySelector('input.url')).not.toBeNull();
     expect(el.textContent).toContain('calendar.import.disconnected');
+  });
+
+  it('server without a key: a connected user can still disconnect (no sync / replace)', async () => {
+    await open(connected({ available: false }));
+    expect(el.querySelector('button.sync')).toBeNull();
+    expect(el.querySelector('button.replace')).toBeNull();
+    el.querySelector<HTMLButtonElement>('button.disconnect')!.click();
+    await settle();
+    const req = http.expectOne(URL);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+    await settle();
   });
 
   it('server without a key: explained, no form', async () => {

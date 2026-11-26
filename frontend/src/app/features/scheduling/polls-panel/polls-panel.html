@@ -4,16 +4,18 @@
       <h2 id="polls-title">{{ 'scheduling.panel.title' | translate }}</h2>
       @if (isGm()) {
         <div class="panel-actions">
-          <button
-            mat-flat-button
-            type="button"
-            class="find-times"
-            [disabled]="busy()"
-            (click)="findTimes()"
-          >
-            <mat-icon aria-hidden="true">group_work</mat-icon>
-            {{ 'scheduling.panel.find' | translate }}
-          </button>
+          @if (canFind()) {
+            <button
+              mat-flat-button
+              type="button"
+              class="find-times"
+              [disabled]="busy()"
+              (click)="findTimes()"
+            >
+              <mat-icon aria-hidden="true">group_work</mat-icon>
+              {{ 'scheduling.panel.find' | translate }}
+            </button>
+          }
           @if (canCreate()) {
             <button
               mat-stroked-button

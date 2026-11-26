@@ -34,7 +34,11 @@
             }
             @if (lastSync(); as when) {
               <p class="nri-muted">
-                {{ 'calendar.import.lastSync' | translate: { when: when, n: s.eventsCount } }}
+                <!-- Зламаний імпорт: дані вже видалено, кількість подій — застаріла. -->
+                {{
+                  (s.broken ? 'calendar.import.lastSyncBroken' : 'calendar.import.lastSync')
+                    | translate: { when: when, n: s.eventsCount }
+                }}
               </p>
             } @else {
               <p class="nri-muted">{{ 'calendar.import.neverSynced' | translate }}</p>
@@ -49,8 +53,9 @@
               <p class="nri-muted truncated">{{ 'calendar.import.truncated' | translate }}</p>
             }
             <p class="nri-muted privacy">{{ 'calendar.import.privacy' | translate }}</p>
-            @if (s.available) {
-              <div class="buttons">
+            <!-- «Відключити» — і коли імпорт на сервері вимкнено: видалити дані можна завжди. -->
+            <div class="buttons">
+              @if (s.available) {
                 <button
                   mat-stroked-button
                   type="button"
@@ -74,17 +79,19 @@
                     {{ 'calendar.import.replace' | translate }}
                   </button>
                 }
-                <button
-                  mat-stroked-button
-                  type="button"
-                  class="disconnect danger"
-                  [disabled]="busy() !== null"
-                  (click)="disconnect()"
-                >
-                  <mat-icon aria-hidden="true">link_off</mat-icon>
-                  {{ 'calendar.import.disconnect' | translate }}
-                </button>
-              </div>
+              }
+              <button
+                mat-stroked-button
+                type="button"
+                class="disconnect danger"
+                [disabled]="busy() !== null"
+                (click)="disconnect()"
+              >
+                <mat-icon aria-hidden="true">link_off</mat-icon>
+                {{ 'calendar.import.disconnect' | translate }}
+              </button>
+            </div>
+            @if (s.available) {
               @if (syncLockedUntil(); as until) {
                 <p class="nri-muted hint" id="calendar-sync-hint">
                   {{ 'calendar.import.syncLocked' | translate: { when: until } }}

@@ -124,6 +124,9 @@
                     @if (!data.paused) {
                       @if (moving() === c.startsAt) {
                         <div class="move">
+                          <p class="nri-muted keeps-duration">
+                            {{ 'scheduling.finder.keepsDuration' | translate }}
+                          </p>
                           @if (sessions(); as list) {
                             @if (list.length) {
                               <label class="move-label" [for]="'move-' + $index">{{

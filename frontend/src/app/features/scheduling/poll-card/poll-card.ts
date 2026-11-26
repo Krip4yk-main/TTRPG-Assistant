@@ -1,8 +1,11 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   inject,
+  Injector,
   input,
   output,
   signal,
@@ -67,6 +70,8 @@ export class PollCard {
   private readonly api = inject(SchedulingApi);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly poll = input.required<PollDto>();
   readonly viewerTimezone = input.required<string>();
@@ -241,6 +246,7 @@ export class PollCard {
       if (code === 'POLL_APPLY_CONFIRM' && optionId) {
         const current = (details as { currentWeekdays?: Weekday[] } | undefined)?.currentWeekdays;
         this.pending.set({ kind: 'weekdays', optionId, current: current ?? [], choice: 'replace' });
+        this.focusPending();
       } else if (
         code === 'SESSION_INVALID_STATE' &&
         p.kind === 'one_off' &&
@@ -249,12 +255,31 @@ export class PollCard {
         !input.asNewSession
       ) {
         this.pending.set({ kind: 'newSession', optionId });
+        this.focusPending();
       } else {
         this.fail(err);
       }
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * Панель рішення зʼявилась — фокус на неї (обраний варіант дня чи кнопку підтвердження), щоб
+   * читач екрана озвучив питання, а клавіатура була одразу там.
+   */
+  private focusPending(): void {
+    afterNextRender(
+      () => {
+        const root = this.host.nativeElement;
+        root
+          .querySelector<HTMLElement>(
+            '.pending input[type="radio"]:checked, .pending .confirm-pending',
+          )
+          ?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   private fail(err: unknown): void {

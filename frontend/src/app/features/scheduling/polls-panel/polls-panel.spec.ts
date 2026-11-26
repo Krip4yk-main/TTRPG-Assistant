@@ -180,6 +180,26 @@ describe('PollsPanel', () => {
     expect(el.textContent).toContain('scheduling.panel.pollMissing');
   });
 
+  it('a member without polls still sees the «poll is gone» notice', async () => {
+    await open(false, { pollId: '77' });
+    http.expectOne('/api/games/7/polls').flush([]);
+    await settle();
+    expect(el.querySelector('.polls-panel')).not.toBeNull();
+    expect(el.textContent).toContain('scheduling.panel.pollMissing');
+  });
+
+  it('a reloaded game object (same id) does not refetch polls; finished games hide the finder', async () => {
+    await open(true);
+    http.expectOne('/api/games/7/polls').flush([]);
+    await settle();
+    expect(el.querySelector('button.find-times')).not.toBeNull();
+    fixture.componentRef.setInput('game', { ...game, status: 'finished' });
+    await settle();
+    http.expectNone('/api/games/7/polls');
+    expect(el.querySelector('button.find-times')).toBeNull();
+    expect(el.querySelector('button.new-poll')).toBeNull();
+  });
+
   it('only 3 closed polls by default, the rest behind a toggle', async () => {
     const closed = [1, 2, 3, 4].map((i) => poll({ id: 100 + i, status: 'closed', canVote: false }));
     await open(false);

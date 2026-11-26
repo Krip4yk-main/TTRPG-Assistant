@@ -173,7 +173,9 @@
   @if (pending(); as pend) {
     <div class="pending nri-notice" role="group" [attr.aria-labelledby]="'poll-pending-' + p.id">
       @if (pend.kind === 'weekdays') {
-        <p [id]="'poll-pending-' + p.id">{{ 'scheduling.poll.weekdays.title' | translate }}</p>
+        <p role="status" [id]="'poll-pending-' + p.id">
+          {{ 'scheduling.poll.weekdays.title' | translate }}
+        </p>
         <label class="choice">
           <input
             type="radio"
@@ -198,7 +200,9 @@
           {{ 'scheduling.poll.weekdays.timeNote' | translate: { time: pendingTime() } }}
         </p>
       } @else {
-        <p [id]="'poll-pending-' + p.id">{{ 'scheduling.poll.newSession.text' | translate }}</p>
+        <p role="status" [id]="'poll-pending-' + p.id">
+          {{ 'scheduling.poll.newSession.text' | translate }}
+        </p>
       }
       <div class="pending-actions">
         <button
