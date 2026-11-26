@@ -6,7 +6,11 @@
 <span class="sc-d3" aria-hidden="true"></span>
 <span class="sc-d4" aria-hidden="true"></span>
 @if (g.restricted) {
-  <article class="panel sc-glass restricted" [attr.data-game-id]="g.id">
+  <article
+    class="panel sc-glass restricted"
+    [attr.data-game-id]="g.id"
+    [attr.data-invite]="'scene.invite' | translate: { id: g.id }"
+  >
     <span class="sc-accent" aria-hidden="true"></span>
     <span class="sc-p1" aria-hidden="true"></span>
     <span class="sc-p2" aria-hidden="true"></span>
@@ -38,7 +42,13 @@
   @if (g.coverUrl; as cover) {
     <nri-sc-attachment [src]="cover" [title]="g.title" />
   }
-  <article class="panel sc-glass" [attr.data-game-id]="g.id">
+  <!-- data-invite — текст для декору дизайну (напр. шапка запрошення «Магіпанку»); інші
+       дизайни його не показують. -->
+  <article
+    class="panel sc-glass"
+    [attr.data-game-id]="g.id"
+    [attr.data-invite]="'scene.invite' | translate: { id: g.id }"
+  >
     <span class="sc-accent" aria-hidden="true"></span>
     <span class="sc-p1" aria-hidden="true"></span>
     <span class="sc-p2" aria-hidden="true"></span>

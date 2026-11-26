@@ -186,6 +186,17 @@ describe('SceneGameCard (slot «game-card»)', () => {
     expect(decodeURIComponent(login!.getAttribute('href')!)).toContain('returnTo=/games/6');
   });
 
+  it('panel carries the translated invitation text (data-invite) for design decor', async () => {
+    TestBed.inject(TranslateService).setTranslation('uk', {
+      scene: { invite: 'Запрошення № {{id}}' },
+    });
+    TestBed.inject(TranslateService).use('uk');
+    await render(game);
+    expect(el.querySelector('.panel')!.getAttribute('data-invite')).toBe('Запрошення № 5');
+    await render(restricted);
+    expect(el.querySelector('.panel')!.getAttribute('data-invite')).toBe('Запрошення № 6');
+  });
+
   it('neon colour on the host is stable per game id; neighbouring games differ', async () => {
     await render(game);
     const host = fixture.nativeElement as HTMLElement;

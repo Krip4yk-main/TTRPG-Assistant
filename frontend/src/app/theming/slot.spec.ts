@@ -97,6 +97,8 @@ describe('nri-slot', () => {
     const item = el.querySelector('nri-sc-my-game-item')!;
     expect(item).not.toBeNull();
     expect(item.querySelector('.pending-count')!.getAttribute('data-count')).toBe('3');
+    // Текст шапки-запрошення для декору дизайну (ключ без перекладу в тесті — сам ключ).
+    expect(item.querySelector('.panel')!.getAttribute('data-invite')).toBe('scene.invite');
 
     el.querySelector<HTMLButtonElement>('[data-action="cancel"]')!.click();
     expect(events).toEqual([{ name: 'action', value: { action: 'cancel' } }]);
