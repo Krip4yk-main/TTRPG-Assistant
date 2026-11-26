@@ -1,4 +1,4 @@
-import { bigint, datetime, index, int, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
+import { bigint, boolean, datetime, index, int, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import { users } from './users.js';
 
 const id = (name: string) => bigint(name, { mode: 'number', unsigned: true });
@@ -30,6 +30,8 @@ export const calendarImports = mysqlTable(
     failures: int('failures').notNull().default(0),
     brokenAt: datetime('broken_at', { fsp: 3 }),
     eventsCount: int('events_count').notNull().default(0),
+    /** Остання успішна синхронізація впоралась не з усіма подіями (ліміти розгортання). */
+    truncated: boolean('truncated').notNull().default(false),
     createdAt: datetime('created_at', { fsp: 3 }).notNull(),
     updatedAt: datetime('updated_at', { fsp: 3 }).notNull(),
   },

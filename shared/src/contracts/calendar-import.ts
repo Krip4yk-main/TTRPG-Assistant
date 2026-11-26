@@ -82,6 +82,12 @@ export interface CalendarImportStatusDto {
   broken: boolean;
   /** Скільки подій (повторів) у горизонті знайдено під час останньої успішної синхронізації. */
   eventsCount: number;
+  /**
+   * Під час останньої успішної синхронізації частину подій пропущено через ліміти (понад
+   * `CALENDAR_IMPORT_MAX_OCCURRENCES` у горизонті або дуже довга серія повторів) — UI може
+   * сказати «частину подій пропущено».
+   */
+  truncated: boolean;
   /** Коли знову можна натиснути «Оновити» (ISO UTC); `null` — уже можна. */
   nextManualSyncAt: string | null;
 }

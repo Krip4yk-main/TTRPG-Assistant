@@ -43,6 +43,8 @@ const schema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(20),
   CALENDAR_IMPORT_KEY: calendarImportKey,
+  /** Попередній ключ (ротація): лише для розшифрування; на наступній синхронізації — перешифрування. */
+  CALENDAR_IMPORT_KEY_PREVIOUS: calendarImportKey,
 });
 
 export type Env = z.infer<typeof schema>;

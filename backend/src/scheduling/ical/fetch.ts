@@ -1,4 +1,4 @@
-import { lookup as dnsLookup } from 'node:dns/promises';
+import { Resolver } from 'node:dns/promises';
 import type { IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
@@ -36,15 +36,47 @@ export interface IcsFetcherOptions {
 const USER_AGENT = 'NRI-Assistant-Calendar/1.0';
 const GONE = new Set([401, 403, 404, 410]);
 
-const defaultResolve = async (hostname: string): Promise<ResolvedAddress[]> =>
-  dnsLookup(hostname, { all: true, verbatim: true });
+/** Скільки перевірених адрес пробувати по черзі, якщо з'єднання з попередньою не вдалось. */
+const MAX_CONNECT_ATTEMPTS = 3;
+
+/**
+ * DNS через c-ares (`Resolver`), а не `dns.lookup`: `lookup` займає потік пулу libuv (його
+ * ділять файлова система, crypto, zlib) і не скасовується — повільний зловмисний DNS-сервер
+ * міг би заблокувати пул. Тут — власний таймаут на запит (2 с, без повторів), A і AAAA
+ * паралельно; невдача одного з них не страшна, якщо інший дав адреси. `/etc/hosts` не
+ * читається (і не потрібен: внутрішні імена однаково заборонені).
+ */
+export function createDnsResolve(
+  opts: { timeoutMs?: number; servers?: string[] } = {},
+): (hostname: string) => Promise<ResolvedAddress[]> {
+  const resolver = new Resolver({ timeout: opts.timeoutMs ?? 2_000, tries: 1 });
+  if (opts.servers) resolver.setServers(opts.servers);
+  return async (hostname) => {
+    const [v4, v6] = await Promise.allSettled([
+      resolver.resolve4(hostname),
+      resolver.resolve6(hostname),
+    ]);
+    const out: ResolvedAddress[] = [
+      ...(v4.status === 'fulfilled' ? v4.value.map((address) => ({ address, family: 4 })) : []),
+      ...(v6.status === 'fulfilled' ? v6.value.map((address) => ({ address, family: 6 })) : []),
+    ];
+    if (out.length === 0) throw new Error('dns: no addresses');
+    return out;
+  };
+}
+
+const defaultResolve = createDnsResolve();
+
+/** Невдале з'єднання до відповіді сервера — можна спробувати наступну адресу. */
+class ConnectError extends CalendarImportError {}
 
 /**
  * Безпечне завантаження iCal:
  * - лише https; кожен хост резолвиться заздалегідь, і **будь-яка** заборонена адреса серед
  *   відповідей DNS — відмова (`blocked_address`); з'єднання йде на вже перевірену IP (SNI і
  *   перевірка сертифіката — за іменем хоста), тож DNS rebinding між перевіркою й з'єднанням
- *   неможливий; після з'єднання адреса сокета перевіряється ще раз;
+ *   неможливий; після з'єднання адреса сокета перевіряється ще раз; не з'єдналось — наступна
+ *   перевірена адреса (до 3); DNS — c-ares з таймаутом 2 с (`createDnsResolve`);
  * - перенаправлення — до `maxRedirects` (2), кожне з тими самими перевірками;
  * - загальний дедлайн 10 с на все (DNS, з'єднання, заголовки, тіло — повільна відповідь
  *   обривається), тіло до 2 МБ (потік обривається, щойно ліміт перевищено), без стиснення;
@@ -83,12 +115,12 @@ export function createIcsFetcher(opts: IcsFetcherOptions = {}): IcsFetcher {
     }
   };
 
-  async function pickAddress(url: URL, signal: AbortSignal): Promise<ResolvedAddress> {
+  async function pickAddresses(url: URL, signal: AbortSignal): Promise<ResolvedAddress[]> {
     const host = literalHost(url.hostname);
     const family = isIP(host);
     if (family) {
       if (isBlocked(host)) throw new CalendarImportError('blocked_address');
-      return { address: host, family };
+      return [{ address: host, family }];
     }
     let addrs: ResolvedAddress[];
     try {
@@ -107,22 +139,39 @@ export function createIcsFetcher(opts: IcsFetcherOptions = {}): IcsFetcher {
     }
     if (addrs.length === 0) throw new CalendarImportError('dns_failed');
     if (addrs.some((a) => isBlocked(a.address))) throw new CalendarImportError('blocked_address');
-    return addrs[0]!;
+    return addrs;
   }
 
-  async function fetchOnce(
-    url: URL,
-    signal: AbortSignal,
-  ): Promise<{ kind: 'body'; body: string } | { kind: 'redirect'; location: string }> {
-    const target = await pickAddress(url, signal);
+  type Result = { kind: 'body'; body: string } | { kind: 'redirect'; location: string };
+
+  /** Усі адреси вже перевірені; наступну пробуємо лише якщо попередня не з'єдналась. */
+  async function fetchOnce(url: URL, signal: AbortSignal): Promise<Result> {
+    const targets = (await pickAddresses(url, signal)).slice(0, MAX_CONNECT_ATTEMPTS);
+    for (let i = 0; ; i++) {
+      try {
+        return await requestTo(url, targets[i]!, signal);
+      } catch (err) {
+        if (!(err instanceof ConnectError) || signal.aborted || i + 1 >= targets.length) {
+          throw err instanceof ConnectError ? new CalendarImportError(err.reason) : err;
+        }
+      }
+    }
+  }
+
+  function requestTo(url: URL, target: ResolvedAddress, signal: AbortSignal): Promise<Result> {
     const hostname = literalHost(url.hostname);
     return new Promise((resolvePromise, rejectPromise) => {
       let settled = false;
+      let responded = false;
       const fail = (reason: ConstructorParameters<typeof CalendarImportError>[0]) => {
         if (settled) return;
         settled = true;
         req.destroy();
-        rejectPromise(new CalendarImportError(reason));
+        rejectPromise(
+          reason === 'connect_failed' && !responded
+            ? new ConnectError(reason)
+            : new CalendarImportError(reason),
+        );
       };
       const done = (v: Parameters<typeof resolvePromise>[0]) => {
         if (settled) return;
@@ -157,6 +206,7 @@ export function createIcsFetcher(opts: IcsFetcherOptions = {}): IcsFetcher {
         else fail('connect_failed');
       });
       req.on('response', (res: IncomingMessage) => {
+        responded = true;
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400) {
           const location = res.headers.location;

@@ -281,6 +281,13 @@
       "when": 1795723906472,
       "tag": "0039_plan12_calendar_import",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1795725151381,
+      "tag": "0040_plan12_calendar_import_truncated",
+      "breakpoints": true
     }
   ]
 }

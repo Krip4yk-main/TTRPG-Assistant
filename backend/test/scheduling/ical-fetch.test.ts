@@ -1,8 +1,14 @@
 import { createServer, request as httpRequest, type Server, type ServerResponse } from 'node:http';
+import { createSocket } from 'node:dgram';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CalendarImportError } from '../../src/scheduling/ical/errors.js';
-import { createIcsFetcher, type IcsFetcherOptions } from '../../src/scheduling/ical/fetch.js';
+import {
+  createDnsResolve,
+  createIcsFetcher,
+  type IcsFetcherOptions,
+} from '../../src/scheduling/ical/fetch.js';
+import { Semaphore } from '../../src/scheduling/ical/slots.js';
 import { isBlockedAddress, normalizeIcsUrl } from '../../src/scheduling/ical/ssrf.js';
 
 const ICS = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n';
@@ -148,6 +154,7 @@ describe('ICS fetcher (local test server; real transport is https only)', () => 
     'mixed.test': ['127.0.0.1', '10.0.0.1'],
     'meta.test': ['169.254.169.254'],
     'v6.test': ['::1'],
+    'multi.test': ['127.0.0.2', '127.0.0.1'],
   };
   const opts = (extra: IcsFetcherOptions = {}): IcsFetcherOptions => ({
     request: httpRequest,
@@ -157,7 +164,7 @@ describe('ICS fetcher (local test server; real transport is https only)', () => 
       if (!list) throw Object.assign(new Error('nx'), { code: 'ENOTFOUND' });
       return list.map((address) => ({ address, family: address.includes(':') ? 6 : 4 }));
     },
-    isBlocked: (ip) => (ip === '127.0.0.1' ? false : isBlockedAddress(ip)),
+    isBlocked: (ip) => (ip === '127.0.0.1' || ip === '127.0.0.2' ? false : isBlockedAddress(ip)),
     ...extra,
   });
   const url = (host: string, path: string) => new URL(`https://${host}:${port}${path}`);
@@ -271,6 +278,12 @@ describe('ICS fetcher (local test server; real transport is https only)', () => 
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 
+  it('connect failure on the first vetted address falls back to the next one', async () => {
+    routes.set('/ok', (res) => res.writeHead(200, { 'content-type': 'text/calendar' }).end(ICS));
+    // 127.0.0.2 — нікого не слухає (сервер прив'язаний до 127.0.0.1).
+    expect(await createIcsFetcher(opts())(url('multi.test', '/ok'))).toBe(ICS);
+  });
+
   it('HTTP errors and non-calendar responses', async () => {
     routes.set('/gone', (res) => res.writeHead(410).end());
     routes.set('/denied', (res) => res.writeHead(403).end());
@@ -307,5 +320,46 @@ describe('ICS fetcher (local test server; real transport is https only)', () => 
         );
       }
     }
+  });
+});
+
+describe('non-blocking DNS (c-ares) and the process-wide import limit', () => {
+  it('resolver gives up after its own timeout on a silent DNS server', async () => {
+    const silent = createSocket('udp4');
+    await new Promise<void>((r) => silent.bind(0, '127.0.0.1', r));
+    const dnsPort = (silent.address() as AddressInfo).port;
+    try {
+      const resolve = createDnsResolve({ timeoutMs: 300, servers: [`127.0.0.1:${dnsPort}`] });
+      const t0 = Date.now();
+      await expect(resolve('calendar.example.com')).rejects.toThrow();
+      expect(Date.now() - t0).toBeLessThan(3_000);
+      const f = createIcsFetcher({ resolve });
+      expect(await reason(f(new URL('https://calendar.example.com/x.ics')))).toBe('dns_failed');
+    } finally {
+      silent.close();
+    }
+  });
+
+  it('semaphore: at most N at once, FIFO queue, wait timeout, idempotent release', async () => {
+    const sem = new Semaphore(2);
+    const a = (await sem.acquire())!;
+    const b = (await sem.acquire())!;
+    expect(sem.inUse).toBe(2);
+    expect(await sem.acquire(50)).toBeNull();
+    expect(sem.queued).toBe(0);
+    const order: string[] = [];
+    const c = sem.acquire().then((r) => (order.push('c'), r!));
+    const d = sem.acquire().then((r) => (order.push('d'), r!));
+    expect(sem.queued).toBe(2);
+    a();
+    a();
+    const rc = await c;
+    expect(sem.inUse).toBe(2);
+    b();
+    const rd = await d;
+    expect(order).toEqual(['c', 'd']);
+    rc();
+    rd();
+    expect(sem.inUse).toBe(0);
   });
 });

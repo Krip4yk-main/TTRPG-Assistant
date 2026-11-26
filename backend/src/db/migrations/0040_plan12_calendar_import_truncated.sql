@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_imports` ADD `truncated` boolean DEFAULT false NOT NULL;

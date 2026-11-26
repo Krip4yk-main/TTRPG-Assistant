@@ -10,10 +10,46 @@ import { AppError } from '../../http/errors.js';
 const VERSION = 'v1';
 const aad = (userId: number) => Buffer.from(`calendar-import:${userId}`, 'utf8');
 
-/** Ключ із `CALENDAR_IMPORT_KEY`; не задано — імпорт вимкнено (fail closed, 503). */
+export interface ImportKeys {
+  current: Buffer;
+  /** `CALENDAR_IMPORT_KEY_PREVIOUS` — лише для розшифрування під час ротації. */
+  previous?: Buffer;
+}
+
+/** Ключі з env; поточного немає — імпорт вимкнено (fail closed, 503). */
+export function importKeys(
+  env: Pick<Env, 'CALENDAR_IMPORT_KEY' | 'CALENDAR_IMPORT_KEY_PREVIOUS'>,
+): ImportKeys {
+  if (!env.CALENDAR_IMPORT_KEY) throw new AppError(503, 'CALENDAR_IMPORT_DISABLED');
+  return {
+    current: Buffer.from(env.CALENDAR_IMPORT_KEY, 'base64'),
+    previous: env.CALENDAR_IMPORT_KEY_PREVIOUS
+      ? Buffer.from(env.CALENDAR_IMPORT_KEY_PREVIOUS, 'base64')
+      : undefined,
+  };
+}
+
+/** Поточний ключ (шифрування). */
 export function importKey(env: Pick<Env, 'CALENDAR_IMPORT_KEY'>): Buffer {
   if (!env.CALENDAR_IMPORT_KEY) throw new AppError(503, 'CALENDAR_IMPORT_DISABLED');
   return Buffer.from(env.CALENDAR_IMPORT_KEY, 'base64');
+}
+
+/**
+ * Розшифрування поточним ключем, інакше попереднім (`stale: true` — перешифрувати поточним).
+ * Жоден не підходить — виняток.
+ */
+export function decryptWithKeys(
+  keys: ImportKeys,
+  userId: number,
+  enc: string,
+): { url: string; stale: boolean } {
+  try {
+    return { url: decryptUrl(keys.current, userId, enc), stale: false };
+  } catch (err) {
+    if (!keys.previous) throw err;
+    return { url: decryptUrl(keys.previous, userId, enc), stale: true };
+  }
 }
 
 export function encryptUrl(key: Buffer, userId: number, url: string): string {

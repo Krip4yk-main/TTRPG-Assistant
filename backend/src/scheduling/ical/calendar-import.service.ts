@@ -19,11 +19,12 @@ import {
   emitNotificationsNew,
   type NotificationRow,
 } from '../../notifications/notifications.service.js';
-import { decryptUrl, encryptUrl, importKey } from './crypto.js';
+import { decryptWithKeys, encryptUrl, importKey, importKeys, type ImportKeys } from './crypto.js';
 import { CalendarImportError } from './errors.js';
 import { createIcsFetcher } from './fetch.js';
 import type { IcsParseResult } from './ics-parse.js';
 import { parseIcsInWorker } from './parse-runner.js';
+import { IMPORT_SLOT_WAIT_MS, importSlots } from './slots.js';
 import { literalHost, normalizeIcsUrl } from './ssrf.js';
 
 export const CALENDAR_IMPORT_JOB = 'schedule.calendar_import';
@@ -36,10 +37,11 @@ export const CALENDAR_IMPORT_EVERY_MS = 15 * 60_000;
 const SYNC_BATCH = 200;
 const SYNC_CONCURRENCY = 4;
 /**
- * Після цього нових посилань у прогоні не беремо (воркер джобів виконує задачі по черзі — не
- * блокуємо доставку сповіщень); решта — у наступному прогоні.
+ * Після цього нових посилань у прогоні не беремо: воркер джобів виконує задачі по черзі, тож
+ * довгий прогін затримав би доставку сповіщень. 60 с + щонайбільше одне завантаження/розбір
+ * (≤ 10 с + ≤ 8 с) на слот; решта — у наступному прогоні за 15 хв.
  */
-const RUN_BUDGET_MS = 120_000;
+const RUN_BUDGET_MS = 60_000;
 /** `PUT` (кожен — завантаження зовнішнього URL): не більше 10 за 10 хв на користувача. */
 const PUT_LIMIT = 10;
 const PUT_WINDOW_SEC = 600;
@@ -73,6 +75,7 @@ function toDto(
       failures: 0,
       broken: false,
       eventsCount: 0,
+      truncated: false,
       nextManualSyncAt: null,
     };
   }
@@ -87,6 +90,7 @@ function toDto(
     failures: row.failures,
     broken: row.brokenAt !== null,
     eventsCount: row.eventsCount,
+    truncated: row.truncated,
     nextManualSyncAt: next > now.getTime() ? new Date(next).toISOString() : null,
   };
 }
@@ -120,6 +124,16 @@ async function replaceBusy(tx: Tx, userId: number, intervals: [number, number][]
       })),
     );
   }
+}
+
+/**
+ * Слот на завантаження + розбір для запиту користувача: чекаємо до `IMPORT_SLOT_WAIT_MS`, далі
+ * 429 `RATE_LIMITED {retryAfterSec, reason: 'busy'}` (сервер зайнятий іншими імпортами).
+ */
+async function requestSlot(): Promise<() => void> {
+  const release = await importSlots.acquire(IMPORT_SLOT_WAIT_MS);
+  if (!release) throw new AppError(429, 'RATE_LIMITED', { retryAfterSec: 30, reason: 'busy' });
+  return release;
 }
 
 // ---------- API ----------
@@ -166,6 +180,7 @@ export async function putCalendarImport(
   await limitPuts(deps, userId);
   const tz = await userTimezone(deps.db, userId);
   let result: IcsParseResult;
+  const release = await requestSlot();
   try {
     result = await download(deps, url, tz, now);
   } catch (err) {
@@ -173,6 +188,8 @@ export async function putCalendarImport(
       throw new AppError(422, 'CALENDAR_IMPORT_FAILED', { reason: err.reason });
     }
     throw err;
+  } finally {
+    release();
   }
   const urlEnc = encryptUrl(key, userId, url.href);
   const host = literalHost(url.hostname).toLowerCase().slice(0, 255);
@@ -186,6 +203,7 @@ export async function putCalendarImport(
       failures: 0,
       brokenAt: null,
       eventsCount: result.occurrences,
+      truncated: result.truncated,
       updatedAt: now,
     };
     await tx
@@ -223,9 +241,26 @@ export async function syncCalendarImportNow(
   userId: number,
   now: Date = new Date(),
 ): Promise<CalendarImportStatusDto> {
-  const key = importKey(deps.env);
+  const keys = importKeys(deps.env);
   const row = await loadRow(deps.db, userId);
   if (!row) throw new AppError(404, 'NOT_FOUND');
+  // Слот — до «заявки»: зайнятий сервер не «з'їдає» 5-хвилинне вікно користувача.
+  const release = await requestSlot();
+  try {
+    await claimAndSync(deps, keys, row, now);
+  } finally {
+    release();
+  }
+  return getCalendarImport(deps, userId, now);
+}
+
+async function claimAndSync(
+  deps: Deps,
+  keys: ImportKeys,
+  row: ImportRow,
+  now: Date,
+): Promise<void> {
+  const userId = row.userId;
   const since = new Date(now.getTime() - CALENDAR_IMPORT_MANUAL_SYNC_MS);
   // Умовний UPDATE — «заявка» на спробу: два паралельні запити не завантажать двічі.
   const [claim] = await deps.db
@@ -246,8 +281,7 @@ export async function syncCalendarImportNow(
     );
     throw new AppError(429, 'RATE_LIMITED', { retryAfterSec });
   }
-  await syncOne(deps, key, row, now);
-  return getCalendarImport(deps, userId, now);
+  await syncOne(deps, keys, row, now);
 }
 
 // ---------- синхронізація ----------
@@ -261,15 +295,16 @@ export async function syncCalendarImportNow(
  */
 async function syncOne(
   deps: Deps,
-  key: Buffer,
+  keys: ImportKeys,
   row: ImportRow,
   now: Date,
 ): Promise<CalendarImportErrorCode | null> {
   let result: IcsParseResult | undefined;
   let reason: CalendarImportErrorCode | null = null;
   let plain: string | undefined;
+  let stale = false;
   try {
-    plain = decryptUrl(key, row.userId, row.urlEnc);
+    ({ url: plain, stale } = decryptWithKeys(keys, row.userId, row.urlEnc));
   } catch {
     // Пошкоджений рядок або інший ключ (ротація) — посилання не відновити.
     reason = 'invalid_url';
@@ -301,6 +336,9 @@ async function syncOne(
           failures: 0,
           brokenAt: null,
           eventsCount: result.occurrences,
+          truncated: result.truncated,
+          // Ротація ключа: розшифровано попереднім — перешифровуємо поточним.
+          ...(stale ? { urlEnc: encryptUrl(keys.current, row.userId, plain!) } : {}),
           updatedAt: now,
         })
         .where(eq(calendarImports.userId, row.userId));
@@ -348,7 +386,7 @@ export async function runCalendarImportSync(
   now: Date,
 ): Promise<{ synced: number; failed: number }> {
   if (!deps.env.CALENDAR_IMPORT_KEY) return { synced: 0, failed: 0 };
-  const key = importKey(deps.env);
+  const keys = importKeys(deps.env);
   const due = new Date(now.getTime() - CALENDAR_IMPORT_SYNC_EVERY_MS);
   const rows = await deps.db
     .select({ row: calendarImports })
@@ -371,8 +409,10 @@ export async function runCalendarImportSync(
   const stopAt = Date.now() + RUN_BUDGET_MS;
   const worker = async () => {
     for (let r = queue.shift(); r && Date.now() < stopAt; r = queue.shift()) {
+      // Спільний із запитами користувачів ліміт процесу; джоб чекає в черзі.
+      const release = (await importSlots.acquire())!;
       try {
-        const reason = await syncOne(deps, key, r, now);
+        const reason = await syncOne(deps, keys, r, now);
         if (reason) {
           failed++;
           console.warn(`calendar import: user ${r.userId} sync failed (${reason})`);
@@ -384,6 +424,8 @@ export async function runCalendarImportSync(
           `calendar import: user ${r.userId} sync error`,
           err instanceof Error ? err.name : 'unknown',
         );
+      } finally {
+        release();
       }
     }
   };
@@ -398,6 +440,11 @@ export async function runCalendarImportSync(
  * Імпортована зайнятість користувачів у `[from, to)` — два запити незалежно від кількості.
  * Ключі результату — лише ті, у кого є чинний імпорт (успішно синхронізований, не «зламаний»):
  * для них імпорт вважається календарем (`hasCalendar`), навіть якщо подій немає.
+ *
+ * Навмисно суворіше за нагадування про порожній календар (`noCalendarData`), де рахується
+ * будь-яке підключене посилання: підбір показує майстру «може», тож спирається лише на дані,
+ * яким можна довіряти; нагадування ж ні до чого тому, хто вже підключив календар (про
+ * поломку імпорту є окреме сповіщення `calendar.import_broken`).
  */
 export async function importedBusyForUsers(
   db: DbLike,

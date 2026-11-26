@@ -30,6 +30,7 @@ import {
 import { computeCommonTimes } from '../../src/scheduling/common-times.service.js';
 import { runCalendarReminders } from '../../src/scheduling/calendar-reminder.service.js';
 import { games } from '../../src/db/schema/index.js';
+import { importSlots, IMPORT_SLOTS } from '../../src/scheduling/ical/slots.js';
 
 /** Секретна частина посилання — не має з'явитись ні у відповідях, ні в БД, ні в логах. */
 const SECRET = 'private-9f8e7d6c5b4a';
@@ -160,6 +161,7 @@ describe('calendar import API (RF 3, ledger c)', () => {
           'lastError',
           'lastSyncAt',
           'nextManualSyncAt',
+          'truncated',
         ].sort(),
       );
     }
@@ -285,6 +287,86 @@ describe('calendar import API (RF 3, ledger c)', () => {
     expect(fetched).toEqual([]);
     expect(await db.select().from(calendarImports)).toEqual([]);
     expect(await runCalendarImportSync(off, new Date())).toEqual({ synced: 0, failed: 0 });
+  });
+});
+
+describe('calendar import limits, rotation, truncation (review fixes)', () => {
+  it('fetch+parse shares a process-wide limit: extra PUTs wait in the queue', async () => {
+    const people = await Promise.all(
+      Array.from({ length: IMPORT_SLOTS + 2 }, (_, i) => userWithAge(25, `u${i}`)),
+    );
+    let active = 0;
+    let peak = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    nextFetch = async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await gate;
+      active--;
+      return cal();
+    };
+    const puts = people.map((p) =>
+      call('put', '/api/me/calendar-import', p.cookie, { url: URL_OK }),
+    );
+    const started = puts.map((r) => r.then((x) => x)); // supertest запускає запит на then
+    await vi.waitFor(() => expect(active).toBe(IMPORT_SLOTS), { timeout: 5_000 });
+    expect(importSlots.queued).toBe(2);
+    release();
+    const res = await Promise.all(started);
+    expect(res.map((r) => r.status)).toEqual(people.map(() => 200));
+    expect(peak).toBe(IMPORT_SLOTS);
+    expect(importSlots.inUse).toBe(0);
+  });
+
+  it('key rotation: the previous key still decrypts; the next success re-encrypts', async () => {
+    const u = await userWithAge(25, 'u');
+    const t0 = Date.now();
+    await connect(u.id, new Date(t0));
+    const oldKey = deps.env.CALENDAR_IMPORT_KEY!;
+    const newKey = Buffer.alloc(32, 7).toString('base64');
+    const rotated: AppDeps = {
+      ...deps,
+      env: { ...deps.env, CALENDAR_IMPORT_KEY: newKey, CALENDAR_IMPORT_KEY_PREVIOUS: oldKey },
+    };
+    fetched.length = 0;
+    expect(await runCalendarImportSync(rotated, new Date(t0 + 3 * HOUR))).toEqual({
+      synced: 1,
+      failed: 0,
+    });
+    expect(fetched).toEqual([URL_OK]);
+    const [row] = await db.select().from(calendarImports);
+    expect(decryptUrl(Buffer.from(newKey, 'base64'), u.id, row!.urlEnc)).toBe(URL_OK);
+    // Без попереднього ключа старий шифротекст не прочитати — помилка, але без витоку.
+    const [again] = await db.select().from(calendarImports);
+    await db.update(calendarImports).set({ urlEnc: encryptUrl(importKey(deps.env), u.id, URL_OK) });
+    const noPrev: AppDeps = { ...deps, env: { ...deps.env, CALENDAR_IMPORT_KEY: newKey } };
+    expect(await runCalendarImportSync(noPrev, new Date(t0 + 6 * HOUR))).toEqual({
+      synced: 0,
+      failed: 1,
+    });
+    expect((await getCalendarImport(deps, u.id)).lastError).toBe('invalid_url');
+    expect(again).toBeTruthy();
+  });
+
+  it('status exposes «truncated» when expansion limits skipped events', async () => {
+    const u = await userWithAge(25, 'u');
+    const t0 = new Date();
+    const hourly = (uid: string) =>
+      [
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTART:${ics(t0)}`,
+        'DURATION:PT10M',
+        'RRULE:FREQ=HOURLY',
+        'END:VEVENT',
+      ].join('\r\n');
+    nextFetch = async () => cal(hourly('a'), hourly('b'));
+    const s = await connect(u.id, t0);
+    expect(s).toMatchObject({ truncated: true, eventsCount: 2000 });
+    nextFetch = async () => cal();
+    const s2 = await syncCalendarImportNow(deps, u.id, new Date(t0.getTime() + 5 * 60_000));
+    expect(s2.truncated).toBe(false);
   });
 });
 
