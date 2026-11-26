@@ -1,0 +1,20 @@
+// Material для дизайну «Підземелля» (бандл `theme-dungeon`): спільний Material родини сцени
+// (../scene/scene-material.scss) у темній схемі; шрифти — токени --sc-font-* дизайну
+// (dungeon.less). Обрані прапорці — мох, як у макеті (#8FB04E на полі #0F100E — 7.7; галочка
+// #12180A на моху — 7.3), решта primary — смолоскип.
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='dungeon'] {
+  @include sc.material(dark);
+
+  @include mat.checkbox-overrides(
+    (
+      selected-icon-color: #8fb04e,
+      selected-focus-icon-color: #8fb04e,
+      selected-hover-icon-color: #a3c25f,
+      selected-pressed-icon-color: #8fb04e,
+      selected-checkmark-color: #12180a,
+    )
+  );
+}

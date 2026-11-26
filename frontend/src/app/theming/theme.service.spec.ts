@@ -28,7 +28,7 @@ const base = {
   identities: [] as MeDto['identities'],
 } satisfies Partial<MeDto>;
 
-const ALL: ThemeId[] = ['quest-board', 'neon-signs', 'holo-market', 'night-city'];
+const ALL: ThemeId[] = ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon'];
 const user: MeDto = {
   ...base,
   role: 'user',
@@ -52,7 +52,7 @@ function def(id: ThemeId, loadSlots: () => Promise<ThemeSlots>): ThemeDefinition
   };
 }
 
-/** Як справжній реєстр: три кібер-дизайни мають один спільний завантажувач слотів. */
+/** Як справжній реєстр: дизайни сцени мають один спільний завантажувач слотів. */
 function registry(
   load: { qb?: () => Promise<ThemeSlots>; scene?: () => Promise<ThemeSlots> } = {},
 ): Record<ThemeId, ThemeDefinition> {
@@ -62,6 +62,7 @@ function registry(
     'neon-signs': def('neon-signs', scene),
     'holo-market': def('holo-market', scene),
     'night-city': def('night-city', scene),
+    dungeon: def('dungeon', scene),
   };
 }
 

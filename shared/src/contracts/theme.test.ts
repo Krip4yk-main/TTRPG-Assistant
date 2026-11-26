@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { availableThemes, resolveTheme } from './theme.js';
 
-const ALL = ['quest-board', 'neon-signs', 'holo-market', 'night-city'];
+const ALL = ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon'];
 
 describe('themes', () => {
   it('resolveTheme: дефолт, відомий і невідомий дизайн', () => {
@@ -16,7 +16,7 @@ describe('themes', () => {
     expect(resolveTheme('classic', 'user')).toBe('quest-board');
   });
 
-  it('availableThemes: усі чотири дизайни доступні кожній ролі', () => {
+  it('availableThemes: усі дизайни доступні кожній ролі', () => {
     for (const role of ['user', 'admin', 'owner'] as const) {
       expect(availableThemes(role)).toEqual(ALL);
     }

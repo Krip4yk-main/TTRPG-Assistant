@@ -98,7 +98,7 @@ describe('GET /api/me', () => {
       locale: 'uk',
       identities: [{ provider: 'google', displayName: 'G' }],
       uiTheme: 'quest-board',
-      availableThemes: ['quest-board', 'neon-signs', 'holo-market', 'night-city'],
+      availableThemes: ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon'],
       uiPrefs: { tearAnimation: true },
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
@@ -372,7 +372,7 @@ describe('PATCH /api/me/ui-prefs', () => {
 });
 
 describe('PATCH /api/me/theme', () => {
-  const ALL_THEMES = ['quest-board', 'neon-signs', 'holo-market', 'night-city'];
+  const ALL_THEMES = ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon'];
 
   it('a regular user picks a cyber design; /api/me returns it; defaults to quest-board', async () => {
     const u = await createUser(db, { nickname: 'Usr' });
@@ -385,6 +385,13 @@ describe('PATCH /api/me/theme', () => {
     expect((await call('get', '/api/me', cookie)).body.uiTheme).toBe('night-city');
     const [row] = await db.select().from(users).where(eq(users.id, u.id));
     expect(row!.uiTheme).toBe('night-city');
+  });
+
+  it('Plan 10: «dungeon» is accepted for a regular user', async () => {
+    const u = await createUser(db, { nickname: 'Dungeon' });
+    const res = await call('patch', '/api/me/theme', await login(u.id), { theme: 'dungeon' });
+    expect(res.status).toBe(200);
+    expect(res.body.uiTheme).toBe('dungeon');
   });
 
   it('removed «classic», unknown id or extra keys: 400', async () => {

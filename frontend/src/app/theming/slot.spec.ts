@@ -50,6 +50,7 @@ function registry(load: () => Promise<ThemeSlots>): Record<ThemeId, ThemeDefinit
     'neon-signs': { ...THEMES['neon-signs'], loadSlots: load },
     'holo-market': { ...THEMES['holo-market'], loadSlots: load },
     'night-city': { ...THEMES['night-city'], loadSlots: load },
+    dungeon: { ...THEMES.dungeon, loadSlots: load },
   };
 }
 
