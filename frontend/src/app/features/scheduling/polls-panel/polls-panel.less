@@ -1,0 +1,62 @@
+:host {
+  display: block;
+}
+
+.polls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+
+  h2,
+  p {
+    margin: 0;
+  }
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}
+
+.polls-notice:empty {
+  display: none;
+}
+
+.polls-notice:focus {
+  outline: none;
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}
+
+.poll-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  > li + li {
+    padding-top: var(--nri-space-lg);
+    border-top: 1px solid var(--nri-border);
+  }
+}
+
+.toggle-closed {
+  align-self: flex-start;
+}

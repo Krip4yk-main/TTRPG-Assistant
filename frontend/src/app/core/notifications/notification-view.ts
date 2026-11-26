@@ -174,6 +174,12 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
   if (n.type === 'session.rsvp_declined' && (p.count ?? 0) > 0) {
     view.key = 'notifications.session.rsvp_declined_many';
   }
+  // Розклад: календарні нагадування й «не буду» — власні значки замість загального.
+  if (n.type === 'calendar.empty' || n.type === 'calendar.import_broken') {
+    view.icon = n.type === 'calendar.empty' ? 'edit_calendar' : 'sync_problem';
+  } else if (n.type === 'session.rsvp_declined') {
+    view.icon = 'event_busy';
+  }
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {
     view.key = 'notifications.game.resumed_recruit';

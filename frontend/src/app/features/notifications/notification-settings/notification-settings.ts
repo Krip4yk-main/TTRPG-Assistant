@@ -10,17 +10,23 @@ import { firstValueFrom } from 'rxjs';
 import {
   NOTIFICATION_CATEGORIES,
   REMINDER_OFFSETS,
+  SITE_OPTIONAL_CATEGORIES,
   type NotificationCategory,
   type NotificationPrefsDto,
   type ReminderOffset,
+  type SiteOptionalCategory,
 } from '@nri/shared';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { NotificationsApi } from '../../../core/notifications/notifications.api';
 
 type TelegramPrefs = Record<NotificationCategory, boolean>;
+type SitePrefs = Record<SiteOptionalCategory, boolean>;
 
-/** `/settings/notifications`: Telegram за категоріями й моменти нагадувань про сесії. */
+/**
+ * `/settings/notifications`: що вимкнути на сайті («Розклад»), Telegram за категоріями й
+ * моменти нагадувань про сесії.
+ */
 @Component({
   selector: 'nri-notification-settings',
   imports: [
@@ -42,6 +48,8 @@ export class NotificationSettings {
   private readonly translate = inject(TranslateService);
 
   protected readonly categories = NOTIFICATION_CATEGORIES;
+  /** Категорії, які можна вимкнути й на сайті (зараз — «Розклад»). */
+  protected readonly siteCategories = SITE_OPTIONAL_CATEGORIES;
   /** Від найближчого до найдальшого (15 хв … 48 год). */
   protected readonly offsets = REMINDER_OFFSETS;
 
@@ -54,6 +62,7 @@ export class NotificationSettings {
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
   protected readonly telegram = signal<TelegramPrefs | null>(null);
+  protected readonly site = signal<SitePrefs | null>(null);
   protected readonly reminderOffsets = signal<ReminderOffset[]>([]);
   protected readonly remindersOff = computed(() => this.reminderOffsets().length === 0);
   /** Останній збережений (завантажений) стан — для «є незбережені зміни». */
@@ -61,10 +70,12 @@ export class NotificationSettings {
   protected readonly dirty = computed(() => {
     const saved = this.saved();
     const telegram = this.telegram();
-    if (!saved || !telegram) return false;
+    const site = this.site();
+    if (!saved || !telegram || !site) return false;
     const offsets = (a: readonly number[]) => [...a].sort((x, y) => y - x).join(',');
     return (
       this.categories.some((c) => telegram[c] !== saved.telegram[c]) ||
+      this.siteCategories.some((c) => site[c] !== saved.site[c]) ||
       offsets(this.reminderOffsets()) !== offsets(saved.reminderOffsets)
     );
   });
@@ -90,6 +101,10 @@ export class NotificationSettings {
     this.telegram.update((t) => (t ? { ...t, [category]: value } : t));
   }
 
+  protected setSite(category: SiteOptionalCategory, value: boolean): void {
+    this.site.update((s) => (s ? { ...s, [category]: value } : s));
+  }
+
   protected setOffsets(event: MatChipListboxChange): void {
     const value = (event.value ?? []) as ReminderOffset[];
     this.reminderOffsets.set([...value]);
@@ -101,13 +116,15 @@ export class NotificationSettings {
 
   protected async save(): Promise<void> {
     const telegram = this.telegram();
-    if (!telegram || this.saving() || !this.dirty()) return;
+    const site = this.site();
+    if (!telegram || !site || this.saving() || !this.dirty()) return;
     this.saving.set(true);
     this.saveError.set(null);
     try {
       const saved = await firstValueFrom(
         this.api.updatePrefs({
           telegram,
+          site,
           reminderOffsets: [...this.reminderOffsets()].sort((a, b) => b - a),
         }),
       );
@@ -127,6 +144,7 @@ export class NotificationSettings {
   private apply(prefs: NotificationPrefsDto): void {
     this.saved.set(prefs);
     this.telegram.set({ ...prefs.telegram });
+    this.site.set({ ...prefs.site });
     this.reminderOffsets.set([...prefs.reminderOffsets]);
   }
 }

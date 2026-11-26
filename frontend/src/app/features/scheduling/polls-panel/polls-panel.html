@@ -1,0 +1,100 @@
+@if (visible()) {
+  <section class="nri-card polls-panel" aria-labelledby="polls-title">
+    <header class="panel-head">
+      <h2 id="polls-title">{{ 'scheduling.panel.title' | translate }}</h2>
+      @if (isGm()) {
+        <div class="panel-actions">
+          <button
+            mat-flat-button
+            type="button"
+            class="find-times"
+            [disabled]="busy()"
+            (click)="findTimes()"
+          >
+            <mat-icon aria-hidden="true">group_work</mat-icon>
+            {{ 'scheduling.panel.find' | translate }}
+          </button>
+          @if (canCreate()) {
+            <button
+              mat-stroked-button
+              type="button"
+              class="new-poll"
+              [disabled]="busy()"
+              (click)="newPoll()"
+            >
+              <mat-icon aria-hidden="true">how_to_vote</mat-icon>
+              {{ 'scheduling.panel.newPoll' | translate }}
+            </button>
+          }
+        </div>
+      }
+    </header>
+    @if (isGm()) {
+      <p class="nri-muted">{{ 'scheduling.panel.gmHint' | translate }}</p>
+    }
+
+    <div class="polls-notice" aria-live="polite" tabindex="-1">
+      @if (notice(); as n) {
+        <p
+          [class.nri-alert]="n.kind === 'error'"
+          [class.nri-notice]="n.kind === 'info'"
+          [attr.role]="n.kind === 'error' ? 'alert' : null"
+        >
+          {{ n.key | translate }}
+        </p>
+      }
+    </div>
+
+    @if (loadFailed()) {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'scheduling.panel.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="retry()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    } @else if (polls(); as list) {
+      @if (list.length) {
+        <ul class="poll-list">
+          @for (p of openPolls(); track p.id) {
+            <li [class.nri-flash]="flash.has(p.id)">
+              <nri-poll-card
+                [poll]="p"
+                [viewerTimezone]="viewerZone()"
+                [gameKind]="game().kind"
+                [paused]="paused()"
+                (changed)="replace($event)"
+                (applied)="onApplied()"
+                (mutated)="mutated.emit()"
+              />
+            </li>
+          }
+          @for (p of visibleClosed(); track p.id) {
+            <li [class.nri-flash]="flash.has(p.id)">
+              <nri-poll-card
+                [poll]="p"
+                [viewerTimezone]="viewerZone()"
+                [gameKind]="game().kind"
+                [paused]="paused()"
+                (changed)="replace($event)"
+                (applied)="onApplied()"
+                (mutated)="mutated.emit()"
+              />
+            </li>
+          }
+        </ul>
+        @if (hiddenClosed() > 0 || showAllClosed()) {
+          <button mat-button type="button" class="toggle-closed" (click)="toggleClosed()">
+            {{
+              (showAllClosed() ? 'scheduling.panel.hideClosed' : 'scheduling.panel.showClosed')
+                | translate: { n: hiddenClosed() }
+            }}
+          </button>
+        }
+      } @else {
+        <p class="nri-muted empty">{{ 'scheduling.panel.empty' | translate }}</p>
+      }
+    } @else {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+  </section>
+}

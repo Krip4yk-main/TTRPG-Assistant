@@ -1,0 +1,217 @@
+<h2 mat-dialog-title>{{ 'scheduling.finder.title' | translate }}</h2>
+<mat-dialog-content class="content">
+  <p class="nri-muted">{{ 'scheduling.finder.intro' | translate }}</p>
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'scheduling.finder.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="load()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (result(); as r) {
+        @if (r.noCalendars) {
+          <div class="nri-notice no-calendars">
+            <p>{{ 'scheduling.finder.noCalendars' | translate }}</p>
+          </div>
+        } @else {
+          @if (campaign) {
+            <mat-button-toggle-group
+              class="tabs"
+              [value]="tab()"
+              [attr.aria-label]="'scheduling.finder.tabsLabel' | translate"
+              (change)="setTab($event.value)"
+            >
+              <mat-button-toggle value="regular">{{
+                'scheduling.finder.regular' | translate
+              }}</mat-button-toggle>
+              <mat-button-toggle value="oneOff">{{
+                'scheduling.finder.oneOff' | translate
+              }}</mat-button-toggle>
+            </mat-button-toggle-group>
+          }
+          <p class="nri-muted pick-hint">
+            {{ 'scheduling.finder.pickHint' | translate: { min: min, max: max } }}
+          </p>
+
+          @if (tab() === 'regular') {
+            @if (r.regular.length) {
+              <ul class="candidates">
+                @for (c of r.regular; track regularKey(c)) {
+                  @let key = regularKey(c);
+                  @let w = weekly(c);
+                  <li class="candidate" [attr.data-key]="key">
+                    <div class="candidate-head">
+                      <mat-checkbox
+                        [checked]="isSelected(key)"
+                        [disabled]="selectionFull(key)"
+                        (change)="toggle(key, $event.checked)"
+                      >
+                        <span class="when">
+                          {{
+                            'scheduling.weekly'
+                              | translate
+                                : {
+                                    day: 'games.weekdaysLong.' + w.weekday | translate,
+                                    time: w.time,
+                                  }
+                          }}
+                        </span>
+                      </mat-checkbox>
+                      <span class="counts">
+                        {{
+                          'scheduling.counts'
+                            | translate: { can: c.can, cannot: c.cannot, unknown: c.unknown }
+                        }}
+                      </span>
+                    </div>
+                    <p class="nri-muted first">
+                      {{ 'scheduling.finder.first' | translate: { when: firstLabel(c) } }}
+                    </p>
+                    <nri-participant-statuses
+                      [participants]="r.participants"
+                      [statuses]="c.statuses"
+                      [weeks]="c.weeks"
+                    />
+                    @if (!data.paused) {
+                      <div class="candidate-actions">
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          class="apply-schedule"
+                          (click)="applySchedule(c)"
+                        >
+                          <mat-icon aria-hidden="true">event_repeat</mat-icon>
+                          {{ 'scheduling.finder.applySchedule' | translate }}
+                        </button>
+                      </div>
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="nri-notice empty">{{ 'scheduling.finder.empty' | translate }}</p>
+            }
+          } @else {
+            @if (r.oneOff.length) {
+              <ul class="candidates">
+                @for (c of r.oneOff; track c.startsAt) {
+                  <li class="candidate" [attr.data-key]="c.startsAt">
+                    <div class="candidate-head">
+                      <mat-checkbox
+                        [checked]="isSelected(c.startsAt)"
+                        [disabled]="selectionFull(c.startsAt)"
+                        (change)="toggle(c.startsAt, $event.checked)"
+                      >
+                        <span class="when">{{ oneOffLabel(c) }}</span>
+                      </mat-checkbox>
+                      <span class="counts">
+                        {{
+                          'scheduling.counts'
+                            | translate: { can: c.can, cannot: c.cannot, unknown: c.unknown }
+                        }}
+                      </span>
+                    </div>
+                    <nri-participant-statuses
+                      [participants]="r.participants"
+                      [statuses]="c.statuses"
+                    />
+                    @if (!data.paused) {
+                      @if (moving() === c.startsAt) {
+                        <div class="move">
+                          @if (sessions(); as list) {
+                            @if (list.length) {
+                              <label class="move-label" [for]="'move-' + $index">{{
+                                'scheduling.finder.whichSession' | translate
+                              }}</label>
+                              <select
+                                class="move-select"
+                                [id]="'move-' + $index"
+                                #sel
+                                (change)="setTarget(sel.value)"
+                              >
+                                @for (s of list; track s.id) {
+                                  <option [value]="s.id" [selected]="s.id === targetId()">
+                                    {{ sessionLabel(s) }}
+                                  </option>
+                                }
+                              </select>
+                              <div class="candidate-actions">
+                                <button
+                                  mat-flat-button
+                                  type="button"
+                                  class="confirm-move"
+                                  [disabled]="busy()"
+                                  (click)="move(c)"
+                                >
+                                  {{ 'scheduling.finder.moveConfirm' | translate }}
+                                </button>
+                                <button mat-button type="button" (click)="cancelMove()">
+                                  {{ 'common.cancel' | translate }}
+                                </button>
+                              </div>
+                            } @else {
+                              <p class="nri-muted">
+                                {{ 'scheduling.finder.noSessions' | translate }}
+                              </p>
+                            }
+                          } @else {
+                            <p class="nri-muted" role="status">
+                              {{ 'common.loading' | translate }}
+                            </p>
+                          }
+                        </div>
+                      } @else {
+                        <div class="candidate-actions">
+                          <button
+                            mat-stroked-button
+                            type="button"
+                            class="start-move"
+                            (click)="startMove(c)"
+                          >
+                            <mat-icon aria-hidden="true">update</mat-icon>
+                            {{ 'scheduling.finder.move' | translate }}
+                          </button>
+                        </div>
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="nri-notice empty">{{ 'scheduling.finder.empty' | translate }}</p>
+            }
+          }
+        }
+      }
+    }
+  }
+  <div aria-live="assertive">
+    @if (error(); as key) {
+      <p class="nri-alert" role="alert">{{ key | translate }}</p>
+    }
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions class="actions">
+  @if (state() === 'ready' && !result()?.noCalendars) {
+    <span class="nri-muted selected-count" aria-live="polite">
+      {{ 'scheduling.finder.selected' | translate: { n: selected().size } }}
+    </span>
+    <button
+      mat-flat-button
+      type="button"
+      class="create-poll"
+      [disabled]="!canPoll()"
+      (click)="createPoll()"
+    >
+      <mat-icon aria-hidden="true">how_to_vote</mat-icon>
+      {{ 'scheduling.finder.createPoll' | translate }}
+    </button>
+  }
+  <button mat-button type="button" (click)="close()">{{ 'common.close' | translate }}</button>
+</mat-dialog-actions>

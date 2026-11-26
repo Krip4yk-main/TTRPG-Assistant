@@ -1,0 +1,40 @@
+.statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs) var(--nri-space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px var(--nri-space-xs);
+    min-width: 0;
+  }
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+
+  .who {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  [data-status='can'] mat-icon {
+    color: var(--nri-success-text);
+  }
+
+  [data-status='cannot'] mat-icon {
+    color: var(--nri-danger-text);
+  }
+
+  [data-status='unknown'] mat-icon {
+    color: var(--nri-text-muted);
+  }
+}

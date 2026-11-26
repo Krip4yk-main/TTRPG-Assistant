@@ -1,0 +1,165 @@
+<h2 mat-dialog-title>{{ 'scheduling.create.title' | translate }}</h2>
+<form novalidate (submit)="$event.preventDefault(); submit()">
+  <mat-dialog-content class="content">
+    <p class="nri-muted">{{ 'scheduling.create.intro' | translate }}</p>
+
+    @if (!kindLocked) {
+      <mat-button-toggle-group
+        class="kind"
+        [value]="pollKind()"
+        [attr.aria-label]="'scheduling.create.kindLabel' | translate"
+        (change)="setKind($event.value)"
+      >
+        <mat-button-toggle value="regular">{{
+          'scheduling.create.kind.regular' | translate
+        }}</mat-button-toggle>
+        <mat-button-toggle value="one_off">{{
+          'scheduling.create.kind.one_off' | translate
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+    <p class="nri-muted kind-hint">
+      {{ 'scheduling.create.kindHint.' + pollKind() | translate }}
+    </p>
+
+    <section class="field" aria-labelledby="poll-options-label">
+      <p class="group-label" id="poll-options-label">
+        {{ 'scheduling.create.options' | translate: { min: min, max: max } }}
+      </p>
+      @if (options().length) {
+        <ol class="options">
+          @for (o of options(); track o.key) {
+            @let l = optionLabel(o);
+            <li class="option">
+              <span class="when">
+                @if (l.weekly) {
+                  {{
+                    'scheduling.weekly'
+                      | translate: { day: 'games.weekdaysLong.' + l.day | translate, time: l.text }
+                  }}
+                } @else {
+                  {{ l.text }}
+                }
+              </span>
+              <button
+                mat-icon-button
+                type="button"
+                class="remove"
+                [attr.aria-label]="'scheduling.create.remove' | translate: { n: $index + 1 }"
+                (click)="remove(o.key)"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </li>
+          }
+        </ol>
+      } @else {
+        <p class="nri-muted">{{ 'scheduling.create.noOptions' | translate }}</p>
+      }
+
+      @if (options().length < max) {
+        <fieldset class="add">
+          <legend>{{ 'scheduling.create.add' | translate }}</legend>
+          <p class="nri-muted zone-hint">
+            {{ 'sessions.zoneHint' | translate }} <strong>{{ data.timezone }}</strong>
+          </p>
+          <div class="add-row">
+            @if (pollKind() === 'regular') {
+              <label class="input">
+                <span>{{ 'scheduling.create.weekday' | translate }}</span>
+                <select class="add-weekday" #wd (change)="setWeekday(wd.value)">
+                  @for (d of weekdays; track d) {
+                    <option [value]="d" [selected]="d === addWeekday()">
+                      {{ 'games.weekdaysLong.' + d | translate }}
+                    </option>
+                  }
+                </select>
+              </label>
+            } @else {
+              <label class="input">
+                <span>{{ 'scheduling.create.date' | translate }}</span>
+                <input
+                  class="add-date"
+                  type="date"
+                  #dt
+                  [value]="addDate()"
+                  (input)="addDate.set(dt.value)"
+                />
+              </label>
+            }
+            <label class="input">
+              <span>{{ 'scheduling.create.time' | translate }}</span>
+              <input
+                class="add-time"
+                type="time"
+                step="60"
+                #tm
+                [value]="addTime()"
+                (input)="addTime.set(tm.value)"
+              />
+            </label>
+            <button mat-stroked-button type="button" class="add-option" (click)="add()">
+              <mat-icon aria-hidden="true">add</mat-icon>
+              {{ 'common.add' | translate }}
+            </button>
+          </div>
+          @if (addPreview(); as p) {
+            <p class="nri-muted preview">{{ 'sessions.viewerPreview' | translate: { when: p } }}</p>
+          }
+          <div aria-live="polite">
+            @if (addError(); as key) {
+              <p class="field-error">{{ key | translate }}</p>
+            }
+          </div>
+        </fieldset>
+      }
+    </section>
+
+    <label class="input">
+      <span class="group-label">{{ 'scheduling.create.deadline' | translate }}</span>
+      <select
+        class="deadline"
+        #dl
+        aria-describedby="poll-deadline-hint"
+        (change)="deadlineHours.set(numberValue(dl.value))"
+      >
+        @for (h of deadlines; track h) {
+          <option [value]="h" [selected]="h === deadlineHours()">
+            {{ 'scheduling.create.deadlines.' + h | translate }}
+          </option>
+        }
+      </select>
+      <span class="nri-muted hint" id="poll-deadline-hint">{{
+        'scheduling.create.deadlineHint' | translate: { when: deadlineLabel() }
+      }}</span>
+    </label>
+
+    @if (pollKind() === 'one_off') {
+      <label class="input">
+        <span class="group-label">{{ 'scheduling.create.target' | translate }}</span>
+        <select class="target" #tg (change)="setTarget(tg.value)">
+          <option value="" [selected]="targetId() === null">
+            {{ 'scheduling.create.targetNone.' + (campaign ? 'campaign' : 'oneshot') | translate }}
+          </option>
+          @for (s of sessions(); track s.id) {
+            <option [value]="s.id" [selected]="s.id === targetId()">
+              {{ 'scheduling.create.targetSession' | translate: { when: sessionLabel(s) } }}
+            </option>
+          }
+        </select>
+      </label>
+    }
+
+    <div aria-live="assertive">
+      @if (error(); as key) {
+        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button type="submit" class="submit" [disabled]="submitting()">
+      {{ 'scheduling.create.submit' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -194,6 +194,8 @@ describe('GameDetails', () => {
   afterEach(() => {
     // Майстру й учасникам сторінка перевіряє, чи є кого оцінити підсумково.
     http.match(targetsUrl).forEach((r) => r.flush(emptyTargets));
+    // Панель «Спільний час» (@defer) читає голосування гри — у цих тестах їх немає.
+    http.match((r) => /^\/api\/games\/\d+\/polls$/.test(r.url)).forEach((r) => r.flush([]));
     http.verify();
   });
 

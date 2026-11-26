@@ -108,7 +108,7 @@
               <a
                 class="item"
                 [class.unread]="!row.n.readAt"
-                [routerLink]="row.n.link"
+                [routerLink]="row.url"
                 (click)="openItem(row.n)"
               >
                 <mat-icon class="icon" aria-hidden="true">{{ row.view.icon }}</mat-icon>

@@ -56,6 +56,7 @@ import {
   type ScheduleRuleDialogData,
 } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { SessionsList } from '../../sessions/sessions-list/sessions-list';
+import { PollsPanel, type PollsPanelHandle } from '../../scheduling/polls-panel/polls-panel';
 import { openPauseDialog, openResumeDialog, resumedNoticeKey } from '../pause/pause-flow';
 import { PausePanel, type PauseAction } from '../pause/pause-panel';
 import { CalendarPin } from '../../calendar/calendar-pin/calendar-pin';
@@ -112,6 +113,7 @@ type FullGame = PublicGameDto &
     GmRating,
     BlockedBadge,
     PausePanel,
+    PollsPanel,
   ],
   templateUrl: './game-details.html',
   styleUrl: './game-details.less',
@@ -131,6 +133,8 @@ export class GameDetails {
   private readonly router = inject(Router);
   private readonly sessionsList = viewChild(SessionsList);
   private readonly membersPanel = viewChild(MembersPanel);
+  /** Панель «Спільний час» вантажиться відкладено (@defer) — без посилання на клас. */
+  private readonly pollsPanel = viewChild<PollsPanelHandle>('polls');
   private readonly watcher = inject(ChangeWatcher);
   /** Підписка на кімнати поточної гри (лише автентифікованим). */
   private readonly watch = signal<ChangeHandle | null>(null);
@@ -149,6 +153,10 @@ export class GameDetails {
    */
   readonly action = input<string | undefined>();
   private actionHandled: string | null = null;
+  /** `?poll=` — голосування зі сповіщення (фокус на ньому). */
+  readonly poll = input<string | undefined>();
+  /** `?session=` — майстру альтернативи сесії (сповіщення «не буду»). */
+  readonly session = input<string | undefined>();
 
   protected readonly view = signal<GameViewDto | null>(null);
   protected readonly state = signal<'loading' | 'ready' | 'notFound' | 'error'>('loading');
@@ -304,7 +312,7 @@ export class GameDetails {
         this.watcher.open({
           gameId: id,
           watch: true,
-          scopes: ['details', 'sessions', 'members'],
+          scopes: ['details', 'sessions', 'members', 'polls'],
         }),
       );
       this.watch.set(handle);
@@ -387,6 +395,13 @@ export class GameDetails {
     this.refreshRatingTargets();
   }
 
+  /** Голосування застосовано чи сесію перенесено з панелі «Спільний час». */
+  protected async scheduleChanged(): Promise<void> {
+    this.quiet();
+    await this.load(Number(this.id()), true);
+    await this.sessionsList()?.reload();
+  }
+
   /** Склад змінився (вихід, виключення) — могли з'явитися «вихідні» оцінки. */
   private refreshRatingTargets(): void {
     const g = this.game();
@@ -418,12 +433,14 @@ export class GameDetails {
         const print = (g: FullGame) => JSON.stringify({ ...g, viewer: null, seen: null });
         if (print(before) !== print(after)) this.flashHead();
       }
-      const [sessionsOk, membersOk] = await Promise.all([
+      const [sessionsOk, membersOk, pollsOk] = await Promise.all([
         scopes.has('sessions') ? this.sessionsList()?.reload(true) : true,
         scopes.has('members') ? this.membersPanel()?.reload(true) : true,
+        scopes.has('polls') ? this.pollsPanel()?.reload(true) : true,
       ]);
       if (sessionsOk === false) failed.push('sessions');
       if (membersOk === false) failed.push('members');
+      if (pollsOk === false) failed.push('polls');
       if (scopes.has('members')) this.refreshRatingTargets();
       // Не вдалося перечитати — області повертаються, банер лишається.
       handle.restore(failed.filter((s) => scopes.has(s)));

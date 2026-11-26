@@ -196,6 +196,8 @@ describe('NotificationBell', () => {
     expect(items[0]!.textContent).not.toContain('Оцінити можна до');
     expect(items[1]!.textContent).toContain('Оцінити можна до');
     expect(items[1]!.textContent).toContain('19:00');
+    // Посилання з query (`?session=`, `?poll=`) не кодують `?` у шлях.
+    expect(items[1]!.getAttribute('href')).toBe('/games/7/rate?session=3');
     expect(items[0]!.querySelector('mat-icon')!.textContent).toContain('star');
     expect(panel()!.textContent).not.toMatch(/notifications\.|\{\{/);
   });

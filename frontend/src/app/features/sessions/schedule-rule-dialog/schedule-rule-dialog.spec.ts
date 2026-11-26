@@ -67,6 +67,32 @@ describe('ScheduleRuleDialog', () => {
     expect(v.weekdays).toEqual([1]);
   });
 
+  it('a candidate from the common-time finder prefills start and weekday', async () => {
+    // Пт, 8 березня 2030, 19:00 у Києві.
+    await create({
+      game: { ...game, recurrence: 'none', weekdays: [] },
+      mode: 'schedule',
+      prefill: { startsAt: '2030-03-08T17:00:00.000Z', weekdays: [4] },
+    });
+    const v = form().getRawValue();
+    expect([v.date!.getFullYear(), v.date!.getMonth() + 1, v.date!.getDate()]).toEqual([
+      2030, 3, 8,
+    ]);
+    expect(v.time).toBe('19:00');
+    // Гра без повторення стає щотижневою — варіант регулярний.
+    expect(v.recurrence).toBe('weekly');
+    expect(v.weekdays).toEqual([4]);
+  });
+
+  it('a past prefill is ignored (the usual next-session start is used)', async () => {
+    await create({
+      game,
+      mode: 'schedule',
+      prefill: { startsAt: '2020-03-06T17:00:00.000Z', weekdays: [4] },
+    });
+    expect(form().getRawValue().weekdays).toEqual([1]);
+  });
+
   it('a started game with a past first session gets a future date prefilled', async () => {
     await create({
       game: { ...game, startsAt: '2020-01-07T17:00:00.000Z', nextSessionAt: null },

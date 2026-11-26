@@ -1,0 +1,67 @@
+// Спільні стилі діалогів і карток спільного часу (підключаються через @import).
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.content p {
+  margin: 0;
+}
+
+// Прокручується вміст діалогу, а не стискаються його частини (перемикач вкладок — overflow: hidden).
+.content > * {
+  flex-shrink: 0;
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}
+
+.candidates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-md);
+  background: var(--nri-surface);
+  min-width: 0;
+}
+
+.candidate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-xs) var(--nri-space-md);
+}
+
+.when {
+  font-weight: 600;
+}
+
+.counts {
+  font-size: 0.9rem;
+  color: var(--nri-text-muted);
+}
+
+.candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs) var(--nri-space-sm);
+}

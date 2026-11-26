@@ -1,0 +1,25 @@
+<ul class="statuses">
+  @for (r of rows(); track r.userId) {
+    <li [attr.data-status]="r.status">
+      <mat-icon aria-hidden="true">{{ r.icon }}</mat-icon>
+      <span class="who">
+        {{ r.nickname ?? ('user.deleted' | translate) }}
+        @if (r.isGm) {
+          <span class="nri-muted">({{ 'scheduling.status.gm' | translate }})</span>
+        }
+      </span>
+      <span class="what">
+        {{ 'scheduling.status.' + r.status | translate }}
+        @if (r.weeksCan !== null && weeks(); as w) {
+          · {{ 'scheduling.status.weeks' | translate: { can: r.weeksCan, weeks: w } }}
+        }
+        @if (r.outside > 0 && r.weeksCan) {
+          · {{ 'scheduling.status.outside' | translate: { n: r.outside } }}
+        }
+        @if (!r.hasCalendar) {
+          · {{ 'scheduling.status.noCalendar' | translate }}
+        }
+      </span>
+    </li>
+  }
+</ul>

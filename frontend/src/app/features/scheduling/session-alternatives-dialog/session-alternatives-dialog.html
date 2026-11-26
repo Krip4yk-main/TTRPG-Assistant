@@ -1,0 +1,74 @@
+<h2 mat-dialog-title>{{ 'scheduling.alternatives.title' | translate }}</h2>
+<mat-dialog-content class="content">
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'scheduling.alternatives.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="load()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('stale') {
+      <p class="nri-notice stale" role="status">
+        {{ 'scheduling.alternatives.stale' | translate }}
+      </p>
+    }
+    @case ('ready') {
+      @if (result(); as r) {
+        <p class="current">
+          {{ 'scheduling.alternatives.current' | translate: { when: label(r.startsAt) } }}
+        </p>
+        <p class="nri-muted">{{ 'scheduling.alternatives.intro' | translate }}</p>
+        @if (r.noCalendars) {
+          <p class="nri-notice no-calendars">{{ 'scheduling.finder.noCalendars' | translate }}</p>
+        } @else if (r.alternatives.length) {
+          <ul class="candidates">
+            @for (c of r.alternatives; track c.startsAt) {
+              <li class="candidate" [attr.data-key]="c.startsAt">
+                <div class="candidate-head">
+                  <span class="when">{{ label(c.startsAt) }}</span>
+                  <span class="counts">
+                    {{
+                      'scheduling.counts'
+                        | translate: { can: c.can, cannot: c.cannot, unknown: c.unknown }
+                    }}
+                  </span>
+                </div>
+                <nri-participant-statuses [participants]="r.participants" [statuses]="c.statuses" />
+                <div class="candidate-actions">
+                  <button
+                    mat-flat-button
+                    type="button"
+                    class="move"
+                    [disabled]="busy() !== null"
+                    [attr.aria-label]="
+                      'scheduling.alternatives.moveAria' | translate: { when: label(c.startsAt) }
+                    "
+                    (click)="move(c)"
+                  >
+                    <mat-icon aria-hidden="true">update</mat-icon>
+                    {{ 'scheduling.alternatives.move' | translate }}
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="nri-notice empty">{{ 'scheduling.alternatives.empty' | translate }}</p>
+        }
+      }
+    }
+  }
+  <div aria-live="assertive">
+    @if (error(); as key) {
+      <p class="nri-alert" role="alert">{{ key | translate }}</p>
+    }
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="close()">{{ 'common.close' | translate }}</button>
+</mat-dialog-actions>

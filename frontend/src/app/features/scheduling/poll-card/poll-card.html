@@ -1,0 +1,236 @@
+@let p = poll();
+<article class="poll" [attr.data-poll-id]="p.id" [attr.aria-labelledby]="'poll-title-' + p.id">
+  <header class="poll-head">
+    <h3 [id]="'poll-title-' + p.id" tabindex="-1">{{ titleKey() | translate }}</h3>
+    <span class="state" [attr.data-state]="p.appliedAt ? 'applied' : p.status">
+      @if (p.appliedAt) {
+        {{ 'scheduling.poll.state.applied' | translate }}
+      } @else if (open()) {
+        {{ 'scheduling.poll.state.open' | translate: { when: closesLabel() } }}
+      } @else {
+        {{ 'scheduling.poll.reason.' + (p.closeReason ?? 'deadline') | translate }}
+      }
+    </span>
+  </header>
+
+  <p class="nri-muted voters-line">
+    {{ 'scheduling.poll.votedCount' | translate: { n: votedCount(), total: p.voters.length } }}
+  </p>
+  @if (p.voters.length) {
+    <ul class="voters" [attr.aria-label]="'scheduling.poll.votersLabel' | translate">
+      @for (v of p.voters; track v.userId) {
+        <li [attr.data-voted]="v.voted">
+          <mat-icon aria-hidden="true">{{ v.voted ? 'task_alt' : 'schedule' }}</mat-icon>
+          {{ v.nickname ?? ('user.deleted' | translate) }} —
+          {{ (v.voted ? 'scheduling.poll.hasVoted' : 'scheduling.poll.notVoted') | translate }}
+        </li>
+      }
+    </ul>
+  }
+
+  <ol class="options">
+    @for (o of p.options; track o.id) {
+      @let l = optionLabel(o);
+      @let mine = myVote(o);
+      @let winner = !open() && o.id === p.winnerOptionId;
+      <li
+        class="option"
+        [class.winner]="winner"
+        [class.applied]="o.id === p.appliedOptionId"
+        [attr.data-option-id]="o.id"
+      >
+        <div class="option-head">
+          <span class="when">
+            @if (l.weekly) {
+              {{
+                'scheduling.weekly'
+                  | translate: { day: 'games.weekdaysLong.' + l.day | translate, time: l.text }
+              }}
+            } @else {
+              {{ l.text }}
+            }
+          </span>
+          @if (o.id === p.appliedOptionId) {
+            <span class="mark applied-mark">
+              <mat-icon aria-hidden="true">done_all</mat-icon>
+              {{ 'scheduling.poll.appliedMark' | translate }}
+            </span>
+          } @else if (winner) {
+            <span class="mark winner-mark">
+              <mat-icon aria-hidden="true">emoji_events</mat-icon>
+              {{ 'scheduling.poll.winner' | translate }}
+            </span>
+          }
+        </div>
+        <p class="tally">
+          {{ 'scheduling.poll.tally' | translate: { yes: o.yes, maybe: o.maybe, no: o.no } }}
+        </p>
+
+        @if (p.canVote) {
+          <div
+            class="vote"
+            role="group"
+            [attr.aria-label]="
+              'scheduling.poll.voteGroup'
+                | translate
+                  : {
+                      n: o.position,
+                      when: l.weekly
+                        ? ('scheduling.weekly'
+                          | translate
+                            : { day: 'games.weekdaysLong.' + l.day | translate, time: l.text })
+                        : l.text,
+                    }
+            "
+          >
+            @for (v of voteValues; track v) {
+              <button
+                mat-stroked-button
+                type="button"
+                class="vote-btn"
+                [class.chosen]="mine === v"
+                [attr.data-value]="v"
+                [attr.aria-pressed]="mine === v"
+                [disabled]="busy()"
+                (click)="vote(o, v)"
+              >
+                <mat-icon aria-hidden="true">{{ voteIcons[v] }}</mat-icon>
+                {{ 'scheduling.poll.vote.' + v | translate }}
+              </button>
+            }
+          </div>
+        } @else if (mine) {
+          <p class="nri-muted my-answer">
+            {{ 'scheduling.poll.myAnswer' | translate }}
+            {{ 'scheduling.poll.vote.' + mine | translate }}
+          </p>
+        }
+
+        @if (o.votes.length) {
+          <details class="answers">
+            <summary>{{ 'scheduling.poll.answers' | translate }}</summary>
+            <ul>
+              @for (a of answers(o); track $index) {
+                <li [attr.data-value]="a.value">
+                  <mat-icon aria-hidden="true">{{ voteIcons[a.value] }}</mat-icon>
+                  {{ a.nickname ?? ('user.deleted' | translate) }} —
+                  {{ 'scheduling.poll.vote.' + a.value | translate }}
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (canApply() && !paused() && o.id !== p.winnerOptionId) {
+          <button
+            mat-button
+            type="button"
+            class="apply-option"
+            [disabled]="busy()"
+            (click)="apply(o.id)"
+          >
+            {{ 'scheduling.poll.applyThis' | translate }}
+          </button>
+        }
+      </li>
+    }
+  </ol>
+
+  @if (p.isGm) {
+    <div class="gm-actions">
+      @if (open()) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="close"
+          [disabled]="busy()"
+          (click)="close()"
+        >
+          <mat-icon aria-hidden="true">stop_circle</mat-icon>
+          {{ 'scheduling.poll.close' | translate }}
+        </button>
+      } @else if (canApply()) {
+        @if (paused()) {
+          <p class="nri-muted">{{ 'scheduling.poll.pausedHint' | translate }}</p>
+        } @else if (p.winnerOptionId !== null) {
+          <button
+            mat-flat-button
+            type="button"
+            class="apply-winner"
+            [disabled]="busy()"
+            (click)="apply(p.winnerOptionId)"
+          >
+            <mat-icon aria-hidden="true">event_available</mat-icon>
+            {{ 'scheduling.poll.applyWinner.' + p.kind | translate }}
+          </button>
+        } @else {
+          <p class="nri-muted">{{ 'scheduling.poll.noWinner' | translate }}</p>
+        }
+      }
+    </div>
+  }
+
+  @if (pending(); as pend) {
+    <div class="pending nri-notice" role="group" [attr.aria-labelledby]="'poll-pending-' + p.id">
+      @if (pend.kind === 'weekdays') {
+        <p [id]="'poll-pending-' + p.id">{{ 'scheduling.poll.weekdays.title' | translate }}</p>
+        <label class="choice">
+          <input
+            type="radio"
+            [name]="'poll-weekdays-' + p.id"
+            value="replace"
+            [checked]="pend.choice === 'replace'"
+            (change)="setChoice('replace')"
+          />
+          {{ 'scheduling.poll.weekdays.replace' | translate }}
+        </label>
+        <label class="choice">
+          <input
+            type="radio"
+            [name]="'poll-weekdays-' + p.id"
+            value="add"
+            [checked]="pend.choice === 'add'"
+            (change)="setChoice('add')"
+          />
+          {{ 'scheduling.poll.weekdays.add' | translate }}
+        </label>
+        <p class="nri-muted">
+          {{ 'scheduling.poll.weekdays.timeNote' | translate: { time: pendingTime() } }}
+        </p>
+      } @else {
+        <p [id]="'poll-pending-' + p.id">{{ 'scheduling.poll.newSession.text' | translate }}</p>
+      }
+      <div class="pending-actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="confirm-pending"
+          [disabled]="busy()"
+          (click)="confirmPending()"
+        >
+          {{
+            (pend.kind === 'weekdays'
+              ? 'scheduling.poll.weekdays.confirm'
+              : 'scheduling.poll.newSession.confirm'
+            ) | translate
+          }}
+        </button>
+        <button mat-button type="button" (click)="cancelPending()">
+          {{ 'common.cancel' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="message" aria-live="polite">
+    @if (message(); as m) {
+      <p
+        [class.nri-alert]="m.kind === 'error'"
+        [class.nri-notice]="m.kind === 'info'"
+        [attr.role]="m.kind === 'error' ? 'alert' : null"
+      >
+        {{ m.key | translate }}
+      </p>
+    }
+  </div>
+</article>

@@ -38,9 +38,10 @@ import {
   type CancelSessionDialogData,
 } from '../session-actions/cancel-session-dialog';
 import { RescheduleDialog, type RescheduleDialogData } from '../session-actions/reschedule-dialog';
+import { openSessionAlternatives } from '../../scheduling/session-alternatives-dialog/open-session-alternatives';
 
 /** Дія майстра над сесією. */
-export type SessionAction = 'reschedule' | 'cancel' | 'finish';
+export type SessionAction = 'alternatives' | 'reschedule' | 'cancel' | 'finish';
 
 interface Message {
   kind: 'error' | 'info';
@@ -264,8 +265,11 @@ export class SessionsList {
   /** Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. */
   protected actions(s: SessionDto): SessionAction[] {
     if (!this.isGm() || !this.manageable() || s.status !== 'scheduled') return [];
-    const list: SessionAction[] = ['reschedule', 'cancel'];
-    if (Date.parse(s.startsAt) <= this.now()) list.push('finish');
+    const started = Date.parse(s.startsAt) <= this.now();
+    // «Інший час» — підбір альтернатив у ±3 доби (лише для майбутньої сесії).
+    const list: SessionAction[] = started
+      ? ['reschedule', 'cancel', 'finish']
+      : ['alternatives', 'reschedule', 'cancel'];
     return list;
   }
 
@@ -292,11 +296,18 @@ export class SessionsList {
     this.busy.set(true);
     this.message.set(null);
     try {
-      const result = await firstValueFrom(this.openDialog(s, action).afterClosed());
+      const result =
+        action === 'alternatives'
+          ? await openSessionAlternatives(this.dialog, {
+              sessionId: s.id,
+              viewerTimezone: this.viewerZone(),
+            })
+          : await firstValueFrom(this.openDialog(s, action).afterClosed());
       if (!result) return;
+      const done = action === 'alternatives' ? 'reschedule' : action;
       // Завершення зсуває вікно матеріалізації — беремо список із сервера.
       await this.load(this.gameId(), true);
-      this.message.set({ kind: 'info', key: `sessions.done.${action}` });
+      this.message.set({ kind: 'info', key: `sessions.done.${done}` });
       this.changed.emit();
       this.focus(`[data-session-id="${s.id}"]`);
     } finally {
@@ -308,7 +319,7 @@ export class SessionsList {
     await this.load(this.gameId());
   }
 
-  private openDialog(s: SessionDto, action: SessionAction) {
+  private openDialog(s: SessionDto, action: Exclude<SessionAction, 'alternatives'>) {
     const when = this.when(s);
     switch (action) {
       case 'reschedule':

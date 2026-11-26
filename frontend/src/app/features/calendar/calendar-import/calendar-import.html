@@ -1,0 +1,160 @@
+<section class="calendar-import" aria-labelledby="calendar-import-title">
+  <h2 id="calendar-import-title">{{ 'calendar.import.title' | translate }}</h2>
+  <p class="nri-muted">{{ 'calendar.import.lead' | translate }}</p>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'calendar.import.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="load()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (status(); as s) {
+        @if (!s.available) {
+          <p class="nri-notice unavailable">{{ 'calendar.import.unavailable' | translate }}</p>
+        }
+        @if (s.connected) {
+          <div class="status" [class.broken]="s.broken">
+            <p class="status-line">
+              <mat-icon aria-hidden="true">{{
+                s.broken ? 'sync_problem' : s.lastError ? 'warning' : 'event_available'
+              }}</mat-icon>
+              <span>{{ 'calendar.import.connectedTo' | translate: { host: s.host } }}</span>
+            </p>
+            @if (s.broken) {
+              <p class="nri-alert broken-text" role="alert">
+                {{ 'calendar.import.broken' | translate }}
+              </p>
+            }
+            @if (lastSync(); as when) {
+              <p class="nri-muted">
+                {{ 'calendar.import.lastSync' | translate: { when: when, n: s.eventsCount } }}
+              </p>
+            } @else {
+              <p class="nri-muted">{{ 'calendar.import.neverSynced' | translate }}</p>
+            }
+            @if (s.lastError) {
+              <p class="last-error">
+                {{ 'calendar.import.lastError' | translate: { when: lastAttempt() ?? '' } }}
+                {{ 'calendar.import.errors.' + s.lastError | translate }}
+              </p>
+            }
+            @if (s.truncated) {
+              <p class="nri-muted truncated">{{ 'calendar.import.truncated' | translate }}</p>
+            }
+            <p class="nri-muted privacy">{{ 'calendar.import.privacy' | translate }}</p>
+            @if (s.available) {
+              <div class="buttons">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="sync"
+                  [disabled]="busy() !== null || !!syncLockedUntil()"
+                  [attr.aria-describedby]="syncLockedUntil() ? 'calendar-sync-hint' : null"
+                  (click)="sync()"
+                >
+                  <mat-icon aria-hidden="true">sync</mat-icon>
+                  {{ 'calendar.import.syncNow' | translate }}
+                </button>
+                @if (!replacing()) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="replace"
+                    [disabled]="busy() !== null"
+                    (click)="startReplace()"
+                  >
+                    <mat-icon aria-hidden="true">link</mat-icon>
+                    {{ 'calendar.import.replace' | translate }}
+                  </button>
+                }
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="disconnect danger"
+                  [disabled]="busy() !== null"
+                  (click)="disconnect()"
+                >
+                  <mat-icon aria-hidden="true">link_off</mat-icon>
+                  {{ 'calendar.import.disconnect' | translate }}
+                </button>
+              </div>
+              @if (syncLockedUntil(); as until) {
+                <p class="nri-muted hint" id="calendar-sync-hint">
+                  {{ 'calendar.import.syncLocked' | translate: { when: until } }}
+                </p>
+              }
+            }
+          </div>
+        }
+
+        @if (showForm()) {
+          <form class="connect" novalidate (submit)="$event.preventDefault(); connect()">
+            <label class="url-label" for="calendar-import-url">{{
+              'calendar.import.urlLabel' | translate
+            }}</label>
+            <input
+              id="calendar-import-url"
+              class="url"
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              spellcheck="false"
+              [maxLength]="maxLength"
+              placeholder="https://…/basic.ics"
+              aria-describedby="calendar-import-help"
+              #urlInput
+              [value]="url()"
+              (input)="setUrl(urlInput.value)"
+            />
+            <div class="buttons">
+              <button
+                mat-flat-button
+                type="submit"
+                class="connect-btn"
+                [disabled]="busy() !== null"
+              >
+                {{
+                  (busy() === 'connect' ? 'calendar.import.connecting' : 'calendar.import.connect')
+                    | translate
+                }}
+              </button>
+              @if (replacing()) {
+                <button mat-button type="button" (click)="cancelReplace()">
+                  {{ 'common.cancel' | translate }}
+                </button>
+              }
+            </div>
+            <details class="help" id="calendar-import-help">
+              <summary>{{ 'calendar.import.help.title' | translate }}</summary>
+              <ul>
+                <li>{{ 'calendar.import.help.google' | translate }}</li>
+                <li>{{ 'calendar.import.help.apple' | translate }}</li>
+                <li>{{ 'calendar.import.help.outlook' | translate }}</li>
+              </ul>
+              <p class="nri-muted">{{ 'calendar.import.help.secret' | translate }}</p>
+            </details>
+          </form>
+        }
+      }
+    }
+  }
+
+  <div aria-live="polite">
+    @if (message(); as m) {
+      <p
+        [class.nri-alert]="m.kind === 'error'"
+        [class.nri-notice]="m.kind === 'info'"
+        [attr.role]="m.kind === 'error' ? 'alert' : null"
+      >
+        {{ m.key | translate: m.params }}
+      </p>
+    }
+  </div>
+</section>

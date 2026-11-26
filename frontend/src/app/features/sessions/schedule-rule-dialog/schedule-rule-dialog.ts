@@ -49,6 +49,11 @@ export interface ScheduleRuleDialogData {
   >;
   /** `schedule` — нове правило кампанії; `convert` — ваншот → кампанія. */
   mode: 'schedule' | 'convert';
+  /**
+   * Підставити варіант із підбору спільного часу: перша сесія (ISO UTC, у майбутньому) і
+   * дні тижня (у поясі гри). Майстер може змінити все перед збереженням.
+   */
+  prefill?: { startsAt: string; weekdays: readonly number[] };
 }
 
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
@@ -94,10 +99,16 @@ export class ScheduleRuleDialog {
   private readonly tz = this.data.game.timezone;
   protected readonly minDate = fromIsoDate(localDate(new Date(), this.tz));
 
+  /** Варіант із підбору — лише якщо він ще в майбутньому. */
+  private readonly prefill =
+    this.data.prefill && Date.parse(this.data.prefill.startsAt) > Date.now()
+      ? this.data.prefill
+      : null;
   private readonly start = this.initialStart();
-  private readonly startRecurrence: Recurrence = this.convert
-    ? 'weekly'
-    : this.data.game.recurrence;
+  private readonly startRecurrence: Recurrence =
+    this.convert || (this.prefill && !isWeekly(this.data.game.recurrence))
+      ? 'weekly'
+      : this.data.game.recurrence;
   protected readonly form = new FormGroup({
     date: new FormControl<Date | null>(this.start.date, { validators: [Validators.required] }),
     time: new FormControl(this.start.time, {
@@ -108,9 +119,11 @@ export class ScheduleRuleDialog {
     recurrence: new FormControl<Recurrence>(this.startRecurrence, { nonNullable: true }),
     weekdays: new FormControl<number[]>(
       isWeekly(this.startRecurrence)
-        ? this.data.game.weekdays.length
-          ? [...this.data.game.weekdays]
-          : [this.weekdayOfDate(this.start.date)]
+        ? this.prefill
+          ? [...this.prefill.weekdays]
+          : this.data.game.weekdays.length
+            ? [...this.data.game.weekdays]
+            : [this.weekdayOfDate(this.start.date)]
         : [],
       { nonNullable: true },
     ),
@@ -216,6 +229,7 @@ export class ScheduleRuleDialog {
    */
   private initialStart(): { date: Date; time: string } {
     const g = this.data.game;
+    if (this.prefill) return utcToZonedInput(this.prefill.startsAt, this.tz);
     const now = Date.now();
     const future = [g.nextSessionAt, g.startsAt].find(
       (iso): iso is string => !!iso && Date.parse(iso) > now,

@@ -1,0 +1,82 @@
+@import '../scheduling-shared';
+
+.kind {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+
+.field,
+.input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+  min-width: 0;
+}
+
+.group-label {
+  font-weight: 600;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+  margin: 0;
+  padding-left: var(--nri-space-lg);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}
+
+.add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  margin: 0;
+  padding: var(--nri-space-sm) var(--nri-space-md);
+  border: 1px dashed var(--nri-border);
+  border-radius: var(--nri-radius-md);
+
+  legend {
+    padding: 0 var(--nri-space-xs);
+    font-weight: 600;
+  }
+}
+
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nri-space-sm);
+
+  .input {
+    flex: 1 1 140px;
+  }
+}
+
+select,
+input {
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0 var(--nri-space-sm);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-surface);
+  color: var(--nri-text);
+  font: inherit;
+}
+
+.hint,
+.preview {
+  font-size: 0.9rem;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--nri-danger-text);
+  font-size: 0.9rem;
+}

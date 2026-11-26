@@ -33,6 +33,11 @@
         <h2 [id]="uid + '-week'">{{ 'calendar.week' | translate }}</h2>
       }
       <p class="nri-muted hint" [id]="uid + '-help'">{{ 'calendar.help' | translate }}</p>
+      @if (!custom) {
+        <p class="nri-notice gm-sees">
+          {{ 'calendar.gmSees' | translate }}
+        </p>
+      }
 
       <div class="grid-scroll">
         <div

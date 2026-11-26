@@ -17,6 +17,7 @@ import {
   NavigationEnd,
   NavigationError,
   Router,
+  type UrlTree,
   RouterLink,
 } from '@angular/router';
 import { filter, take } from 'rxjs';
@@ -49,6 +50,8 @@ interface Row {
   n: NotificationDto;
   view: NotificationView;
   time: NotificationTime;
+  /** Посилання як `UrlTree`: рядок із `?poll=…` у `routerLink` закодував би `?`. */
+  url: UrlTree;
 }
 
 /**
@@ -100,6 +103,7 @@ export class NotificationBell {
       n,
       view: notificationView(n, tz),
       time: notificationTime(n.createdAt, tz, now),
+      url: this.router.parseUrl(n.link),
     }));
   });
 

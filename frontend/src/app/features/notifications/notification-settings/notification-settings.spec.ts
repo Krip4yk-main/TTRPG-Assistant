@@ -132,12 +132,44 @@ describe('NotificationSettings', () => {
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({
       telegram: { ...defaultNotificationPrefs().telegram, applications: false },
+      site: { schedule: true },
       reminderOffsets: [60, 15],
     });
     req.flush({ ...req.request.body });
     await flushAsync();
     await settle();
     expect(snack.open).toHaveBeenCalledWith(uk.notifications.settings.saved, '', expect.anything());
+  });
+
+  it('«Розклад» can be muted on the site: separate toggle, saved as site.schedule', async () => {
+    await start(true);
+    const site = () =>
+      el.querySelector<HTMLButtonElement>(
+        'mat-slide-toggle[data-site-category="schedule"] button',
+      )!;
+    expect(site().getAttribute('aria-checked')).toBe('true');
+    // Без Telegram перемикач сайту теж працює — це не Telegram-налаштування.
+    expect(site().disabled).toBe(false);
+    expect(el.textContent).toContain(uk.notifications.settings.site.schedule);
+    site().click();
+    await settle();
+    el.querySelector<HTMLButtonElement>('button.save')!.click();
+    const req = http.expectOne('/api/me/notification-prefs');
+    expect(req.request.body.site).toEqual({ schedule: false });
+    expect(req.request.body.telegram).toEqual(defaultNotificationPrefs().telegram);
+    req.flush({ ...req.request.body });
+    await flushAsync();
+    await settle();
+    expect(site().getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('a stored site opt-out is shown off; no Telegram does not disable it', async () => {
+    await start(false, { ...defaultNotificationPrefs(), site: { schedule: false } });
+    const site = el.querySelector<HTMLButtonElement>(
+      'mat-slide-toggle[data-site-category="schedule"] button',
+    )!;
+    expect(site.getAttribute('aria-checked')).toBe('false');
+    expect(site.disabled).toBe(false);
   });
 
   it('no offsets = reminders off (explained), saved as []', async () => {

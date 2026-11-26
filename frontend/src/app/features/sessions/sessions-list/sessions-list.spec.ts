@@ -204,7 +204,7 @@ describe('SessionsList', () => {
   it('the GM can finish only sessions that already started', async () => {
     await create(true);
     expect(buttons(2)).toEqual(['reschedule', 'cancel', 'finish']);
-    expect(buttons(3)).toEqual(['reschedule', 'cancel']);
+    expect(buttons(3)).toEqual(['alternatives', 'reschedule', 'cancel']);
     expect(buttons(1)).toEqual([]);
     expect(buttons(4)).toEqual([]);
   });
@@ -293,7 +293,7 @@ describe('SessionsList', () => {
       vi.setSystemTime(new Date('2027-03-02T16:59:30.000Z'));
       await create(true);
       expect(row(3)!.closest('.upcoming')).not.toBeNull();
-      expect(buttons(3)).toEqual(['reschedule', 'cancel']);
+      expect(buttons(3)).toEqual(['alternatives', 'reschedule', 'cancel']);
 
       vi.advanceTimersByTime(60_000);
       await settle();

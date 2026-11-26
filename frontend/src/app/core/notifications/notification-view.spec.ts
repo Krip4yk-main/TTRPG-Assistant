@@ -155,6 +155,25 @@ describe('notificationView', () => {
     expect(cal).toContain('можете, не можете, чи це невідомо');
   });
 
+  it('schedule notifications: own icons, translated texts for every new type', () => {
+    const icon = (type: NotificationType) =>
+      notificationView({ ...dto(type), category: 'schedule' }, 'UTC').icon;
+    expect(icon('poll.created')).toBe('how_to_vote');
+    expect(icon('poll.closed')).toBe('how_to_vote');
+    expect(icon('session.rsvp_declined')).toBe('event_busy');
+    expect(icon('calendar.empty')).toBe('edit_calendar');
+    expect(icon('calendar.import_broken')).toBe('sync_problem');
+    for (const type of [
+      'poll.created',
+      'poll.closed',
+      'session.created',
+      'calendar.empty',
+      'calendar.import_broken',
+    ] as const) {
+      expect(typeof lookup('notifications.' + type)).toBe('string');
+    }
+  });
+
   it('long pause reminder: text names the three choices; quick actions link to the game page', () => {
     const v = notificationView(dto('game.long_pause'), 'UTC');
     expect(v.key).toBe('notifications.game.long_pause');

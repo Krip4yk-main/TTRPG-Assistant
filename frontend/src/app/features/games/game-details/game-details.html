@@ -372,6 +372,18 @@
               (changed)="membersChanged()"
               (mutated)="quiet(['sessions'])"
             />
+            @defer (on idle) {
+              <nri-polls-panel
+                #polls
+                class="polls"
+                [game]="g"
+                [isGm]="isGm()"
+                [pollId]="poll()"
+                [sessionId]="session()"
+                (changed)="scheduleChanged()"
+                (mutated)="quiet(['polls'])"
+              />
+            }
             <nri-members-panel
               class="nri-card members"
               [gameId]="g.id"

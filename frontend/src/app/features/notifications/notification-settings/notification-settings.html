@@ -13,6 +13,31 @@
     </div>
   } @else if (telegram(); as tg) {
     <div class="prefs">
+      <!-- На сайті -->
+      <section class="nri-card" aria-labelledby="site-title">
+        <h2 id="site-title">{{ 'notifications.settings.site.title' | translate }}</h2>
+        <p class="nri-muted">{{ 'notifications.settings.site.hint' | translate }}</p>
+        <ul class="categories">
+          @for (category of siteCategories; track category) {
+            <li>
+              <mat-slide-toggle
+                [attr.data-site-category]="category"
+                [checked]="site()?.[category] ?? true"
+                [disabled]="saving()"
+                [aria-describedby]="'site-hint-' + category"
+                (change)="setSite(category, $event.checked)"
+                >{{
+                  'notifications.categories.' + category + '.label' | translate
+                }}</mat-slide-toggle
+              >
+              <p class="nri-muted hint" [id]="'site-hint-' + category">
+                {{ 'notifications.settings.site.' + category | translate }}
+              </p>
+            </li>
+          }
+        </ul>
+      </section>
+
       <!-- Telegram -->
       <section class="nri-card" aria-labelledby="telegram-title">
         <h2 id="telegram-title">{{ 'notifications.settings.telegram.title' | translate }}</h2>
