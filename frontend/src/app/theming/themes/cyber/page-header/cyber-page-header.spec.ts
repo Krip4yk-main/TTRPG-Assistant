@@ -41,7 +41,18 @@ describe('CyberPageHeader (slot «page-header»)', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const h1 = (fixture.nativeElement as HTMLElement).querySelector('h1')!;
+    const host = fixture.nativeElement as HTMLElement;
+    // Як getByRole('heading', { name }): заголовок знаходиться за доступною назвою
+    // (aria-label, інакше текст) — і він один.
+    const headings = [
+      ...host.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6, [role="heading"]'),
+    ];
+    const named = headings.filter(
+      (h) => (h.getAttribute('aria-label') ?? h.textContent!.trim()) === 'Знайдіть свою гру',
+    );
+    expect(named).toHaveLength(1);
+    const h1 = named[0]!;
+    expect(h1.tagName).toBe('H1');
     // Копіювання, пошук на сторінці, innerText — один раз, без зайвих пробілів між частинами.
     expect(h1.textContent!.trim()).toBe('Знайдіть свою гру');
     expect(h1.getAttribute('aria-label')).toBe('Знайдіть свою гру');
