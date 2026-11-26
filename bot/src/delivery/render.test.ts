@@ -34,7 +34,7 @@ describe('renderNotification', () => {
     expect(text).not.toMatch(/\{\w+\}/);
     expect(text).toContain('Прокляття Страда');
     expect(text).toMatch(
-      /Детальніше: https:\/\/nri\.example\/(games\/12|my-applications|my-games)/,
+      /Детальніше: https:\/\/nri\.example\/(games\/12|my-applications|my-games|calendar)/,
     );
   });
 
@@ -491,5 +491,32 @@ describe('callback data', () => {
     ]) {
       expect(parseCallback(d), d).toBeNull();
     }
+  });
+});
+
+describe('smart reschedule and calendar reminder', () => {
+  const p: NotificationParams = {
+    gameId: 12,
+    gameTitle: 'Гра',
+    sessionId: 56,
+    startsAt: '2026-11-27T17:00:00.000Z',
+    actor: { publicId: 'p1', nickname: 'Аня' },
+    count: 0,
+  };
+
+  it('session.rsvp_declined: one member, several members, link to the session', () => {
+    const one = render('session.rsvp_declined', p);
+    expect(one.text.split('\n')[0]).toContain('Аня не зможе прийти на сесію гри «Гра» (пт, 27 листопада о 19:00)');
+    expect(one.text).toContain('Детальніше: https://nri.example/games/12?session=56');
+    expect(one.keyboard).toBeUndefined();
+    const many = render('session.rsvp_declined', { ...p, count: 2 });
+    expect(many.text).toContain('Аня та ще 2 з групи не зможуть прийти');
+  });
+
+  it('calendar.empty: explains can/cannot/unknown, links to the calendar', () => {
+    const r = render('calendar.empty', { gameId: 12, gameTitle: 'Гра' });
+    expect(r.text).toContain('майстер гри «Гра»');
+    expect(r.text).toContain('можеш, не можеш, чи це невідомо');
+    expect(r.text).toContain('Детальніше: https://nri.example/calendar');
   });
 });

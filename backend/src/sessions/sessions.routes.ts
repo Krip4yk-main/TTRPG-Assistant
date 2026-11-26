@@ -10,6 +10,7 @@ import {
   rescheduleSession,
 } from './sessions.service.js';
 import { setRsvp } from './rsvp.js';
+import { getSessionAlternatives } from '../scheduling/reschedule.service.js';
 
 /** Монтується на `/api/games/:id`: список сесій гри. */
 export function gameSessionsRouter(deps: AppDeps): Router {
@@ -36,6 +37,10 @@ export function sessionsRouter(deps: AppDeps): Router {
       res.json(await run(deps, req.user!.userId, numericId(req.params.id), req.body));
     });
   }
+  // Розумне перенесення: альтернативи на тижні сесії (лише майстер).
+  router.get('/:id/alternatives', auth, requireActive, async (req, res) => {
+    res.json(await getSessionAlternatives(deps, req.user!.userId, numericId(req.params.id)));
+  });
   router.put('/:id/rsvp', auth, requireActive, async (req, res) => {
     const id = numericId(req.params.id);
     await setRsvp(deps, req.user!.userId, id, req.body);

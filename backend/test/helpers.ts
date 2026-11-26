@@ -37,6 +37,8 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 }
 
 const TABLES = [
+  'rsvp_decline_notices',
+  'calendar_reminders',
   'poll_votes',
   'poll_options',
   'polls',

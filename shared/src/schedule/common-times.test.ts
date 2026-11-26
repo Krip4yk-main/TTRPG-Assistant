@@ -287,6 +287,23 @@ describe('findCommonTimes', () => {
     expect(r.regular).toHaveLength(5);
   });
 
+  it('excludeOneOff drops candidates before the top is picked (neighbours are not blocked)', () => {
+    const a = person({ userId: 1, slots: [{ weekday: TUE, startMin: H(18), endMin: H(23) }] });
+    const base = { timezone: KYIV, durationMinutes: 240, from: FROM, to: TO, people: [a] };
+    const plain = findCommonTimes({ ...base, regular: false, top: 1 });
+    expect(plain.oneOff[0]!.startsAt).toBe('2027-03-16T16:00:00.000Z');
+    const cur = Date.parse('2027-03-16T16:00:00.000Z');
+    const r = findCommonTimes({
+      ...base,
+      regular: false,
+      top: 2,
+      excludeOneOff: (start) => start.getTime() === cur,
+    });
+    // 18:30 перетинається з виключеним 18:00, але сам не виключений — його пропонують.
+    expect(r.oneOff[0]!.startsAt).toBe('2027-03-16T16:30:00.000Z');
+    expect(r.oneOff.map((x) => x.startsAt)).not.toContain('2027-03-16T16:00:00.000Z');
+  });
+
   it('regular: no regular candidates when disabled (oneshot)', () => {
     const a = person({ userId: 1, slots: [{ weekday: TUE, startMin: H(19), endMin: H(23) }] });
     const r = findCommonTimes({

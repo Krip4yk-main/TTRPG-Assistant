@@ -10,6 +10,7 @@ import { gameMembers, games, gameSessions, sessionRsvp, users } from '../db/sche
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 import { emitGameChanged } from '../realtime/game-rooms.js';
+import { recordRsvpDecline } from '../scheduling/reschedule.service.js';
 
 export type RsvpView = Pick<SessionDto, 'myRsvp' | 'rsvpSummary'>;
 
@@ -129,10 +130,18 @@ export async function setRsvp(
     if (!s || s.status !== 'scheduled' || s.startsAt <= now) {
       throw new AppError(409, 'SESSION_INVALID_STATE');
     }
+    const [prev] = await tx
+      .select({ status: sessionRsvp.status })
+      .from(sessionRsvp)
+      .where(and(eq(sessionRsvp.sessionId, sessionId), eq(sessionRsvp.userId, userId)));
     await tx
       .insert(sessionRsvp)
       .values({ sessionId, userId, status, updatedAt: now })
       .onDuplicateKeyUpdate({ set: { status, updatedAt: now } });
+    // Нове «не буду» (не повтор) — майстру підказка про перенесення, із затримкою (джоб).
+    if (status === 'not_going' && prev?.status !== 'not_going') {
+      await recordRsvpDecline(tx, sessionId, userId, now);
+    }
   });
   // Відповідь бачать лише майстер (зведення) і сам учасник — пінг лише їм.
   emitGameChanged(deps, r.game.id, 'sessions', { userIds: [r.game.gmUserId, userId] });

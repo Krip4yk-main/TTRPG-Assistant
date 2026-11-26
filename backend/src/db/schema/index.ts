@@ -13,6 +13,7 @@ import * as notifications from './notifications.js';
 import * as polls from './polls.js';
 import * as profiles from './profiles.js';
 import * as ratings from './ratings.js';
+import * as scheduling from './scheduling.js';
 import * as sessions from './sessions.js';
 import * as users from './users.js';
 import * as views from './views.js';
@@ -32,6 +33,7 @@ export * from './notifications.js';
 export * from './polls.js';
 export * from './profiles.js';
 export * from './ratings.js';
+export * from './scheduling.js';
 export * from './sessions.js';
 export * from './users.js';
 export * from './views.js';
@@ -55,4 +57,5 @@ export const schema = {
   ...moderation,
   ...demo,
   ...polls,
+  ...scheduling,
 };

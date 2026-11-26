@@ -123,7 +123,12 @@ export async function computeCommonTimes(
   deps: AppDeps,
   game: GameRow,
   window: { from: Date; to: Date },
-  opts: { top?: number; now?: Date } = {},
+  opts: {
+    top?: number;
+    now?: Date;
+    /** Разові кандидати, яких не пропонувати (розумне перенесення: поточний час сесії тощо). */
+    excludeOneOff?: (start: Date, end: Date) => boolean;
+  } = {},
 ): Promise<CommonTimesDto> {
   const participants = await loadParticipants(deps, game);
   // Кандидат, що починається біля кінця вікна, триває ще `durationMinutes` — зайнятість
@@ -154,6 +159,7 @@ export async function computeCommonTimes(
     people,
     regular: game.kind === 'campaign',
     top: opts.top,
+    excludeOneOff: opts.excludeOneOff,
   });
   return {
     timezone: game.timezone,

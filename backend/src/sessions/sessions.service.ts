@@ -24,6 +24,7 @@ import { materializeSessions, sessionsWindow } from './materialize.js';
 import { sessionsChanged } from '../realtime/game-rooms.js';
 import { markGameSessionsViewed, markOwnChange, seenFor } from '../views/views.service.js';
 import { rsvpOf, rsvpViews, type RsvpView } from './rsvp.js';
+import { clearRsvpDeclines } from '../scheduling/reschedule.service.js';
 
 type GameRow = typeof games.$inferSelect;
 type SessionRow = typeof gameSessions.$inferSelect;
@@ -197,6 +198,7 @@ export async function rescheduleSession(
       .where(eq(gameSessions.id, sessionId));
     // RSVP відповідали на старий час — після перенесення учасники відповідають наново.
     await tx.delete(sessionRsvp).where(eq(sessionRsvp.sessionId, sessionId));
+    await clearRsvpDeclines(tx, sessionId);
     return session;
   });
   await logEvent(deps.db, {

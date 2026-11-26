@@ -54,6 +54,11 @@ export interface CommonTimesInput {
   top?: number;
   /** Крок сітки, хв; за замовчуванням 30. */
   stepMinutes?: number;
+  /**
+   * Разові кандидати, яких не пропонувати (до вибору топу, тож вони не витісняють сусідів):
+   * розумне перенесення прибирає поточний час сесії й час інших сесій гри.
+   */
+  excludeOneOff?: (start: Date, end: Date) => boolean;
 }
 
 export interface CommonTimesResult {
@@ -275,7 +280,8 @@ export function findCommonTimes(input: CommonTimesInput): CommonTimesResult {
   const verdicts = evaluateGrid(points, input.people);
   const durMs = input.durationMinutes * MINUTE;
 
-  const oneOffAll = points.map((p, i) => {
+  const oneOffAll = points.flatMap((p, i) => {
+    if (input.excludeOneOff?.(p.start, p.end)) return [];
     const statuses = input.people.map((person, k) => ({
       userId: person.userId,
       status: verdicts[k]![i]!.status,
@@ -286,7 +292,7 @@ export function findCommonTimes(input: CommonTimesInput): CommonTimesResult {
       ...counts(statuses),
       statuses,
     };
-    return { c, t: p.start.getTime() };
+    return [{ c, t: p.start.getTime() }];
   });
   oneOffAll.sort((a, b) => b.c.can - a.c.can || a.c.cannot - b.c.cannot || a.t - b.t);
   const startOf = (c: OneOffCandidateDto) => Date.parse(c.startsAt);

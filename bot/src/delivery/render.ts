@@ -122,6 +122,10 @@ export function renderNotification(
     if (kind === 'rating.deadline' && params.sessionId !== undefined && params.startsAt) {
       key = 'notify.rating.deadline_session';
     }
+    // «Не буду» кількох учасників одним сповіщенням — «X та ще N».
+    if (kind === 'session.rsvp_declined' && (params.count ?? 0) > 0) {
+      key = 'notify.session.rsvp_declined_many';
+    }
     // Голосування за час: окремий текст для регулярного; закриття — за причиною й переможцем.
     if (kind === 'poll.created' && params.pollKind === 'regular')
       key = 'notify.poll.created_regular';

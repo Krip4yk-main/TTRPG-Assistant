@@ -27,6 +27,16 @@ import {
   POLLS_CLOSE_JOB,
   runPollsClose,
 } from '../scheduling/polls.service.js';
+import {
+  CALENDAR_REMINDERS_EVERY_MS,
+  CALENDAR_REMINDERS_JOB,
+  runCalendarReminders,
+} from '../scheduling/calendar-reminder.service.js';
+import {
+  RSVP_DECLINED_EVERY_MS,
+  RSVP_DECLINED_JOB,
+  runRsvpDeclineNotices,
+} from '../scheduling/reschedule.service.js';
 import { DAILY_AT_UTC, DAILY_JOB, runDaily } from './daily.js';
 import { purgeFinishedJobs } from './queue.js';
 import { registerHandler, registerRecurring } from './registry.js';
@@ -89,4 +99,16 @@ export function registerJobs(): void {
     await runPollsClose(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
   });
   registerRecurring(POLLS_CLOSE_JOB, { everyMs: POLLS_CLOSE_EVERY_MS });
+
+  // «Не буду» → сповіщення майстру із затримкою (збирає кілька в одне); ідемпотентно.
+  registerHandler(RSVP_DECLINED_JOB, async (deps, _payload, job) => {
+    await runRsvpDeclineNotices(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(RSVP_DECLINED_JOB, { everyMs: RSVP_DECLINED_EVERY_MS });
+
+  // Нагадування про порожній календар: раз назавжди (рядок `calendar_reminders`).
+  registerHandler(CALENDAR_REMINDERS_JOB, async (deps, _payload, job) => {
+    await runCalendarReminders(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(CALENDAR_REMINDERS_JOB, { everyMs: CALENDAR_REMINDERS_EVERY_MS });
 }

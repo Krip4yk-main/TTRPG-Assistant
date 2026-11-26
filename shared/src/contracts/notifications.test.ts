@@ -32,6 +32,8 @@ describe('notification contracts', () => {
       'game.suspicious',
       'game.closed_by_admin',
       'game.long_pause',
+      'session.rsvp_declined',
+      'calendar.empty',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -108,7 +110,11 @@ describe('notificationLink', () => {
     expect(notificationLink('game.finished', {})).toBe('/');
     const deadGameTypes = ['game.stale_reminder', 'game.dead', 'game.suspicious'] as const;
     for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/my-games');
-    expect(notificationLink('game.closed_by_admin', { gameId: 5 })).toBe('/games/5');
+    expect(notificationLink('game.closed_by_admin', { gameId: 5 })).toBe('/games/5');    expect(notificationLink('session.rsvp_declined', { gameId: 5, sessionId: 2 })).toBe(
+      '/games/5?session=2',
+    );
+    expect(notificationLink('calendar.empty', { gameId: 5 })).toBe('/calendar');
+    expect(notificationLink('calendar.empty', {})).toBe('/calendar');
   });
 
   it('rating notifications lead to the rate page (session set via ?session=)', () => {

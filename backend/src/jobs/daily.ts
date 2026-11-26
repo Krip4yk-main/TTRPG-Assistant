@@ -12,6 +12,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { purgeTelegramOutbox } from '../notifications/telegram-outbox.js';
+import { purgeRsvpDeclineNotices } from '../scheduling/reschedule.service.js';
 import { materializeSessions } from '../sessions/materialize.js';
 import { sessionsChanged } from '../realtime/game-rooms.js';
 
@@ -169,6 +170,7 @@ export async function runDaily(deps: AppDeps, now = new Date()): Promise<void> {
     ['purgeReadNotifications', () => purgeReadNotifications(deps, now)],
     ['purgeReminderLog', () => purgeReminderLog(deps, now)],
     ['purgeTelegramOutbox', () => purgeTelegramOutbox(deps, now)],
+    ['purgeRsvpDeclineNotices', () => purgeRsvpDeclineNotices(deps, now)],
   ];
   let failure: unknown;
   for (const [name, step] of steps) {

@@ -143,6 +143,18 @@ describe('notificationView', () => {
     expect(String(lookup('notifications.game.resumed_recruit'))).toContain('донабір');
   });
 
+  it('rsvp declined: one member vs «X та ще N»; calendar reminder explains can/cannot/unknown', () => {
+    expect(notificationView(dto('session.rsvp_declined', { count: 0 }), 'UTC').key).toBe(
+      'notifications.session.rsvp_declined',
+    );
+    const many = notificationView(dto('session.rsvp_declined', { count: 2 }), 'UTC');
+    expect(many.key).toBe('notifications.session.rsvp_declined_many');
+    expect(many.count).toBe(2);
+    expect(String(lookup(many.key))).toContain('{{count}}');
+    const cal = String(lookup('notifications.calendar.empty'));
+    expect(cal).toContain('можете, не можете, чи це невідомо');
+  });
+
   it('long pause reminder: text names the three choices; quick actions link to the game page', () => {
     const v = notificationView(dto('game.long_pause'), 'UTC');
     expect(v.key).toBe('notifications.game.long_pause');

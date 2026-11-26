@@ -39,7 +39,12 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * сесії, `recruit` — оголошено донабір), `game.long_pause` (не з подій, майстру: кампейн на паузі
  * понад 90 днів). Голосування за час (категорія `schedule`): `poll.created` (учасникам: `pollId`,
  * `pollKind`, `pollOptions`, дедлайн `closesAt`; у Telegram — кнопки відповіді), `poll.closed`
- * (майстру, коли закрилось само: `closeReason`, `startsAt` переможця або без нього). Текст —
+ * (майстру, коли закрилось само: `closeReason`, `startsAt` переможця або без нього). Розумне
+ * перенесення (не з подій, `schedule`): `session.rsvp_declined` — майстру, що учасник(и)
+ * поставили «не буду» на сесію (`sessionId`, `startsAt`, `actor` — перший, `absentees` — усі,
+ * `count` — скільки ще крім першого; із затримкою й збиранням кількох в одне). Нагадування
+ * про порожній календар (не з подій, `schedule`): `calendar.empty` — учаснику кампейну без
+ * тижневих слотів, один раз (`gameId`/`gameTitle` — кампейн, з якого почалось). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -79,6 +84,8 @@ export const NOTIFICATION_TYPES = [
   'appeal.decided',
   'poll.created',
   'poll.closed',
+  'session.rsvp_declined',
+  'calendar.empty',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -139,6 +146,8 @@ export interface NotificationParams {
   pollKind?: PollKind;
   /** Варіанти голосування (`poll.created`) — для тексту в Telegram. */
   pollOptions?: NotificationPollOption[];
+  /** Хто з учасників не зможе прийти (`session.rsvp_declined`), у порядку відповіді. */
+  absentees?: NotificationActor[];
   /** Чому закрилось голосування (`poll.closed`). */
   closeReason?: PollCloseReason;
   actor?: NotificationActor | null;
@@ -255,11 +264,17 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   if (type === 'game.stale_reminder' || type === 'game.dead' || type === 'game.suspicious') {
     return '/my-games';
   }
+  // Нагадування про календар — до редактора доступності.
+  if (type === 'calendar.empty') return '/calendar';
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'poll.created':
     case 'poll.closed':
       return p.pollId !== undefined ? `/games/${p.gameId}?poll=${p.pollId}` : `/games/${p.gameId}`;
+    case 'session.rsvp_declined':
+      return p.sessionId !== undefined
+        ? `/games/${p.gameId}?session=${p.sessionId}`
+        : `/games/${p.gameId}`;
     case 'rating.session_open':
     case 'rating.final_open':
     case 'rating.member_left':

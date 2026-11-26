@@ -25,6 +25,7 @@ export const ANONYMOUS_VARIANTS: readonly NotificationType[] = [
   'application.created',
   'application.withdrawn',
   'member.left',
+  'session.rsvp_declined',
 ];
 
 /** Жанри з власною подякою після завершення гри (`notifications.thanks.<slug>`). */
@@ -168,6 +169,10 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
       code: p.pauseReason ? `pause.${p.pauseReason}` : null,
       text: p.note || null,
     };
+  }
+  // «Не буду» кількох учасників одним сповіщенням — «X та ще N» (як у боті).
+  if (n.type === 'session.rsvp_declined' && (p.count ?? 0) > 0) {
+    view.key = 'notifications.session.rsvp_declined_many';
   }
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {
