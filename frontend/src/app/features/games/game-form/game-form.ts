@@ -93,7 +93,9 @@ const MAX_QUESTIONS = 10;
 const MAX_CUSTOM_WARNINGS = 10;
 /** Затримка автозбереження незбережених значень у `localStorage`. */
 const AUTOSAVE_DEBOUNCE_MS = 500;
-const LOCKED_STATUSES = new Set<GameStatus>(['recruiting', 'started']);
+const LOCKED_STATUSES = new Set<GameStatus>(['recruiting', 'started', 'paused']);
+/** Розклад лише для читання: гра йде (зміна — на сторінці гри) чи на паузі (— відновленням). */
+const SCHEDULE_LOCKED = new Set<GameStatus>(['started', 'paused']);
 const CLOSED_STATUSES = new Set<GameStatus>(['finished', 'cancelled']);
 /**
  * Поля правила розкладу. Для гри, що вже йде, вони лише для читання: розклад змінюється
@@ -290,7 +292,7 @@ export class GameForm {
   protected readonly locked = computed(() => LOCKED_STATUSES.has(this.status()));
   protected readonly closed = computed(() => CLOSED_STATUSES.has(this.status()));
   /** Гра йде: правило розкладу тут не редагується (див. `RULE_CONTROLS`). */
-  protected readonly scheduleLocked = computed(() => this.status() === 'started');
+  protected readonly scheduleLocked = computed(() => SCHEDULE_LOCKED.has(this.status()));
   protected readonly ready = computed(
     () => this.catalog() !== null && (this.id() === undefined || this.game() !== null),
   );
@@ -866,7 +868,7 @@ export class GameForm {
         this.c.systemOther.disable();
         this.c.kind.disable();
       }
-      if (g.status === 'started') for (const name of RULE_CONTROLS) this.c[name].disable();
+      if (SCHEDULE_LOCKED.has(g.status)) for (const name of RULE_CONTROLS) this.c[name].disable();
       this.startDraft();
     }
     this.validate();

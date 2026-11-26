@@ -706,8 +706,10 @@ describe('GameDetails', () => {
       );
       expect(button('change-schedule')).toBeNull();
       expect(button('pause')).toBeNull();
-      expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
+      // Нерозкладові поля редагуються й на паузі (розклад у формі вимкнено).
+      expect(el().querySelector('a[href="/games/7/edit"]')).not.toBeNull();
       expect(button('resume')).not.toBeNull();
+      expect(button('cancel')).not.toBeNull();
       expect(button('finish')).not.toBeNull();
 
       nextDialog({ ...own, status: 'started', showWhenFull: true, warning: 'BELOW_MIN_PLAYERS' });
@@ -741,6 +743,23 @@ describe('GameDetails', () => {
       req.flush({ ...own, status: 'finished' });
       await afterChange({ ...own, status: 'finished' });
       expect(el().querySelector('.notice-area')!.textContent).toContain('games.my.done.finish');
+    });
+
+    it('paused, GM: «cancel» uses the regular cancel confirmation and POSTs cancel', async () => {
+      await open(me, (r) => r.flush(paused));
+      await flushGmExtras();
+      nextDialog(true);
+      button('cancel')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenLastCalledWith(
+        ConfirmDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'games.confirm.cancel.title', danger: true }),
+        }),
+      );
+      http.expectOne('/api/games/7/cancel').flush({ ...own, status: 'cancelled' });
+      await afterChange({ ...own, status: 'cancelled' });
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.my.done.cancel');
     });
 
     it('paused, outsider: panel without the private reason, no apply button, a clear hint', async () => {

@@ -49,7 +49,7 @@ describe('toMyGameItemVm', () => {
     expect(cancel).toMatchObject({ danger: true, link: null, labelKey: 'games.actions.cancel' });
   });
 
-  it('campaign pause: «pause» for running campaigns; «resume» / «recruit» on paused, no edit', () => {
+  it('campaign pause: «pause» for running campaigns; «resume» / «recruit» on paused, plus edit', () => {
     const campaign = (id: number, status: MyGameCardDto['status']): MyGameCardDto => ({
       ...card(id, status),
       kind: 'campaign',
@@ -60,14 +60,21 @@ describe('toMyGameItemVm', () => {
     // Ваншот на паузу не ставиться.
     expect(actions(card(4, 'started'))).not.toContain('pause');
     const paused = vm(campaign(5, 'paused'));
-    expect(paused.actions.map((a) => a.id)).toEqual(['resume', 'recruit', 'finish', 'cancel']);
+    expect(paused.actions.map((a) => a.id)).toEqual([
+      'edit',
+      'resume',
+      'recruit',
+      'finish',
+      'cancel',
+    ]);
     expect(paused.statusKey).toBe('games.status.paused');
-    expect(paused.actions[0]).toMatchObject({
+    expect(paused.actions[0]).toMatchObject({ link: ['/games', 5, 'edit'] });
+    expect(paused.actions[1]).toMatchObject({
       labelKey: 'games.actions.resume',
       emphasis: 'stroked',
       link: null,
     });
-    expect(paused.actions[1]).toMatchObject({ labelKey: 'games.actions.recruit', link: null });
+    expect(paused.actions[2]).toMatchObject({ labelKey: 'games.actions.recruit', link: null });
     expect(paused.applications).toEqual({ link: ['/games', 5, 'applications'], pending: 0 });
   });
 

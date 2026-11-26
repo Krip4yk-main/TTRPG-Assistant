@@ -51,6 +51,15 @@
     >
       {{ 'games.pause.panel.finish' | translate }}
     </button>
+    <button
+      mat-button
+      type="button"
+      class="cancel danger"
+      [disabled]="busy()"
+      (click)="action.emit('cancel')"
+    >
+      {{ 'games.actions.cancel' | translate }}
+    </button>
   </div>
 } @else if (member()) {
   <p class="hint nri-muted">{{ 'games.pause.panel.memberHint' | translate }}</p>

@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 
 /** Дія майстра з паузи. */
-export type PauseAction = 'resume' | 'recruit' | 'finish';
+export type PauseAction = 'resume' | 'recruit' | 'finish' | 'cancel';
 
 /** Що показати на панелі паузи (усе вже відформатовано). */
 export interface PauseInfo {

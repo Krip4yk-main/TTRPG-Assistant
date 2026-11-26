@@ -72,7 +72,7 @@ import {
   type ComplaintDialogData,
 } from '../../moderation/complaint-dialog/complaint-dialog';
 
-const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
+const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
 /** Дії майстра з паузи, які можна відкрити посиланням (`?action=…`, з нагадування). */
 const PAUSE_LINK_ACTIONS: readonly PauseAction[] = ['resume', 'recruit', 'finish'];
@@ -509,7 +509,7 @@ export class GameDetails {
 
   /** Дія з панелі паузи: «Відновити», «Оголосити донабір» чи «Завершити кампейн». */
   protected async runPauseAction(action: PauseAction): Promise<void> {
-    if (action === 'finish') await this.finishPaused();
+    if (action === 'finish' || action === 'cancel') await this.closePaused(action);
     else await this.resume(action === 'recruit');
   }
 
@@ -533,8 +533,8 @@ export class GameDetails {
     }
   }
 
-  /** «Завершити кампейн» з паузи — після підтвердження. */
-  private async finishPaused(): Promise<void> {
+  /** «Завершити кампейн» / «Скасувати гру» з паузи — після того самого підтвердження, що й деінде. */
+  private async closePaused(action: 'finish' | 'cancel'): Promise<void> {
     const g = this.game();
     if (!g || this.busy() || !this.isGm() || g.status !== 'paused') return;
     this.busy.set(true);
@@ -542,9 +542,9 @@ export class GameDetails {
     try {
       const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
         data: {
-          title: 'games.confirm.finish.title',
-          text: 'games.confirm.finish.text',
-          confirm: 'games.confirm.finish.confirm',
+          title: `games.confirm.${action}.title`,
+          text: `games.confirm.${action}.text`,
+          confirm: `games.confirm.${action}.confirm`,
           danger: true,
         },
         autoFocus: 'first-tabbable',
@@ -552,8 +552,8 @@ export class GameDetails {
       });
       if (!(await firstValueFrom(ref.afterClosed()))) return;
       this.quiet();
-      await firstValueFrom(this.api.transition(g.id, 'finish'));
-      await this.afterPauseChange(g.id, 'games.my.done.finish');
+      await firstValueFrom(this.api.transition(g.id, action));
+      await this.afterPauseChange(g.id, `games.my.done.${action}`);
     } catch (err) {
       const { code } = toApiError(err);
       if (code !== 'UNAUTHENTICATED') {

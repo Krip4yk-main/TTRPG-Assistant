@@ -227,6 +227,29 @@ describe('resume', () => {
     expect(row!.status).toBe('paused');
   });
 
+  it('validates only the schedule: legacy fields (http channel link) do not block resuming', async () => {
+    const { gm, id } = await runningCampaign();
+    await pause(id, gm.cookie);
+    // Дані з часів, коли посилання могли бути http (сьогоднішня схема вимагає https).
+    await db
+      .update(games)
+      .set({ channelLinks: [{ url: 'http://localhost:4200/demo/roll20/1', label: 'Roll20' }] })
+      .where(eq(games.id, id));
+    const tuesday = new Date(Date.parse(mondayKyiv(1)) + DAY).toISOString();
+    const wrongDay = await resume(id, gm.cookie, { startsAt: tuesday, recruit: true });
+    expect(wrongDay.status).toBe(400);
+    expect(JSON.stringify(wrongDay.body.error.details)).toContain('weekdays');
+    expect(JSON.stringify(wrongDay.body.error.details)).not.toContain('channelLinks');
+
+    const res = await resume(id, gm.cookie, { startsAt: mondayKyiv(1), recruit: true });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'started', showWhenFull: true });
+    expect(res.body.startsAt).toBe(mondayKyiv(1));
+    expect(res.body.channelLinks).toEqual([
+      { url: 'http://localhost:4200/demo/roll20/1', label: 'Roll20' },
+    ]);
+  });
+
   it('resumes from the new date: sessions start at startsAt, no duplicates, paused-cancelled slots are replaced', async () => {
     const { gm, member, id } = await runningCampaign();
     const old = await sessionsOf(id);

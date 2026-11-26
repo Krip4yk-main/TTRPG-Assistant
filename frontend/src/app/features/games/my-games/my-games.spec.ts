@@ -350,7 +350,7 @@ describe('MyGames', () => {
         expect.objectContaining({ data: { gameId: 11, title: 'Гра 11' } }),
       );
       expect(article(11).querySelector('.status')!.textContent).toContain('games.status.paused');
-      expect(actions(11)).toEqual(['resume', 'recruit', 'finish', 'cancel']);
+      expect(actions(11)).toEqual(['edit', 'resume', 'recruit', 'finish', 'cancel']);
       expect(el.textContent).toContain('games.pause.done.pause');
       http.expectOne('/api/games/mine').flush([campaign(11, 'paused')]);
       await settle();

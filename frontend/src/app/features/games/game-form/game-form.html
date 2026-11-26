@@ -231,9 +231,11 @@
         @if (scheduleLocked()) {
           <p class="nri-notice schedule-locked">
             {{
-              (game()?.kind === 'campaign'
-                ? 'games.form.scheduleLocked.campaign'
-                : 'games.form.scheduleLocked.oneshot'
+              (status() === 'paused'
+                ? 'games.form.scheduleLocked.paused'
+                : game()?.kind === 'campaign'
+                  ? 'games.form.scheduleLocked.campaign'
+                  : 'games.form.scheduleLocked.oneshot'
               ) | translate
             }}
             <a [routerLink]="['/games', gameId()]">{{

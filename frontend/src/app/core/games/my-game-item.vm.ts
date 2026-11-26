@@ -19,7 +19,7 @@ const ACTIONS: Record<GameStatus, GameAction[]> = {
 /** Кампейн можна поставити на паузу, поки він набирає чи триває. */
 const PAUSABLE = new Set<GameStatus>(['recruiting', 'started']);
 
-const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started']);
+const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
 /** Статуси, у яких у гри можуть бути заявки (чернетка — ще ні). */
 const HAS_APPLICATIONS = new Set<GameStatus>([
   'recruiting',

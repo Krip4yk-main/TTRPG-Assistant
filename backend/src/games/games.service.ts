@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { ZodError } from 'zod';
 import {
   CAMPAIGN_PAUSED_REASON,
   expandOccurrences,
@@ -10,6 +11,7 @@ import {
   pauseInputSchema,
   resumeInputSchema,
   scheduleRuleInputSchema,
+  toZoned,
   type GameAction,
   type GameCardDto,
   type MyGameCardDto,
@@ -829,14 +831,13 @@ async function resumeGame(
   const { startsAt, belowMin } = await db.transaction(async (tx) => {
     const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
     if (!row || row.status !== 'paused') throw new AppError(409, 'GAME_INVALID_TRANSITION');
-    // Та сама перевірка, що при створенні: день `startsAt` має входити в `weekdays` правила.
-    const next = gameInputSchema(row.timezone).parse({
-      ...toInput(row, []),
-      startsAt: input.startsAt,
-    });
+    // Перевіряємо лише те, що змінює відновлення: день `startsAt` має входити в `weekdays`
+    // щотижневого правила (у поясі гри). Решту гри не валідуємо — застарілі поля (напр.
+    // http-посилання з давніх даних) не мають блокувати відновлення.
+    assertRuleWeekday(row, input.startsAt);
     const set = {
       status: 'started' as const,
-      startsAt: new Date(next.startsAt),
+      startsAt: new Date(input.startsAt),
       showWhenFull: input.recruit,
       startedAt: row.startedAt ?? now,
       pausedAt: null,
@@ -849,7 +850,7 @@ async function resumeGame(
     await restartRuleAfterPause(tx, { ...row, ...set }, now);
     // Пауза з набору: відновлення — перший старт гри (попередження, як у `start`).
     const belowMin = row.startedAt === null && (await activeCount(tx, id)) < row.minPlayers;
-    return { startsAt: next.startsAt, belowMin };
+    return { startsAt: input.startsAt, belowMin };
   });
   await logEvent(db, {
     type: 'game.resumed',
@@ -863,6 +864,27 @@ async function resumeGame(
   sessionsChanged(deps, id);
   const view = await gmView(deps, id);
   return belowMin ? { ...view, warning: 'BELOW_MIN_PLAYERS' } : view;
+}
+
+/**
+ * День першої сесії після паузи — один із днів щотижневого правила в поясі гри; інакше
+ * 400 `VALIDATION` з issue по `weekdays` (як у `gameInputSchema`).
+ */
+function assertRuleWeekday(
+  row: Pick<GameRow, 'recurrence' | 'weekdays' | 'timezone'>,
+  startsAt: string,
+): void {
+  if (row.recurrence !== 'weekly' && row.recurrence !== 'biweekly') return;
+  const wd = toZoned(new Date(startsAt), row.timezone).weekday;
+  if (row.weekdays.includes(wd)) return;
+  throw new ZodError([
+    {
+      code: 'custom',
+      path: ['weekdays'],
+      message: 'Weekdays must include the weekday of startsAt',
+      input: startsAt,
+    },
+  ]);
 }
 
 /** Закриття адміністрацією (вкладка «Мертві ігри»): хто й що ще записати в транзакції переходу. */

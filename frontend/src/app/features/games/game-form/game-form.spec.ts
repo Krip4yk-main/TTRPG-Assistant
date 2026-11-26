@@ -7,6 +7,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import type { CatalogDto, GameDto, MeDto } from '@nri/shared';
 import { GameForm } from './game-form';
+import uk from '../../../../assets/i18n/uk.json';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 
@@ -364,6 +365,31 @@ describe('GameForm', () => {
       expect(req.request.body).not.toHaveProperty(field);
     }
     req.flush(game({ status: 'started', title: 'Нова назва' }));
+    await settle();
+  });
+
+  it('paused campaign: other fields editable, schedule disabled with the «changes on resume» hint', async () => {
+    await setup(5, game({ status: 'paused', kind: 'campaign' }));
+    for (const name of ['startDate', 'startTime']) {
+      expect(q<HTMLInputElement>(`input[formcontrolname="${name}"]`).disabled).toBe(true);
+    }
+    expect(selectOf('durationMinutes').disabled).toBe(true);
+    expect(selectOf('recurrence').disabled).toBe(true);
+    expect(selectOf('system').disabled).toBe(true);
+    const hint = q<HTMLElement>('.schedule-locked');
+    expect(hint.textContent).toContain('games.form.scheduleLocked.paused');
+    expect(hint.querySelector('a')!.getAttribute('href')).toBe('/games/5');
+    expect(String(uk.games.form.scheduleLocked.paused)).toContain('при відновленні');
+    expect(q<HTMLInputElement>('input[formcontrolname="title"]').disabled).toBe(false);
+    await type('input[formcontrolname="title"]', 'Нова назва');
+    await submit();
+    const req = http.expectOne('/api/games/5');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toMatchObject({ title: 'Нова назва' });
+    for (const field of ['startsAt', 'durationMinutes', 'recurrence', 'weekdays', 'kind']) {
+      expect(req.request.body).not.toHaveProperty(field);
+    }
+    req.flush(game({ status: 'paused', kind: 'campaign', title: 'Нова назва' }));
     await settle();
   });
 
