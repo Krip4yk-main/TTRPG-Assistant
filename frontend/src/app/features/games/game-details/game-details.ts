@@ -335,11 +335,17 @@ export class GameDetails {
         if (key) void this.loadRatingTargets(g!.id, key);
       });
     });
-    // `?action=…` з нагадування про довгу паузу — відкриваємо діалог один раз.
+    // `?action=…` з нагадування про довгу паузу — відкриваємо діалог майстру один раз на
+    // перехід; параметр прибираємо, тож повторне посилання на тій самій сторінці спрацює знову.
+    // Кампейн уже не на паузі — коротке пояснення замість мовчання.
     effect(() => {
       const action = this.action();
       const g = this.game();
-      if (!action || !g || !this.isGm() || g.status !== 'paused') return;
+      if (!action) {
+        this.actionHandled = null;
+        return;
+      }
+      if (!g || !this.isGm()) return;
       const key = `${g.id}:${action}`;
       if (key === this.actionHandled) return;
       this.actionHandled = key;
@@ -350,7 +356,12 @@ export class GameDetails {
           queryParamsHandling: 'merge',
           replaceUrl: true,
         });
-        void this.runPauseAction(action as PauseAction);
+        if (g.status === 'paused') {
+          void this.runPauseAction(action as PauseAction);
+        } else {
+          this.notice.set({ kind: 'info', key: 'games.pause.linkStale' });
+          this.focusNotice();
+        }
       });
     });
     // Учасник бачить відповіді майстра на свої обмеження.
@@ -507,7 +518,7 @@ export class GameDetails {
     }
   }
 
-  /** Дія з панелі паузи: «Відновити», «Оголосити донабір» чи «Завершити кампейн». */
+  /** Дія з панелі паузи: «Відновити», «Оголосити донабір», «Завершити кампейн» чи «Скасувати гру». */
   protected async runPauseAction(action: PauseAction): Promise<void> {
     if (action === 'finish' || action === 'cancel') await this.closePaused(action);
     else await this.resume(action === 'recruit');
@@ -523,6 +534,7 @@ export class GameDetails {
       const dto: GameTransitionDto | null = await openResumeDialog(this.dialog, {
         game: g,
         recruit,
+        firstStart: g.startedAt === null,
         viewerTimezone: viewerTimeZone(this.auth.me()),
         beforeRequest: () => this.quiet(),
       });

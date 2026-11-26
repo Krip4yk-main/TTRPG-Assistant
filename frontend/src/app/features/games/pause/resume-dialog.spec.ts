@@ -40,7 +40,13 @@ describe('ResumeDialog', () => {
         provideTranslateService(),
         {
           provide: MAT_DIALOG_DATA,
-          useValue: { game, recruit: false, viewerTimezone: 'Europe/Kyiv', ...data },
+          useValue: {
+            game,
+            recruit: false,
+            firstStart: false,
+            viewerTimezone: 'Europe/Kyiv',
+            ...data,
+          },
         },
         { provide: MatDialogRef, useValue: { close } },
       ],
@@ -67,6 +73,10 @@ describe('ResumeDialog', () => {
     expect(weekday(v.date!)).toBe(1);
     expect(v.time).toBe('19:00');
     expect(el.querySelector('.rule-days')!.textContent).toContain('games.weekdaysLong.1');
+    // Дні правила озвучуються разом із полем дати.
+    expect(el.querySelector('input.date')!.getAttribute('aria-describedby')).toContain(
+      'resume-rule-days',
+    );
     expect(el.querySelector('h2')!.textContent).toContain('games.pause.resume.title');
     // Учасників 3 із мінімуму 2 — попередження немає.
     expect(el.querySelector('.below-min')).toBeNull();
@@ -156,9 +166,15 @@ describe('ResumeDialog', () => {
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('errors.GAME_PAUSED');
   });
 
-  it('warns when members are below the minimum; viewer-zone preview has no zone label', async () => {
+  it('below the minimum on a campaign that already ran: no warning (the backend does not warn)', async () => {
+    await create({ game: { ...game, minPlayers: 4, freeSlots: 3 }, firstStart: false });
+    expect(el.querySelector('.below-min')).toBeNull();
+  });
+
+  it('first start below the minimum warns; viewer-zone preview has no zone label', async () => {
     await create({
       game: { ...game, minPlayers: 4, freeSlots: 3 },
+      firstStart: true,
       viewerTimezone: 'America/New_York',
     });
     expect(el.querySelector('.below-min')!.textContent).toContain('games.pause.belowMin');

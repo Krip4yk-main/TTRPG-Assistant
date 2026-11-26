@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
@@ -719,6 +719,7 @@ describe('GameDetails', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             recruit: true,
+            firstStart: true,
             viewerTimezone: 'Europe/Kyiv',
             game: expect.objectContaining({ id: 7, weekdays: [1] }),
           }),
@@ -788,6 +789,32 @@ describe('GameDetails', () => {
         ResumeDialog,
         expect.objectContaining({ data: expect.objectContaining({ recruit: true }) }),
       );
+    });
+
+    it('the same ?action= quick link works again on the same page', async () => {
+      await open(me, (r) => r.flush(paused), '/games/7?action=resume');
+      await flushGmExtras();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledTimes(1);
+      expect(harness.routeNativeElement).toBeTruthy();
+      expect(TestBed.inject(Router).url).toBe('/games/7');
+      await harness.navigateByUrl('/games/7?action=resume');
+      await settle();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledTimes(2);
+      expect(dialogOpen).toHaveBeenLastCalledWith(
+        ResumeDialog,
+        expect.objectContaining({ data: expect.objectContaining({ recruit: false }) }),
+      );
+    });
+
+    it('a quick link for a campaign that is no longer paused shows a short notice', async () => {
+      await open(me, (r) => r.flush(own), '/games/7?action=recruit');
+      await flushGmExtras();
+      await settle();
+      expect(dialogOpen).not.toHaveBeenCalled();
+      expect(el().querySelector('.notice-area')!.textContent).toContain('games.pause.linkStale');
+      expect(TestBed.inject(Router).url).toBe('/games/7');
     });
 
     it('?action=… is ignored for a member', async () => {

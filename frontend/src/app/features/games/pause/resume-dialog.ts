@@ -49,6 +49,11 @@ export interface ResumeDialogData {
   >;
   /** `true` — «Оголосити донабір» (кампейн знову приймає заявки); `false` — «Відновити». */
   recruit: boolean;
+  /**
+   * Кампейн ще не стартував (пауза почалась у наборі, `startedAt === null`): відновлення — це
+   * й перший старт, бекенд попереджає `BELOW_MIN_PLAYERS`, тож і діалог показує попередження.
+   */
+  firstStart: boolean;
   /** Пояс глядача — для підказки, якщо відрізняється від поясу гри. */
   viewerTimezone: string;
   /** Перед запитом (напр. приглушити власні пінги змін, що прийдуть раніше за відповідь). */
@@ -95,9 +100,9 @@ export class ResumeDialog {
   protected readonly ruleDays: readonly number[] = isWeekly(this.data.game.recurrence)
     ? [...this.data.game.weekdays].sort((a, b) => a - b)
     : [];
-  /** Учасників менше за мінімум — попередження (як перед «Почати»). */
+  /** Перший старт з меншою за мінімум кількістю учасників — попередження (як перед «Почати»). */
   protected readonly members = this.data.game.maxPlayers - this.data.game.freeSlots;
-  protected readonly belowMin = this.members < this.data.game.minPlayers;
+  protected readonly belowMin = this.data.firstStart && this.members < this.data.game.minPlayers;
 
   private readonly start = this.initialStart();
   protected readonly form = new FormGroup({

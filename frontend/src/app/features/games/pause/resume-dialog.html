@@ -25,6 +25,7 @@
           matInput
           class="date"
           required
+          [aria-describedby]="ruleDays.length ? 'resume-rule-days' : ''"
           [matDatepicker]="picker"
           [min]="minDate"
           formControlName="date"

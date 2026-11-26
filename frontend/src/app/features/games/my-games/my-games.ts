@@ -157,6 +157,7 @@ export class MyGames {
       const dto = await openResumeDialog(this.dialog, {
         game: full,
         recruit,
+        firstStart: full.startedAt === null,
         viewerTimezone: viewerTimeZone(this.auth.me()),
       });
       if (!dto) return;

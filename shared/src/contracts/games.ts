@@ -230,9 +230,9 @@ export type PauseInput = z.input<typeof pauseInputSchema>;
 
 /**
  * Тіло `POST /api/games/:id/resume`: дата першої сесії після паузи (ціла хвилина) і
- * `recruit` — оголосити донабір (`showWhenFull = recruit`). Що `startsAt` у майбутньому й
- * припадає на один із днів правила (`weekdays`, у поясі гри), бекенд перевіряє через
- * `gameInputSchema` після злиття з грою.
+ * `recruit` — оголосити донабір (`showWhenFull = recruit`). Бекенд перевіряє лише розклад:
+ * `startsAt` у майбутньому (інакше 422 `GAME_IN_PAST`) і, для щотижневого правила, на один із
+ * днів `weekdays` у поясі гри (інакше 400 `VALIDATION` по `weekdays`); решту гри не валідує.
  */
 export const resumeInputSchema = z.object({ startsAt, recruit: z.boolean() }).strict();
 export type ResumeInput = z.input<typeof resumeInputSchema>;
