@@ -69,6 +69,23 @@
     )
   );
 
+  // Поля. Поле з помилкою під курсором: Material бере on-error-container (у темній схемі M3 — світлий),
+  // а в нас error-container — яскраво-червоний, on-error-container — майже чорний. Без цього
+  // підпис і рамка поля з помилкою під курсором зливаються з темним фоном.
+  @include mat.form-field-overrides(
+    (
+      error-hover-trailing-icon-color: var(--mat-sys-error),
+      filled-error-hover-active-indicator-color: var(--mat-sys-error),
+      filled-error-hover-label-text-color: var(--mat-sys-error),
+      outlined-error-hover-label-text-color: var(--mat-sys-error),
+      outlined-error-hover-outline-color: var(--mat-sys-error),
+      // Варіанти нативного <select>: типово neutral10 (майже чорний) — на темному списку
+      // невидимі. Фон списку — cyber-base.less (`select option`).
+      select-option-text-color: var(--cy-ink),
+      select-disabled-option-text-color: var(--cy-ink-muted),
+    )
+  );
+
   @include mat.dialog-overrides(
     (
       container-color: var(--mat-sys-surface-container-high),
