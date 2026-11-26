@@ -73,7 +73,7 @@ import {
 } from '../../moderation/complaint-dialog/complaint-dialog';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
-const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled']);
+const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled', 'paused']);
 /** Дії майстра з паузи, які можна відкрити посиланням (`?action=…`, з нагадування). */
 const PAUSE_LINK_ACTIONS: readonly PauseAction[] = ['resume', 'recruit', 'finish'];
 
