@@ -1,0 +1,19 @@
+@if (themes.isGuest()) {
+  <div class="toggle" role="group" [attr.aria-label]="'shell.guestTheme.label' | translate">
+    @for (opt of options; track opt.id) {
+      <button
+        #btn
+        type="button"
+        class="option"
+        [class.active]="themes.guestTheme() === opt.id"
+        [attr.aria-pressed]="themes.guestTheme() === opt.id"
+        [attr.data-theme-id]="opt.id"
+        [title]="'theme.names.' + opt.id | translate"
+        (click)="pick(opt.id, btn)"
+      >
+        <mat-icon aria-hidden="true">{{ opt.icon }}</mat-icon>
+        <span class="name">{{ 'theme.names.' + opt.id | translate }}</span>
+      </button>
+    }
+  </div>
+}

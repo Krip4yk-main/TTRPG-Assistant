@@ -109,6 +109,15 @@ describe('SceneShell (slot «shell»): home by view mode', () => {
     expect(el.querySelector('a[href="/my-applications"]')).toBeNull();
   });
 
+  it('the guest design toggle shows only for guests', async () => {
+    await settle();
+    expect(el.querySelector('nri-guest-theme-toggle [role="group"]')).toBeNull();
+    TestBed.inject(AuthStore).setMe(null);
+    await settle();
+    expect(el.querySelectorAll('nri-guest-theme-toggle button[aria-pressed]')).toHaveLength(2);
+    expect(el.querySelector('a[href="/login"]')).not.toBeNull();
+  });
+
   it('player view shows the "My applications" link', async () => {
     TestBed.inject(ViewModeStore).setMode('player');
     await settle();

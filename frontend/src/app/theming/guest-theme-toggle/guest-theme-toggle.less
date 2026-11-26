@@ -1,0 +1,77 @@
+// Сегментований перемикач. Вигляд задає каркас дизайну змінними --gt-* (успадковуються крізь
+// інкапсуляцію); без них — загальні токени --nri-*.
+:host {
+  display: contents;
+}
+
+.toggle {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--gt-border, var(--nri-border));
+  border-radius: var(--gt-radius, 999px);
+  background: var(--gt-bg, transparent);
+}
+
+.option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--gt-radius, 999px);
+  background: transparent;
+  color: var(--gt-fg, inherit);
+  font: inherit;
+  font-family: var(--gt-font, inherit);
+  font-size: 0.9rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--nri-transition, 0.15s),
+    color var(--nri-transition, 0.15s);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+
+  &:hover {
+    color: var(--gt-fg-hover, var(--gt-fg, inherit));
+  }
+
+  &.active {
+    background: var(--gt-active-bg, var(--nri-primary));
+    color: var(--gt-active-fg, var(--nri-on-primary));
+    box-shadow: var(--gt-active-shadow, none);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--gt-focus, var(--nri-focus-ring));
+    outline-offset: 2px;
+  }
+}
+
+// Вузький екран: лише значки (назва лишається для читачів екрана і в підказці).
+@media (max-width: 767.98px) {
+  .option {
+    min-width: 36px;
+    padding: 0 8px;
+    justify-content: center;
+  }
+
+  .name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

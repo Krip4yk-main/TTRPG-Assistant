@@ -55,7 +55,10 @@
     "myGames": "Мої ігри",
     "newGame": "Нова гра",
     "myApplications": "Мої заявки",
-    "admin": "Адмінка"
+    "admin": "Адмінка",
+    "guestTheme": {
+      "label": "Дизайн сайту"
+    }
   },
   "theme": {
     "names": {

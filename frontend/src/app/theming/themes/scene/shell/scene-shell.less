@@ -134,6 +134,19 @@
   flex: none;
 }
 
+// Перемикач дизайну гостя: скляна смуга з тонкою рамкою, обраний — неонове підкреслення.
+nri-guest-theme-toggle {
+  --gt-radius: 6px;
+  --gt-border: var(--sc-neon-b);
+  --gt-bg: var(--sc-overlay);
+  --gt-fg: var(--sc-ink-muted);
+  --gt-fg-hover: var(--sc-ink);
+  --gt-active-bg: rgba(255, 255, 255, 0.08);
+  --gt-active-fg: var(--sc-ink);
+  --gt-active-shadow: inset 0 -2px 0 var(--sc-neon-a);
+  --gt-font: var(--sc-font-display);
+}
+
 .menu-header {
   padding: var(--nri-space-sm) var(--nri-space-md);
   font-weight: 600;

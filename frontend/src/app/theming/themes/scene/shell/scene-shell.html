@@ -59,6 +59,9 @@
 
   <span class="spacer"></span>
 
+  <!-- Гість: перемикач між дизайнами GUEST_THEMES (сам ховається для тих, хто ввійшов). -->
+  <nri-guest-theme-toggle />
+
   @if (auth.isActive()) {
     <mat-button-toggle-group
       class="view-mode"
