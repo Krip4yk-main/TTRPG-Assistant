@@ -132,7 +132,7 @@ export class ThemeService {
     // щоб поки вантажиться новий бандл не було видно кольору попереднього.
     if (themeChanged) root.style.removeProperty('background-color');
     this.doc.querySelector('meta[name="color-scheme"]')?.setAttribute('content', def.colorScheme);
-    this.setStyle(def.styleHref, themeChanged);
+    this.setStyle(def.styleHref);
     this.current.set(id);
     this.loaded.set(slots);
     try {
@@ -144,28 +144,40 @@ export class ThemeService {
   }
 
   /**
-   * Один `<link>` бандла дизайну. Інший дизайн — старий бандл знімається одразу (його
-   * селектори вже не збігаються з `data-theme`, і стилі недоступного дизайну не лишаються
-   * підключеними). Той самий дизайн з іншою версією — старий знімається після завантаження
-   * нового, щоб сторінка не лишилась без стилів.
+   * Один `<link>` бандла дизайну. Новий бандл (інший дизайн чи та сама тема з іншою версією)
+   * додається поруч, а старий знімається, щойно новий завантажився (або впав), — сторінка не
+   * лишається без стилів на час завантаження. Обидва одночасно — безпечно: токени й стилі
+   * кожного бандла обмежені `:root[data-theme='<id>']`, а `data-theme` уже новий. Посилання на
+   * бандл, якого немає в реєстрі (кеш давно прибраного дизайну, напр. `classic`), знімається
+   * одразу — інакше його 404 тримав би старий `<link>` до завантаження нового.
    */
-  private setStyle(href: string, themeChanged: boolean): void {
+  private setStyle(href: string): void {
     const head = this.doc.head;
     const old = Array.from(head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`));
     if (old.length === 1 && old[0]!.getAttribute('href') === href) return;
+    const known = new Set(Object.values(this.registry).map((d) => bundlePath(d.styleHref)));
+    const [stale, previous] = partition(old, (l) => !known.has(bundlePath(l.getAttribute('href'))));
+    stale.forEach((l) => l.remove());
     const link = this.doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
     link.id = THEME_LINK_ID;
-    if (themeChanged || old.length === 0) {
-      old.forEach((l) => l.remove());
-    } else {
-      const drop = () => old.forEach((l) => l.remove());
+    if (previous.length > 0) {
+      const drop = () => previous.forEach((l) => l.remove());
       link.addEventListener('load', drop, { once: true });
       link.addEventListener('error', drop, { once: true });
     }
     head.appendChild(link);
   }
+}
+
+/** Адреса бандла без `?v=` (за нею бандл шукається в реєстрі). */
+function bundlePath(href: string | null): string {
+  return (href ?? '').split('?')[0]!;
+}
+
+function partition<T>(items: T[], test: (item: T) => boolean): [T[], T[]] {
+  return [items.filter(test), items.filter((i) => !test(i))];
 }
 
 /** Чинний дизайн для акаунта (гість — за замовчуванням). */

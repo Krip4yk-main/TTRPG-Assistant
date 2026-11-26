@@ -64,6 +64,12 @@ function registry(
   };
 }
 
+/** Останній (новий) `<link>` бандла «завантажився» (`load`) чи впав (`error`). */
+const settleNewest = (type: 'load' | 'error' = 'load') => {
+  const all = document.head.querySelectorAll(`link#${THEME_LINK_ID}`);
+  all[all.length - 1]!.dispatchEvent(new Event(type));
+};
+
 const links = () =>
   Array.from(document.head.querySelectorAll<HTMLLinkElement>(`link#${THEME_LINK_ID}`)).map((l) =>
     l.getAttribute('href'),
@@ -128,6 +134,7 @@ describe('ThemeService', () => {
     auth.setMe(null);
     await service.init();
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
+    settleNewest();
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
   });
 
@@ -168,6 +175,7 @@ describe('ThemeService', () => {
 
     expect(service.theme()).toBe('quest-board');
     expect(document.documentElement.getAttribute('data-theme')).toBe('quest-board');
+    settleNewest();
     expect(links()).toEqual(['theme-quest-board.css?v=1']);
     expect(service.slots()).toBe(QB_SLOTS);
     expect(auth.me()!.uiTheme).toBe('quest-board');
@@ -188,10 +196,39 @@ describe('ThemeService', () => {
 
     expect(service.theme()).toBe('neon-signs');
     expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
-    // Старий бандл знято одразу — стилі «Нічного міста» не лишаються підключеними.
+    // Старий бандл знято, щойно новий завантажився, — стилі «Нічного міста» не лишаються.
+    settleNewest();
     expect(links()).toEqual(['theme-neon-signs.css?v=1']);
     expect(service.slots()).toBe(CY_SLOTS);
     expect(cyber).toHaveBeenCalledTimes(1);
+  });
+
+  it('switching designs keeps the old bundle until the new one loads (no unstyled flash)', async () => {
+    setup();
+    auth.setMe(user);
+    await service.init();
+    settleNewest();
+
+    const done = service.select('neon-signs');
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...user, uiTheme: 'neon-signs' });
+    await done;
+    // data-theme уже новий, а старий бандл ще підключений, доки новий вантажиться.
+    expect(document.documentElement.getAttribute('data-theme')).toBe('neon-signs');
+    expect(links()).toEqual(['theme-night-city.css?v=1', 'theme-neon-signs.css?v=1']);
+    settleNewest();
+    expect(links()).toEqual(['theme-neon-signs.css?v=1']);
+
+    // Новий бандл не завантажився — старий однаково знімається (не лишається назавжди).
+    const back = service.select('holo-market');
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/me/theme')
+      .flush({ ...user, uiTheme: 'holo-market' });
+    await back;
+    expect(links()).toEqual(['theme-neon-signs.css?v=1', 'theme-holo-market.css?v=1']);
+    settleNewest('error');
+    expect(links()).toEqual(['theme-holo-market.css?v=1']);
   });
 
   it('logging out returns to the default design', async () => {
