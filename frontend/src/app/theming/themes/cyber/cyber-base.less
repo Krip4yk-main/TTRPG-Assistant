@@ -223,9 +223,10 @@
       box-shadow: var(--nri-shadow-md);
     }
 
-    // Панель (фільтри пошуку) — з неоновою трубкою вгорі.
+    // Панель (фільтри пошуку) — з неоновою трубкою вгорі. Позицію не перебиваємо: на широкому
+    // екрані сторінка робить фільтри липкими (`sticky` — теж опора для трубки), на вузькому —
+    // див. медіазапит унизу.
     .nri-panel {
-      position: relative;
       padding: 22px 18px 18px;
       border: 1px solid var(--cy-glass-line);
       border-radius: var(--nri-radius-md);
@@ -286,6 +287,15 @@
   .mat-datepicker-content.mat-datepicker-content {
     outline: 1px solid var(--nri-overlay-border);
     outline-offset: -1px;
+  }
+
+  // Вузький екран: сторінка робить фільтри статичними — повертаємо `relative` для трубки, але
+  // без зсуву `top`, який лишився від липкого положення (інакше панель налазить на сортування).
+  @media (max-width: 899.98px) {
+    .nri-page.nri-board .nri-panel {
+      position: relative;
+      top: auto;
+    }
   }
 
   @media (max-width: 599.98px) {

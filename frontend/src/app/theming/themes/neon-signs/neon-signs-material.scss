@@ -1,7 +1,7 @@
 // Material для дизайну «Неонові вивіски» (бандл `theme-neon-signs`): спільний темний Material
-// кібер-родини (../cyber/cyber-material.scss); заголовковий шрифт дизайну — разом із його виглядом.
+// кібер-родини (../cyber/cyber-material.scss) з заголовковим шрифтом дизайну.
 @use '../cyber/cyber-material' as cy;
 
 :root[data-theme='neon-signs'] {
-  @include cy.material("'Golos Text', 'Segoe UI', system-ui, sans-serif");
+  @include cy.material("'M PLUS Rounded 1c', 'Golos Text', 'Segoe UI', system-ui, sans-serif");
 }

@@ -1,9 +1,21 @@
 <header class="page-header">
   <div class="heading">
-    <!-- Вивіска: заголовок на пластині (вигляд пластини й неону — у бандлі дизайну). -->
+    <!-- Вивіска: заголовок на пластині (вигляд пластини й неону — у бандлі дизайну). Читачі
+         екрана чують звичайний текст заголовка; видимий — той самий текст, поділений на
+         частини для неону (перше слово, решта, «напівмертва» літера), прихований від них. -->
+    @let title = titleKey() | translate;
+    @let p = parts(title);
     <div class="sign cy-sign">
       <span class="cy-screw" aria-hidden="true"></span>
-      <h1 class="cy-sign-title">{{ titleKey() | translate }}</h1>
+      <h1 class="cy-sign-title">
+        <span class="nri-visually-hidden">{{ title }}</span>
+        <span class="cy-sign-lit" aria-hidden="true"
+          ><span class="cy-sign-w1"
+            >{{ p.before }}<span class="cy-sign-dead">{{ p.dead }}</span
+            >{{ p.after }}</span
+          ><span class="cy-sign-w2">{{ p.rest }}</span></span
+        >
+      </h1>
     </div>
     @if (leadKey(); as lead) {
       <p class="lead">{{ lead | translate }}</p>
