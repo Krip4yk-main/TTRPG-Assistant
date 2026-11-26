@@ -42,6 +42,7 @@ import { getAvailability } from '../availability/availability.service.js';
 import { gameBusyIntervals, type GameBusy } from '../calendar/game-busy.service.js';
 import { gameContentWarnings, gameMembers, games, publishedRatings } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { importedBusyForUsers } from '../scheduling/ical/calendar-import.service.js';
 import { loadGames, resolveViewer, toCardDto, type Loaded } from './games.service.js';
 import { toCardView, viewerAge, type Viewer } from './games.visibility.js';
 
@@ -354,6 +355,30 @@ async function calendarAvailability(
   }
 }
 
+/**
+ * Зайнятість глядача для фільтра календаря: сесії його ігор (`gameBusyIntervals`) та
+ * імпортовані з iCal інтервали (`gameId: 0` — жодна гра-кандидат їх не «звільняє»).
+ */
+async function viewerBusy(
+  deps: AppDeps,
+  userId: number,
+  from: Date,
+  to: Date,
+): Promise<GameBusy[]> {
+  const [own, imported] = await Promise.all([
+    gameBusyIntervals(deps, userId, from, to, from),
+    importedBusyForUsers(deps.db, [userId], from, to),
+  ]);
+  const ical = (imported.get(userId) ?? []).map((b) => ({
+    gameId: 0,
+    gameTitle: '',
+    sessionId: null,
+    start: b.start,
+    end: b.end,
+  }));
+  return [...own, ...ical];
+}
+
 const RESTRICTED_RATINGS: AgeRating[] = AGE_RATINGS.filter((r) => r !== 'none');
 
 /** Чи задано хоч один фільтр за атрибутами гри (усе, крім `ageRatings`/`sort`/`cursor`/`limit`). */
@@ -417,15 +442,10 @@ export async function searchGames(
   const [availability, viewer, busy] = await Promise.all([
     calendarAvailability(deps, f, user),
     resolveViewer(deps, user),
-    // Залогінений з увімкненим календарем (`mine`/`custom`): сесії його ігор — зайнятий час.
+    // Залогінений з увімкненим календарем (`mine`/`custom`): сесії його ігор і імпортовані
+    // з iCal події — зайнятий час.
     f.calendar.mode !== 'off' && user
-      ? gameBusyIntervals(
-          deps,
-          user.userId,
-          now,
-          new Date(now.getTime() + FIT_HORIZON_DAYS * DAY_MS),
-          now,
-        )
+      ? viewerBusy(deps, user.userId, now, new Date(now.getTime() + FIT_HORIZON_DAYS * DAY_MS))
       : Promise.resolve([]),
   ]);
   const filter = memoryFilter(f, availability, busy, now);

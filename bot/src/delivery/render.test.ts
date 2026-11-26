@@ -25,6 +25,8 @@ describe('renderNotification', () => {
     'sanction.imposed',
     'sanction.lifted',
     'appeal.decided',
+    // Без гри: стан імпорту календаря користувача.
+    'calendar.import_broken',
   ];
   const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
 
@@ -506,7 +508,9 @@ describe('smart reschedule and calendar reminder', () => {
 
   it('session.rsvp_declined: one member, several members, link to the session', () => {
     const one = render('session.rsvp_declined', p);
-    expect(one.text.split('\n')[0]).toContain('Аня не зможе прийти на сесію гри «Гра» (пт, 27 листопада о 19:00)');
+    expect(one.text.split('\n')[0]).toContain(
+      'Аня не зможе прийти на сесію гри «Гра» (пт, 27 листопада о 19:00)',
+    );
     expect(one.text).toContain('Детальніше: https://nri.example/games/12?session=56');
     expect(one.keyboard).toBeUndefined();
     const many = render('session.rsvp_declined', { ...p, count: 2 });
@@ -517,6 +521,12 @@ describe('smart reschedule and calendar reminder', () => {
     const r = render('calendar.empty', { gameId: 12, gameTitle: 'Гра' });
     expect(r.text).toContain('майстер гри «Гра»');
     expect(r.text).toContain('можеш, не можеш, чи це невідомо');
+    expect(r.text).toContain('Детальніше: https://nri.example/calendar');
+  });
+
+  it('calendar.import_broken: no params, links to the calendar', () => {
+    const r = render('calendar.import_broken', {});
+    expect(r.text).toContain('автооновлення зупинено');
     expect(r.text).toContain('Детальніше: https://nri.example/calendar');
   });
 });

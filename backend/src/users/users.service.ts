@@ -40,6 +40,7 @@ import {
   pingLeaveCascade,
   runLeaveCascade,
 } from './leave-cascade.js';
+import { deleteCalendarImportTx } from '../scheduling/ical/calendar-import.service.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
 
@@ -328,6 +329,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
     await tx.delete(availabilitySlots).where(eq(availabilitySlots.userId, userId));
     await tx.delete(availabilityBusyDates).where(eq(availabilityBusyDates.userId, userId));
     await tx.delete(calendarPinnedGames).where(eq(calendarPinnedGames.userId, userId));
+    await deleteCalendarImportTx(tx, userId);
     const cascade = await runLeaveCascade(tx, userId, active, now, 'account_deleted');
     await tx
       .update(users)

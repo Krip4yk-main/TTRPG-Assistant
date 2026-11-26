@@ -8,6 +8,10 @@ import { generatePublicId } from '../src/users/nickname.js';
 import { createRedis } from '../src/redis/client.js';
 
 export const TEST_PEPPER = 'test-pepper-0123456789abcdefghijklmnop';
+/** Тестовий ключ шифрування посилань iCal (32 байти, base64). */
+export const TEST_CALENDAR_IMPORT_KEY = Buffer.from('test-calendar-import-key-0123456').toString(
+  'base64',
+);
 
 const pools = new WeakMap<Db, { end(): Promise<void> }>();
 
@@ -28,6 +32,7 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
     REALTIME_ADAPTER_KEY: process.env.REALTIME_ADAPTER_KEY,
     IDENTITY_PEPPER: TEST_PEPPER,
     INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
+    CALENDAR_IMPORT_KEY: TEST_CALENDAR_IMPORT_KEY,
     ...extraEnv,
   });
   const { db, pool } = createDb(dbUrl);
@@ -37,6 +42,8 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 }
 
 const TABLES = [
+  'calendar_import_busy',
+  'calendar_imports',
   'rsvp_decline_notices',
   'calendar_reminders',
   'poll_votes',

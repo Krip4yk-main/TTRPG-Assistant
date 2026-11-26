@@ -20,6 +20,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
+import { importedBusyForUsers } from './ical/calendar-import.service.js';
 import { AppError } from '../http/errors.js';
 
 type GameRow = typeof games.$inferSelect;
@@ -39,8 +40,8 @@ export interface SchedulingParticipant {
 export interface ParticipantBusy {
   intervals: BusyInterval[];
   /**
-   * Є імпортований календар (Task 4: iCal) — учасник без тижневих слотів тоді не «невідомо»:
-   * вільний усюди, де немає подій.
+   * Є чинний імпорт iCal — учасник без тижневих слотів тоді не «невідомо»: вільний усюди,
+   * де немає подій.
    */
   imported: boolean;
 }
@@ -91,10 +92,10 @@ export async function loadParticipants(
 }
 
 /**
- * **Точка розширення** зайнятості учасників у `[from, to)`: зараз — сесії інших ігор
- * (`gameBusyIntervalsForUsers`, з повагою до `calendar_autobusy` і закріплень), без сесій
- * самої гри `excludeGameId`. Task 4 (імпорт iCal) додає сюди імпортовані інтервали одним
- * пакетним запитом і ставить `imported: true` тим, у кого підключено календар.
+ * Зайнятість учасників у `[from, to)`: сесії інших ігор (`gameBusyIntervalsForUsers`, з
+ * повагою до `calendar_autobusy` і закріплень; без сесій самої гри `excludeGameId`) і
+ * імпортовані з iCal інтервали (`importedBusyForUsers`, пакетно). `imported: true` — у
+ * користувача чинний імпорт (успішно синхронізований, не «зламаний»).
  */
 export async function collectBusy(
   deps: AppDeps,
@@ -103,13 +104,21 @@ export async function collectBusy(
   to: Date,
   opts: { excludeGameId?: number; now?: Date } = {},
 ): Promise<Map<number, ParticipantBusy>> {
-  const gameBusy = await gameBusyIntervalsForUsers(deps, userIds, from, to, opts.now);
+  const [gameBusy, imported] = await Promise.all([
+    gameBusyIntervalsForUsers(deps, userIds, from, to, opts.now),
+    importedBusyForUsers(deps.db, userIds, from, to),
+  ]);
   const out = new Map<number, ParticipantBusy>();
   for (const u of userIds) {
     const intervals = (gameBusy.get(u) ?? [])
       .filter((b) => b.gameId !== opts.excludeGameId)
       .map((b) => ({ start: b.start, end: b.end }));
-    out.set(u, { intervals, imported: false });
+    const ical = imported.get(u);
+    if (ical) {
+      intervals.push(...ical);
+      intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    out.set(u, { intervals, imported: ical !== undefined });
   }
   return out;
 }

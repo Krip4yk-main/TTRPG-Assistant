@@ -7,6 +7,16 @@ const bool = z
 
 const optional = z.string().min(1).optional();
 
+/**
+ * Ключ шифрування посилань імпорту iCal (AES-256-GCM): base64 рівно 32 байтів
+ * (`openssl rand -base64 32`). Не задано — імпорт вимкнено (API відповідає
+ * `CALENDAR_IMPORT_DISABLED`), посилання у відкритому вигляді не зберігаються ніколи.
+ */
+const calendarImportKey = z
+  .string()
+  .refine((v) => /^[A-Za-z0-9+/]+={0,2}$/.test(v) && Buffer.from(v, 'base64').length === 32)
+  .optional();
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -32,6 +42,7 @@ const schema = z.object({
   RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(20),
+  CALENDAR_IMPORT_KEY: calendarImportKey,
 });
 
 export type Env = z.infer<typeof schema>;

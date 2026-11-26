@@ -19,6 +19,7 @@ import type { Db } from '../db/client.js';
 import { isTransientDbError } from '../db/errors.js';
 import {
   availabilitySlots,
+  calendarImports,
   calendarReminders,
   gameMembers,
   games,
@@ -40,9 +41,8 @@ type DbLike = Db | Tx;
 
 /**
  * **Точка розширення** «у користувача немає даних календаря» — умова для `userId` (колонки
- * зовнішнього запиту): немає тижневих слотів. Task 4 (імпорт iCal) додає сюди
- * `notExists(підключений календар)`, тож і вибірка кандидатів, і перевірка в момент
- * надсилання враховують імпорт автоматично. Зайняті дати календарем не вважаються (як і в
+ * зовнішнього запиту): немає тижневих слотів і не підключено імпорт iCal — і вибірка
+ * кандидатів, і перевірка в момент надсилання. Зайняті дати календарем не вважаються (як і в
  * підборі: без слотів учасник для майстра «невідомо»).
  */
 export function noCalendarData(db: DbLike, userId: AnyMySqlColumn): SQL[] {
@@ -52,6 +52,14 @@ export function noCalendarData(db: DbLike, userId: AnyMySqlColumn): SQL[] {
         .select({ x: sql`1` })
         .from(availabilitySlots)
         .where(eq(availabilitySlots.userId, userId)),
+    ),
+    // Підключений імпорт iCal (навіть ще не синхронізований чи «зламаний») — календар є:
+    // користувач уже зробив дію, нагадування про порожній календар йому ні до чого.
+    notExists(
+      db
+        .select({ x: sql`1` })
+        .from(calendarImports)
+        .where(eq(calendarImports.userId, userId)),
     ),
   ];
 }

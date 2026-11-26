@@ -44,7 +44,9 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * поставили «не буду» на сесію (`sessionId`, `startsAt`, `actor` — перший, `absentees` — усі,
  * `count` — скільки ще крім першого; із затримкою й збиранням кількох в одне). Нагадування
  * про порожній календар (не з подій, `schedule`): `calendar.empty` — учаснику кампейну без
- * тижневих слотів, один раз (`gameId`/`gameTitle` — кампейн, з якого почалось). Текст —
+ * тижневих слотів, один раз (`gameId`/`gameTitle` — кампейн, з якого почалось). Імпорт iCal
+ * (не з подій, `schedule`): `calendar.import_broken` — власнику посилання, один раз, коли
+ * автооновлення зупинилось після кількох невдач поспіль (без параметрів). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -86,6 +88,7 @@ export const NOTIFICATION_TYPES = [
   'poll.closed',
   'session.rsvp_declined',
   'calendar.empty',
+  'calendar.import_broken',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -265,7 +268,7 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
     return '/my-games';
   }
   // Нагадування про календар — до редактора доступності.
-  if (type === 'calendar.empty') return '/calendar';
+  if (type === 'calendar.empty' || type === 'calendar.import_broken') return '/calendar';
   if (p.gameId === undefined) return '/';
   switch (type) {
     case 'poll.created':

@@ -34,6 +34,7 @@ describe('notification contracts', () => {
       'game.long_pause',
       'session.rsvp_declined',
       'calendar.empty',
+      'calendar.import_broken',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -115,6 +116,7 @@ describe('notificationLink', () => {
     );
     expect(notificationLink('calendar.empty', { gameId: 5 })).toBe('/calendar');
     expect(notificationLink('calendar.empty', {})).toBe('/calendar');
+    expect(notificationLink('calendar.import_broken', {})).toBe('/calendar');
   });
 
   it('rating notifications lead to the rate page (session set via ?session=)', () => {

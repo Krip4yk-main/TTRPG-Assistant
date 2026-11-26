@@ -63,6 +63,7 @@ docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRA
 - Redis у production — лише в приватній мережі і **з автентифікацією** (`requirepass` або ACL-користувач, `REDIS_URL=redis://user:password@host:6379`): бекенд довіряє вмісту Redis (кеш сесій, надгробки відкликаних сесій, OAuth state), тож доступ до Redis рівнозначний доступу до будь-якого акаунта;
 - вхід через Google / Discord — необов'язковий: задайте `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` чи `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` (redirect URI — `${PUBLIC_BASE_URL}/api/auth/<google|discord>/callback`) і збирайте фронтенд з відповідним `NG_APP_GOOGLE_LOGIN=true` / `NG_APP_DISCORD_LOGIN=true`; без змінних ендпоінти провайдера відповідають NOT_FOUND;
 - MySQL і Redis не публікуйте назовні: локальний `docker-compose.yml` прив'язує їхні порти лише до `127.0.0.1`.
+- імпорт календаря з iCal-посилання — `CALENDAR_IMPORT_KEY` (base64 рівно 32 байтів, `openssl rand -base64 32`): ним шифруються збережені посилання (AES-256-GCM). Без ключа імпорт вимкнено. Бекенд завантажує посилання користувачів сам (лише https, без приватних адрес, 10 с, 2 МБ), тож йому потрібен вихідний доступ до інтернету на порт 443; заміна ключа «ламає» всі підключені імпорти (користувачі зберігають посилання знову).
 
 ### Reverse proxy
 

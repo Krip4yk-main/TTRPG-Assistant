@@ -27,6 +27,9 @@ import { gameMembersRouter } from './members/members.routes.js';
 import { blacklistRouter } from './members/blacklist.routes.js';
 import { gameSessionsRouter, sessionsRouter } from './sessions/sessions.routes.js';
 import { gameSchedulingRouter, pollsRouter } from './scheduling/scheduling.routes.js';
+import { calendarImportRouter } from './scheduling/ical/calendar-import.routes.js';
+import type { IcsFetcher } from './scheduling/ical/fetch.js';
+import type { IcsParser } from './scheduling/ical/parse-runner.js';
 import { gameNotesRouter, sessionNotesRouter } from './notes/notes.routes.js';
 import { notificationsRouter } from './notifications/notifications.routes.js';
 import { notificationPrefsRouter } from './notifications/prefs.routes.js';
@@ -53,6 +56,9 @@ export type AppDeps = {
   oauthProviders?: Record<string, OAuthProvider>;
   /** Realtime-хаб; відсутній у тестах без сокетів. */
   realtime?: RealtimeHub;
+  /** DI для тестів імпорту iCal: завантаження й розбір (за замовчуванням — безпечні реальні). */
+  icsFetcher?: IcsFetcher;
+  icsParser?: IcsParser;
 };
 
 export function createApp(deps: AppDeps): express.Express {
@@ -95,6 +101,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/sanctions', mySanctionsRouter(deps));
   app.use('/api/me/sanctions', mySanctionAppealsRouter(deps));
   app.use('/api/me/dead-games', myDeadGamesRouter(deps));
+  app.use('/api/me/calendar-import', calendarImportRouter(deps));
   app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));

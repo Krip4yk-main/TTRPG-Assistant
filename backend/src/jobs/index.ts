@@ -37,6 +37,11 @@ import {
   RSVP_DECLINED_JOB,
   runRsvpDeclineNotices,
 } from '../scheduling/reschedule.service.js';
+import {
+  CALENDAR_IMPORT_EVERY_MS,
+  CALENDAR_IMPORT_JOB,
+  runCalendarImportSync,
+} from '../scheduling/ical/calendar-import.service.js';
 import { DAILY_AT_UTC, DAILY_JOB, runDaily } from './daily.js';
 import { purgeFinishedJobs } from './queue.js';
 import { registerHandler, registerRecurring } from './registry.js';
@@ -111,4 +116,10 @@ export function registerJobs(): void {
     await runCalendarReminders(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
   });
   registerRecurring(CALENDAR_REMINDERS_JOB, { everyMs: CALENDAR_REMINDERS_EVERY_MS });
+
+  // Імпорт iCal: кожні 15 хв оновлює посилання, яким минуло 3 год від останньої спроби.
+  registerHandler(CALENDAR_IMPORT_JOB, async (deps, _payload, job) => {
+    await runCalendarImportSync(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(CALENDAR_IMPORT_JOB, { everyMs: CALENDAR_IMPORT_EVERY_MS });
 }
