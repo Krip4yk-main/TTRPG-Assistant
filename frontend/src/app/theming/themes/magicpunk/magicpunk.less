@@ -1,0 +1,1189 @@
+// Дизайн «Магіпанк» (родина сцени, макет docs/design-concepts/themes2/magicpunk.html і
+// magicpunk-card.html): окремий бандл `theme-magicpunk.css` (`inject: false` в angular.json),
+// який підключає ThemeService / інлайн-скрипт index.html з `?v=<версія>`. Тут — шрифти
+// (Cormorant Unicase — логотип і заголовок сторінки, Cormorant SC — мітки, «Фільтри», числа
+// печатки, Lora — текст і назви карток, Spectral SC — дрібні підписи; @fontsource: лише кирилиця
+// й латиниця), токени --sc-* і вигляд: зоряна стеля опівнічного індиго (кілька шарів зірок
+// різного розміру — без помітної сітки, склепінчасті дуги, туманності), свічки, що ширяють, і
+// рунічна астролябія біля заголовка; шапка — темна балка з позолоченою рейкою й бірюзовими
+// рунами; заголовок сторінки — золотий градієнтний текст. Панелі фільтрів, картки, порожні стани
+// й сторінки-панелі — світлий пергамент у золотій рамці з кутиками (локальна світла схема,
+// див. нижче). Картка — зачароване запрошення: шапка «Запрошення № <id гри>» з паперовою
+// ластівкою, місця — флакони зілля (заповнений — зайняте місце; число — у тексті), ціна —
+// воскова печатка (слива — сума, глибока бірюза — «без плати»), «Підходить» — бірюзова пігулка
+// з півмісяцем, вік — кругла печатка червоним чорнилом, «Нове» — золотий листок; обкладинка —
+// «сплячий портрет» в овальній позолоченій рамі на кільці (у спокої — сепія й тьмяно, наперед —
+// колір, бірюзова аура, іскри й ледь помітне «дихання» лише за prefers-reduced-motion:
+// no-preference; поведінка — спільна CoverAttachment). Прапорці — рунічні ромби. Material —
+// magicpunk-material.scss. Без назв, символів і шрифтів чужих франшиз (жодних гербів, кольорів
+// «факультетів», сов, блискавок тощо) — лише загальна естетика магії й астрономії.
+//
+// Схема. Сторінка — темна (стіна, шапка, заголовок, оверлеї Material: меню, списки, діалоги,
+// датапікер, автодоповнення — опівнічне індиго з золотою межею: вони рендеряться поза
+// ділянками й «висять» над нічним небом). Світлі ділянки — `.mp-paper()`: токени пергаменту
+// + `.sc-local-scheme(light)` на кожній .sc-glass (картки, «Мої ігри», порожні стани, банер),
+// на панелях і повідомленнях сторінок-дощок і на звичайній сторінці-панелі (форми, сторінка
+// гри, налаштування) — поля, кнопки, прапорці й текст усередині — темні на світлому. Поза
+// ділянками на стіні (сортування, лічильник, кнопки «Ще») — темна схема сторінки.
+//
+// Гачки декору сцени (карта — у шапці scene-base.less):
+//   sc-accent — чотири позолочені кутики рамки (один шар з чотирма фонами; і в порожньому
+//     стані); sc-p1, sc-p2, sc-d1…sc-d4, sc-s1 — не вживаються.
+//   Шапка запрошення — `::before` (паперова ластівка, «Запрошення № <id>», золота лінія) і
+//     `::after` (три зірочки кольору варіанта) самої панелі картки / «Моїх ігор»: номер — з
+//     атрибута data-game-id панелі; текст — декоративний (альтернативний текст порожній, для
+//     читачів екрана його немає).
+//   Заголовок сторінки: свічки — `nri-sc-page-header .page-header::before` (≥ 1360px),
+//     астролябія — `::after` (≥ 1100px); обидва — лише на сторінці без кнопок дій.
+//   Панель фільтрів: кутики — `::before` (замість неонової трубки основи).
+//   Обкладинка: кільце — `.attach::before`, ромб-самоцвіт — `.attach::after`, іскри —
+//     `.cap::before / ::after`.
+//   data-neon (варіант картки): колір рядка системи й зірочок шапки (фіалка, слива, глибока
+//     бірюза, бурштин, мох, червоне чорнило).
+
+// Шрифти (локально, @fontsource: лише кирилиця й латиниця). Грані оголошено тут, а не імпортом
+// файлів підмножин @fontsource (`cyrillic-600.css` тощо): у тих файлах немає unicode-range, тож
+// кирилична й латинська грані однієї ваги — дві грані на весь Unicode, і Chrome інколи бере
+// літеру не з тієї. Тут кожна грань має свій діапазон.
+@mp-cyr: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+@mp-lat: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+.mp-face(@pkg; @family; @weight; @style: normal) {
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-cyrillic-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @mp-cyr;
+  }
+
+  @font-face {
+    font-family: @family;
+    font-style: @style;
+    font-display: swap;
+    font-weight: @weight;
+    src:
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff2') format('woff2'),
+      url('@fontsource/@{pkg}/files/@{pkg}-latin-@{weight}-@{style}.woff') format('woff');
+    unicode-range: @mp-lat;
+  }
+}
+
+.mp-face(cormorant-unicase; 'Cormorant Unicase'; 700);
+.mp-face(cormorant-sc; 'Cormorant SC'; 600);
+.mp-face(cormorant-sc; 'Cormorant SC'; 700);
+.mp-face(lora; 'Lora'; 400);
+.mp-face(lora; 'Lora'; 400; italic);
+.mp-face(lora; 'Lora'; 600);
+.mp-face(lora; 'Lora'; 700);
+.mp-face(spectral-sc; 'Spectral SC'; 500);
+.mp-face(spectral-sc; 'Spectral SC'; 600);
+@import '../scene/scene-base.less';
+
+@mp: ~":root[data-theme='magicpunk']";
+
+// Зображення (data-URI SVG). Шви:
+//   Зірки — три шари плиток різного розміру (640×560, 910×830, 1270×1130; разом повторюються
+//     лише через десятки тисяч пікселів — сітки не видно). Без фільтрів; кожна зірка (з
+//     ореолом) лежить усередині плитки з відступом від країв — нічого не перетинає стик, тож
+//     плитка безшовна за побудовою. Помітні фігури (сузір'я) — лише в шарі склепіння без
+//     повтору, щоб не впізнавались через кожну плитку.
+//   Пергамент 300×300: фільтр — область = плитка (x/y 0, width/height 1), stitchTiles,
+//     baseFrequency 0.02 × 300 = 6 (ціле).
+//   Дуги склепіння й два сузір'я 1440×620 — без повтору; лінії дуг згасають до прозорого на
+//     обох кінцях (на екрані, ширшому за 1440, не обриваються помітно).
+//   Свічки, астролябія, кутики, ластівка, флакони, півмісяць, іскра — без повтору й фільтрів.
+@mp-star-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='560'%3E%3Ccircle cx='200.4' cy='27.5' r='0.45' fill='%23f3ead2' opacity='0.46'/%3E%3Ccircle cx='302.4' cy='158.9' r='0.66' fill='%23f3ead2' opacity='0.28'/%3E%3Ccircle cx='375.9' cy='461.3' r='0.51' fill='%23bff7ee' opacity='0.33'/%3E%3Ccircle cx='378.6' cy='310.2' r='0.54' fill='%23f3ead2' opacity='0.35'/%3E%3Ccircle cx='9.9' cy='109.7' r='0.57' fill='%23f3ead2' opacity='0.38'/%3E%3Ccircle cx='565.8' cy='292.3' r='0.46' fill='%23f3ead2' opacity='0.25'/%3E%3Ccircle cx='574.6' cy='13.2' r='0.83' fill='%23f3ead2' opacity='0.42'/%3E%3Ccircle cx='108.6' cy='446' r='0.83' fill='%23f3ead2' opacity='0.49'/%3E%3Ccircle cx='276.5' cy='144.2' r='0.85' fill='%23bff7ee' opacity='0.39'/%3E%3Ccircle cx='225.9' cy='487.4' r='0.83' fill='%23f3ead2' opacity='0.22'/%3E%3Ccircle cx='433.7' cy='285.2' r='0.83' fill='%23f3ead2' opacity='0.46'/%3E%3Ccircle cx='272.7' cy='452.5' r='0.82' fill='%23f3ead2' opacity='0.36'/%3E%3Ccircle cx='527.8' cy='62.9' r='0.47' fill='%23f3ead2' opacity='0.32'/%3E%3Ccircle cx='69.9' cy='212.9' r='0.60' fill='%23f3ead2' opacity='0.27'/%3E%3Ccircle cx='65.2' cy='546' r='0.67' fill='%23f3ead2' opacity='0.50'/%3E%3Ccircle cx='549.2' cy='361' r='0.68' fill='%23f3ead2' opacity='0.36'/%3E%3Ccircle cx='613.5' cy='318.5' r='0.66' fill='%23f3ead2' opacity='0.47'/%3E%3Ccircle cx='441.2' cy='162.5' r='0.51' fill='%23f3ead2' opacity='0.45'/%3E%3Ccircle cx='325.7' cy='131' r='0.80' fill='%23f3ead2' opacity='0.25'/%3E%3Ccircle cx='483.3' cy='191.4' r='0.80' fill='%23f3ead2' opacity='0.46'/%3E%3Ccircle cx='23.4' cy='311.8' r='0.45' fill='%23f3ead2' opacity='0.30'/%3E%3Ccircle cx='631' cy='276.1' r='0.58' fill='%23f3ead2' opacity='0.43'/%3E%3Ccircle cx='157.5' cy='149.7' r='0.71' fill='%23f3ead2' opacity='0.36'/%3E%3Ccircle cx='314.4' cy='285.3' r='0.63' fill='%23f3ead2' opacity='0.25'/%3E%3Ccircle cx='358.1' cy='121.4' r='0.78' fill='%23f3ead2' opacity='0.44'/%3E%3Ccircle cx='247.8' cy='112' r='0.49' fill='%23f3ead2' opacity='0.36'/%3E%3Ccircle cx='534.5' cy='465.2' r='0.61' fill='%23f3ead2' opacity='0.42'/%3E%3Ccircle cx='200.7' cy='512.2' r='0.56' fill='%23f3ead2' opacity='0.41'/%3E%3Ccircle cx='283.9' cy='414.3' r='0.62' fill='%23f3ead2' opacity='0.22'/%3E%3Ccircle cx='500' cy='272.3' r='0.76' fill='%23bff7ee' opacity='0.39'/%3E%3Ccircle cx='572.7' cy='140.5' r='0.79' fill='%23f3ead2' opacity='0.27'/%3E%3Ccircle cx='479.6' cy='263.1' r='0.64' fill='%23f3ead2' opacity='0.27'/%3E%3Ccircle cx='202.1' cy='49.7' r='0.69' fill='%23f3ead2' opacity='0.35'/%3E%3Ccircle cx='370' cy='404.3' r='0.78' fill='%23f3ead2' opacity='0.46'/%3E%3Ccircle cx='581.3' cy='368.1' r='0.60' fill='%23f3ead2' opacity='0.26'/%3E%3Ccircle cx='536.1' cy='17.7' r='0.59' fill='%23f3ead2' opacity='0.38'/%3E%3Ccircle cx='103.6' cy='119.2' r='0.77' fill='%23f3ead2' opacity='0.43'/%3E%3Ccircle cx='540.8' cy='212.5' r='0.49' fill='%23f3ead2' opacity='0.32'/%3E%3Ccircle cx='335.7' cy='441' r='0.53' fill='%23f3ead2' opacity='0.50'/%3E%3Ccircle cx='238.1' cy='505.2' r='0.83' fill='%23f3ead2' opacity='0.35'/%3E%3Ccircle cx='93.4' cy='486.9' r='0.73' fill='%23f3ead2' opacity='0.22'/%3E%3Ccircle cx='596.2' cy='435.1' r='0.85' fill='%23bff7ee' opacity='0.22'/%3E%3Ccircle cx='327' cy='332.7' r='0.65' fill='%23f3ead2' opacity='0.36'/%3E%3Ccircle cx='509.3' cy='66.8' r='0.55' fill='%23f3ead2' opacity='0.23'/%3E%3Ccircle cx='226.3' cy='196.2' r='0.61' fill='%23f3ead2' opacity='0.47'/%3E%3Ccircle cx='185.7' cy='535.9' r='0.64' fill='%23f3ead2' opacity='0.39'/%3E%3C/svg%3E");
+@mp-star-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='910' height='830'%3E%3Ccircle cx='345.5' cy='455.4' r='0.70' fill='%23bff7ee' opacity='0.44'/%3E%3Ccircle cx='567' cy='413.3' r='0.75' fill='%23f3ead2' opacity='0.64'/%3E%3Ccircle cx='210.4' cy='153.7' r='0.76' fill='%23f3ead2' opacity='0.50'/%3E%3Ccircle cx='547.3' cy='658.6' r='1.15' fill='%23f3ead2' opacity='0.54'/%3E%3Ccircle cx='107.1' cy='36' r='0.95' fill='%23bff7ee' opacity='0.55'/%3E%3Ccircle cx='36.1' cy='78.7' r='1.22' fill='%23f3ead2' opacity='0.68'/%3E%3Ccircle cx='720.6' cy='334.9' r='1.00' fill='%23f3ead2' opacity='0.59'/%3E%3Ccircle cx='893.3' cy='556.5' r='1.04' fill='%23f3ead2' opacity='0.53'/%3E%3Ccircle cx='572' cy='817.1' r='0.85' fill='%23f3ead2' opacity='0.51'/%3E%3Ccircle cx='174.6' cy='535.4' r='0.84' fill='%23f3ead2' opacity='0.67'/%3E%3Ccircle cx='793.6' cy='281.4' r='1.14' fill='%23f3ead2' opacity='0.59'/%3E%3Ccircle cx='725.1' cy='576.8' r='0.77' fill='%23f3ead2' opacity='0.53'/%3E%3Ccircle cx='169.4' cy='565.2' r='0.91' fill='%23f3ead2' opacity='0.57'/%3E%3Ccircle cx='39' cy='730.9' r='0.98' fill='%23f3ead2' opacity='0.48'/%3E%3Ccircle cx='846.4' cy='566.9' r='1.23' fill='%23f3ead2' opacity='0.70'/%3E%3Ccircle cx='69.2' cy='666.6' r='0.90' fill='%23f3ead2' opacity='0.56'/%3E%3Ccircle cx='178.6' cy='459.6' r='0.96' fill='%23f3ead2' opacity='0.48'/%3E%3Ccircle cx='487.1' cy='125' r='1.03' fill='%23f3ead2' opacity='0.51'/%3E%3Ccircle cx='883' cy='176.6' r='0.86' fill='%23f3ead2' opacity='0.61'/%3E%3Ccircle cx='612.9' cy='739.1' r='0.90' fill='%23f3ead2' opacity='0.50'/%3E%3Ccircle cx='65.2' cy='438.7' r='0.75' fill='%23f3ead2' opacity='0.57'/%3E%3Ccircle cx='148.2' cy='253' r='1.01' fill='%23f3ead2' opacity='0.49'/%3E%3Ccircle cx='792.9' cy='759.2' r='0.95' fill='%23f3ead2' opacity='0.52'/%3E%3Ccircle cx='520.5' cy='805.9' r='0.98' fill='%23f3ead2' opacity='0.63'/%3E%3Ccircle cx='239.7' cy='820.9' r='1.04' fill='%23f3ead2' opacity='0.63'/%3E%3Ccircle cx='815.4' cy='492.8' r='1.07' fill='%23f3ead2' opacity='0.47'/%3E%3Ccircle cx='272.1' cy='390.9' r='1.20' fill='%23f3ead2' opacity='0.60'/%3E%3Ccircle cx='592.9' cy='611.4' r='1.22' fill='%23f3ead2' opacity='0.63'/%3E%3Ccircle cx='18.8' cy='307.8' r='1.14' fill='%23f3ead2' opacity='0.39'/%3E%3Ccircle cx='744.5' cy='91.6' r='1.05' fill='%23f3ead2' opacity='0.35'/%3E%3Ccircle cx='550.6' cy='356.1' r='0.72' fill='%23f3ead2' opacity='0.70'/%3E%3Ccircle cx='683.6' cy='662' r='1.05' fill='%23f3ead2' opacity='0.64'/%3E%3Ccircle cx='350.5' cy='523.4' r='1.14' fill='%23f3ead2' opacity='0.66'/%3E%3Ccircle cx='768.5' cy='127.1' r='0.76' fill='%23f3ead2' opacity='0.60'/%3E%3C/svg%3E");
+@mp-star-c: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1270' height='1130'%3E%3Ccircle cx='1213.1' cy='1093.2' r='1.10' fill='%23bff7ee' opacity='0.76'/%3E%3Ccircle cx='176' cy='658.2' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='176' cy='658.2' r='1.54' fill='%23bff7ee' opacity='0.61'/%3E%3Ccircle cx='1234.5' cy='675.2' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='1234.5' cy='675.2' r='1.55' fill='%23bff7ee' opacity='0.80'/%3E%3Ccircle cx='568.5' cy='465.4' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='568.5' cy='465.4' r='1.21' fill='%23f3ead2' opacity='0.79'/%3E%3Ccircle cx='513' cy='225.2' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='513' cy='225.2' r='1.28' fill='%23f3ead2' opacity='0.67'/%3E%3Ccircle cx='899.3' cy='850.4' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='899.3' cy='850.4' r='1.51' fill='%23bff7ee' opacity='0.62'/%3E%3Ccircle cx='847.7' cy='584.7' r='1.34' fill='%23f3ead2' opacity='0.59'/%3E%3Ccircle cx='137.6' cy='777.7' r='1.54' fill='%23f3ead2' opacity='0.66'/%3E%3Ccircle cx='459.8' cy='761.1' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='459.8' cy='761.1' r='1.15' fill='%23bff7ee' opacity='0.79'/%3E%3Ccircle cx='9.4' cy='245.6' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='9.4' cy='245.6' r='1.28' fill='%23bff7ee' opacity='0.74'/%3E%3Ccircle cx='133.2' cy='906.7' r='1.38' fill='%23bff7ee' opacity='0.70'/%3E%3Ccircle cx='92.4' cy='819.8' r='5' fill='%236fe6d2' opacity='.14'/%3E%3Ccircle cx='92.4' cy='819.8' r='1.61' fill='%23bff7ee' opacity='0.71'/%3E%3C/svg%3E");
+@mp-vault: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1440' height='620'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23d6be8c' stop-opacity='0'/%3E%3Cstop offset='.18' stop-color='%23d6be8c' stop-opacity='.16'/%3E%3Cstop offset='.82' stop-color='%23d6be8c' stop-opacity='.16'/%3E%3Cstop offset='1' stop-color='%23d6be8c' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke='url(%23f)'%3E%3Cpath d='M0 500Q720 -120 1440 500'/%3E%3Cpath d='M0 548Q720 -70 1440 548'/%3E%3Cpath d='M360 0Q720 260 1080 0' stroke-dasharray='2 6'/%3E%3C/g%3E%3Cpath d='M1040 96 1092 70 1160 84 1196 128 1270 118' fill='none' stroke='%23bff7ee' stroke-opacity='.2' stroke-width='.8'/%3E%3Ccircle cx='1040' cy='96' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='1040' cy='96' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='1092' cy='70' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='1092' cy='70' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='1160' cy='84' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='1160' cy='84' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='1196' cy='128' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='1196' cy='128' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='1270' cy='118' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='1270' cy='118' r='1.7' fill='%23e6fffa'/%3E%3Cpath d='M118 300 160 262 214 276 232 330' fill='none' stroke='%23bff7ee' stroke-opacity='.2' stroke-width='.8'/%3E%3Ccircle cx='118' cy='300' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='118' cy='300' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='160' cy='262' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='160' cy='262' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='214' cy='276' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='214' cy='276' r='1.7' fill='%23e6fffa'/%3E%3Ccircle cx='232' cy='330' r='5' fill='%236fe6d2' opacity='.16'/%3E%3Ccircle cx='232' cy='330' r='1.7' fill='%23e6fffa'/%3E%3C/svg%3E");
+@mp-candles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='280' viewBox='0 0 520 280'%3E%3Cdefs%3E%3CradialGradient id='fl' cx='.5' cy='.65' r='.55'%3E%3Cstop offset='0' stop-color='%23fffbe6'/%3E%3Cstop offset='.45' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23f08a2a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='ha'%3E%3Cstop offset='0' stop-color='%23ffcf73' stop-opacity='.42'/%3E%3Cstop offset='.4' stop-color='%23ffb84d' stop-opacity='.12'/%3E%3Cstop offset='1' stop-color='%23ffb84d' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='wx' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23d9ccb0'/%3E%3Cstop offset='.35' stop-color='%23fbf3df'/%3E%3Cstop offset='1' stop-color='%23bfae8c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(50 64) scale(0.75)' opacity='1'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(160 124) scale(0.55)' opacity='0.85'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(236 46) scale(0.95)' opacity='1'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(346 134) scale(0.55)' opacity='0.8'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(428 76) scale(0.7)' opacity='0.95'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3C/svg%3E");
+@mp-candles-low: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='560' viewBox='0 0 220 560'%3E%3Cdefs%3E%3CradialGradient id='fl' cx='.5' cy='.65' r='.55'%3E%3Cstop offset='0' stop-color='%23fffbe6'/%3E%3Cstop offset='.45' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23f08a2a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='ha'%3E%3Cstop offset='0' stop-color='%23ffcf73' stop-opacity='.42'/%3E%3Cstop offset='.4' stop-color='%23ffb84d' stop-opacity='.12'/%3E%3Cstop offset='1' stop-color='%23ffb84d' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='wx' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23d9ccb0'/%3E%3Cstop offset='.35' stop-color='%23fbf3df'/%3E%3Cstop offset='1' stop-color='%23bfae8c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(40 50) scale(0.75)' opacity='0.85'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(150 240) scale(0.55)' opacity='0.7'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3Cg transform='translate(80 410) scale(0.65)' opacity='0.6'%3E%3Ccircle cx='20' cy='20' r='46' fill='url(%23ha)'/%3E%3Cpath d='M20 6c3.6 6 5 9.5 5 13a5 5 0 0 1-10 0c0-3.5 1.4-7 5-13Z' fill='url(%23fl)'/%3E%3Cpath d='M20 15c1.4 2.4 2 3.8 2 5a2 2 0 0 1-4 0c0-1.2.6-2.6 2-5Z' fill='%23fff'/%3E%3Cpath d='M20 24v4' stroke='%233a2a1a'/%3E%3Cpath d='M13 30q7-3 14 0v118H13Z' fill='url(%23wx)'/%3E%3Cpath d='M15 31q1 10 0 18q-1 4 1 6v-24Z' fill='%23fffaf0' opacity='.8'/%3E%3C/g%3E%3C/svg%3E");
+@mp-astro: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250' viewBox='0 0 250 250'%3E%3Cdefs%3E%3CradialGradient id='c' cx='.42' cy='.38'%3E%3Cstop offset='0' stop-color='%23f2fffc'/%3E%3Cstop offset='.35' stop-color='%238ff0e0'/%3E%3Cstop offset='.8' stop-color='%231f7f74'/%3E%3Cstop offset='1' stop-color='%230f4a45'/%3E%3C/radialGradient%3E%3CradialGradient id='a'%3E%3Cstop offset='0' stop-color='%236fe6d2' stop-opacity='.45'/%3E%3Cstop offset='1' stop-color='%236fe6d2' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f7dc9a'/%3E%3Cstop offset='.5' stop-color='%23c8963f'/%3E%3Cstop offset='1' stop-color='%237a5520'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='125' cy='125' r='70' fill='url(%23a)'/%3E%3Ccircle cx='125' cy='125' r='112' fill='none' stroke='url(%23b)' stroke-width='3'/%3E%3Ccircle cx='125' cy='125' r='104' fill='none' stroke='%23f7dc9a' stroke-opacity='.5'/%3E%3Cg stroke='%23f0c36a' stroke-width='1.4' fill='none' stroke-linecap='round' opacity='.9'%3E%3Cpath d='M-3 -5v10M-3 -5l5 3-5 3' transform='translate(221.0 125.0) rotate(90) scale(.95)'/%3E%3Cpath d='M0 -5v10M-4 -1l4-4 4 4' transform='translate(217.7 149.8) rotate(105) scale(.95)'/%3E%3Cpath d='M-3 -5l6 10M3 -5l-6 10' transform='translate(208.1 173.0) rotate(120) scale(.95)'/%3E%3Cpath d='M0 -5v10M0 -1l4-3' transform='translate(192.9 192.9) rotate(135) scale(.95)'/%3E%3Cpath d='M-4 5V-5l4 5 4-5v10' transform='translate(173.0 208.1) rotate(150) scale(.95)'/%3E%3Cpath d='M-3 -5h6M0 -5v10' transform='translate(149.8 217.7) rotate(165) scale(.95)'/%3E%3Cpath d='M-4 -5 4 5M-4 5l4-4' transform='translate(125.0 221.0) rotate(180) scale(.95)'/%3E%3Cpath d='M0 -5 4 0 0 5-4 0Z' transform='translate(100.2 217.7) rotate(195) scale(.95)'/%3E%3Cpath d='M-3 -5v10M-3 -5l5 3-5 3' transform='translate(77.0 208.1) rotate(210) scale(.95)'/%3E%3Cpath d='M0 -5v10M-4 -1l4-4 4 4' transform='translate(57.1 192.9) rotate(225) scale(.95)'/%3E%3Cpath d='M-3 -5l6 10M3 -5l-6 10' transform='translate(41.9 173.0) rotate(240) scale(.95)'/%3E%3Cpath d='M0 -5v10M0 -1l4-3' transform='translate(32.3 149.8) rotate(255) scale(.95)'/%3E%3Cpath d='M-4 5V-5l4 5 4-5v10' transform='translate(29.0 125.0) rotate(270) scale(.95)'/%3E%3Cpath d='M-3 -5h6M0 -5v10' transform='translate(32.3 100.2) rotate(285) scale(.95)'/%3E%3Cpath d='M-4 -5 4 5M-4 5l4-4' transform='translate(41.9 77.0) rotate(300) scale(.95)'/%3E%3Cpath d='M0 -5 4 0 0 5-4 0Z' transform='translate(57.1 57.1) rotate(315) scale(.95)'/%3E%3Cpath d='M-3 -5v10M-3 -5l5 3-5 3' transform='translate(77.0 41.9) rotate(330) scale(.95)'/%3E%3Cpath d='M0 -5v10M-4 -1l4-4 4 4' transform='translate(100.2 32.3) rotate(345) scale(.95)'/%3E%3Cpath d='M-3 -5l6 10M3 -5l-6 10' transform='translate(125.0 29.0) rotate(360) scale(.95)'/%3E%3Cpath d='M0 -5v10M0 -1l4-3' transform='translate(149.8 32.3) rotate(375) scale(.95)'/%3E%3Cpath d='M-4 5V-5l4 5 4-5v10' transform='translate(173.0 41.9) rotate(390) scale(.95)'/%3E%3Cpath d='M-3 -5h6M0 -5v10' transform='translate(192.9 57.1) rotate(405) scale(.95)'/%3E%3Cpath d='M-4 -5 4 5M-4 5l4-4' transform='translate(208.1 77.0) rotate(420) scale(.95)'/%3E%3Cpath d='M0 -5 4 0 0 5-4 0Z' transform='translate(217.7 100.2) rotate(435) scale(.95)'/%3E%3C/g%3E%3Cellipse cx='125' cy='125' rx='88' ry='32' fill='none' stroke='url(%23b)' stroke-width='2.4' transform='rotate(-28 125 125)'/%3E%3Cellipse cx='125' cy='125' rx='88' ry='32' fill='none' stroke='url(%23b)' stroke-width='2.4' transform='rotate(38 125 125)'/%3E%3Ccircle cx='125' cy='125' r='58' fill='none' stroke='%236fe6d2' stroke-opacity='.6' stroke-dasharray='1 5'/%3E%3Ccircle cx='201' cy='84' r='6' fill='%239b84ff' stroke='%23f7dc9a' stroke-width='1.5'/%3E%3Ccircle cx='56' cy='160' r='4.5' fill='%23f0c36a' stroke='%237a5520'/%3E%3Cpath d='M125 92 146 125 125 158 104 125Z' fill='url(%23c)' stroke='%23d9fff8'/%3E%3Cpath d='M125 92v66M104 125h42' stroke='%23fff' stroke-opacity='.55' stroke-width='.8'/%3E%3Cpath d='M125 6v20M125 224v20M6 125h20M224 125h20' stroke='%23f0c36a' stroke-width='2'/%3E%3C/svg%3E");
+@mp-parch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .40 0 0 0 0 .18 0 0 0 .55 -.32'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+@mp-corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cg transform='scale(1)'%3E%3Cg fill='none' stroke='%23a87a33' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M2 28V8a6 6 0 0 1 6-6h20'/%3E%3Cpath d='M6 24V11a5 5 0 0 1 5-5h13'/%3E%3Cpath d='M10 10c3 0 5 2 5 5'/%3E%3C/g%3E%3Ccircle cx='10' cy='10' r='1.8' fill='%23a87a33'/%3E%3C/g%3E%3C/svg%3E");
+@mp-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cg transform='matrix(-1 0 0 1 30 0)'%3E%3Cg fill='none' stroke='%23a87a33' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M2 28V8a6 6 0 0 1 6-6h20'/%3E%3Cpath d='M6 24V11a5 5 0 0 1 5-5h13'/%3E%3Cpath d='M10 10c3 0 5 2 5 5'/%3E%3C/g%3E%3Ccircle cx='10' cy='10' r='1.8' fill='%23a87a33'/%3E%3C/g%3E%3C/svg%3E");
+@mp-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cg transform='matrix(1 0 0 -1 0 30)'%3E%3Cg fill='none' stroke='%23a87a33' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M2 28V8a6 6 0 0 1 6-6h20'/%3E%3Cpath d='M6 24V11a5 5 0 0 1 5-5h13'/%3E%3Cpath d='M10 10c3 0 5 2 5 5'/%3E%3C/g%3E%3Ccircle cx='10' cy='10' r='1.8' fill='%23a87a33'/%3E%3C/g%3E%3C/svg%3E");
+@mp-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cg transform='matrix(-1 0 0 -1 30 30)'%3E%3Cg fill='none' stroke='%23a87a33' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M2 28V8a6 6 0 0 1 6-6h20'/%3E%3Cpath d='M6 24V11a5 5 0 0 1 5-5h13'/%3E%3Cpath d='M10 10c3 0 5 2 5 5'/%3E%3C/g%3E%3Ccircle cx='10' cy='10' r='1.8' fill='%23a87a33'/%3E%3C/g%3E%3C/svg%3E");
+@mp-bird: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cg fill='none' stroke='%237a5f3f' stroke-width='1.1' stroke-linejoin='round'%3E%3Cpath d='M1 8 9 6 21 1 13 7 16 13 10 8Z'/%3E%3Cpath d='M9 6l1 2'/%3E%3C/g%3E%3C/svg%3E");
+@mp-vial-full: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='22' viewBox='0 0 12 22'%3E%3Cdefs%3E%3ClinearGradient id='p' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23b9a6ff'/%3E%3Cstop offset='1' stop-color='%235b3a9c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='4' y='.5' width='4' height='3' rx='.6' fill='%238a5a2b'/%3E%3Cpath d='M4.4 3.5h3.2v4.2l3.1 4.6a5 5 0 1 1-9.4 0l3.1-4.6Z' fill='%23fff8ea' stroke='%235a4326'/%3E%3Cpath d='M2.1 13.2a4.4 4.4 0 1 0 7.8 0Z' fill='url(%23p)'/%3E%3Ccircle cx='4.3' cy='15.2' r='.9' fill='%23efe9ff' opacity='.9'/%3E%3C/svg%3E");
+@mp-vial-empty: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='22' viewBox='0 0 12 22'%3E%3Crect x='4' y='.5' width='4' height='3' rx='.6' fill='%238a5a2b' opacity='.6'/%3E%3Cpath d='M4.4 3.5h3.2v4.2l3.1 4.6a5 5 0 1 1-9.4 0l3.1-4.6Z' fill='%23fffdf6' stroke='%238a7354'/%3E%3Cpath d='M3 12.6l1.4-2' stroke='%23b7a385' stroke-width='.8' stroke-linecap='round'/%3E%3C/svg%3E");
+@mp-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M11 1.5a6.5 6.5 0 1 0 3.5 11.8A6 6 0 0 1 11 1.5Z' fill='%23165a53'/%3E%3C/svg%3E");
+@mp-moon-partial: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M11 1.5a6.5 6.5 0 1 0 3.5 11.8A6 6 0 0 1 11 1.5Z' fill='%236a4a0c'/%3E%3C/svg%3E");
+@mp-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 0c.6 4.6 2.8 7 8 8-5.2 1-7.4 3.4-8 8-.6-4.6-2.8-7-8-8 5.2-1 7.4-3.4 8-8Z' fill='%23bff7ee'/%3E%3C/svg%3E");
+
+// Контраст (WCAG, відносна яскравість).
+// Темна схема сторінки. Поверхні: стіна #11163A (під заголовком і лічильником; туманності
+// ледь світліші — ≈ #1A1F4D), оверлей (меню, діалоги, датапікер) #1D2254, поле #0D1132, смуга
+// шапки #1C1530 … #150F26.
+//   Текст #F3EAD2 — 14.6 стіна / 12.4 оверлей / 15.3 поле; лід #D8D1EE — 11.9 стіна; підписи
+//   #BDB3E0 — 8.9 стіна / 7.6 оверлей / 9.4 поле. Навігація #CFC6E8 на смузі — 10.9; логотип і
+//   активний пункт #F6E3B4 / #FFF3D6 — 13.8+.
+//   Межа полів #8F86C0 — 4.5 оверлей / 5.5 поле (≥ 3:1).
+//   Бірюза #6FE6D2 (primary: фокус, посилання, filled-кнопки) — 11.6 стіна / 9.9 оверлей / 12.2
+//     поле; #0B2A27 на бірюзі — 10.1. Золото свічок #F0C36A (перший акцент) — 10.6 стіна;
+//     #2A1A05 на золоті — 10.2.
+//   Червоний текст #FFB0A6 — 8.5 оверлей; небезпечні кнопки #B5443A, текст #FFF6F2 — 5.1.
+//   Заголовок сторінки — градієнт #FFF2C9 … #C38B35 на стіні — 7.5+.
+// Світлі ділянки (пергамент): #F4E9CF у центрі … #EAD8AF на краях, найтемніші плями ≈ #E2CC9C;
+// поле #FFFAF0; картка всередині сторінки #FBF4E4.
+//   Текст #2B1F17 — 13.3 / 11.4 / 15.4 поле; описи #3D2D20 — 10.9 / 9.4; підписи #5D4831 — 6.1
+//     край / 5.5 пляма / 8.3 поле.
+//   Межа полів #8A6A3C — 4.1 пергамент / 4.8 поле (≥ 3:1).
+//   Глибока бірюза #1F7F74 (primary: фокус, прапорці, filled-кнопки) — 4.6 поле / 4.0
+//     пергамент (≥ 3 для меж і значків); білий на ній — 4.8. Текст посилань #165A53 — 6.6 / 5.7.
+//   Індиго #2A2160 (перший акцент) — 11.7; #F6E3B4 на індиго — 11.2; текст акценту #3B2E86 —
+//     7.8 / 7.0 пляма.
+//   Червоне чорнило #8F2F22 (вік, помилки) — 6.7 / 5.1 пляма; #FFF6F2 на ньому — 7.6.
+//   «Підходить»: #165A53 на бірюзовій заливці (≈ #D8E8D2) — 6.4; частковий збіг #6A4A0C на
+//     бурштиновій (≈ #EFDDB0) — 6.0. «Нове» #3B2A08 на золотому листку #F7DC9A … #D5A24B — 10.3
+//     … 6.0.
+//   Рядок системи (варіанти, на краю #EAD8AF / плямі #E2CC9C): фіалка #5B3A9C — 5.9 / 5.3,
+//     слива #8C2A5B — 5.8 / 5.1, бірюза #17616A — 5.1 / 4.5, бурштин #7A4F0E — 5.1 / 4.5, мох
+//     #3F5E1A — 5.3 / 4.7, червоне чорнило #8F2F22 — 5.8 / 5.1.
+//   Печатка: #FBE9F1 на сливовому воску #7D2C5E … #3F1230 — 7.5 … 13.5; «без плати» #E6FBF7 на
+//     бірюзовому #22706F … #0E3538 — 5.4 … 12.3.
+//   Шапка запрошення #6B5338 (декоративний текст) — 6.0 / 4.6 пляма.
+// Свічки, зірки, астролябія, кутики, флакони, рамка портрета — декор, не фон тексту.
+
+// Токени пергаменту — на корені кожної світлої ділянки, потім локальна світла схема.
+.mp-paper() {
+  --sc-ink: #2b1f17;
+  --sc-ink-soft: #3d2d20;
+  --sc-ink-muted: #5d4831;
+  --sc-line: rgba(160, 125, 75, 0.38);
+  --sc-outline: #8a6a3c;
+  --sc-panel: #f4e9cf;
+  --sc-panel-raised: #fbf4e4;
+  --sc-field: #fffaf0;
+  --sc-overlay: #fbf4e4;
+  --sc-blur-overlay: rgba(248, 239, 217, 0.9);
+
+  --sc-neon-a: #2a2160;
+  --sc-neon-a-core: #4b3d8f;
+  --sc-neon-a-text: #3b2e86;
+  --sc-on-neon-a: #f6e3b4;
+  --sc-neon-b: #1f7f74;
+  --sc-neon-b-core: #6fe6d2;
+  --sc-neon-b-text: #165a53;
+  --sc-neon-b-glow: rgba(31, 127, 116, 0.3);
+  --sc-on-neon-b: #fff;
+
+  --sc-lime: #1f7f74;
+  --sc-lime-text: #165a53;
+  --sc-lime-line: rgba(22, 90, 83, 0.45);
+  --sc-lime-fill: rgba(111, 230, 210, 0.2);
+  --sc-amber: #d5a24b;
+  --sc-amber-text: #6a4a0c;
+  --sc-amber-line: rgba(122, 85, 32, 0.6);
+  --sc-amber-fill: rgba(213, 162, 75, 0.2);
+  --sc-on-amber: #3b2a08;
+  --sc-red: #8f2f22;
+  --sc-red-text: #8f2f22;
+  --sc-red-fill: rgba(143, 47, 34, 0.08);
+  --sc-on-red: #fff6f2;
+
+  --nri-shadow-md: 0 6px 14px rgba(70, 45, 15, 0.18);
+  --nri-shadow-lg: 0 12px 24px rgba(70, 45, 15, 0.22);
+
+  .sc-local-scheme(light);
+
+  color: var(--sc-ink);
+
+  ::selection {
+    background: #1f7f74;
+    color: #fff;
+  }
+}
+
+// Пергамент (фон світлих ділянок): плями + світліший центр.
+@mp-paper-bg:
+  @mp-parch 0 0 / 300px 300px,
+  radial-gradient(ellipse 120% 95% at 50% 35%, #f8efd9 50%, #ead8af 100%);
+
+// Позолочена рамка пергаменту (внутрішні лінії) і тінь над нічним небом.
+@mp-frame:
+  inset 0 0 0 1px #b48d4a,
+  inset 0 0 0 4px #f6eddb,
+  inset 0 0 0 5px rgba(180, 141, 74, 0.45),
+  0 0 0 1px rgba(0, 0, 0, 0.55),
+  0 16px 30px rgba(2, 4, 20, 0.6);
+
+@{mp} {
+  --sc-font-display: 'Cormorant SC', Georgia, 'Times New Roman', serif;
+  --sc-font-body: 'Lora', Georgia, 'Times New Roman', serif;
+  --sc-font-mono: 'Spectral SC', Georgia, 'Times New Roman', serif;
+
+  --sc-wall: #11163a;
+  --sc-wall-deep: #0c1030;
+  --sc-bar: linear-gradient(180deg, #1c1530, #150f26);
+  --sc-bar-line: #000;
+
+  // Темні поверхні (оверлеї Material, поля поза пергаментом); фон .sc-glass — пергамент (його
+  // токени — .mp-paper() на тій самій панелі).
+  --sc-panel: #171c48;
+  --sc-glass: @mp-paper-bg;
+  --sc-glass-line: #5a4220;
+  --sc-panel-raised: #222866;
+  --sc-overlay: #1d2254;
+  --sc-overlay-line: rgba(200, 150, 63, 0.6);
+  --sc-field: #0d1132;
+  --sc-backdrop: rgba(6, 8, 26, 0.78);
+  --sc-blur-overlay: rgba(20, 24, 60, 0.85);
+
+  --sc-ink: #f3ead2;
+  --sc-ink-soft: #d8d1ee;
+  --sc-ink-muted: #bdb3e0;
+  --sc-line: rgba(214, 190, 140, 0.2);
+  --sc-outline: #8f86c0;
+
+  // Перший акцент — золото свічок; другий (primary: фокус, посилання, filled-кнопки) —
+  // бірюзове сяйво.
+  --sc-neon-a: #f0c36a;
+  --sc-neon-a-core: #fff2c9;
+  --sc-neon-a-text: #f6e3b4;
+  --sc-on-neon-a: #2a1a05;
+  --sc-neon-b: #6fe6d2;
+  --sc-neon-b-core: #bff7ee;
+  --sc-neon-b-text: #8ff0e0;
+  --sc-neon-b-glow: rgba(111, 230, 210, 0.35);
+  --sc-on-neon-b: #0b2a27;
+  --sc-mark: #f0c36a;
+  --sc-mark-glow: rgba(240, 195, 106, 0.45);
+
+  .sc-neon-tokens();
+
+  --sc-lime: #6fe6d2;
+  --sc-lime-text: #9ff3e6;
+  --sc-lime-line: rgba(111, 230, 210, 0.5);
+  --sc-lime-fill: rgba(111, 230, 210, 0.12);
+  --sc-amber: #f0c36a;
+  --sc-amber-text: #f6e3b4;
+  --sc-amber-line: rgba(240, 195, 106, 0.55);
+  --sc-amber-fill: rgba(240, 195, 106, 0.12);
+  --sc-on-amber: #3b2a08;
+  --sc-red: #b5443a;
+  --sc-red-text: #ffb0a6;
+  --sc-red-fill: rgba(181, 68, 58, 0.25);
+  --sc-on-red: #fff6f2;
+
+  // Шість варіантів картки (картки — пергамент): колір — зірочки шапки, текст — рядок системи.
+  --sc-neon-violet: #5b3a9c;
+  --sc-neon-violet-core: #9b84ff;
+  --sc-neon-violet-text: #5b3a9c;
+  --sc-neon-pink: #8c2a5b;
+  --sc-neon-pink-core: #c25a8c;
+  --sc-neon-pink-text: #8c2a5b;
+  --sc-neon-cyan: #17616a;
+  --sc-neon-cyan-core: #3fb7a6;
+  --sc-neon-cyan-text: #17616a;
+  --sc-neon-amber: #8a5a12;
+  --sc-neon-amber-core: #d5a24b;
+  --sc-neon-amber-text: #7a4f0e;
+  --sc-neon-lime: #476a1e;
+  --sc-neon-lime-core: #8fae4e;
+  --sc-neon-lime-text: #3f5e1a;
+  --sc-neon-red: #8f2f22;
+  --sc-neon-red-core: #c8634a;
+  --sc-neon-red-text: #8f2f22;
+
+  .sc-base();
+
+  --sc-shadow-panel: 0 18px 36px rgba(2, 4, 20, 0.6);
+  --sc-glass-highlight: inset 0 0 0 0 transparent;
+  --nri-shadow-md: 0 14px 28px rgba(2, 4, 20, 0.55);
+  --nri-shadow-lg: 0 24px 44px rgba(2, 4, 20, 0.7);
+  --nri-radius-sm: 3px;
+  --nri-radius-md: 3px;
+  --nri-radius-lg: 4px;
+  // Шапка 68px + межа 1px + позолочена рейка 6px під нею.
+  --nri-header-height: 75px;
+
+  // Cormorant і Spectral мають старовинні цифри («3» майже як «з» — «1 з 4» читалося б «1 3 4»)
+  // — по всьому сайту цифри рівної висоти.
+  // Скорочення `font:` скидає font-variant-numeric — у правилах цього бандла з `font:` цифри
+  // рівної висоти задано ще раз.
+  body {
+    font-variant-numeric: lining-nums;
+  }
+
+  // Те саме для скорочень `font:` у спільних компонентах карток (там немає табличних цифр).
+  :is(nri-sc-game-card, nri-sc-my-game-item, nri-sc-empty-state) * {
+    font-variant-numeric: lining-nums;
+  }
+
+  ::selection {
+    background: #6fe6d2;
+    color: #0b2a27;
+  }
+
+  // ---- Стіна: зоряна стеля опівнічного індиго ----
+  // Згори вниз: туманності (фіксованого розміру, згасають до прозорого), дуги склепіння (без
+  // повтору), три шари зірок (різні плитки), небо
+  // (вертикальний перехід 1400px, далі — колір стіни).
+  .sc-wall {
+    // Обкладинки й печатки не дають горизонтального скролу (clip — не контейнер прокрутки:
+    // липка шапка й фільтри працюють).
+    overflow-x: clip;
+    background-color: var(--sc-wall);
+    background-image:
+      radial-gradient(ellipse 760px 420px at 74% 80px, rgba(111, 230, 210, 0.1), transparent 70%),
+      radial-gradient(ellipse 900px 600px at 20% 140px, rgba(155, 132, 255, 0.12), transparent 70%),
+      radial-gradient(
+        ellipse 900px 520px at 60% 1300px,
+        rgba(155, 132, 255, 0.06),
+        transparent 70%
+      ),
+      @mp-vault, @mp-star-c, @mp-star-b, @mp-star-a,
+      linear-gradient(180deg, #101538, #141a44 600px, #11163a 1400px);
+    background-repeat:
+      no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, no-repeat;
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      50% 0,
+      0 0,
+      317px 211px,
+      151px 97px,
+      0 0;
+    background-size:
+      100% 1000px,
+      100% 1000px,
+      100% 2000px,
+      1440px 620px,
+      1270px 1130px,
+      910px 830px,
+      640px 560px,
+      100% 1400px;
+  }
+
+  // ---- Шапка: темна балка з позолоченою рейкою й бірюзовими рунами ----
+  .top.sc-bar {
+    border-bottom: 1px solid #000;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+
+    &::after,
+    &::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      bottom: -7px;
+      left: 0;
+      height: 6px;
+      pointer-events: none;
+    }
+
+    &::after {
+      background: linear-gradient(180deg, #f7dc9a, #c8963f 45%, #7a5520);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    &::before {
+      z-index: 1;
+      background:
+        radial-gradient(
+            circle at 50% 50%,
+            #bff7ee 0 1px,
+            rgba(111, 230, 210, 0.9) 1.6px,
+            transparent 3px
+          )
+          0 0 / 72px 6px repeat-x,
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 18px,
+          rgba(60, 35, 8, 0.55) 18px 19px,
+          transparent 19px 36px
+        );
+    }
+  }
+
+  .bottom.sc-bar {
+    border-top: 1px solid #000;
+    box-shadow: 0 -1px 0 #7a5520;
+  }
+
+  .top .brand {
+    color: #f6e3b4;
+    font:
+      700 1.5rem/1 'Cormorant Unicase',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.02em;
+
+    &:hover {
+      color: #fff3d6;
+    }
+  }
+
+  .top .mark {
+    filter: drop-shadow(0 0 6px rgba(240, 195, 106, 0.45));
+  }
+
+  .top .nav-link {
+    border-radius: 0;
+    color: #cfc6e8;
+    font: 600 1rem/1.2 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+
+    &:hover {
+      color: #fff3d6;
+    }
+
+    &.active {
+      background: none;
+      color: #fff3d6;
+      text-shadow: 0 0 12px rgba(111, 230, 210, 0.55);
+      box-shadow: inset 0 -2px 0 #6fe6d2;
+    }
+  }
+
+  // Аватар — індигова печатка в золотому обідку.
+  .top .avatar {
+    border: 2px solid #c8963f;
+    background: radial-gradient(circle at 35% 30%, #4b3d8f, #2a2160 70%);
+    color: #f6e3b4;
+    font: 700 1.0625rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow:
+      0 0 0 2px #150f26,
+      0 0 10px rgba(240, 195, 106, 0.35);
+  }
+
+  // ---- Заголовок сторінки: золотий градієнтний текст, свічки й астролябія ----
+  .sc-sign {
+    padding: 0;
+  }
+
+  .sc-sign-title {
+    // Колір-запас (без підтримки background-clip: text) — світле золото.
+    color: #f6e3b4;
+    font:
+      700 clamp(2.125rem, 4.4vw, 3.875rem) / 1.05 'Cormorant Unicase',
+      var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.01em;
+    filter: drop-shadow(0 2px 0 rgba(10, 8, 30, 0.6))
+      drop-shadow(0 0 22px rgba(240, 195, 106, 0.25));
+
+    @supports (background-clip: text) {
+      background: linear-gradient(180deg, #fff2c9 10%, #f0c36a 55%, #c38b35 95%);
+      background-clip: text;
+      color: transparent;
+    }
+  }
+
+  nri-sc-page-header .lead {
+    max-width: 34rem;
+    color: #d8d1ee;
+    font-size: 1.0625rem;
+  }
+
+  // Астролябія праворуч (широкий екран, сторінка без кнопок дій: інакше заступила б їх) і
+  // свічки між заголовком і астролябією (лише дуже широкий екран — інакше налізли б на текст).
+  @media (min-width: 1100px) {
+    nri-sc-page-header .page-header:not(:has(.header-actions)) {
+      position: relative;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: -52px;
+        right: 72px;
+        z-index: -1;
+        width: 168px;
+        height: 168px;
+        background: @mp-astro 0 0 / 100% 100% no-repeat;
+        pointer-events: none;
+      }
+    }
+  }
+
+  @media (min-width: 1360px) {
+    nri-sc-page-header .page-header:not(:has(.header-actions))::before {
+      content: '';
+      position: absolute;
+      top: -70px;
+      right: 300px;
+      z-index: -1;
+      width: 420px;
+      height: 226px;
+      background: @mp-candles 0 0 / 100% 100% no-repeat;
+      pointer-events: none;
+    }
+
+    // Свічки внизу ліворуч на стіні (під фільтрами; на вужчому екрані там картки).
+    // Стіна обрізає й по вертикалі: на короткій сторінці свічки не подовжують прокрутку.
+    .sc-wall {
+      position: relative;
+      overflow: clip;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 1180px;
+        left: 24px;
+        z-index: -1;
+        width: 220px;
+        height: 560px;
+        background: @mp-candles-low 0 0 / 100% 100% no-repeat;
+        pointer-events: none;
+      }
+    }
+  }
+
+  // ---- Світлі ділянки: пергамент у позолоченій рамці ----
+  .sc-glass,
+  .nri-page:not(.nri-board),
+  .nri-page.nri-board :is(.nri-panel, .nri-card, .nri-alert, .nri-notice) {
+    .mp-paper();
+  }
+
+  // Декор усередині панелей з z-index -1 — над фоном панелі, під текстом.
+  .sc-glass {
+    isolation: isolate;
+    border-color: #5a4220;
+    border-radius: 3px;
+    box-shadow: @mp-frame;
+  }
+
+  .nri-page:not(.nri-board) {
+    border: 1px solid #5a4220;
+    border-radius: 3px;
+    background: @mp-paper-bg;
+    box-shadow:
+      @mp-frame,
+      0 0 60px rgba(240, 195, 106, 0.06);
+  }
+
+  // Картки всередині сторінки-панелі — світліший аркуш.
+  .nri-page:not(.nri-board) .nri-card {
+    border-color: rgba(160, 125, 75, 0.45);
+    background: #fbf4e4;
+  }
+
+  .nri-page.nri-board :is(.nri-card, .nri-alert, .nri-notice) {
+    border-color: #5a4220;
+    background: @mp-paper-bg;
+    box-shadow: @mp-frame;
+  }
+
+  // Повідомлення всередині пергаменту (напр. у фільтрах) — світліший аркуш без рамки.
+  .nri-page.nri-board .nri-panel .nri-notice {
+    background: #fbf4e4;
+    box-shadow: inset 0 0 0 1px rgba(160, 125, 75, 0.45);
+  }
+
+  // Чотири позолочені кутики (картки, порожній стан).
+  .sc-accent {
+    position: absolute;
+    inset: 4px;
+    z-index: -1;
+    display: block;
+    height: auto;
+    border-radius: 0;
+    background:
+      @mp-corner-tl 0 0 / 22px 22px no-repeat,
+      @mp-corner-tr 100% 0 / 22px 22px no-repeat,
+      @mp-corner-bl 0 100% / 22px 22px no-repeat,
+      @mp-corner-br 100% 100% / 22px 22px no-repeat;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  // Порожній стан і банер — той самий пергамент.
+  nri-sc-empty-state .note {
+    padding: 30px 28px 24px;
+  }
+
+  // Панель фільтрів пошуку: аркуш книги заклинань з кутиками (замість неонової трубки основи).
+  .nri-page.nri-board .nri-panel {
+    padding: 28px 22px 24px;
+    border: 1px solid #5a4220;
+    border-radius: 3px;
+    background: @mp-paper-bg;
+    box-shadow:
+      inset 0 0 0 1px #b48d4a,
+      inset 0 0 0 5px #f4e9cf,
+      inset 0 0 0 6px rgba(180, 141, 74, 0.6),
+      0 0 0 1px rgba(0, 0, 0, 0.5),
+      0 18px 36px rgba(2, 4, 20, 0.6),
+      0 0 60px rgba(240, 195, 106, 0.06);
+
+    &::before {
+      inset: 4px;
+      height: auto;
+      border-radius: 0;
+      background:
+        @mp-corner-tl 0 0 / 30px 30px no-repeat,
+        @mp-corner-tr 100% 0 / 30px 30px no-repeat,
+        @mp-corner-bl 0 100% / 30px 30px no-repeat,
+        @mp-corner-br 100% 100% / 30px 30px no-repeat;
+      box-shadow: none;
+    }
+
+    legend {
+      color: #2b1f17;
+      font: 700 1.25rem/1.2 var(--sc-font-display);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.02em;
+    }
+  }
+
+  // ---- Картка (пошук і «Мої ігри»): зачароване запрошення ----
+  [data-neon] > .sc-glass {
+    padding-top: 46px;
+    border: 1px solid #5a4220;
+    box-shadow: @mp-frame;
+
+    // Шапка запрошення: паперова ластівка, «Запрошення № <id>», золота лінія (декоративний текст
+    // — без альтернативного тексту для читачів екрана).
+    &::before {
+      content: 'Запрошення № ' attr(data-game-id) / '';
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      left: 20px;
+      z-index: -1;
+      overflow: hidden;
+      padding: 0 46px 6px 26px;
+      background:
+        @mp-bird 0 1px / 18px 12px no-repeat,
+        linear-gradient(#b48d4a, #b48d4a) 0 100% / 100% 1px no-repeat;
+      color: #6b5338;
+      font: 600 0.75rem/1.2 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    // Три зірочки кольору варіанта праворуч у шапці.
+    &::after {
+      content: '\2726\2726\2726' / '';
+      position: absolute;
+      top: 15px;
+      right: 22px;
+      z-index: -1;
+      color: var(--sc-n, #6b5338);
+      font: 400 0.6875rem/1.3 var(--sc-font-body);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.3em;
+      pointer-events: none;
+    }
+  }
+
+  // Наведення / фокус — бірюзове сяйво навколо аркуша.
+  [data-neon]:is(:hover, :focus-within) > .sc-glass {
+    box-shadow:
+      inset 0 0 0 1px #b48d4a,
+      inset 0 0 0 4px #f6eddb,
+      inset 0 0 0 5px rgba(180, 141, 74, 0.45),
+      0 0 0 1px rgba(0, 0, 0, 0.55),
+      0 0 0 3px rgba(111, 230, 210, 0.45),
+      0 0 34px rgba(111, 230, 210, 0.22),
+      0 22px 38px rgba(2, 4, 20, 0.7);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-neon] > .sc-glass {
+      transition:
+        box-shadow 450ms,
+        transform 450ms;
+    }
+
+    [data-neon]:is(:hover, :focus-within) > .sc-glass {
+      transform: translateY(-3px);
+    }
+  }
+
+  // ---- Текст картки ----
+  :is(nri-sc-game-card, nri-sc-my-game-item) .sys {
+    font: 600 0.78125rem/1.4 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.06em;
+    text-transform: none;
+  }
+
+  :is(nri-sc-game-card, nri-sc-my-game-item) .title {
+    color: #1f150d;
+    font: 700 1.21875rem/1.22 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0;
+  }
+
+  nri-sc-game-card .title {
+    margin: 6px 0 4px;
+  }
+
+  nri-sc-game-card .desc {
+    color: var(--sc-ink-soft);
+    font-size: 0.90625rem;
+    line-height: 1.38;
+  }
+
+  // Коли / Де / Місця — рядки з тонкими золотими лініями.
+  :is(nri-sc-game-card, nri-sc-my-game-item) .facts {
+    gap: 0;
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: 0;
+    font-size: 0.90625rem;
+
+    > div {
+      align-items: center;
+      min-height: 26px;
+      padding: 2px 0 1px;
+      border-bottom: 1px solid rgba(160, 125, 75, 0.38);
+    }
+
+    dt {
+      color: #5d4831;
+      font: 600 0.75rem/1.4 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.08em;
+      text-transform: none;
+    }
+  }
+
+  nri-sc-my-game-item .facts {
+    gap: 2px 12px;
+
+    dt {
+      align-self: center;
+    }
+  }
+
+  // Місця — флакони зілля: заповнений — зайняте місце, порожній — вільне (число — у тексті).
+  [data-neon] .pips {
+    gap: 2px;
+
+    b {
+      width: 11px;
+      height: 20px;
+      border: 0;
+      border-radius: 0;
+      background: @mp-vial-full 0 0 / 100% 100% no-repeat;
+    }
+
+    .on {
+      background-image: @mp-vial-empty;
+      box-shadow: none;
+    }
+  }
+
+  // Ініціал майстра — індигова печатка в золотому обідку.
+  nri-sc-game-card .gm .initial {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    background: radial-gradient(circle at 35% 30%, #4b3d8f, #2a2160 70%);
+    color: #f6e3b4;
+    font: 700 1rem/1 var(--sc-font-display);
+    font-variant-numeric: lining-nums;
+    box-shadow:
+      0 0 0 1.5px #c8963f,
+      0 0 0 3px #f6eddb,
+      0 0 0 4px rgba(180, 141, 74, 0.6);
+  }
+
+  nri-sc-game-card .gm .name {
+    color: #24180f;
+    font-weight: 700;
+  }
+
+  nri-sc-game-card .gm .role {
+    color: #5d4831;
+  }
+
+  // Ціна — воскова печатка: слива (сума), глибока бірюза (без плати). Перший рядок (число) —
+  // крупніше; «грн» / «плати» — другим рядком (word-spacing ширший за печатку переносить кожне
+  // слово).
+  nri-sc-game-card .foot {
+    padding-top: 4px;
+  }
+
+  nri-sc-game-card .price {
+    position: relative;
+    display: block;
+    width: 66px;
+    height: 62px;
+    box-sizing: border-box;
+    margin: -6px -6px -6px 0;
+    padding: 12px 0 0;
+    border: 0;
+    border-radius: 52% 48% 46% 54% / 55% 46% 54% 45%;
+    background: radial-gradient(
+      circle at 34% 28%,
+      #b2527f 0,
+      #7d2c5e 32%,
+      #5a1c44 70%,
+      #3f1230 100%
+    );
+    color: #fbe9f1;
+    font: 600 0.6875rem/1.05 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.1em;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+    white-space: normal;
+    word-spacing: 66px;
+    box-shadow:
+      0 3px 5px rgba(40, 10, 30, 0.45),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+
+    &::first-line {
+      font-family: var(--sc-font-display);
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
+    // Внутрішнє коло відбитка.
+    &::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 9px;
+      width: 48px;
+      height: 46px;
+      box-sizing: border-box;
+      border: 1.5px solid rgba(255, 210, 235, 0.38);
+      border-radius: 50%;
+      box-shadow:
+        inset 0 0 0 4px rgba(0, 0, 0, 0.08),
+        inset 0 2px 3px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+    }
+
+    &.free {
+      padding-top: 15px;
+      border: 0;
+      background: radial-gradient(
+        circle at 34% 28%,
+        #4aa3a0 0,
+        #22706f 34%,
+        #164e50 72%,
+        #0e3538 100%
+      );
+      color: #e6fbf7;
+      box-shadow:
+        0 3px 5px rgba(5, 30, 30, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+
+      &::first-line {
+        font-size: 0.9375rem;
+      }
+
+      &::after {
+        border-color: rgba(200, 255, 245, 0.38);
+      }
+    }
+  }
+
+  // ---- Бейджі ----
+  // «Підходить вашому розкладу» — бірюзова пігулка з півмісяцем; частковий збіг — бурштинова.
+  .badge.fit {
+    gap: 7px;
+    padding: 3px 10px 3px 8px;
+    border: 1px solid rgba(22, 90, 83, 0.45);
+    border-radius: 20px;
+    background: linear-gradient(90deg, rgba(111, 230, 210, 0.22), rgba(111, 230, 210, 0.06));
+    color: #165a53;
+    font: 600 0.78125rem/1.3 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.06em;
+
+    &::before {
+      content: '';
+      flex: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 0;
+      background: @mp-moon 0 0 / 100% 100% no-repeat;
+      box-shadow: none;
+    }
+
+    &[data-fit='partial'] {
+      border-color: rgba(122, 85, 32, 0.55);
+      background: linear-gradient(90deg, rgba(213, 162, 75, 0.25), rgba(213, 162, 75, 0.08));
+      color: #6a4a0c;
+
+      &::before {
+        background: @mp-moon-partial 0 0 / 100% 100% no-repeat;
+        box-shadow: none;
+      }
+    }
+  }
+
+  // Вік — кругла печатка червоним чорнилом; скасована гра — так само.
+  .badge:is(.age, .status[data-status='cancelled']) {
+    padding: 4px 6px;
+    border: 1.5px solid #8f2f22;
+    border-radius: 50%;
+    background: none;
+    color: #8f2f22;
+    font: 700 0.6875rem/1 var(--sc-font-body);
+    font-variant-numeric: lining-nums;
+    transform: rotate(-6deg);
+  }
+
+  nri-sc-my-game-item .status {
+    border-radius: 2px;
+    font: 600 0.75rem/1.2 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.04em;
+  }
+
+  // «Нове» / «Оновлено» — золотий листок.
+  .nri-seen-badge {
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 2px 10px;
+    background: linear-gradient(180deg, #f7dc9a, #d5a24b);
+    color: #3b2a08;
+    font: 600 0.75rem/1 var(--sc-font-mono);
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0.06em;
+    box-shadow: inset 0 0 0 1px rgba(122, 85, 32, 0.6);
+  }
+
+  // ---- Обкладинка: «сплячий портрет» в овальній позолоченій рамі на кільці ----
+  // Рама — фон самої кнопки (позолота в border-box, темне тло портрета — у content-box), кільце —
+  // ::before, ромб-самоцвіт — ::after, підпис — золота табличка під рамою (лише наперед) з
+  // іскрами. У спокої — сепія й тьмяно; наперед (наведення / клік / Enter) — виходить на аркуш,
+  // збільшується, колір, бірюзова аура.
+  nri-sc-attachment {
+    top: -34px;
+    right: -14px;
+    width: 112px;
+    height: 138px;
+
+    .attach {
+      overflow: visible;
+      padding: 8px;
+      border-radius: 50%;
+      background:
+        linear-gradient(#0a081e, #0a081e) content-box,
+        conic-gradient(
+            from 20deg,
+            #7a5520,
+            #f7dc9a,
+            #c8963f,
+            #7a5520,
+            #f2d088,
+            #a87a33,
+            #f7dc9a,
+            #7a5520
+          )
+          border-box;
+      outline: 1px dashed rgba(77, 52, 16, 0.7);
+      outline-offset: -5px;
+      box-shadow:
+        0 8px 16px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 1.5px #4d3410;
+      transform: rotate(5deg);
+
+      &:focus-visible {
+        outline: 3px solid #6fe6d2;
+        outline-offset: 2px;
+        box-shadow:
+          0 0 0 7px #0c1030,
+          0 8px 16px rgba(0, 0, 0, 0.55);
+      }
+
+      img {
+        border-radius: 50%;
+        filter: grayscale(0.6) sepia(0.6) brightness(0.78) contrast(0.9);
+        mask-image: radial-gradient(ellipse at 50% 30%, #000 40%, rgba(0, 0, 0, 0.45));
+      }
+
+      // Кільце-підвіс.
+      &::before {
+        content: '';
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        z-index: -1;
+        width: 14px;
+        height: 14px;
+        box-sizing: border-box;
+        margin-left: -7px;
+        border: 2.5px solid #c8963f;
+        border-radius: 50%;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      }
+
+      // Ромб-самоцвіт унизу рами.
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -7px;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        box-sizing: border-box;
+        margin-left: -7px;
+        border: 1.5px solid #4d3410;
+        background: radial-gradient(circle at 35% 30%, #e6fffa, #6fe6d2 45%, #1f7f74);
+        transform: rotate(45deg);
+      }
+    }
+
+    .cap {
+      position: absolute;
+      bottom: -32px;
+      left: 50%;
+      display: block;
+      padding: 3px 10px;
+      border-radius: 2px;
+      background: linear-gradient(#f7dc9a, #d5a24b);
+      color: #3b2a08;
+      font: 600 0.6875rem/1.2 var(--sc-font-mono);
+      font-variant-numeric: lining-nums;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transform: translateX(-50%);
+      pointer-events: none;
+
+      // Іскри біля рами.
+      &::before,
+      &::after {
+        content: '';
+        position: absolute;
+        background: @mp-spark 0 0 / 100% 100% no-repeat;
+        filter: drop-shadow(0 0 4px #6fe6d2);
+      }
+
+      &::before {
+        bottom: 110px;
+        left: -12px;
+        width: 14px;
+        height: 14px;
+      }
+
+      &::after {
+        right: -14px;
+        bottom: 72px;
+        width: 11px;
+        height: 11px;
+      }
+    }
+  }
+
+  .mp-attachment-front() {
+    box-shadow:
+      0 0 0 1px rgba(191, 247, 238, 0.6),
+      0 0 26px 4px rgba(111, 230, 210, 0.55),
+      0 18px 30px rgba(0, 0, 0, 0.55),
+      inset 0 0 0 1.5px #4d3410;
+    transform: translate(-54px, 22px) rotate(-1deg) scale(1.16);
+
+    img {
+      filter: none;
+    }
+
+    .cap {
+      opacity: 1;
+    }
+  }
+
+  nri-sc-attachment.front .attach {
+    .mp-attachment-front();
+  }
+
+  @media (hover: hover) {
+    nri-sc-attachment:hover:not(.dismissed) .attach {
+      .mp-attachment-front();
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nri-sc-attachment .attach {
+      transition:
+        transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        box-shadow 450ms;
+
+      img {
+        transition: filter 450ms;
+      }
+
+      .cap {
+        transition: opacity 450ms;
+      }
+    }
+
+    // Портрет «прокидається»: ледь помітне дихання, поки він наперед.
+    nri-sc-attachment.front .attach img {
+      animation: mp-breathe 3.2s ease-in-out infinite;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    nri-sc-attachment:hover:not(.dismissed) .attach img {
+      animation: mp-breathe 3.2s ease-in-out infinite;
+    }
+  }
+
+  // ---- Прапорці — рунічні ромби (Material: повернутий квадрат; обраний — бірюзовий самоцвіт
+  // зі світлим ромбом усередині замість галочки; у режимі примусових кольорів — звичайна
+  // галочка) ----
+  .mat-mdc-checkbox .mdc-checkbox__background {
+    border-radius: 2px;
+    transform: rotate(45deg) scale(0.82);
+  }
+
+  .mat-mdc-checkbox .mdc-checkbox__native-control:checked ~ .mdc-checkbox__background {
+    background-image: radial-gradient(
+      circle at 40% 40%,
+      rgba(255, 255, 255, 0.45),
+      transparent 70%
+    );
+    box-shadow: 0 0 8px var(--nri-focus-ring);
+  }
+
+  @media (forced-colors: none) {
+    .mat-mdc-checkbox .mdc-checkbox__checkmark {
+      visibility: hidden;
+    }
+
+    .mat-mdc-checkbox .mdc-checkbox__native-control:checked ~ .mdc-checkbox__background::after {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border-radius: 1px;
+      background: var(--mat-sys-on-primary);
+    }
+  }
+}
+
+@keyframes mp-breathe {
+  0%,
+  100% {
+    filter: none;
+  }
+
+  50% {
+    filter: brightness(1.08) saturate(1.1);
+  }
+}
+
+// Вузький екран: обкладинка не виходить за поля сторінки (без горизонтального скролу), шапка
+// запрошення — без зайвого відступу.
+@media (max-width: 599.98px) {
+  @{mp} nri-sc-attachment {
+    right: -4px;
+  }
+
+  @{mp} .sc-sign-title {
+    font-size: 2.125rem;
+  }
+}

@@ -12,6 +12,7 @@ export const THEME_IDS = [
   'night-city',
   'dungeon',
   'gothic-gloom',
+  'magicpunk',
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -26,6 +27,7 @@ export const themeAccess: Record<ThemeId, 'everyone' | 'owner'> = {
   'night-city': 'everyone',
   dungeon: 'everyone',
   'gothic-gloom': 'everyone',
+  magicpunk: 'everyone',
 };
 
 /** Дизайни, доступні ролі. */

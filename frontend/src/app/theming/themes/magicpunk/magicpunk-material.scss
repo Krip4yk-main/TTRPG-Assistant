@@ -1,0 +1,23 @@
+// Material для дизайну «Магіпанк» (бандл `theme-magicpunk`): спільний Material родини сцени
+// (../scene/scene-material.scss) у темній схемі сторінки — оверлеї (меню, списки, діалоги,
+// датапікер, автодоповнення) рендеряться поза пергаментними ділянками, тож вони — опівнічне
+// індиго з золотою межею (токени --sc-overlay / --sc-overlay-line у magicpunk.less). Поля,
+// кнопки й прапорці всередині пергаменту беруть світлі ролі з `.sc-local-scheme(light)`
+// (magicpunk.less) — тут без перевизначень кольорів компонентів сталими значеннями, бо такі токени
+// «застигли» б на :root у темних значеннях. Форма прапорців (рунічні ромби) — у magicpunk.less.
+@use '@angular/material' as mat;
+@use '../scene/scene-material' as sc;
+
+:root[data-theme='magicpunk'] {
+  @include sc.material(dark);
+
+  // Кнопки — майже прямокутні, як аркуші й таблички макета (форма — стала величина, не колір).
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 3px,
+      outlined-container-shape: 3px,
+      protected-container-shape: 3px,
+      text-container-shape: 3px,
+    )
+  );
+}

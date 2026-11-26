@@ -52,6 +52,7 @@ function registry(load: () => Promise<ThemeSlots>): Record<ThemeId, ThemeDefinit
     'night-city': { ...THEMES['night-city'], loadSlots: load },
     dungeon: { ...THEMES.dungeon, loadSlots: load },
     'gothic-gloom': { ...THEMES['gothic-gloom'], loadSlots: load },
+    magicpunk: { ...THEMES.magicpunk, loadSlots: load },
   };
 }
 

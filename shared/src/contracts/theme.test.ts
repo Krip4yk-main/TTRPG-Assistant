@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { availableThemes, resolveTheme } from './theme.js';
 
-const ALL = ['quest-board', 'neon-signs', 'holo-market', 'night-city', 'dungeon', 'gothic-gloom'];
+const ALL = [
+  'quest-board',
+  'neon-signs',
+  'holo-market',
+  'night-city',
+  'dungeon',
+  'gothic-gloom',
+  'magicpunk',
+];
 
 describe('themes', () => {
   it('resolveTheme: дефолт, відомий і невідомий дизайн', () => {

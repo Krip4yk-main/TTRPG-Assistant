@@ -35,6 +35,7 @@ const ALL: ThemeId[] = [
   'night-city',
   'dungeon',
   'gothic-gloom',
+  'magicpunk',
 ];
 const user: MeDto = {
   ...base,
@@ -71,6 +72,7 @@ function registry(
     'night-city': def('night-city', scene),
     dungeon: def('dungeon', scene),
     'gothic-gloom': def('gothic-gloom', scene),
+    magicpunk: def('magicpunk', scene),
   };
 }
 
