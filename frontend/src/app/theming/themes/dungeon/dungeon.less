@@ -59,7 +59,7 @@
 @dg-lintel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Cfilter id='n' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.06' numOctaves='4' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.09 0 0 0 0.7 -0.1'/%3E%3C/filter%3E%3Crect width='400' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
 //   Плями сланцю плити 480×480 (без повтору; зсув — за варіантом): 0.0125 × 480 = 6,
 //     0.0208333 × 480 = 10.
-@dg-slab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='480'%3E%3Cfilter id='m' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0125 0.0208333' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 -0.25'/%3E%3C/filter%3E%3Crect width='480' height='480' filter='url(%23m)' opacity='.5'/%3E%3C/svg%3E");
+@dg-slab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='480'%3E%3Cfilter id='m' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0125 0.0208333333' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 -0.25'/%3E%3C/filter%3E%3Crect width='480' height='480' filter='url(%23m)' opacity='.5'/%3E%3C/svg%3E");
 //   Ланка ланцюга 28×12 (без фільтрів).
 @dg-chain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='12'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%238a8b90'/%3E%3Cstop offset='.5' stop-color='%234a4b4f'/%3E%3Cstop offset='1' stop-color='%231c1d1f'/%3E%3C/linearGradient%3E%3Cellipse cx='9' cy='6' rx='8' ry='4.3' fill='none' stroke='url(%23g)' stroke-width='2.6'/%3E%3Crect x='15' y='4.4' width='13' height='3.2' rx='1.6' fill='url(%23g)'/%3E%3C/svg%3E");
 //   Смолоскип 48×132 і клапоть мапи з d20 300×210 (без фільтрів; цифра на кубику — системний
@@ -549,7 +549,12 @@
       0 16px 18px rgba(0, 0, 0, 0.75),
       0 2px 1px rgba(0, 0, 0, 0.9);
     pointer-events: none;
-    transition: box-shadow var(--nri-transition);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .sc-d3 {
+      transition: box-shadow var(--nri-transition);
+    }
   }
 
   [data-neon]:is(:hover, :focus-within) > .sc-d3 {
