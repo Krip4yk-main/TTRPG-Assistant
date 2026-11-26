@@ -1,5 +1,6 @@
 # Збірка з кореня репозиторію: docker build -f backend/Dockerfile .
-# Міграції — окремий крок (не при старті):
+# Міграції — не при старті бекенду, а окремий одноразовий сервіс `migrate` у docker-compose.prod.yml
+# (той самий образ; backend стартує після його успішного завершення). Вручну:
 #   docker run --rm --env-file backend/.env <image> node --import tsx src/db/migrate.ts
 # Бекенд виконується через tsx (окремого кроку компіляції немає), shared збирається в dist.
 FROM node:26-alpine AS build

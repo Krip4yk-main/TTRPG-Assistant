@@ -1,0 +1,109 @@
+# Продакшн-стек. Збірка/запуск: див. docs/ops/deploy.md
+# Змінні для ${...} беруться з кореневого .env (поруч із цим файлом) або з оточення.
+# Секрети лише в .env-файлах (backend/.env, bot/.env, корінь) — не в цьому файлі.
+# /api і /socket.io на backend:3000 та статику з frontend:8080 віддає зовнішній reverse proxy.
+
+x-restart: &restart
+  restart: unless-stopped
+
+# Спільні перевизначення адрес сервісів (мають пріоритет над значеннями з env_file)
+x-backend-env: &backend-env
+  DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/nri
+  REDIS_URL: redis://redis:6379
+
+services:
+  mysql:
+    <<: *restart
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: nri
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    <<: *restart
+    image: redis:8
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Одноразова міграція БД перед стартом бекенду
+  migrate:
+    image: ttrpg-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: 'no'
+    command: ['node', '--import', 'tsx', 'src/db/migrate.ts']
+    env_file: backend/.env
+    environment:
+      <<: *backend-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # API + воркер джобів (воркер працює всередині процесу API, див. backend/src/server.ts)
+  backend:
+    <<: *restart
+    image: ttrpg-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: backend/.env
+    environment:
+      <<: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:3000:3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health/live').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  bot:
+    <<: *restart
+    image: ttrpg-bot
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    env_file: bot/.env
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:3000/api/internal
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    <<: *restart
+    image: ttrpg-frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - '127.0.0.1:8080:8080'
+
+volumes:
+  mysql_data:
+  redis_data:
