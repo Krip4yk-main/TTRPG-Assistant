@@ -316,11 +316,12 @@
       border-radius: 9px;
       background: none;
       opacity: 0.95;
+      // Внутрішній відсвіт (12px) — не далі за поля панелі: відтінок не лягає під текст.
       box-shadow:
         0 0 4px var(--cy-n),
         0 0 14px var(--cy-n),
         inset 0 0 4px var(--cy-n),
-        inset 0 0 18px color-mix(in srgb, var(--cy-n) 28%, transparent);
+        inset 0 0 12px color-mix(in srgb, var(--cy-n) 28%, transparent);
       transition: box-shadow var(--nri-transition);
     }
   }
@@ -365,7 +366,7 @@
           0 0 5px var(--cy-n),
           0 0 20px var(--cy-n),
           inset 0 0 5px var(--cy-n),
-          inset 0 0 22px color-mix(in srgb, var(--cy-n) 34%, transparent);
+          inset 0 0 12px color-mix(in srgb, var(--cy-n) 34%, transparent);
       }
     }
 
@@ -494,7 +495,9 @@
         pointer-events: none;
       }
 
-      // Відблиск і відсвіт неону гри на папері.
+      // Відблиск і відсвіт неону гри на папері (screen-змішування лягає й на підпис
+      // «ОБКЛАДИНКА» — він декоративний, aria-hidden; ім'я вкладення — в aria-label кнопки, а
+      // контраст підпису в спокої — у шапці файлу, на притемненому папері 4.9).
       &::after {
         content: '';
         position: absolute;

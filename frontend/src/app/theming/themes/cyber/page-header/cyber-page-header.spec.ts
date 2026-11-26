@@ -27,7 +27,7 @@ describe('signParts', () => {
 });
 
 describe('CyberPageHeader (slot «page-header»)', () => {
-  it('screen readers get the plain heading text; the split neon letters are hidden', async () => {
+  it('the heading text is the title once; screen readers get it as one string', async () => {
     await TestBed.configureTestingModule({
       imports: [CyberPageHeader],
       providers: [provideRouter([]), provideTranslateService()],
@@ -42,12 +42,10 @@ describe('CyberPageHeader (slot «page-header»)', () => {
     fixture.detectChanges();
 
     const h1 = (fixture.nativeElement as HTMLElement).querySelector('h1')!;
-    const plain = h1.querySelector('.nri-visually-hidden')!;
-    expect(plain.textContent).toBe('Знайдіть свою гру');
-    expect(plain.closest('[aria-hidden]')).toBeNull();
-    const lit = h1.querySelector('.cy-sign-lit')!;
-    expect(lit.getAttribute('aria-hidden')).toBe('true');
-    expect(lit.textContent).toBe('Знайдіть свою гру');
-    expect(lit.querySelector('.cy-sign-dead')!.textContent).toBe('і');
+    // Копіювання, пошук на сторінці, innerText — один раз, без зайвих пробілів між частинами.
+    expect(h1.textContent!.trim()).toBe('Знайдіть свою гру');
+    expect(h1.getAttribute('aria-label')).toBe('Знайдіть свою гру');
+    expect(h1.querySelector('[aria-hidden], .nri-visually-hidden')).toBeNull();
+    expect(h1.querySelector('.cy-sign-dead')!.textContent).toBe('і');
   });
 });

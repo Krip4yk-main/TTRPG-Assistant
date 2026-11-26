@@ -55,14 +55,21 @@
   }
 }
 
+// «майстер · ★ рейтинг» — завжди один рядок (висота картки стала): що не вміщається — «…»
+// (повний текст — у підказці).
 .role {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 5px;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   color: var(--cy-ink-muted);
   font-size: 0.8125rem;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  > * + * {
+    margin-left: 5px;
+  }
 
   // Зірка рейтингу (колір — --nri-accent-text) — бурштинова, як у макеті.
   --nri-accent-text: var(--cy-amber);

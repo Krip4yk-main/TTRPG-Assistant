@@ -18,7 +18,15 @@
         <nri-blocked-badge />
       }
     </span>
-    <small class="role">
+    <!-- Один рядок з «…»: без рейтингу «майстер · ще немає рейтингу» на вузькій картці не
+         вміщається (повний текст — у підказці). -->
+    @let none = g.showRating && g.rating === null;
+    <small
+      class="role"
+      [nriTruncateTooltip]="
+        none ? ('cyber.gm' | translate) + ' · ' + ('ratings.gmRating.none' | translate) : ''
+      "
+    >
       <span aria-hidden="true">{{ 'cyber.gm' | translate }}</span>
       @if (g.showRating) {
         <span aria-hidden="true">·</span>
