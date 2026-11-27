@@ -221,24 +221,41 @@ export class ApplyDialog {
     return this.auth.me()?.myLimits ?? [];
   }
 
-  /** Додає збережені межі до наявних обмеження без дублікатів; нічого не надсилає. */
+  /**
+   * Додає збережені межі до наявних обмеження без дублікатів; нічого не надсилає. Порожні рядки
+   * заповнюються першими (щоб не лишити порожніх обов'язкових), решта — нові рядки.
+   * Кількість підставлених озвучується читачам екрана.
+   */
   protected insertMyLimits(): void {
     const present = new Set(this.constraints.controls.map((c) => c.value.trim()));
+    const empty = this.constraints.controls.filter((c) => c.value.trim() === '');
+    let inserted = 0;
     for (const limit of this.myLimits) {
-      if (this.constraints.length >= APPLICATION_CONSTRAINTS_MAX) break;
       if (present.has(limit)) continue;
+      const blank = empty.shift();
+      if (blank) {
+        blank.setValue(limit);
+      } else if (this.constraints.length < APPLICATION_CONSTRAINTS_MAX) {
+        this.constraints.push(
+          new FormControl(limit, {
+            nonNullable: true,
+            validators: [
+              Validators.required,
+              Validators.pattern(/\S/),
+              Validators.maxLength(APPLICATION_CONSTRAINT_MAX),
+            ],
+          }),
+        );
+      } else {
+        break;
+      }
       present.add(limit);
-      this.constraints.push(
-        new FormControl(limit, {
-          nonNullable: true,
-          validators: [
-            Validators.required,
-            Validators.pattern(/\S/),
-            Validators.maxLength(APPLICATION_CONSTRAINT_MAX),
-          ],
-        }),
-      );
+      inserted++;
     }
+    void this.announcer.announce(
+      this.translate.instant('myLimits.inserted', { count: inserted }) as string,
+      'polite',
+    );
   }
 
   protected removeConstraint(index: number): void {

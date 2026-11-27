@@ -431,7 +431,30 @@ describe('ApplyDialog', () => {
       (i) => i.value,
     );
     expect(values).toEqual(['Без павуків', 'Без крові']);
+    // Перший клік додав одну межу, другий — нічого; обидва озвучені.
+    expect(announce).toHaveBeenNthCalledWith(1, 'myLimits.inserted', 'polite');
+    expect(announce).toHaveBeenCalledTimes(2);
     http.expectNone('/api/games/7/applications');
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it('my limits: fills empty rows first instead of leaving blank required ones', async () => {
+    await create();
+    TestBed.inject(AuthStore).setMe({
+      id: 1,
+      status: 'active',
+      timezone: 'Europe/Kyiv',
+      myLimits: ['Без павуків', 'Без крові'],
+    } as unknown as MeDto);
+    await settle();
+    el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();
+    await settle();
+    el.querySelector<HTMLButtonElement>('button.insert-my-limits')!.click();
+    await settle();
+    const values = [...el.querySelectorAll<HTMLInputElement>('input.constraint')].map(
+      (i) => i.value,
+    );
+    expect(values).toEqual(['Без павуків', 'Без крові']);
+    expect(announce).toHaveBeenCalledWith('myLimits.inserted', 'polite');
   });
 });
