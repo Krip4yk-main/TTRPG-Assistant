@@ -65,7 +65,7 @@ export function createGoogleProvider(opts: {
         provider: 'google',
         subject: claims.sub,
         displayName: typeof claims.name === 'string' ? claims.name : undefined,
-        avatarUrl: typeof claims.picture === 'string' ? claims.picture : undefined,
+        avatarUrl: typeof claims.picture === 'string' ? claims.picture : null,
       };
     },
   };

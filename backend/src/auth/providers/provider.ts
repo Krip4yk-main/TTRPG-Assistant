@@ -4,5 +4,6 @@ export interface VerifiedIdentity {
   provider: Provider;
   subject: string;
   displayName?: string;
-  avatarUrl?: string;
+  /** `undefined` — аватар невідомий (не змінюємо збережений); `null` — у провайдера аватара немає/прибрано. */
+  avatarUrl?: string | null;
 }

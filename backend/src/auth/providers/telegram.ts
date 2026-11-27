@@ -40,6 +40,6 @@ export function verifyTelegramLogin(
     provider: 'telegram',
     subject: id,
     displayName: fields.first_name || fields.username || undefined,
-    avatarUrl: fields.photo_url || undefined,
+    avatarUrl: fields.photo_url || null,
   };
 }

@@ -6,6 +6,7 @@ import { linkIdentity, resolveLogin } from '../../src/auth/identity.service.js';
 import { createSession } from '../../src/auth/session.service.js';
 import { authIdentities, users } from '../../src/db/schema/index.js';
 import { ImageUrlError } from '../../src/http/image-url.js';
+import { deleteAccount } from '../../src/users/users.service.js';
 import { effectiveAvatar } from '../../src/users/avatar.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 
@@ -34,8 +35,10 @@ afterAll(async () => {
 
 const TG = 'https://t.me/i/userpic/a.jpg';
 const GOOGLE = 'https://lh3.example.com/g.jpg';
-const tg = (avatarUrl?: string) => ({ provider: 'telegram', subject: '1', avatarUrl }) as const;
-const google = (avatarUrl?: string) => ({ provider: 'google', subject: 'g1', avatarUrl }) as const;
+const tg = (avatarUrl?: string | null) =>
+  ({ provider: 'telegram', subject: '1', avatarUrl }) as const;
+const google = (avatarUrl?: string | null) =>
+  ({ provider: 'google', subject: 'g1', avatarUrl }) as const;
 
 const userRow = async (id: number) => (await db.select().from(users).where(eq(users.id, id)))[0]!;
 async function activeUser(avatarUrl?: string) {
@@ -79,12 +82,14 @@ describe('avatar refresh on login / link', () => {
     const [i] = await db.select().from(authIdentities).where(eq(authIdentities.userId, userId));
     expect(i!.avatarUrl).toBe('https://t.me/i/userpic/new.jpg');
     expect((await userRow(userId)).avatarUrl).toBe('https://t.me/i/userpic/new.jpg');
-    await resolveLogin(deps, tg()); // провайдер прибрав фото
+    await resolveLogin(deps, tg()); // аватар невідомий — зберігаємо
+    expect((await userRow(userId)).avatarUrl).toBe('https://t.me/i/userpic/new.jpg');
+    await resolveLogin(deps, tg(null)); // провайдер прибрав фото
     expect((await userRow(userId)).avatarUrl).toBeNull();
   });
 
   it('linking stores avatar; auto picks it up when the creation provider has none', async () => {
-    const { userId } = await resolveLogin(deps, tg());
+    const { userId } = await resolveLogin(deps, tg(null));
     expect((await userRow(userId)).avatarUrl).toBeNull();
     await linkIdentity(deps, userId, google(GOOGLE));
     expect((await userRow(userId)).avatarUrl).toBe(GOOGLE);
@@ -130,7 +135,7 @@ describe('PUT /api/me/avatar', () => {
     let res = await put(cookie, { source: 'discord' });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('AVATAR_SOURCE_UNAVAILABLE');
-    await linkIdentity(deps, userId, google());
+    await linkIdentity(deps, userId, google(null));
     res = await put(cookie, { source: 'google' });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('AVATAR_SOURCE_UNAVAILABLE');
@@ -193,5 +198,18 @@ describe('PUT /api/me/avatar', () => {
       .set('X-CSRF-Token', 't');
     expect(res.status).toBe(200);
     expect(await userRow(userId)).toMatchObject({ avatarSource: 'auto', avatarUrl: TG });
+  });
+});
+
+describe('deleteAccount', () => {
+  it('clears avatar, source and custom url', async () => {
+    const { userId, cookie } = await activeUser(TG);
+    await put(cookie, { source: 'custom', customUrl: 'https://img.example.com/me.png' });
+    await deleteAccount(deps, userId);
+    expect(await userRow(userId)).toMatchObject({
+      avatarUrl: null,
+      avatarSource: 'auto',
+      customAvatarUrl: null,
+    });
   });
 });

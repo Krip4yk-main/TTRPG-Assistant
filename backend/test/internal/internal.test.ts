@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
+import { resolveLogin } from '../../src/auth/identity.service.js';
 import { createSession } from '../../src/auth/session.service.js';
 import { authIdentities, users } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
@@ -98,6 +99,22 @@ describe('POST /api/internal/telegram/link', () => {
     const again = await link(body(token));
     expect(again.status).toBe(404);
     expect(again.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('re-linking Telegram via the bot keeps the stored avatar (avatar unknown, not removed)', async () => {
+    const photo = 'https://t.me/i/userpic/a.jpg';
+    const { userId } = await resolveLogin(deps, {
+      provider: 'telegram',
+      subject: '777',
+      avatarUrl: photo,
+    });
+    await db.update(users).set({ status: 'active', nickname: 'Hero' }).where(eq(users.id, userId));
+    const res = await link(body(await issueToken(userId)));
+    expect(res.status).toBe(200);
+    const [i] = await db.select().from(authIdentities).where(eq(authIdentities.userId, userId));
+    expect(i!.avatarUrl).toBe(photo);
+    const [u] = await db.select().from(users).where(eq(users.id, userId));
+    expect(u!.avatarUrl).toBe(photo);
   });
 
   it('deleted account: token is useless, no identity row', async () => {

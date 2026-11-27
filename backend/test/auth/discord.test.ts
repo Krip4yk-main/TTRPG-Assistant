@@ -155,7 +155,7 @@ describe('discord provider (unit)', () => {
       nonce: 'n',
     });
     expect(id.displayName).toBe('Global');
-    expect(id.avatarUrl).toBeUndefined();
+    expect(id.avatarUrl).toBeNull();
   });
 
   it.each([

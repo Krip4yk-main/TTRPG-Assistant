@@ -125,7 +125,7 @@ export function createDiscordProvider(opts: {
         avatarUrl:
           avatar && AVATAR_HASH.test(avatar)
             ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.png`
-            : undefined,
+            : null,
       };
     },
   };

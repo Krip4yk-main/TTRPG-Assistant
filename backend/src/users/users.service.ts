@@ -112,15 +112,17 @@ export async function changeAvatar(
 ): Promise<MeDto> {
   const { db } = deps;
   const { source, customUrl } = input;
-  if (source !== 'auto' && source !== 'none' && source !== 'custom') {
-    const [row] = await db
-      .select({ avatarUrl: authIdentities.avatarUrl })
-      .from(authIdentities)
-      .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, source)));
-    if (!row?.avatarUrl) throw new AppError(422, 'AVATAR_SOURCE_UNAVAILABLE');
-  }
   if (source === 'custom') await assertImageUrl(deps, 'customUrl', customUrl!);
   await db.transaction(async (tx) => {
+    if (source !== 'auto' && source !== 'none' && source !== 'custom') {
+      // Перевірка в транзакції з блокуванням рядка ідентичності: паралельне відв'язування зачекає.
+      const [row] = await tx
+        .select({ avatarUrl: authIdentities.avatarUrl })
+        .from(authIdentities)
+        .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, source)))
+        .for('update');
+      if (!row?.avatarUrl) throw new AppError(422, 'AVATAR_SOURCE_UNAVAILABLE');
+    }
     await tx
       .update(users)
       .set({

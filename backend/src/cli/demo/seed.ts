@@ -732,6 +732,13 @@ class Seeder {
         createdAt: p.createdAt,
       })),
     );
+    // Аватар демо-користувача живе на його dev-ідентичності: `users.avatar_url` — обчислюване
+    // значення (`users/avatar.ts`), яке при вході перераховується з ідентичностей.
+    await this.db.execute(
+      sql`UPDATE auth_identities i JOIN users u ON u.id = i.user_id
+          SET i.avatar_url = u.avatar_url
+          WHERE i.provider = 'dev' AND i.display_name = ${DEMO_IDENTITY_MARKER}`,
+    );
     await this.insertProfiles();
     await this.insertAvailability();
   }

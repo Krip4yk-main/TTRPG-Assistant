@@ -118,7 +118,7 @@ async function findIdentity(
 }
 
 /**
- * Оновлює аватар ідентичності значенням від провайдера (відсутнє — `NULL`) й, якщо він змінився,
+ * Оновлює аватар ідентичності значенням від провайдера (`null` — прибрано) й, якщо він змінився,
  * перераховує ефективний `users.avatar_url`.
  */
 async function refreshIdentityAvatar(
@@ -126,7 +126,9 @@ async function refreshIdentityAvatar(
   row: { id: number; userId: number; avatarUrl: string | null },
   identity: VerifiedIdentity,
 ): Promise<void> {
-  const next = identity.avatarUrl ?? null;
+  // `undefined` — аватар невідомий (напр. прив'язка через бота): збережений не чіпаємо.
+  if (identity.avatarUrl === undefined) return;
+  const next = identity.avatarUrl;
   if (next === row.avatarUrl) return;
   await db.transaction(async (tx) => {
     await tx.update(authIdentities).set({ avatarUrl: next }).where(eq(authIdentities.id, row.id));
