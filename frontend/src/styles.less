@@ -64,6 +64,20 @@ a,
   outline-offset: 2px;
 }
 
+// Кнопки й перемикачі Material обнуляють `outline` власними (пізніше підключеними) стилями,
+// а їхній `mat-focus-indicator` прозорий — повертаємо те саме кільце, лише для клавіатури.
+.mat-mdc-button-base:focus-visible,
+.mdc-switch:focus-visible {
+  outline: 2px solid var(--nri-focus-ring);
+  outline-offset: 2px;
+}
+
+// У групі перемикачів (`overflow: hidden`, заокруглення) зовнішнє кільце обрізалося б.
+.mat-button-toggle-button:focus-visible {
+  outline: 2px solid var(--nri-focus-ring);
+  outline-offset: -4px;
+}
+
 .nri-visually-hidden {
   position: absolute !important;
   width: 1px;
