@@ -1,11 +1,11 @@
 import type { Routes } from '@angular/router';
-import { staffGuard } from './admin.guards';
+import { devEnvMatch, staffGuard } from './admin.guards';
 import { AdminShell } from './admin-shell/admin-shell';
 
 /**
  * Розділ `/admin` (окремий чанк). Вкладки «Скарги», «Користувачі», «Апеляції», «Відгуки»,
  * «Мертві ігри» — модератору й вище; «Ролі», «Каталог» і «Журнал» — адміну й власнику.
- * «Звіти тестерів» — адміну й власнику, лише на dev-сервері (поза dev вкладка прихована).
+ * «Звіти тестерів» — адміну й власнику, лише на dev-сервері (поза dev вкладка прихована, а адреса — «не знайдено»).
  */
 export const ADMIN_ROUTES: Routes = [
   {
@@ -65,6 +65,7 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: 'tester-reports',
         title: 'titles.admin',
+        canMatch: [devEnvMatch()],
         canActivate: [staffGuard('admin')],
         loadComponent: () =>
           import('./tester-reports/tester-reports').then((m) => m.AdminTesterReports),
