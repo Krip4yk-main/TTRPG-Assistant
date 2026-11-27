@@ -57,4 +57,14 @@ describe('THEMES: фірмові анімації', () => {
     expect(loaded).toBeTypeOf('function');
     expect(loaded.name).toBe(effect);
   });
+
+  it('gothic-gloom — лише «вас прийнято»: pressWaxSeal (лінивий чанк)', async () => {
+    const effects = THEMES['gothic-gloom'].effects ?? {};
+    expect(Object.keys(effects)).toEqual(['acceptedNotice']);
+    expect(effects.acceptedNotice?.pref).toBe('sendAnimation');
+    expect(THEMES['gothic-gloom'].options).toContain('sendAnimation');
+    const loaded = await effects.acceptedNotice!.load();
+    expect(loaded).toBeTypeOf('function');
+    expect(loaded.name).toBe('pressWaxSeal');
+  });
 });

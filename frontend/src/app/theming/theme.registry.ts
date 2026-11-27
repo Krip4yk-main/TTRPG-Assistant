@@ -172,7 +172,12 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       import('./themes/dungeon/portcullis/game-opened').then((m) => m.raisePortcullis),
     ),
   }),
-  'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots),
+  // «Готичний морок» — фірмова анімація «вас прийнято»: на сповіщення лягає сургучна печатка.
+  'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots, [], {
+    acceptedNotice: signatureEffect(() =>
+      import('./themes/gothic-gloom/wax-seal/accepted-notice').then((m) => m.pressWaxSeal),
+    ),
+  }),
   // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (фірмова
   // анімація; ефект — окремий лінивий чанк).
   magicpunk: theme('magicpunk', 'dark', '700 1em "Cormorant Unicase"', loadSceneSlots, [], {
