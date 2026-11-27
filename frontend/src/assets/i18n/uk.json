@@ -112,6 +112,13 @@
       "brassSteam": {
         "tape": "Заявку подано STOP",
         "stamp": "Відправлено"
+      },
+      "solarGarden": {
+        "packet": "Насіння гри",
+        "tag": "Заявку подано"
+      },
+      "paintedCity": {
+        "tag": "Я в грі!"
       }
     }
   },

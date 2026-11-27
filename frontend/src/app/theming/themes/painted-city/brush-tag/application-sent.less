@@ -1,0 +1,113 @@
+// «Мальоване місто»: вигляд ефекту «Тег пензлем» (рух — brush-tag/application-sent.ts, Web
+// Animations API; оверлей і його розміщення — theming/effect-stage.ts). Тег — посередині
+// діалогу-афіші, трохи навскіс: рожеві літери графіті (Rubik Wet Paint) з чорнильним контуром,
+// пензель з рожевою щетиною, патьоки, бірюзовий підкреслювальний мазок і бризки. Без текстур і
+// зображень — лише кольори й градієнти (жодних швів).
+
+@pc-send-ink: #060708;
+@pc-send-pink: #ff4fae;
+@pc-send-pink-deep: #b0186a;
+@pc-send-teal: #35e0c2;
+
+.pc-send-tag {
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-6deg);
+}
+
+.pc-send-text {
+  position: relative;
+  z-index: 1;
+  color: @pc-send-pink;
+  font-family: 'Rubik Wet Paint', var(--sc-font-display);
+  font-weight: 400;
+  line-height: 1.15;
+  white-space: nowrap;
+  // Чорнильний контур (як графіті в шапці дизайну) і глибша рожева тінь мазка.
+  text-shadow:
+    3px 3px 0 @pc-send-pink-deep,
+    2px 2px 0 @pc-send-ink,
+    -1px -1px 0 @pc-send-ink,
+    1px -1px 0 @pc-send-ink,
+    -1px 1px 0 @pc-send-ink;
+}
+
+.pc-send-letter,
+.pc-send-gap {
+  display: inline-block;
+  white-space: pre;
+}
+
+// Пензель: кінчик (рожева щетина) — у точці мазка, ручка — вгору праворуч.
+.pc-send-brush {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  width: 56px;
+  height: 14px;
+  margin-top: -7px;
+  transform-origin: 0 50%;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 0;
+    width: 16px;
+    height: 10px;
+    border-radius: 6px 0 0 6px;
+    background: @pc-send-pink;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 16px;
+    width: 40px;
+    height: 6px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(90deg, #9aa0a6 0 20%, #d4a648 20%);
+    box-shadow: 1px 1px 0 @pc-send-ink;
+  }
+}
+
+// Патьок: росте вниз від літери, на кінці — крапля (ширший заокруглений низ).
+.pc-send-drip {
+  position: absolute;
+  width: 5px;
+  margin-left: -2.5px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, @pc-send-pink 60%, @pc-send-pink-deep);
+  box-shadow: 1px 0 0 @pc-send-ink;
+  transform-origin: 50% 0;
+}
+
+.pc-send-swoosh {
+  position: absolute;
+  left: -8px;
+  height: 12px;
+  border-bottom: 5px solid @pc-send-teal;
+  border-radius: 0 0 60% 40%;
+  transform: rotate(-3deg);
+  transform-origin: 0 100%;
+}
+
+.pc-send-splat {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: @pc-send-teal;
+}
+
+.pc-send-splat-2 {
+  width: 4px;
+  height: 4px;
+}
+
+.pc-send-splat-3 {
+  width: 3px;
+  height: 3px;
+}

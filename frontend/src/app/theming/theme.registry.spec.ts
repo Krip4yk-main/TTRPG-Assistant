@@ -33,6 +33,8 @@ describe('THEMES: фірмові анімації', () => {
     ['neon-signs', 'lightNeonSign'],
     ['night-city', 'pulseAlongBus'],
     ['brass-steam', 'printTelegraphTape'],
+    ['solar-garden', 'growSprout'],
+    ['painted-city', 'paintBrushTag'],
   ] as const)('%s — лише «заявку подано»: %s (лінивий чанк)', async (id, effect) => {
     const effects = THEMES[id].effects ?? {};
     expect(Object.keys(effects)).toEqual(['applicationSent']);

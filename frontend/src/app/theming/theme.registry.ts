@@ -177,9 +177,19 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     ),
   }),
   // «Сонячний сад» — світлий дизайн сцени: світла сторінка, поля й оверлеї Material.
-  'solar-garden': theme('solar-garden', 'light', '400 1em Alice', loadSceneSlots),
+  // Фірмова анімація «заявку подано»: з насінини проклюнувся паросток з биркою.
+  'solar-garden': theme('solar-garden', 'light', '400 1em Alice', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/solar-garden/sprout/application-sent').then((m) => m.growSprout),
+    ),
+  }),
   // «Мальоване місто» — темний дизайн сцени (світла лише смуга верхнього міста в заголовку).
-  'painted-city': theme('painted-city', 'dark', '400 1em "Yeseva One"', loadSceneSlots),
+  // Фірмова анімація «заявку подано»: пензель виписує тег «Я в грі!».
+  'painted-city': theme('painted-city', 'dark', '400 1em "Yeseva One"', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/painted-city/brush-tag/application-sent').then((m) => m.paintBrushTag),
+    ),
+  }),
 };
 
 /** Реєстр дизайнів для DI (у тестах підміняється). */
