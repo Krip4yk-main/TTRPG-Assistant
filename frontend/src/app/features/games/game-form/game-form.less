@@ -18,6 +18,17 @@
     font-weight: 700;
     color: var(--nri-accent-text);
   }
+
+  // Вузький екран: довга легенда переноситься, а рамка fieldset лягає посередині її висоти —
+  // між рядками. Тут легенда — звичайний заголовок усередині рамки (float знімає «виріз»).
+  @media (max-width: 599px) {
+    legend {
+      float: left;
+      width: 100%;
+      padding: 0;
+      line-height: 1.25;
+    }
+  }
 }
 
 .row {
