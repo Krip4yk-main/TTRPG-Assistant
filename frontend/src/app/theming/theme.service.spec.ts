@@ -54,6 +54,7 @@ const user: MeDto = {
   uiTheme: 'night-city',
   availableThemes: ALL,
   uiPrefs: { tearAnimation: true, sendAnimation: true },
+  myLimits: [],
 };
 
 // Окремі «чанки» дизайнів (тест не тягне справжні чанки): «Дошка» і кібер-родина.

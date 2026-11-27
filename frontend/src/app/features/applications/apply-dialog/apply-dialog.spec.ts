@@ -5,7 +5,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
-import type { ApplicationDto } from '@nri/shared';
+import type { ApplicationDto, MeDto } from '@nri/shared';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { Subject } from 'rxjs';
+import { SocketService } from '../../../core/realtime/socket.service';
 import { ThemeService } from '../../../theming/theme.service';
 import { browserTimeZone, formatDateTime, formatTime } from '../../../core/i18n/dates';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
@@ -67,6 +70,15 @@ describe('ApplyDialog', () => {
         { provide: MatDialogRef, useValue: ref },
         { provide: ThemeService, useValue: themes },
         { provide: LiveAnnouncer, useValue: { announce } },
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -365,5 +377,33 @@ describe('ApplyDialog', () => {
     }
     expect(el.querySelectorAll('input.constraint')).toHaveLength(10);
     expect(add.disabled).toBe(true);
+  });
+  it('my limits: button is hidden without saved limits', async () => {
+    await create();
+    expect(el.querySelector('button.insert-my-limits')).toBeNull();
+  });
+
+  it('my limits: appends without duplicates, never submits automatically', async () => {
+    await create();
+    TestBed.inject(AuthStore).setMe({
+      id: 1,
+      status: 'active',
+      timezone: 'Europe/Kyiv',
+      myLimits: ['Без павуків', 'Без крові'],
+    } as unknown as MeDto);
+    await settle();
+    el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();
+    await settle();
+    await type('input.constraint', 'Без павуків');
+    el.querySelector<HTMLButtonElement>('button.insert-my-limits')!.click();
+    await settle();
+    el.querySelector<HTMLButtonElement>('button.insert-my-limits')!.click();
+    await settle();
+    const values = [...el.querySelectorAll<HTMLInputElement>('input.constraint')].map(
+      (i) => i.value,
+    );
+    expect(values).toEqual(['Без павуків', 'Без крові']);
+    http.expectNone('/api/games/7/applications');
+    expect(close).not.toHaveBeenCalled();
   });
 });

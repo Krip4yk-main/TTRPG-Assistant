@@ -47,6 +47,11 @@ export const users = mysqlTable('users', {
   qbTearAnimation: boolean('qb_tear_animation').notNull().default(true),
   /** Налаштування вигляду дизайну «Магіпанк»: заявка відлітає в конверті (за замовчуванням — так). */
   uiSendAnimation: boolean('ui_send_animation').notNull().default(true),
+  /** Приватні «Мої межі» (масив рядків); віддаються лише власнику через `MeDto`. */
+  myLimits: json('my_limits')
+    .$type<string[]>()
+    .notNull()
+    .default(sql`(json_array())`),
   privacy: json('privacy')
     .$type<Record<string, unknown>>()
     .notNull()

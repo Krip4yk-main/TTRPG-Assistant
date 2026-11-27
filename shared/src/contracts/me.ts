@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ianaTimezone } from '../schemas/common.js';
+import { APPLICATION_CONSTRAINT_MAX, APPLICATION_CONSTRAINTS_MAX } from './applications.js';
 import type { ThemeId, UiPrefsDto } from './theme.js';
 
 export type UserStatus = 'pending' | 'active' | 'deleted';
@@ -47,6 +48,8 @@ export interface MeDto {
   availableThemes: ThemeId[];
   /** Налаштування вигляду, що зберігаються в профілі (для всіх пристроїв). */
   uiPrefs: UiPrefsDto;
+  /** Мої межі — приватні нотатки для підстановки в заявку; лише тут, нікому більше не показуються. */
+  myLimits: string[];
 }
 
 /**
@@ -71,3 +74,14 @@ export const updateAvatarSchema = z
     path: ['customUrl'],
   });
 export type UpdateAvatarInput = z.infer<typeof updateAvatarSchema>;
+
+/** `PUT /api/me/limits` → `MeDto`. Приватні «Мої межі»: ті самі ліміти, що й `constraints` заявки; дублікати прибираються. */
+export const updateMyLimitsSchema = z
+  .object({
+    limits: z
+      .array(z.string().trim().min(1).max(APPLICATION_CONSTRAINT_MAX))
+      .max(APPLICATION_CONSTRAINTS_MAX),
+  })
+  .strict()
+  .transform((v) => ({ limits: [...new Set(v.limits)] }));
+export type UpdateMyLimitsInput = z.output<typeof updateMyLimitsSchema>;

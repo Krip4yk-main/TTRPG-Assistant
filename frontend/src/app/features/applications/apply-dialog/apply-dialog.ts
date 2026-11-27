@@ -211,6 +211,31 @@ export class ApplyDialog {
     this.focus(`input.constraint[data-index="${index}"]`);
   }
 
+  /** Мої збережені межі з профілю (порожньо — кнопку підстановки не показуємо). */
+  protected get myLimits(): string[] {
+    return this.auth.me()?.myLimits ?? [];
+  }
+
+  /** Додає збережені межі до наявних обмеження без дублікатів; нічого не надсилає. */
+  protected insertMyLimits(): void {
+    const present = new Set(this.constraints.controls.map((c) => c.value.trim()));
+    for (const limit of this.myLimits) {
+      if (this.constraints.length >= APPLICATION_CONSTRAINTS_MAX) break;
+      if (present.has(limit)) continue;
+      present.add(limit);
+      this.constraints.push(
+        new FormControl(limit, {
+          nonNullable: true,
+          validators: [
+            Validators.required,
+            Validators.pattern(/\S/),
+            Validators.maxLength(APPLICATION_CONSTRAINT_MAX),
+          ],
+        }),
+      );
+    }
+  }
+
   protected removeConstraint(index: number): void {
     this.constraints.removeAt(index);
     this.focus('button.add-constraint');

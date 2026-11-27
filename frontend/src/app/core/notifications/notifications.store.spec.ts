@@ -20,6 +20,7 @@ const testMe: MeDto = {
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
+  myLimits: [],
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],

@@ -125,6 +125,17 @@
         <mat-icon aria-hidden="true">add</mat-icon>
         {{ 'games.applications.apply.addConstraint' | translate }}
       </button>
+      @if (myLimits.length > 0) {
+        <button
+          mat-button
+          type="button"
+          class="insert-my-limits"
+          [disabled]="constraints.length >= limits.constraints"
+          (click)="insertMyLimits()"
+        >
+          {{ 'myLimits.insert' | translate }}
+        </button>
+      }
     </fieldset>
 
     <div aria-live="assertive">

@@ -24,6 +24,7 @@ const me: MeDto = {
   uiTheme: 'neon-signs',
   availableThemes: ['neon-signs'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
+  myLimits: [],
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],

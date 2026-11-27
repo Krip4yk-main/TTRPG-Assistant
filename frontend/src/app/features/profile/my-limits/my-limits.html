@@ -1,0 +1,28 @@
+<details class="my-limits" [open]="open">
+  <summary>{{ 'myLimits.title' | translate }}</summary>
+  <p class="nri-muted hint">{{ 'myLimits.hint' | translate: { max: max, len: maxLen } }}</p>
+  <mat-form-field appearance="outline">
+    <mat-label>{{ 'myLimits.label' | translate }}</mat-label>
+    <textarea matInput name="myLimits" rows="4" [formControl]="control"></textarea>
+  </mat-form-field>
+  <div class="actions">
+    <button mat-stroked-button type="button" [disabled]="saving()" (click)="save()">
+      {{ (saving() ? 'common.saving' : 'common.save') | translate }}
+    </button>
+  </div>
+  <div aria-live="polite">
+    @switch (status()) {
+      @case ('saved') {
+        <p class="nri-notice">{{ 'myLimits.saved' | translate }}</p>
+      }
+      @case ('invalid') {
+        <p class="nri-alert" role="alert">
+          {{ 'myLimits.invalid' | translate: { max: max, len: maxLen } }}
+        </p>
+      }
+      @case ('error') {
+        <p class="nri-alert" role="alert">{{ 'myLimits.saveError' | translate }}</p>
+      }
+    }
+  </div>
+</details>

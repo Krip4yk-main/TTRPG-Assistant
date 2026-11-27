@@ -23,6 +23,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
+import { MyLimits } from '../my-limits/my-limits';
 import { AvatarPicker } from '../avatar-picker/avatar-picker';
 import { ProfileApi } from '../../../core/profile/profile.api';
 
@@ -40,6 +41,7 @@ type PrivacyGroup = FormGroup<Record<ProfilePrivacyKey, FormControl<boolean>>>;
   selector: 'nri-profile-edit',
   imports: [
     AvatarPicker,
+    MyLimits,
     NgTemplateOutlet,
     ReactiveFormsModule,
     RouterLink,

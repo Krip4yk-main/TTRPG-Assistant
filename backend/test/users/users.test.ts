@@ -67,7 +67,7 @@ async function login(userId: number): Promise<string> {
   return `nri_sid=${token}; nri_csrf=t`;
 }
 const call = (
-  method: 'get' | 'post' | 'patch' | 'delete',
+  method: 'get' | 'post' | 'patch' | 'put' | 'delete',
   path: string,
   cookie: string,
   body?: object,
@@ -114,6 +114,7 @@ describe('GET /api/me', () => {
         'painted-city',
       ],
       uiPrefs: { tearAnimation: true, sendAnimation: true },
+      myLimits: [],
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
   });
@@ -592,6 +593,45 @@ describe('DELETE /api/me/identities/:provider', () => {
   });
 });
 
+describe('PUT /api/me/limits', () => {
+  it('saves trimmed unique limits, returns them in MeDto, and keeps them private', async () => {
+    const u = await createUser(db, { nickname: 'Hero', birthDate: '2000-01-01' });
+    const cookie = await login(u.id);
+    const res = await call('put', '/api/me/limits', cookie, {
+      limits: ['  без павуків ', 'без павуків', 'без жорстокості до тварин'],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.myLimits).toEqual(['без павуків', 'без жорстокості до тварин']);
+    expect((await call('get', '/api/me', cookie)).body.myLimits).toEqual(res.body.myLimits);
+    // Приватність: публічний профіль не містить поля.
+    const pub = await request(app).get(`/api/users/${u.publicId}`);
+    expect(pub.status).toBe(200);
+    expect(JSON.stringify(pub.body)).not.toContain('павуків');
+    expect(pub.body).not.toHaveProperty('myLimits');
+  });
+
+  it('allows clearing and rejects too many / too long / empty / unknown keys / guests', async () => {
+    const u = await createUser(db, { nickname: 'Hero', birthDate: '2000-01-01' });
+    const cookie = await login(u.id);
+    expect((await call('put', '/api/me/limits', cookie, { limits: [] })).status).toBe(200);
+    const many = Array.from({ length: 11 }, (_, i) => `межа ${i}`);
+    expect((await call('put', '/api/me/limits', cookie, { limits: many })).status).toBe(400);
+    expect(
+      (await call('put', '/api/me/limits', cookie, { limits: ['x'.repeat(201)] })).status,
+    ).toBe(400);
+    expect((await call('put', '/api/me/limits', cookie, { limits: ['  '] })).status).toBe(400);
+    expect((await call('put', '/api/me/limits', cookie, { limits: [], extra: 1 })).status).toBe(
+      400,
+    );
+    const guest = await request(app)
+      .put('/api/me/limits')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ limits: [] });
+    expect(guest.status).toBe(401);
+  });
+});
+
 describe('DELETE /api/me', () => {
   const ident = { provider: 'telegram' as const, subject: '777', displayName: 'T' };
 
@@ -599,7 +639,13 @@ describe('DELETE /api/me', () => {
     const { userId } = await resolveLogin(deps, ident);
     await db
       .update(users)
-      .set({ status: 'active', nickname: 'Hero', birthDate: '2000-01-01', avatarUrl: 'x' })
+      .set({
+        status: 'active',
+        nickname: 'Hero',
+        birthDate: '2000-01-01',
+        avatarUrl: 'x',
+        myLimits: ['без розчленування'],
+      })
       .where(eq(users.id, userId));
     const cookie = await login(userId);
     const res = await call('delete', '/api/me', cookie);
@@ -610,6 +656,7 @@ describe('DELETE /api/me', () => {
       nickname: null,
       avatarUrl: null,
       birthDate: null,
+      myLimits: [],
     });
     expect(row!.deletedAt).not.toBeNull();
     expect(

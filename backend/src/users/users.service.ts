@@ -98,6 +98,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     uiTheme: resolveTheme(u.uiTheme, u.role),
     availableThemes: availableThemes(u.role),
     uiPrefs: { tearAnimation: u.qbTearAnimation, sendAnimation: u.uiSendAnimation },
+    myLimits: u.myLimits,
   };
 }
 
@@ -132,6 +133,16 @@ export async function changeAvatar(
       .where(eq(users.id, userId));
     await recomputeAvatar(tx, userId);
   });
+  return getMe(deps, userId);
+}
+
+/** Збереження приватних «Моїх меж» (дублікати вже прибрані схемою). */
+export async function changeMyLimits(
+  deps: Pick<AppDeps, 'db'>,
+  userId: number,
+  limits: string[],
+): Promise<MeDto> {
+  await deps.db.update(users).set({ myLimits: limits }).where(eq(users.id, userId));
   return getMe(deps, userId);
 }
 
@@ -391,6 +402,7 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         avatarUrl: null,
         avatarSource: 'auto',
         customAvatarUrl: null,
+        myLimits: [],
         birthDate: null,
         birthDateChangedAt: null,
         deletedAt: now,

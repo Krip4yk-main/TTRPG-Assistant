@@ -62,6 +62,11 @@ export class AuthApi {
     return this.http.put<MeDto>('/api/me/avatar', input);
   }
 
+  /** Приватні «Мої межі» (замінює весь список). */
+  changeMyLimits(limits: string[]): Observable<MeDto> {
+    return this.http.put<MeDto>('/api/me/limits', { limits });
+  }
+
   unlinkIdentity(provider: IdentityProvider): Observable<{ identities: IdentityDto[] }> {
     return this.http.delete<{ identities: IdentityDto[] }>(
       `/api/me/identities/${encodeURIComponent(provider)}`,

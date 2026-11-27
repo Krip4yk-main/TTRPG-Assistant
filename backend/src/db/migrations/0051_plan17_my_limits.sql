@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `my_limits` json DEFAULT (json_array()) NOT NULL;

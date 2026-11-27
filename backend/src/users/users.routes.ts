@@ -6,6 +6,7 @@ import {
   changeTimezoneSchema,
   completeProfileSchema,
   updateAvatarSchema,
+  updateMyLimitsSchema,
   updateThemeSchema,
   updateUiPrefsSchema,
 } from '@nri/shared';
@@ -23,6 +24,7 @@ import {
   changeUiPrefs,
   changeTimezone,
   completeProfile,
+  changeMyLimits,
   deleteAccount,
   getMe,
   unlinkIdentity,
@@ -72,6 +74,11 @@ export function usersRouter(deps: AppDeps): Router {
   router.put('/avatar', auth, requireActive, async (req, res) => {
     const input = updateAvatarSchema.parse(req.body);
     res.json(await changeAvatar(deps, req.user!.userId, input));
+  });
+
+  router.put('/limits', auth, requireActive, async (req, res) => {
+    const { limits } = updateMyLimitsSchema.parse(req.body);
+    res.json(await changeMyLimits(deps, req.user!.userId, limits));
   });
 
   router.patch('/theme', auth, requireActive, async (req, res) => {
