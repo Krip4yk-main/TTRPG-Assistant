@@ -58,6 +58,33 @@ describe('loadEnv', () => {
     expect(env.RATE_LIMIT_MAX).toBe(300);
     expect(env.RATE_LIMIT_AUTH_MAX).toBe(20);
   });
+
+  it('refuses a non-https PUBLIC_BASE_URL in production only', () => {
+    const base = {
+      DATABASE_URL: 'a',
+      REDIS_URL: 'b',
+      IDENTITY_PEPPER: TEST_PEPPER,
+      INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
+    };
+    for (const url of ['http://nri.example.com', 'ftp://nri.example.com', 'nri.example.com']) {
+      expect(() => loadEnv({ ...base, NODE_ENV: 'production', PUBLIC_BASE_URL: url })).toThrow(
+        /PUBLIC_BASE_URL \(must be an https:\/\/ URL in production\)/,
+      );
+    }
+    // Без явного значення в production — типовий http://localhost:4200 теж відмова.
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(/PUBLIC_BASE_URL/);
+    const prod = loadEnv({
+      ...base,
+      NODE_ENV: 'production',
+      PUBLIC_BASE_URL: 'https://nri.example.com',
+    });
+    expect(prod.PUBLIC_BASE_URL).toBe('https://nri.example.com');
+    for (const NODE_ENV of ['development', 'test']) {
+      expect(
+        loadEnv({ ...base, NODE_ENV, PUBLIC_BASE_URL: 'http://localhost:4200' }).NODE_ENV,
+      ).toBe(NODE_ENV);
+    }
+  });
 });
 
 describe('app', () => {

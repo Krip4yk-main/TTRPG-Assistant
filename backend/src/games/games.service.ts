@@ -462,11 +462,6 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
 
 const COPY_SUFFIX = ' (копія)';
 
-/**
- * Початок копії: та сама локальна година й день тижня, що в оригіналу, але першого ж тижня
- * після `now`. Колонка `starts_at` обов'язкова, а правило розкладу має містити день тижня
- * першої сесії, тож порожньої дати в чернетці бути не може; майстер уточнює дату у формі.
- */
 /** «<назва> (копія)» не довше 120 символів; ріжемо по кодових точках (без обірваних сурогатів). */
 export function copyTitle(title: string): string {
   const chars = Array.from(title);
@@ -474,6 +469,11 @@ export function copyTitle(title: string): string {
   return `${chars.join('').trimEnd()}${COPY_SUFFIX}`;
 }
 
+/**
+ * Початок копії: та сама локальна година й день тижня, що в оригіналу, але першого ж тижня
+ * після `now`. Колонка `starts_at` обов'язкова, а правило розкладу має містити день тижня
+ * першої сесії, тож порожньої дати в чернетці бути не може; майстер уточнює дату у формі.
+ */
 export function copyStartsAt(source: Date, tz: string, now: Date): Date {
   const z = toZoned(source, tz);
   let n = dayNumber(z.year, z.month, z.day);

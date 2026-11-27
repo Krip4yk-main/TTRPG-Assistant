@@ -46,6 +46,7 @@ describe('image URL checker (local test server; real transport is https only)', 
   const DNS: Record<string, string[]> = {
     'img.test': ['127.0.0.1'],
     'internal.test': ['10.1.2.3'],
+    'loop.test': ['127.0.0.2'],
   };
   const opts = (extra: ImageUrlCheckerOptions = {}): ImageUrlCheckerOptions => ({
     request: httpRequest,
@@ -141,6 +142,18 @@ describe('image URL checker (local test server; real transport is https only)', 
     expect(await reason(strict('https://localhost/a.png'))).toBe('forbidden_address');
     expect(hits).toBe(before);
     expect(await reason(createImageUrlChecker(opts())(url('/to-meta')))).toBe('forbidden_address');
+  });
+
+  it('a redirect to a hostname whose DNS answer is private → forbidden_address', async () => {
+    routes.set('/to-loop', (res) =>
+      res.writeHead(302, { location: `https://loop.test:${port}/a.png` }).end(),
+    );
+    routes.set('/to-internal', (res) =>
+      res.writeHead(302, { location: `https://internal.test:${port}/a.png` }).end(),
+    );
+    const check = createImageUrlChecker(opts());
+    expect(await reason(check(url('/to-loop')))).toBe('forbidden_address');
+    expect(await reason(check(url('/to-internal')))).toBe('forbidden_address');
   });
 
   it('redirects: up to 3, each re-checked; more → unreachable', async () => {

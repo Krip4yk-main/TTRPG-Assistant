@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, notExists, or } from 'drizzle-orm';
 import {
   cancelSessionInputSchema,
   finishSessionInputSchema,
@@ -11,6 +11,7 @@ import {
 import type { AppDeps } from '../app.js';
 import type { Tx } from '../applications/applications.rules.js';
 import {
+  gameBans,
   gameMembers,
   games,
   gameSessions,
@@ -413,8 +414,9 @@ async function lockDone(tx: Tx, gameId: number, sessionId: number): Promise<Sess
 /**
  * Сповіщення `session.summary` (категорія «Розклад», сайт + Telegram) усім, хто був активним
  * учасником гри на час сесії (вступив не пізніше початку й не вийшов до нього), крім майстра;
- * лише активним акаунтам, без тих, хто вимкнув «Розклад» на сайті. Викликати в транзакції, що
- * тримає сесію FOR UPDATE і ставить `summary_sent_at`; `emitNotificationsNew` — після коміту.
+ * лише активним акаунтам, без забанених у цій грі й тих, хто вимкнув «Розклад» на сайті.
+ * Викликати в транзакції, що тримає сесію FOR UPDATE і ставить `summary_sent_at`;
+ * `emitNotificationsNew` — після коміту.
  */
 async function notifySummary(
   deps: AppDeps,
@@ -433,6 +435,12 @@ async function notifySummary(
         or(isNull(gameMembers.leftAt), gt(gameMembers.leftAt, session.startsAt)),
         ne(gameMembers.userId, game.gmUserId),
         eq(users.status, 'active'),
+        notExists(
+          tx
+            .select({ id: gameBans.userId })
+            .from(gameBans)
+            .where(and(eq(gameBans.gameId, game.id), eq(gameBans.userId, gameMembers.userId))),
+        ),
       ),
     );
   const params = {

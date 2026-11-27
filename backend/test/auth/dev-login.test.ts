@@ -88,7 +88,7 @@ describe('POST /api/auth/dev-login', () => {
 
   it('404 when NODE_ENV=production or DEV_LOGIN_ENABLED=false', async () => {
     for (const extra of [
-      { ...DEV, NODE_ENV: 'production' },
+      { ...DEV, NODE_ENV: 'production', PUBLIC_BASE_URL: 'https://nri.example.com' },
       { ...DEV, DEV_LOGIN_ENABLED: 'false' },
     ]) {
       const res = await post(await appWith(extra), { nickname: 'Hero' });

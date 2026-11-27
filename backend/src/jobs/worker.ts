@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
 import type { Db } from '../db/client.js';
-import { writeWorkerHeartbeat } from '../http/health.js';
 import { jobs } from '../db/schema/index.js';
+import { writeWorkerHeartbeat, writeWorkerProgress } from './liveness.js';
 import {
   ensureRecurring,
   getHandler,
@@ -121,6 +121,8 @@ export async function runDueJobs(
       await releaseJobs(deps.db, claimed.slice(i));
       break;
     }
+    // Штамп просування між задачами (реальний час — його порівнює `/api/health`).
+    await writeWorkerProgress(deps.redis);
     try {
       await runOne(deps, job, clock);
     } catch (err) {
@@ -128,6 +130,7 @@ export async function runDueJobs(
       console.error(`job ${job.id} (${job.type}): worker error`, err);
     }
   }
+  if (claimed.length > 0) await writeWorkerProgress(deps.redis);
   return claimed.length + exhausted.length;
 }
 
@@ -230,7 +233,8 @@ export function startWorker(
   let lastEnsureAt = -Infinity;
   const shouldStop = (): boolean => stopped;
 
-  // Heartbeat окремим таймером: довга задача не маскує живий процес, а збій Redis не валить воркер.
+  // Heartbeat окремим таймером — лише «процес живий» (діагностика); `/api/health` судить за
+  // штампом progress, який пише сам цикл: на початку й наприкінці прогону та між задачами.
   void writeWorkerHeartbeat(deps.redis);
   const heartbeat = setInterval(() => void writeWorkerHeartbeat(deps.redis), HEARTBEAT_EVERY_MS);
   heartbeat.unref();
@@ -238,6 +242,7 @@ export function startWorker(
   const tick = (): void => {
     if (stopped) return;
     current = (async () => {
+      await writeWorkerProgress(deps.redis);
       try {
         if (Date.now() - lastEnsureAt >= ensureRecurringEveryMs) {
           await ensureRecurring(deps);
@@ -248,6 +253,7 @@ export function startWorker(
       } catch (err) {
         console.error('job worker error', err);
       }
+      await writeWorkerProgress(deps.redis);
     })().finally(() => {
       if (!stopped) timer = setTimeout(tick, pollMs);
     });

@@ -370,7 +370,10 @@ export function createSafeGet(cfg: SafeGetConfig): SafeGet {
           const location = res.headers.location;
           res.resume();
           if (!location) return fail('redirect');
-          return done({ kind: 'redirect', location });
+          done({ kind: 'redirect', location });
+          // Наступний хоп — нове з'єднання; це закриваємо одразу.
+          req.destroy();
+          return;
         }
         if (GONE.has(status)) return fail('http_gone');
         if (status < 200 || status >= 300) return fail('http_status');

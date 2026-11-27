@@ -1,25 +1,10 @@
 import { Router } from 'express';
 import { sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
-import type { Redis } from '../redis/client.js';
+import { WORKER_PROGRESS_KEY, isProgressFresh } from '../jobs/liveness.js';
 
-/** Ключ heartbeat воркера в Redis (спільний для API та окремого процесу воркера). */
-export const WORKER_HEARTBEAT_KEY = 'nri:worker:heartbeat';
-/** TTL ключа heartbeat, секунди. */
-export const WORKER_HEARTBEAT_TTL_S = 600;
-/** Heartbeat старший за це вважається застарілим. */
-export const WORKER_STALE_MS = 5 * 60_000;
 /** Ліміт кожної перевірки. */
 export const HEALTH_CHECK_TIMEOUT_MS = 1000;
-
-/** Пише heartbeat воркера (epoch ms) з TTL. Помилку не кидає — лише лог. */
-export async function writeWorkerHeartbeat(redis: Redis, now: Date = new Date()): Promise<void> {
-  try {
-    await redis.set(WORKER_HEARTBEAT_KEY, String(now.getTime()), 'EX', WORKER_HEARTBEAT_TTL_S);
-  } catch (err) {
-    console.error('worker heartbeat failed', err instanceof Error ? err.message : err);
-  }
-}
 
 type Status = 'ok' | 'down' | 'stale';
 
@@ -62,11 +47,8 @@ export function healthRouter({ db, redis }: Pick<AppDeps, 'db' | 'redis'>): Rout
       guarded('redis', async () => ((await redis.ping()) === 'PONG' ? 'ok' : 'down'), 'down'),
       guarded(
         'worker',
-        async () => {
-          const raw = await redis.get(WORKER_HEARTBEAT_KEY);
-          const at = raw === null ? NaN : Number(raw);
-          return Number.isFinite(at) && Date.now() - at < WORKER_STALE_MS ? 'ok' : 'stale';
-        },
+        // Судимо за просуванням циклу задач, а не за heartbeat: завислий цикл → stale.
+        async () => (isProgressFresh(await redis.get(WORKER_PROGRESS_KEY)) ? 'ok' : 'stale'),
         'down',
       ),
     ]);

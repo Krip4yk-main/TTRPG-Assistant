@@ -227,6 +227,16 @@ describe('POST /api/sessions/:id/summary/send', () => {
     expect((await summaryNotes()).map((r) => r.userId)).toEqual([p4.id]);
   });
 
+  it('a member banned from the game after the session gets nothing', async () => {
+    const { gm, gameId, sessionId, p1, p4 } = await party();
+    const ban = await call('post', `/api/games/${gameId}/members/${p1.publicId}/ban`, gm.cookie);
+    expect(ban.status).toBe(204);
+    expect((await call('post', `/api/sessions/${sessionId}/summary/send`, gm.cookie)).status).toBe(
+      200,
+    );
+    expect((await summaryNotes()).map((r) => r.userId)).toEqual([p4.id]);
+  });
+
   it('a short summary is sent whole, without «…»', async () => {
     const { gm, sessionId, p1 } = await party({ finish: { summary: 'Коротко' } });
     await call('post', `/api/sessions/${sessionId}/summary/send`, gm.cookie);

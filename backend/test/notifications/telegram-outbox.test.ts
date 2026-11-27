@@ -623,14 +623,63 @@ describe('quiet hours (Task 5)', () => {
       now,
       true,
     );
-    // За 3 год — не термінове: зранку, зі звуком.
+    // За 3 год (04:00 Київ) — ще до кінця тихих годин: теж одразу, без звуку.
+    expectImmediate(
+      await enqueueAt(u, now, 'session.reminder', { gameId: 1, sessionId: 2, startsAt: later }),
+      now,
+      true,
+    );
+    // Сесія після кінця тихих годин (09:00 Київ) — не термінове: зранку, зі звуком.
     const r = await enqueueAt(u, now, 'session.reminder', {
       gameId: 1,
-      sessionId: 2,
-      startsAt: later,
+      sessionId: 3,
+      startsAt: '2026-12-02T07:00:00.000Z',
     });
     expect(r.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
     expect(r.silent).toBe(false);
+  });
+
+  it('urgent at 23:10: a session before the quiet end is not held past itself', async () => {
+    const u = await recipient();
+    const now = at('2026-12-01T21:10:00Z'); // 23:10 Київ, кінець тихих — 08:00 (06:00Z)
+    const week = '2026-12-08T17:00:00.000Z';
+    // Перенесення сесії о 06:30 Київ на наступний тиждень — одразу, без звуку.
+    expectImmediate(
+      await enqueueAt(u, now, 'session.rescheduled', {
+        gameId: 1,
+        from: '2026-12-02T04:30:00.000Z',
+        startsAt: week,
+      }),
+      now,
+      true,
+    );
+    // Скасування сесії о 02:00 Київ — одразу, без звуку.
+    expectImmediate(
+      await enqueueAt(u, now, 'session.cancelled', {
+        gameId: 1,
+        startsAt: '2026-12-02T00:00:00.000Z',
+      }),
+      now,
+      true,
+    );
+    // Нагадування (не термінове зміщення) про сесію о 07:00 Київ — одразу, без звуку.
+    expectImmediate(
+      await enqueueAt(u, now, 'session.reminder', {
+        gameId: 1,
+        sessionId: 1,
+        startsAt: '2026-12-02T05:00:00.000Z',
+      }),
+      now,
+      true,
+    );
+    // Перенесення сесії наступного тижня — як і було, зранку о 08:00.
+    const held = await enqueueAt(u, now, 'session.rescheduled', {
+      gameId: 1,
+      from: week,
+      startsAt: '2026-12-09T17:00:00.000Z',
+    });
+    expect(held.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    expect(held.silent).toBe(false);
   });
 
   it('urgent: reschedule with the old or new date ≤ 2h, cancellation ≤ 2h', async () => {

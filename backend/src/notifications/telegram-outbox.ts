@@ -90,7 +90,7 @@ export function buttonsFor(
  *
  * Тихі години одержувача (`prefs.quietHours`, пояс `users.timezone`): поставлене в них
  * отримує `next_try_at` = їхній кінець (бот забере зранку); термінове (`isUrgent`: сесія
- * ≤ 2 год) — одразу, але `silent` (без звуку). Поза тихими годинами / вимкнено — одразу, зі звуком.
+ * ≤ 2 год або ще до кінця тихих годин) — одразу, але `silent` (без звуку). Поза тихими годинами / вимкнено — одразу, зі звуком.
  */
 export async function enqueueTelegram(
   tx: DbLike,
@@ -164,7 +164,7 @@ export async function enqueueTelegram(
     if (chatId === undefined) return [];
     if ((prefsOf.get(r.userId) ?? defaults)[r.category] === false) return [];
     const quietEnd = quietEndOf.get(r.userId) ?? null;
-    const urgent = quietEnd !== null && isUrgent(r.type, r.payload, now);
+    const urgent = quietEnd !== null && isUrgent(r.type, r.payload, now, quietEnd);
     return [
       {
         notificationId: r.id,

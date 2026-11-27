@@ -5,11 +5,12 @@
 
 ## Підготовка
 
-1. Скопіюйте `backend/.env.template` у `backend/.env`, `bot/.env.template` у `bot/.env` й заповніть (`NODE_ENV=production`, `TRUST_PROXY` за кількістю проксі, `DEV_LOGIN_ENABLED=false`).
+1. Скопіюйте `backend/.env.template` у `backend/.env`, `bot/.env.template` у `bot/.env` й заповніть (`NODE_ENV=production`, `PUBLIC_BASE_URL` лише `https://…` — інакше бекенд не стартує, `TRUST_PROXY` за кількістю проксі, `DEV_LOGIN_ENABLED=false`).
 2. У кореневому `.env` задайте `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD` (пароль без символів, що ламають URL: `@ : / ? #`).
 3. `DATABASE_URL`, `REDIS_URL` і `BACKEND_INTERNAL_URL` у compose перевизначаються на адреси сервісів — у `.env` їх можна не задавати.
 4. Налаштування фронтенду (`NG_APP_*`) — build-аргументи, див. `frontend/Dockerfile`.
-5. Бекапи: створіть MySQL-користувача `backup` і задайте `BACKUP_*` у кореневому `.env` — див. [backups.md](backups.md). Без `BACKUP_PASSPHRASE` сервіс `backup` не працює (fail closed).
+5. Бекапи: створіть MySQL-користувача `backup` і задайте `BACKUP_*` у кореневому `.env` — див. [backups.md](backups.md). Без `MYSQL_*`, `BACKUP_DB_PASSWORD` і `BACKUP_PASSPHRASE` compose відмовляється запускати стек (fail closed).
+6. Reverse proxy: вимкніть або редагуйте access-логи для `/api/cal/` — у шляху ICS-фіду секретний токен.
 
 ## Збірка і запуск
 
@@ -35,5 +36,5 @@ docker compose -f docker-compose.prod.yml logs migrate
 ```sh
 docker compose -f docker-compose.prod.yml ps
 curl -s http://127.0.0.1:3000/api/health/live   # завжди 200, якщо процес живий
-curl -s http://127.0.0.1:3000/api/health        # повна перевірка: MySQL, Redis, воркер; 200 або 503
+curl -s http://127.0.0.1:3000/api/health        # повна перевірка: MySQL, Redis, воркер (цикл задач просувався ≤ 5 хв тому); 200 або 503
 ```

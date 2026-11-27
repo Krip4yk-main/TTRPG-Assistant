@@ -47,17 +47,21 @@ export function quietHoursEnd(now: Date, quiet: QuietHours, zone: string): Date 
 
 /**
  * Термінове: нагадування / перенесення / скасування сесії, що починається (стара `from` або
- * нова `startsAt` дата) не далі ніж за 2 год від `now` (або почалась щойно, ≤ 2 год тому).
+ * нова `startsAt` дата) не далі ніж за 2 год від `now` (або почалась щойно, ≤ 2 год тому) —
+ * чи ще до кінця тихих годин `quietEnd`: відкладене до ранку прийшло б уже після сесії.
  */
 export function isUrgent(
   type: string,
   params: { startsAt?: string; from?: string },
   now: Date,
+  quietEnd: Date | null = null,
 ): boolean {
   if (!URGENT_TYPES.has(type)) return false;
+  const nowMs = now.getTime();
+  const horizon = Math.max(nowMs + URGENT_WITHIN_MS, quietEnd?.getTime() ?? 0);
   return [params.startsAt, params.from].some((iso) => {
     if (!iso) return false;
     const t = Date.parse(iso);
-    return Number.isFinite(t) && Math.abs(t - now.getTime()) <= URGENT_WITHIN_MS;
+    return Number.isFinite(t) && t >= nowMs - URGENT_WITHIN_MS && t <= horizon;
   });
 }

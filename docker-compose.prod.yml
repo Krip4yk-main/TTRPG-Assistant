@@ -1,6 +1,8 @@
 # Продакшн-стек. Збірка/запуск: див. docs/ops/deploy.md
 # Змінні для ${...} беруться з кореневого .env (поруч із цим файлом) або з оточення.
 # Секрети лише в .env-файлах (backend/.env, bot/.env, корінь) — не в цьому файлі.
+# Обов'язкові (${VAR:?…}): MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD, BACKUP_DB_PASSWORD,
+# BACKUP_PASSPHRASE — без них compose не запуститься.
 # /api і /socket.io на backend:3000 та статику з frontend:8080 віддає зовнішній reverse proxy.
 
 x-restart: &restart
@@ -8,7 +10,7 @@ x-restart: &restart
 
 # Спільні перевизначення адрес сервісів (мають пріоритет над значеннями з env_file)
 x-backend-env: &backend-env
-  DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/nri
+  DATABASE_URL: mysql://${MYSQL_USER:?set MYSQL_USER in the root .env}:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in the root .env}@mysql:3306/nri
   REDIS_URL: redis://redis:6379
 
 services:
@@ -16,9 +18,9 @@ services:
     <<: *restart
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the root .env}
+      MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER in the root .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in the root .env}
       MYSQL_DATABASE: nri
     volumes:
       - mysql_data:/var/lib/mysql
@@ -117,8 +119,8 @@ services:
     environment:
       BACKUP_DB_HOST: mysql
       BACKUP_DB_USER: ${BACKUP_DB_USER:-backup}
-      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-}
-      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:?set BACKUP_DB_PASSWORD in the root .env (docs/ops/backups.md)}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE in the root .env (docs/ops/backups.md)}
       BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
       BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
       BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
