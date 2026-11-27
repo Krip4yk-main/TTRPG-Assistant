@@ -20,3 +20,12 @@ bot/.env
 
 # Скріншоти, макети й інші медіа для показу/рецензій — не в репозиторії
 .media/
+
+# Страховка: бекапи БД ніколи не потрапляють у git
+*.sql
+*.sql.gz
+*.sql.gz.enc
+*.partial
+backups/
+!backend/src/db/migrations/*.sql
+!docker/mysql-init.sql

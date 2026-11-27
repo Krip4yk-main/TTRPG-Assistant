@@ -55,17 +55,8 @@ import {
 import { DAILY_AT_UTC, DAILY_JOB, runDaily } from './daily.js';
 import { registerHandler, registerRecurring } from './registry.js';
 
-/**
- * Колишня періодична `jobs.purge` (тепер чистка — крок `runDaily`). У проді лишився її
- * запланований рядок: no-op завершує його без помилки й без перепланування.
- * TODO: прибрати після одного релізу.
- */
-export const LEGACY_PURGE_JOB = 'jobs.purge';
-
 /** Реєструє всі обробники й розклади фонових задач (викликається при старті сервера). */
 export function registerJobs(): void {
-  registerHandler(LEGACY_PURGE_JOB, async () => {});
-
   registerHandler(DISPATCH_JOB, async (deps) => {
     await runDispatch(deps);
   });

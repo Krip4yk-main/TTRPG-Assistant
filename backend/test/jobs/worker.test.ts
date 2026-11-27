@@ -1,7 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq, inArray } from 'drizzle-orm';
 import { jobs } from '../../src/db/schema/index.js';
-import { registerJobs, LEGACY_PURGE_JOB } from '../../src/jobs/index.js';
 import { enqueue } from '../../src/jobs/queue.js';
 import {
   ensureRecurring,
@@ -139,15 +138,6 @@ describe('runDueJobs', () => {
     expect(row.lastError).toContain(`boom ${MAX_ATTEMPTS}`);
     expect(calls).toBe(MAX_ATTEMPTS);
     expect(await runDueJobs(deps, at(365 * 86_400_000))).toBe(0);
-  });
-
-  it('залишковий рядок колишньої jobs.purge завершується no-op і не перепланується', async () => {
-    registerJobs();
-    const { id } = (await enqueue(deps, { type: LEGACY_PURGE_JOB, runAt: T0 }))!;
-    expect(await runDueJobs(deps, T0)).toBe(1);
-    expect((await jobRow(id)).status).toBe('done');
-    const rows = await db.select().from(jobs).where(eq(jobs.type, LEGACY_PURGE_JOB));
-    expect(rows).toHaveLength(1);
   });
 
   it('невідомий тип → failed без повторів', async () => {
