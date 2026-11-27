@@ -233,9 +233,14 @@ describe('MyGames', () => {
     article(5).querySelector<HTMLButtonElement>('[data-action="start"]')!.click();
     await settle();
     expect(open.mock.calls[0]![1].data.title).toBe('games.confirm.start.title');
-    http.expectOne('/api/games/5/start').flush({ ...card(5, 'started'), status: 'started' });
+    http
+      .expectOne('/api/games/5/start')
+      .flush({ ...card(5, 'started'), status: 'started', nextSessionWindowMinutes: 90 });
     await settle();
     expect(el.textContent).toContain('games.my.done.start');
+    // Картка оновлюється з відповіді переходу разом із вікном найближчої сесії.
+    const patched = fixture.componentInstance['games']()!.find((g) => g.id === 5)!;
+    expect(patched).toMatchObject({ status: 'started', nextSessionWindowMinutes: 90 });
     http.expectOne('/api/games/mine').flush([{ ...card(5, 'started'), memberCount: 2 }]);
     await settle();
   });

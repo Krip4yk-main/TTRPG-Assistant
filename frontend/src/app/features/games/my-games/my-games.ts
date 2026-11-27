@@ -138,7 +138,11 @@ export class MyGames {
     try {
       const dto = await openPauseDialog(this.dialog, { gameId: game.id, title: game.title });
       if (!dto) return;
-      this.patch(game.id, { status: dto.status, nextSessionAt: dto.nextSessionAt });
+      this.patch(game.id, {
+        status: dto.status,
+        nextSessionAt: dto.nextSessionAt,
+        nextSessionWindowMinutes: dto.nextSessionWindowMinutes,
+      });
       this.message.set({ kind: 'info', key: 'games.pause.done.pause' });
       void this.refresh();
     } finally {
@@ -167,7 +171,11 @@ export class MyGames {
         viewerTimezone: viewerTimeZone(this.auth.me()),
       });
       if (!dto) return;
-      this.patch(game.id, { status: dto.status, nextSessionAt: dto.nextSessionAt });
+      this.patch(game.id, {
+        status: dto.status,
+        nextSessionAt: dto.nextSessionAt,
+        nextSessionWindowMinutes: dto.nextSessionWindowMinutes,
+      });
       this.message.set({ kind: 'info', key: resumedNoticeKey(dto, recruit) });
       void this.refresh();
     } catch (err) {
@@ -196,6 +204,7 @@ export class MyGames {
       this.patch(game.id, {
         status: dto.status,
         nextSessionAt: dto.nextSessionAt,
+        nextSessionWindowMinutes: dto.nextSessionWindowMinutes,
         freeSlots: dto.freeSlots,
         staleness: 'ok',
         suspicious: false,
@@ -258,6 +267,7 @@ export class MyGames {
                 ...g,
                 status: dto.status,
                 nextSessionAt: dto.nextSessionAt,
+                nextSessionWindowMinutes: dto.nextSessionWindowMinutes,
                 freeSlots: dto.freeSlots,
               }
             : g,
