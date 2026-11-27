@@ -391,7 +391,7 @@ describe('approximate start time: start / finish guards', () => {
     expect((await rows(gameId))[0]!.status).toBe('done');
   });
 
-  /** Ваншот, що «йде», з вікном 19:00–20:00; сесія зсунута напряму в БД на `startsAt`. */
+  /** Ваншот, що «йде», з вікном 60 хв; гра й її сесія зсунуті напряму в БД на `startsAt`. */
   async function startedWindowedOneshot(startsAt: Date) {
     const gm = await userWithAge(30, 'gm');
     const gameId = await createGame(
@@ -406,7 +406,10 @@ describe('approximate start time: start / finish guards', () => {
       true,
     );
     const [s] = await rows(gameId);
-    await db.update(gameSessions).set({ startsAt }).where(eq(gameSessions.id, s!.id));
+    await db
+      .update(gameSessions)
+      .set({ startsAt, ruleStartsAt: startsAt })
+      .where(eq(gameSessions.id, s!.id));
     await db
       .update(games)
       .set({ status: 'started', startsAt, deadAt: new Date() })
