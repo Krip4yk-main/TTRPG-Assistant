@@ -48,6 +48,7 @@ export function toSessionDto(s: SessionRow, seen: SeenState, rsvp: RsvpView = NO
     gameId: s.gameId,
     startsAt: s.startsAt.toISOString(),
     durationMinutes: s.durationMinutes,
+    startWindowMinutes: s.startWindowMinutes,
     status: s.status,
     origin: s.origin,
     rescheduled: s.rescheduled,
@@ -184,7 +185,12 @@ async function afterGmSessionChange(
   sessionsChanged(deps, gameId);
 }
 
-/** Перенесення: новий час (ціла хвилина, у майбутньому), за бажанням — тривалість. */
+/**
+ * Перенесення: новий час (ціла хвилина, у майбутньому), за бажанням — тривалість і вікно
+ * початку (`startWindowMinutes`; без поля — лишається поточне, `null` — точний час). «Уточнити
+ * час» сесії з вікном — це перенесення на точний час. Нагадування майстру уточнити час
+ * (`session.time_unpinned`) після перенесення — знову за новим часом.
+ */
 export async function rescheduleSession(
   deps: AppDeps,
   userId: number,
@@ -203,7 +209,11 @@ export async function rescheduleSession(
       .set({
         startsAt,
         rescheduled: true,
+        unpinnedRemindedAt: null,
         ...(input.durationMinutes !== undefined ? { durationMinutes: input.durationMinutes } : {}),
+        ...(input.startWindowMinutes !== undefined
+          ? { startWindowMinutes: input.startWindowMinutes }
+          : {}),
       })
       .where(eq(gameSessions.id, sessionId));
     // RSVP відповідали на старий час — після перенесення учасники відповідають наново.
@@ -221,6 +231,10 @@ export async function rescheduleSession(
       from: from.startsAt.toISOString(),
       to: startsAt.toISOString(),
       durationMinutes: input.durationMinutes ?? from.durationMinutes,
+      // Вікна початку до й після (`null` — точний час): сповіщення показує вікно чи точний час.
+      fromWindowMinutes: from.startWindowMinutes,
+      startWindowMinutes:
+        input.startWindowMinutes !== undefined ? input.startWindowMinutes : from.startWindowMinutes,
     },
   });
   await afterGmSessionChange(deps, userId, g.id, sessionId);
@@ -230,7 +244,8 @@ export async function rescheduleSession(
 /**
  * Додаткова разова сесія кампейну (`origin='manual'`, без слоту правила) — застосування
  * разового голосування за час без цільової сесії (Plan 12). Лише майстер (перевіряє
- * викликач), гра набирає чи йде, час — ціла хвилина в майбутньому; тривалість — з гри.
+ * викликач), гра набирає чи йде, час — ціла хвилина в майбутньому; тривалість — з гри;
+ * `startWindowMinutes` — вікно початку (`null` — точний час).
  * Подія `session.created` — учасникам сповіщення з RSVP-кнопками в Telegram.
  */
 export async function createManualSession(
@@ -238,8 +253,12 @@ export async function createManualSession(
   userId: number,
   gameId: number,
   startsAtIso: string,
+  startWindowMinutes: number | null = null,
 ): Promise<SessionDto> {
-  const { startsAt: iso } = rescheduleSessionInputSchema.parse({ startsAt: startsAtIso });
+  const { startsAt: iso, startWindowMinutes: window = null } = rescheduleSessionInputSchema.parse({
+    startsAt: startsAtIso,
+    startWindowMinutes,
+  });
   const startsAt = new Date(iso);
   if (startsAt <= new Date()) throw new AppError(422, 'GAME_IN_PAST');
   const sessionId = await deps.db.transaction(async (tx) => {
@@ -253,6 +272,7 @@ export async function createManualSession(
         gameId,
         startsAt,
         durationMinutes: game.durationMinutes,
+        startWindowMinutes: window,
         origin: 'manual',
         ruleStartsAt: null,
       })
@@ -264,7 +284,7 @@ export async function createManualSession(
     userId,
     entityType: 'session',
     entityId: sessionId,
-    payload: { gameId, startsAt: startsAt.toISOString() },
+    payload: { gameId, startsAt: startsAt.toISOString(), startWindowMinutes: window },
   });
   await afterGmSessionChange(deps, userId, gameId, sessionId);
   return reload(deps, userId, sessionId);
@@ -298,7 +318,8 @@ export async function cancelSession(
 }
 
 /**
- * Завершення сесії, що вже почалась: присутність активних учасників + необов'язковий
+ * Завершення сесії, що вже почалась (з точним часом; з вікном — 409
+ * `SESSION_TIME_APPROXIMATE`): присутність активних учасників + необов'язковий
  * підсумок (бачать лише майстер і активні учасники); `sendSummary` — одразу надіслати його
  * учасникам (як `sendSessionSummary`; без підсумку → 422 `SUMMARY_EMPTY`). Невідомий чи
  * колишній учасник у присутності → 400. Після завершення вікно матеріалізації зсувається.
@@ -316,6 +337,10 @@ export async function finishSession(
   let sent: NotificationRow[] = [];
   const attendance = await deps.db.transaction(async (tx) => {
     const { session } = await lockScheduled(tx, g.id, sessionId);
+    // Сесію з приблизним часом спершу треба уточнити (перенесенням на точний час).
+    if (session.startWindowMinutes !== null) {
+      throw new AppError(409, 'SESSION_TIME_APPROXIMATE', { sessionId });
+    }
     if (session.startsAt > now) throw new AppError(409, 'SESSION_INVALID_STATE');
     // FOR SHARE гри блокує лише виключення/бан (беруть X). Склад не заморожено: вихід із
     // гри (теж FOR SHARE) чи видалення акаунта можуть пройти паралельно. Присутність щойно

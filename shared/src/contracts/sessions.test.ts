@@ -27,6 +27,23 @@ describe('session contracts', () => {
       }).success,
     ).toBe(false);
   });
+  it('reschedule takes an optional start window (null — exact time, «pin»)', () => {
+    const at = '2027-01-04T17:00:00Z';
+    expect(rescheduleSessionInputSchema.parse({ startsAt: at }).startWindowMinutes).toBeUndefined();
+    expect(
+      rescheduleSessionInputSchema.parse({ startsAt: at, startWindowMinutes: null })
+        .startWindowMinutes,
+    ).toBeNull();
+    expect(
+      rescheduleSessionInputSchema.parse({ startsAt: at, startWindowMinutes: 90 })
+        .startWindowMinutes,
+    ).toBe(90);
+    for (const bad of [0, 20, 735]) {
+      expect(
+        rescheduleSessionInputSchema.safeParse({ startsAt: at, startWindowMinutes: bad }).success,
+      ).toBe(false);
+    }
+  });
   it('cancel requires a reason of at most 300 characters', () => {
     expect(cancelSessionInputSchema.safeParse({ reason: ' ' }).success).toBe(false);
     expect(cancelSessionInputSchema.safeParse({ reason: 'a'.repeat(301) }).success).toBe(false);

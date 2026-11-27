@@ -21,7 +21,12 @@ import {
   expireSlot,
 } from '../moderation/sanctions.jobs.js';
 import { DISPATCH_EVERY_MS, DISPATCH_JOB, runDispatch } from '../notifications/dispatcher.js';
-import { REMINDERS_EVERY_MS, REMINDERS_JOB, sendReminders } from '../notifications/reminders.js';
+import {
+  REMINDERS_EVERY_MS,
+  REMINDERS_JOB,
+  sendReminders,
+  sendUnpinnedReminders,
+} from '../notifications/reminders.js';
 import {
   RATING_DEADLINE_EVERY_MS,
   RATING_DEADLINE_JOB,
@@ -60,6 +65,7 @@ export function registerJobs(): void {
   // Вікно нагадувань рахується від запланованого слоту (job.runAt), не від «зараз».
   registerHandler(REMINDERS_JOB, async (deps, _payload, job) => {
     await sendReminders(deps, job.runAt);
+    await sendUnpinnedReminders(deps);
   });
   registerRecurring(REMINDERS_JOB, { everyMs: REMINDERS_EVERY_MS });
 

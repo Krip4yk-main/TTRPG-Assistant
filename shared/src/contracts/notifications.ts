@@ -51,7 +51,9 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * майстру, один раз, коли заявка 3 дні без рішення (`applicationId`, `actor` — заявник);
  * `application.expired` — заявнику, коли заявку 14 днів не розглянули. Підсумок сесії (не з
  * подій, `schedule`): `session.summary` — учасникам гри на час сесії, один раз (`sessionId`,
- * `startsAt`, `excerpt` — початок підсумку). Текст —
+ * `startsAt`, `excerpt` — початок підсумку). Приблизний час (не з подій, `sessions`):
+ * `session.time_unpinned` — майстру за 24 год до початку вікна, один раз на час сесії:
+ * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -71,6 +73,7 @@ export const NOTIFICATION_TYPES = [
   'session.created',
   'session.reminder',
   'session.summary',
+  'session.time_unpinned',
   'game.started',
   'game.finished',
   'game.cancelled',
@@ -128,6 +131,13 @@ export interface NotificationParams {
   startsAt?: string;
   /** Старий час перенесеної сесії (ISO UTC). */
   from?: string;
+  /**
+   * Вікно початку сесії, хв (`startsAt` … `startsAt` + стільки): приблизний час; немає чи
+   * `null` — точний час. Для перенесення — нове вікно.
+   */
+  startWindowMinutes?: number | null;
+  /** Вікно початку до перенесення (`from` … `from` + стільки); немає чи `null` — точний час. */
+  fromWindowMinutes?: number | null;
   /** Причина скасування сесії (текст майстра) або код (`account_deleted`). */
   reason?: string | null;
   /** Жанр гри (slug) — для подяки після завершення (`thanks.<genreSlug>`). */
@@ -321,6 +331,7 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
     case 'poll.closed':
       return p.pollId !== undefined ? `/games/${p.gameId}?poll=${p.pollId}` : `/games/${p.gameId}`;
     case 'session.rsvp_declined':
+    case 'session.time_unpinned':
       return p.sessionId !== undefined
         ? `/games/${p.gameId}?session=${p.sessionId}`
         : `/games/${p.gameId}`;

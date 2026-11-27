@@ -50,19 +50,52 @@ export function formatWhen(iso: string | undefined, timeZone = DEFAULT_TIME_ZONE
 }
 
 function formatIn(d: Date, timeZone: string): string {
-  const date = new Intl.DateTimeFormat('uk-UA', {
+  return `${dateIn(d, timeZone)} о ${timeIn(d, timeZone)}`;
+}
+
+function dateIn(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('uk-UA', {
     timeZone,
     weekday: 'short',
     day: 'numeric',
     month: 'long',
   }).format(d);
-  const time = new Intl.DateTimeFormat('uk-UA', {
+}
+
+function timeIn(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('uk-UA', {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
   }).format(d);
-  return `${date} о ${time}`;
+}
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Час сесії для тексту: з вікном початку (`windowMinutes`) — `пт, 28 листопада, початок між
+ * 19:00 і 21:00` (шаблон `notify.window`; кінець вікна — у UTC-мілісекундах, тож перехід на
+ * літній час його не зсуває), без вікна — як `formatWhen`. Зіпсована дата — `null`.
+ */
+export function formatWhenWindow(
+  iso: string | undefined,
+  windowMinutes: number | null | undefined,
+  t: Translate,
+  timeZone = DEFAULT_TIME_ZONE,
+): string | null {
+  if (!windowMinutes) return formatWhen(iso, timeZone);
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const end = new Date(d.getTime() + windowMinutes * MINUTE_MS);
+  const render = (zone: string) =>
+    t('notify.window', { date: dateIn(d, zone), start: timeIn(d, zone), end: timeIn(end, zone) });
+  try {
+    return render(timeZone);
+  } catch {
+    return render(DEFAULT_TIME_ZONE);
+  }
 }
 
 /**
@@ -84,8 +117,10 @@ export function renderNotification(
   const vars: Record<string, string> = {
     game: params.gameTitle || t('notify.unknownGame'),
     actor: params.actor?.nickname || t('notify.someone'),
-    when: formatWhen(params.startsAt, tz) ?? t('notify.unknownTime'),
-    from: formatWhen(params.from, tz) ?? t('notify.unknownTime'),
+    when:
+      formatWhenWindow(params.startsAt, params.startWindowMinutes, t, tz) ??
+      t('notify.unknownTime'),
+    from: formatWhenWindow(params.from, params.fromWindowMinutes, t, tz) ?? t('notify.unknownTime'),
     offset: offsetPhrase(params.offsetMin, t),
     ratee: params.ratee?.nickname || t('notify.someone'),
     count: String(params.count ?? 0),
@@ -125,6 +160,10 @@ export function renderNotification(
     // Нагадування про календар тому, хто підключив лише імпорт iCal: «додай звичні години».
     if (kind === 'calendar.empty' && params.hasImport === true)
       key = 'notify.calendar.empty_imported';
+    // Майстер уточнив приблизний час (з вікна — на точний) — окремий текст.
+    if (kind === 'session.rescheduled' && params.fromWindowMinutes && !params.startWindowMinutes) {
+      key = 'notify.session.rescheduled_pinned';
+    }
     // «Не буду» кількох учасників одним сповіщенням — «X та ще N».
     if (kind === 'session.rsvp_declined' && (params.count ?? 0) > 0) {
       key = 'notify.session.rsvp_declined_many';

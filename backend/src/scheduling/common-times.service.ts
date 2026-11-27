@@ -7,6 +7,7 @@ import {
   type AvailabilityDto,
   type BusyInterval,
   type CommonTimesDto,
+  type CommonTimesParticipantDto,
   type CommonTimesPerson,
   type Weekday,
 } from '@nri/shared';
@@ -124,6 +125,47 @@ export async function collectBusy(
 }
 
 /**
+ * Учасники підбору (майстер і активні учасники) з календарями й зовнішньою зайнятістю в
+ * `[busyWindow.from, busyWindow.to)` (без сесій самої гри) — вхід для `evaluateGrid` /
+ * `findCommonTimes`. `participants` — у тому самому порядку, що й `people`.
+ */
+export async function schedulingPeople(
+  deps: AppDeps,
+  game: Pick<GameRow, 'id' | 'gmUserId'>,
+  busyWindow: { from: Date; to: Date },
+  now?: Date,
+): Promise<{ participants: CommonTimesParticipantDto[]; people: CommonTimesPerson[] }> {
+  const participants = await loadParticipants(deps, game);
+  const busy = await collectBusy(
+    deps,
+    participants.map((p) => p.userId),
+    busyWindow.from,
+    busyWindow.to,
+    { excludeGameId: game.id, now },
+  );
+  const people: CommonTimesPerson[] = participants.map((p) => {
+    const b = busy.get(p.userId) ?? { intervals: [], imported: false };
+    return {
+      userId: p.userId,
+      timezone: p.timezone,
+      slots: p.slots,
+      busyDates: p.busyDates,
+      busy: b.intervals,
+      hasCalendar: p.slots.length > 0 || b.imported,
+    };
+  });
+  return {
+    participants: participants.map((p, i) => ({
+      userId: p.userId,
+      nickname: p.nickname,
+      isGm: p.isGm,
+      hasCalendar: people[i]!.hasCalendar,
+    })),
+    people,
+  };
+}
+
+/**
  * Підбір для гри у вікні `[from, to)` без перевірки прав — для повторного використання
  * (голосування заповнює варіанти, розумне перенесення шукає альтернативи на тижні сесії).
  * Разові ігри (oneshot) отримують лише разові кандидати.
@@ -139,27 +181,14 @@ export async function computeCommonTimes(
     excludeOneOff?: (start: Date, end: Date) => boolean;
   } = {},
 ): Promise<CommonTimesDto> {
-  const participants = await loadParticipants(deps, game);
   // Кандидат, що починається біля кінця вікна, триває ще `durationMinutes` — зайнятість
   // потрібна до `to + durationMinutes`.
-  const busy = await collectBusy(
+  const { participants, people } = await schedulingPeople(
     deps,
-    participants.map((p) => p.userId),
-    window.from,
-    new Date(window.to.getTime() + game.durationMinutes * 60_000),
-    { excludeGameId: game.id, now: opts.now },
+    game,
+    { from: window.from, to: new Date(window.to.getTime() + game.durationMinutes * 60_000) },
+    opts.now,
   );
-  const people: CommonTimesPerson[] = participants.map((p) => {
-    const b = busy.get(p.userId) ?? { intervals: [], imported: false };
-    return {
-      userId: p.userId,
-      timezone: p.timezone,
-      slots: p.slots,
-      busyDates: p.busyDates,
-      busy: b.intervals,
-      hasCalendar: p.slots.length > 0 || b.imported,
-    };
-  });
   const found = findCommonTimes({
     timezone: game.timezone,
     durationMinutes: game.durationMinutes,
@@ -175,12 +204,7 @@ export async function computeCommonTimes(
     durationMinutes: game.durationMinutes,
     from: window.from.toISOString(),
     to: window.to.toISOString(),
-    participants: participants.map((p, i) => ({
-      userId: p.userId,
-      nickname: p.nickname,
-      isGm: p.isGm,
-      hasCalendar: people[i]!.hasCalendar,
-    })),
+    participants,
     noCalendars: people.every((p) => !p.hasCalendar),
     ...found,
   };

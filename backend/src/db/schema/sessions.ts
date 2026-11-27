@@ -35,6 +35,13 @@ export const gameSessions = mysqlTable(
       .references(() => games.id, { onDelete: 'cascade' }),
     startsAt: datetime('starts_at').notNull(),
     durationMinutes: smallint('duration_minutes').notNull(),
+    /**
+     * Приблизний час: початок «з `starts_at` до `starts_at` + стільки хвилин» (30..720, крок 30);
+     * `NULL` — точний час.
+     */
+    startWindowMinutes: smallint('start_window_minutes'),
+    /** Коли майстру нагадали уточнити час (`session.time_unpinned`, раз на час сесії). */
+    unpinnedRemindedAt: datetime('unpinned_reminded_at', { fsp: 3 }),
     status: mysqlEnum('status', SESSION_STATUSES).notNull().default('scheduled'),
     origin: mysqlEnum('origin', SESSION_ORIGINS).notNull(),
     ruleStartsAt: datetime('rule_starts_at'),

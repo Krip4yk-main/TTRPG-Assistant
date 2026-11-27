@@ -36,6 +36,7 @@ const base: SessionDto = {
   gameId: 3,
   startsAt: '',
   durationMinutes: 180,
+  startWindowMinutes: null,
   status: 'scheduled',
   origin: 'rule',
   rescheduled: false,

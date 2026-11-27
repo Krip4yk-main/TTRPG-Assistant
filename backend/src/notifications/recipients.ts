@@ -190,13 +190,17 @@ async function planEventNotifications(db: DbLike, batch: EventRow[]): Promise<Ne
   const sessionIds = [
     ...new Set(todo.filter((t) => t.ev.entityType === 'session').map((t) => num(t.ev.entityId)!)),
   ].filter(Boolean);
-  const sessionStarts = new Map<number, Date>();
+  const sessionStarts = new Map<number, SessionTime>();
   if (sessionIds.length) {
     const rows = await db
-      .select({ id: gameSessions.id, startsAt: gameSessions.startsAt })
+      .select({
+        id: gameSessions.id,
+        startsAt: gameSessions.startsAt,
+        startWindowMinutes: gameSessions.startWindowMinutes,
+      })
       .from(gameSessions)
       .where(inArray(gameSessions.id, sessionIds));
-    for (const r of rows) sessionStarts.set(r.id, r.startsAt);
+    for (const r of rows) sessionStarts.set(r.id, r);
   }
 
   // Отримувачі кожної події (до фільтра активності).
@@ -267,26 +271,39 @@ async function planEventNotifications(db: DbLike, batch: EventRow[]): Promise<Ne
   });
 }
 
+/** Поточний час сесії (початок і вікно початку) — для тексту сповіщення. */
+type SessionTime = { startsAt: Date; startWindowMinutes: number | null };
+
 function paramsFor(
   ev: EventRow,
   game: { id: number; title: string; genreSlug: string | null },
   p: Payload,
-  sessionStarts: Map<number, Date>,
+  sessionStarts: Map<number, SessionTime>,
 ): NotificationParams {
   const params: NotificationParams = { gameId: game.id, gameTitle: game.title };
   if (ev.entityType === 'application' && num(ev.entityId)) params.applicationId = ev.entityId!;
   if (ev.entityType === 'session' && num(ev.entityId)) {
     params.sessionId = ev.entityId!;
-    const startsAt = sessionStarts.get(ev.entityId!);
-    if (startsAt) params.startsAt = startsAt.toISOString();
+    const time = sessionStarts.get(ev.entityId!);
+    if (time) {
+      params.startsAt = time.startsAt.toISOString();
+      if (time.startWindowMinutes !== null) params.startWindowMinutes = time.startWindowMinutes;
+    }
   }
   switch (ev.type) {
     case 'session.rescheduled': {
-      // Знімок перенесення з події (сесію могли перенести ще раз — то окрема подія).
+      // Знімок перенесення з події (сесію могли перенести ще раз — то окрема подія): час і
+      // вікно початку до й після (з вікна на точний час і навпаки).
       const from = str(p.from);
       const to = str(p.to);
       if (from) params.from = from;
       if (to) params.startsAt = to;
+      // Без поля — точний час (як і раніше).
+      delete params.startWindowMinutes;
+      const toWindow = num(p.startWindowMinutes);
+      const fromWindow = num(p.fromWindowMinutes);
+      if (toWindow !== undefined) params.startWindowMinutes = toWindow;
+      if (fromWindow !== undefined) params.fromWindowMinutes = fromWindow;
       break;
     }
     case 'session.cancelled':

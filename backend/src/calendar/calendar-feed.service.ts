@@ -6,6 +6,7 @@ import {
   CALENDAR_FEED_PAST_DAYS,
   type CalendarFeedCreatedDto,
   type CalendarFeedStatusDto,
+  windowEnd,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { calendarFeeds, gameMembers, gameSessions, games, users } from '../db/schema/index.js';
@@ -20,6 +21,8 @@ const ACCESS_TOUCH_MS = 60_000;
 /** Точка відліку `SEQUENCE` (секунди `updated_at` від неї — монотонні й поміщаються в int32). */
 const SEQUENCE_EPOCH_MS = Date.UTC(2024, 0, 1);
 const CALENDAR_NAME = 'НРІ Асистент — мої сесії';
+/** Позначка в назві події сесії з приблизним часом (вікно початку). */
+const APPROXIMATE_SUFFIX = '(час уточнюється)';
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 const baseUrl = (deps: Pick<AppDeps, 'env'>) => deps.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
@@ -101,6 +104,7 @@ export async function renderCalendarFeed(
       id: gameSessions.id,
       startsAt: gameSessions.startsAt,
       durationMinutes: gameSessions.durationMinutes,
+      startWindowMinutes: gameSessions.startWindowMinutes,
       status: gameSessions.status,
       updatedAt: gameSessions.updatedAt,
       gameId: games.id,
@@ -141,13 +145,18 @@ export async function renderCalendarFeed(
   const events: IcsEvent[] = rows.map((r) => {
     const gameUrl = `${base}/games/${r.gameId}`;
     const cancelled = r.status === 'cancelled';
+    // Приблизний час: подія охоплює все вікно — від його початку до найпізнішого кінця сесії
+    // (кінець вікна + тривалість; UTC-мілісекунди, тож перехід на літній час не зсуває).
+    const approximate = r.startWindowMinutes !== null;
     return {
       uid: `session-${r.id}@${domain}`,
       start: r.startsAt,
-      end: new Date(r.startsAt.getTime() + r.durationMinutes * 60_000),
+      end: new Date(
+        windowEnd(r.startsAt, r.startWindowMinutes).getTime() + r.durationMinutes * 60_000,
+      ),
       sequence: Math.max(0, Math.floor((r.updatedAt.getTime() - SEQUENCE_EPOCH_MS) / 1000)),
       lastModified: r.updatedAt,
-      summary: r.title,
+      summary: approximate ? `${r.title} ${APPROXIMATE_SUFFIX}` : r.title,
       status: cancelled ? 'CANCELLED' : 'CONFIRMED',
       url: gameUrl,
       description: `${cancelled ? 'Сесію скасовано.\n' : ''}Сторінка гри: ${gameUrl}`,

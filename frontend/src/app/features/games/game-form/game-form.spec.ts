@@ -58,6 +58,7 @@ function game(overrides: Partial<GameDto> = {}): GameDto {
     kind: 'campaign',
     startsAt: '2027-03-02T17:00:00.000Z',
     durationMinutes: 180,
+    startWindowMinutes: null,
     recurrence: 'none',
     weekdays: [],
     minPlayers: 3,

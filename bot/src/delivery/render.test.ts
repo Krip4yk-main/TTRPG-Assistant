@@ -211,6 +211,41 @@ describe('renderNotification', () => {
     expect(render('session.reminder', { ...base, offsetMin: 7 }).text).toContain('за 7 хв');
   });
 
+  it('approximate time: reminder, reschedule and pin show the window or the exact time', () => {
+    // 19:00–21:00 за Києвом.
+    const w = { ...base, startWindowMinutes: 120 };
+    expect(render('session.reminder', { ...w, offsetMin: 60 }).text).toContain(
+      'пт, 27 листопада, початок між 19:00 і 21:00',
+    );
+    // З точного на вікно.
+    const moved = render('session.rescheduled', w).text;
+    expect(moved).toContain('було чт, 26 листопада о 18:30');
+    expect(moved).toContain('тепер пт, 27 листопада, початок між 19:00 і 21:00');
+    // Уточнення: з вікна на точний час — окремий текст.
+    const pinned = render('session.rescheduled', { ...base, fromWindowMinutes: 90 }).text;
+    expect(pinned).toContain('Майстер уточнив час сесії гри «Прокляття Страда»');
+    expect(pinned).toContain('пт, 27 листопада о 19:00');
+    expect(pinned).toContain('було чт, 26 листопада, початок між 18:30 і 20:00');
+    // Нагадування майстру уточнити час.
+    expect(render('session.time_unpinned', w).text).toMatch(
+      /Сесія гри «Прокляття Страда» \(пт, 27 листопада, початок між 19:00 і 21:00\).*Уточни/,
+    );
+    expect(render('session.time_unpinned', w).text).toContain(
+      'https://nri.example/games/12?session=56',
+    );
+  });
+
+  it('approximate time across the spring DST switch: end in UTC ms', () => {
+    // Київ, 28.03.2027: 02:00 EET (00:00 UTC) + 180 хв = 06:00 EEST.
+    const text = render('session.reminder', {
+      ...base,
+      startsAt: '2027-03-28T00:00:00.000Z',
+      startWindowMinutes: 180,
+      offsetMin: 60,
+    }).text;
+    expect(text).toContain('початок між 02:00 і 06:00');
+  });
+
   it('session.rescheduled shows old and new time; cancelled shows the reason', () => {
     const r = render('session.rescheduled');
     expect(r.text).toContain('18:30');

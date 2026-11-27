@@ -53,8 +53,34 @@ export type PauseReason = (typeof PAUSE_REASONS)[number];
 /** Найдовший необов'язковий коментар до паузи. */
 export const PAUSE_NOTE_MAX = 300;
 
+const MINUTE_MS = 60_000;
+
 /** Причина автоскасування майбутніх сесій під час паузи (`game_sessions.cancel_reason`). */
 export const CAMPAIGN_PAUSED_REASON = 'campaign_paused';
+
+/**
+ * Приблизний час: майстер задає не точний початок, а вікно «з N до M» у день сесії. `startsAt`
+ * — початок вікна (N), `startWindowMinutes` — його ширина (M − N, хв): 30..720 з кроком 30;
+ * `null` — точний час. Кінець вікна рахується в UTC-мілісекундах (`windowEnd`), не в локальних
+ * годинах, тож перехід на літній/зимовий час його не зсуває.
+ */
+export const START_WINDOW_MIN = 30;
+export const START_WINDOW_MAX = 720;
+export const START_WINDOW_STEP = 30;
+
+/** Ширина вікна початку (`null` — точний час). */
+export const startWindowMinutesSchema = z
+  .number()
+  .int()
+  .min(START_WINDOW_MIN)
+  .max(START_WINDOW_MAX)
+  .multipleOf(START_WINDOW_STEP)
+  .nullable();
+
+/** Найпізніший початок сесії: `startsAt` + вікно (без вікна — сам `startsAt`). */
+export function windowEnd(startsAt: Date, startWindowMinutes: number | null): Date {
+  return new Date(startsAt.getTime() + (startWindowMinutes ?? 0) * MINUTE_MS);
+}
 
 /** Поля, які в `recruiting`/`started` змінювати не можна (рішення власника). */
 export const GAME_LOCKED_AFTER_PUBLISH = ['systemId', 'systemOther', 'kind'] as const;
@@ -63,8 +89,6 @@ export interface ChannelLink {
   label: string;
   url: string;
 }
-
-const MINUTE_MS = 60_000;
 
 /** `''` → `null` для необов'язкових текстових полів. */
 const optText = (max: number) =>
@@ -98,6 +122,8 @@ const shape = {
   /** `null` — дату ще не визначено (лише чернетка; публікація без дати — 422 `GAME_START_REQUIRED`). */
   startsAt: startsAt.nullable(),
   durationMinutes: z.number().int().min(30).max(720).multipleOf(30),
+  /** Вікно початку сесій правила (див. `START_WINDOW_MIN`); `null` — точний час. */
+  startWindowMinutes: startWindowMinutesSchema,
   recurrence: z.enum(RECURRENCES),
   weekdays: z
     .array(z.number().int().min(0).max(6))
@@ -153,6 +179,7 @@ const GAME_DEFAULTS = {
   customWarnings: [],
   contentWarningIds: [],
   showWhenFull: false,
+  startWindowMinutes: null,
 } as const satisfies Partial<z.output<typeof gameObject>>;
 
 /** Нормалізовані поля гри (вихід `gameInputSchema`). */
@@ -201,7 +228,8 @@ export function gameInputSchema(timezone: string) {
 
 /**
  * Нове правило розкладу: тіло `PUT /api/games/:id/schedule` і
- * `POST /api/games/:id/convert-to-campaign`. Без `durationMinutes` — лишається поточна.
+ * `POST /api/games/:id/convert-to-campaign`. Без `durationMinutes` (`startWindowMinutes`) —
+ * лишається поточна (поточне).
  * Узгодженість із грою (дні тижня, `oneshot` → лише `none`) бекенд перевіряє через
  * `gameInputSchema` після злиття з поточною грою.
  */
@@ -209,6 +237,8 @@ export const scheduleRuleInputSchema = z
   .object({
     startsAt,
     durationMinutes: shape.durationMinutes.optional(),
+    /** Без поля — лишається поточне вікно початку. */
+    startWindowMinutes: startWindowMinutesSchema.optional(),
     recurrence: shape.recurrence,
     weekdays: shape.weekdays.default([]),
   })

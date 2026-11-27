@@ -98,6 +98,7 @@ describe('materialization on publish', () => {
       gameId,
       startsAt: first.startsAt,
       durationMinutes: 240,
+      startWindowMinutes: null,
       status: 'scheduled',
       origin: 'rule',
       rescheduled: false,

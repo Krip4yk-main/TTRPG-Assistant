@@ -58,6 +58,7 @@ const game: PublicGameDto = {
   kind: 'campaign',
   startsAt: '2027-03-02T17:00:00.000Z',
   durationMinutes: 240,
+  startWindowMinutes: null,
   recurrence: 'weekly',
   weekdays: [1],
   minPlayers: 3,

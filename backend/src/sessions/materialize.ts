@@ -82,6 +82,9 @@ export async function materializeForRow(
         gameId: game.id,
         startsAt: s.start,
         durationMinutes: game.durationMinutes,
+        // Вікно початку — з гри на момент матеріалізації (зміну вікна застосовує
+        // `replaceRuleSessions`, як і зміну часу).
+        startWindowMinutes: game.startWindowMinutes,
         origin: 'rule' as const,
         ruleStartsAt: s.start,
       })),

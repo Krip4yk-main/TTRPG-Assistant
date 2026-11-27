@@ -25,6 +25,7 @@ describe('notification contracts', () => {
     const notFromEvents = [
       'session.reminder',
       'session.summary',
+      'session.time_unpinned',
       'complaint.resolved',
       'moderation.digest',
       'sanction.imposed',

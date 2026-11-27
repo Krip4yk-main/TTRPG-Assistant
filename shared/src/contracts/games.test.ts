@@ -9,6 +9,9 @@ import {
   resumeInputSchema,
   scheduleRuleInputSchema,
   searchFiltersSchema,
+  START_WINDOW_MAX,
+  START_WINDOW_MIN,
+  windowEnd,
 } from './games.js';
 
 const TZ = 'Europe/Kyiv';
@@ -118,6 +121,37 @@ describe('gameInputSchema', () => {
   it('rejects unknown keys', () => {
     expect(parse({ timezone: 'Europe/Kyiv' }).success).toBe(false);
     expect(parse({ status: 'recruiting' }).success).toBe(false);
+  });
+});
+
+describe('approximate start window', () => {
+  it('30..720 minutes, step 30; null (default) — exact time', () => {
+    expect([START_WINDOW_MIN, START_WINDOW_MAX]).toEqual([30, 720]);
+    expect(parse({}).data!.startWindowMinutes).toBeNull();
+    for (const m of [30, 120, 720, null]) {
+      expect(parse({ startWindowMinutes: m }).data?.startWindowMinutes).toBe(m);
+    }
+    for (const m of [0, 15, 45, 750, 60.5, '60']) {
+      expect(parse({ startWindowMinutes: m }).success).toBe(false);
+    }
+    expect(gamePatchSchema.safeParse({ startWindowMinutes: 90 }).success).toBe(true);
+    expect(gamePatchSchema.safeParse({ startWindowMinutes: 10 }).success).toBe(false);
+  });
+  it('schedule rule: optional window', () => {
+    const rule = { startsAt: ok.startsAt, recurrence: 'weekly', weekdays: [0] };
+    expect(scheduleRuleInputSchema.parse(rule).startWindowMinutes).toBeUndefined();
+    expect(
+      scheduleRuleInputSchema.parse({ ...rule, startWindowMinutes: null }).startWindowMinutes,
+    ).toBeNull();
+    expect(scheduleRuleInputSchema.safeParse({ ...rule, startWindowMinutes: 20 }).success).toBe(
+      false,
+    );
+  });
+  it('windowEnd adds the window in UTC ms (DST does not shift it)', () => {
+    // Київ, 28.03.2027 03:00 → 04:00: 02:00 EET + 3 год = 06:00 EEST.
+    const start = new Date('2027-03-28T00:00:00.000Z');
+    expect(windowEnd(start, 180).toISOString()).toBe('2027-03-28T03:00:00.000Z');
+    expect(windowEnd(start, null)).toEqual(start);
   });
 });
 

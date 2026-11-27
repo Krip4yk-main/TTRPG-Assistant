@@ -51,6 +51,7 @@ import {
   type Tx,
 } from '../applications/applications.rules.js';
 import { logEvent } from '../events/events.service.js';
+import { assertNearestSessionPinned } from '../sessions/start-window.js';
 import {
   cancelFutureSessions,
   logSessionsCancelled,
@@ -273,6 +274,7 @@ function toInput(row: GameRow, contentWarningIds: number[]): GameInput {
     kind: row.kind,
     startsAt: iso(row.startsAt),
     durationMinutes: row.durationMinutes,
+    startWindowMinutes: row.startWindowMinutes,
     recurrence: row.recurrence,
     weekdays: row.weekdays,
     minPlayers: row.minPlayers,
@@ -632,12 +634,23 @@ export async function updateGame(
 
 // ---------- правило розкладу ----------
 
-const RULE_FIELDS = ['startsAt', 'durationMinutes', 'recurrence', 'weekdays'] as const;
+/**
+ * Поля правила розкладу. Вікно початку — теж: його зміна, як і зміна часу, замінює майбутні
+ * неперенесені сесії правила новими (з новим вікном).
+ */
+const RULE_FIELDS = [
+  'startsAt',
+  'durationMinutes',
+  'startWindowMinutes',
+  'recurrence',
+  'weekdays',
+] as const;
 type Rule = Pick<GameInput, (typeof RULE_FIELDS)[number]>;
 
 const pickRule = (g: Rule): Rule => ({
   startsAt: g.startsAt,
   durationMinutes: g.durationMinutes,
+  startWindowMinutes: g.startWindowMinutes,
   recurrence: g.recurrence,
   weekdays: g.weekdays,
 });
@@ -714,6 +727,10 @@ export async function changeScheduleRule(
       kind: 'campaign',
       startsAt: input.startsAt,
       durationMinutes: input.durationMinutes ?? current.durationMinutes,
+      startWindowMinutes:
+        input.startWindowMinutes !== undefined
+          ? input.startWindowMinutes
+          : current.startWindowMinutes,
       recurrence: input.recurrence,
       weekdays: input.weekdays,
     });
@@ -1013,6 +1030,8 @@ export async function applyTransition(
       if (action === 'publish' || action === 'start') {
         await materializeForRow(tx, { ...row, status: t.to }, now);
       }
+      // Почати гру можна лише з точним часом найближчої сесії (майстер спершу уточнює час).
+      if (action === 'start') await assertNearestSessionPinned(tx, id, now);
       const doneSessionIds =
         action === 'finish' && row.kind === 'oneshot'
           ? await finishOneshotSession(tx, row, now)

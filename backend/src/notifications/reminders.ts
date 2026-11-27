@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte } from 'drizzle-orm';
 import { DEFAULT_REMINDER_OFFSETS, REMINDER_OFFSETS } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { isDuplicateKey, isTransientDbError } from '../db/errors.js';
@@ -33,12 +33,14 @@ type SessionCandidate = {
   gameTitle: string;
   gmUserId: number;
   startsAt: Date;
+  startWindowMinutes: number | null;
 };
 
 type Planned = { session: SessionCandidate; userId: number; offsetMin: number };
 
 /**
  * Нагадування перед сесіями для вікна задачі, що запланована на `runAt`: офсет `o`
+ * (для сесії з приблизним часом — від початку вікна `starts_at`)
  * спрацьовує, якщо момент `starts_at − o` ∈ [max(runAt, now) − запас, runAt + 5 хв), а сесія ще
  * не почалась (`starts_at > now`). Лише `scheduled` сесії опублікованих ігор, що набирають або
  * йдуть. Отримувачі — майстер і активні учасники (`left_at IS NULL`, акаунт активний, не
@@ -73,6 +75,7 @@ export async function sendReminders(
       gameTitle: games.title,
       gmUserId: games.gmUserId,
       startsAt: gameSessions.startsAt,
+      startWindowMinutes: gameSessions.startWindowMinutes,
     })
     .from(gameSessions)
     .innerJoin(games, eq(games.id, gameSessions.gameId))
@@ -204,6 +207,10 @@ async function remindSession(deps: AppDeps, planned: Planned[]): Promise<Notific
             sessionId: session.id,
             startsAt: session.startsAt.toISOString(),
             offsetMin: p.offsetMin,
+            // Приблизний час: нагадування рахується від початку вікна, текст — з вікном.
+            ...(session.startWindowMinutes !== null
+              ? { startWindowMinutes: session.startWindowMinutes }
+              : {}),
           },
           entityType: 'session',
           entityId: session.id,
@@ -211,5 +218,107 @@ async function remindSession(deps: AppDeps, planned: Planned[]): Promise<Notific
       );
     }
     return rows;
+  });
+}
+
+// ---------- приблизний час: нагадування майстру уточнити ----------
+
+/** За скільки до початку вікна майстру нагадують уточнити час сесії. */
+export const UNPINNED_REMINDER_BEFORE_MS = 24 * 60 * MIN;
+
+/**
+ * Майстру — `session.time_unpinned` (категорія `sessions`, не термінове — у тихі години чекає
+ * ранку): сесія з приблизним часом (`start_window_minutes IS NOT NULL`) починається не далі ніж
+ * за 24 год (від `now` до `starts_at`, тобто початку вікна), а майстер ще не уточнив час. Один раз
+ * на час сесії: штамп `unpinned_reminded_at` ставиться в тій самій транзакції (перенесення його
+ * скидає — нове вікно отримає своє нагадування). Сесія, якій вікно задали менш ніж за добу, —
+ * нагадування на найближчому прогоні. Лише `scheduled` сесії опублікованих ігор, що набирають
+ * чи йдуть, і лише активному незаблокованому майстру. Пінги — після коміту.
+ */
+export async function sendUnpinnedReminders(
+  deps: AppDeps,
+  now: Date = new Date(),
+): Promise<NotificationRow[]> {
+  const due = await deps.db
+    .select({ id: gameSessions.id })
+    .from(gameSessions)
+    .innerJoin(games, eq(games.id, gameSessions.gameId))
+    .innerJoin(users, eq(users.id, games.gmUserId))
+    .where(
+      and(
+        eq(gameSessions.status, 'scheduled'),
+        isNotNull(gameSessions.startWindowMinutes),
+        isNull(gameSessions.unpinnedRemindedAt),
+        gt(gameSessions.startsAt, now),
+        lte(gameSessions.startsAt, new Date(now.getTime() + UNPINNED_REMINDER_BEFORE_MS)),
+        inArray(games.status, [...RUNNING_GAME_STATUSES]),
+        isNotNull(games.publishedAt),
+        eq(users.status, 'active'),
+        eq(users.isBanned, false),
+      ),
+    )
+    .orderBy(gameSessions.id);
+  const created: NotificationRow[] = [];
+  for (const { id } of due) {
+    try {
+      const row = await remindUnpinned(deps, id, now);
+      if (row) {
+        emitNotificationsNew(deps, [row]);
+        created.push(row);
+      }
+    } catch (err) {
+      if (isTransientDbError(err)) throw err;
+      console.error(`reminders: unpinned session ${id} failed`, err);
+    }
+  }
+  return created;
+}
+
+async function remindUnpinned(
+  deps: AppDeps,
+  sessionId: number,
+  now: Date,
+): Promise<NotificationRow | null> {
+  return deps.db.transaction(async (tx) => {
+    const [r] = await tx
+      .select({ s: gameSessions, gameId: games.id, title: games.title, gmUserId: games.gmUserId })
+      .from(gameSessions)
+      .innerJoin(games, eq(games.id, gameSessions.gameId))
+      .where(eq(gameSessions.id, sessionId));
+    if (!r) return null;
+    // Порядок блокувань як у діях майстра: гра (FOR SHARE) → сесія (FOR UPDATE).
+    await tx.select({ id: games.id }).from(games).where(eq(games.id, r.gameId)).for('share');
+    const [s] = await tx
+      .select()
+      .from(gameSessions)
+      .where(
+        and(
+          eq(gameSessions.id, sessionId),
+          eq(gameSessions.status, 'scheduled'),
+          isNotNull(gameSessions.startWindowMinutes),
+          isNull(gameSessions.unpinnedRemindedAt),
+          gt(gameSessions.startsAt, now),
+        ),
+      )
+      .for('update');
+    if (!s) return null;
+    await tx
+      .update(gameSessions)
+      .set({ unpinnedRemindedAt: now })
+      .where(eq(gameSessions.id, sessionId));
+    return createNotification(deps, tx, {
+      userId: r.gmUserId,
+      type: 'session.time_unpinned',
+      category: 'sessions',
+      params: {
+        gameId: r.gameId,
+        gameTitle: r.title,
+        sessionId,
+        startsAt: s.startsAt.toISOString(),
+        startWindowMinutes: s.startWindowMinutes,
+      },
+      entityType: 'session',
+      entityId: sessionId,
+    });
   });
 }

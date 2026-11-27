@@ -79,6 +79,8 @@ export const games = mysqlTable(
     kind: mysqlEnum('kind', GAME_KINDS).notNull(),
     startsAt: datetime('starts_at'),
     durationMinutes: smallint('duration_minutes').notNull(),
+    /** Вікно початку сесій правила, хв (30..720, крок 30); `NULL` — точний час. */
+    startWindowMinutes: smallint('start_window_minutes'),
     recurrence: mysqlEnum('recurrence', RECURRENCES).notNull().default('none'),
     weekdays: json('weekdays')
       .$type<Weekday[]>()

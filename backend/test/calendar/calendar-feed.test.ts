@@ -12,6 +12,7 @@ import {
   users,
 } from '../../src/db/schema/index.js';
 import { escapeIcsText, foldIcsLine } from '../../src/calendar/ics.js';
+import { renderCalendarFeed } from '../../src/calendar/calendar-feed.service.js';
 import { CAL_FEED_TOKEN_MAX } from '../../src/http/security.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
@@ -248,6 +249,43 @@ describe('GET /api/cal/<token>.ics', () => {
     expect(after!.sequence).toBeGreaterThan(before!.sequence);
     expect(before!.sequence).toBeGreaterThanOrEqual(0);
     expect(after!.start).not.toBe(before!.start);
+  });
+
+  it('approximate time: DTSTART = window start, DTEND = window end + duration, marked summary', async () => {
+    const me = await userWithAge(25, 'me');
+    const g = await game(me, { title: 'Вікно' });
+    // Цілі хвилини: `starts_at` — DATETIME без дробу.
+    const start = new Date(Math.floor((Date.now() + 2 * DAY) / 60_000) * 60_000);
+    await session(g, start, { startWindowMinutes: 120 });
+    await session(g, new Date(start.getTime() + DAY));
+    const { path } = await enable(me);
+    const text = (await fetchFeed(path)).text;
+    const unfolded = text.replace(/\r\n[ \t]/g, '');
+    const stamp = (d: Date) =>
+      d
+        .toISOString()
+        .replace(/\.\d{3}Z$/, 'Z')
+        .replace(/[-:]/g, '');
+    expect(unfolded).toContain(`DTSTART:${stamp(start)}`);
+    // Кінець вікна (+120) + тривалість (180).
+    expect(unfolded).toContain(`DTEND:${stamp(new Date(start.getTime() + 300 * 60_000))}`);
+    expect(unfolded).toContain('SUMMARY:Вікно (час уточнюється)');
+    expect(parseFeed(text).map((e) => e.summary)).toEqual(['Вікно (час уточнюється)', 'Вікно']);
+  });
+
+  it('approximate time across the spring DST switch: DTEND in UTC ms', async () => {
+    const me = await userWithAge(25, 'me');
+    const g = await game(me, { title: 'Ніч' });
+    // Київ, 28.03.2027: 03:00 EET → 04:00 EEST. Вікно 02:00 EET (00:00 UTC) + 180 хв, сесія 60 хв.
+    await session(g, new Date('2027-03-28T00:00:00.000Z'), {
+      startWindowMinutes: 180,
+      durationMinutes: 60,
+    });
+    const { token } = await enable(me);
+    const text = (await renderCalendarFeed(deps, `${token}.ics`, new Date('2027-03-20T00:00Z')))!;
+    const [ev] = parseFeed(text);
+    expect(ev!.start).toBe('2027-03-28T00:00:00.000Z');
+    expect(ev!.end).toBe('2027-03-28T04:00:00.000Z');
   });
 
   it('reissue: old token 404, new 200; DELETE → 404; unknown → 404', async () => {

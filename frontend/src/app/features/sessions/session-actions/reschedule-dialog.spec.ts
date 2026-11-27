@@ -11,6 +11,7 @@ const session: SessionDto = {
   gameId: 3,
   startsAt: '2027-03-09T00:00:00.000Z',
   durationMinutes: 180,
+  startWindowMinutes: null,
   status: 'scheduled',
   origin: 'rule',
   rescheduled: false,

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { SeenState } from './views.js';
+import { startWindowMinutesSchema } from './games.js';
+import type { OneOffCandidateDto, CommonTimesParticipantDto } from './scheduling.js';
 
 export const SESSION_STATUSES = ['scheduled', 'done', 'cancelled'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
@@ -61,9 +63,17 @@ const startsAt = z.iso
 
 const durationMinutes = z.number().int().min(30).max(720).multipleOf(30);
 
-/** Тіло `POST /api/sessions/:id/reschedule`. */
+/**
+ * Тіло `POST /api/sessions/:id/reschedule`. `startWindowMinutes` — вікно початку від `startsAt`
+ * (`null` — точний час; без поля — лишається поточне). «Уточнити час» сесії з вікном —
+ * перенесення на точний `startsAt` з `startWindowMinutes: null`.
+ */
 export const rescheduleSessionInputSchema = z
-  .object({ startsAt, durationMinutes: durationMinutes.optional() })
+  .object({
+    startsAt,
+    durationMinutes: durationMinutes.optional(),
+    startWindowMinutes: startWindowMinutesSchema.optional(),
+  })
   .strict();
 export type RescheduleSessionInput = z.input<typeof rescheduleSessionInputSchema>;
 
@@ -96,6 +106,11 @@ export interface SessionDto {
   gameId: number;
   startsAt: string;
   durationMinutes: number;
+  /**
+   * Приблизний час: сесія почнеться між `startsAt` і `startsAt` + стільки хвилин; `null` —
+   * точний час (див. `START_WINDOW_MIN`).
+   */
+  startWindowMinutes: number | null;
   status: SessionStatus;
   origin: SessionOrigin;
   rescheduled: boolean;
@@ -111,4 +126,24 @@ export interface SessionDto {
   rsvpSummary: SessionRsvpSummary | null;
   /** Стан перегляду сесії глядачем (майстер чи активний учасник). */
   seen: SeenState;
+}
+
+/**
+ * `GET /api/sessions/:id/window-slots` (лише майстер гри, сесія `scheduled`): підказка, коли
+ * саме почати сесію з приблизним часом. Для кожного 30-хв старту у вікні (від `startsAt` до
+ * `startsAt` + `startWindowMinutes` включно, лише в майбутньому; без вікна — один старт)
+ * — хто з учасників може на всю тривалість сесії, хто ні, про кого невідомо (той самий
+ * підбір, що й у спільному часі). Нічого не змінює — уточнює час майстер перенесенням.
+ */
+export interface SessionWindowSlotsDto {
+  sessionId: number;
+  /** Початок вікна (ISO UTC). */
+  startsAt: string;
+  startWindowMinutes: number | null;
+  timezone: string;
+  durationMinutes: number;
+  participants: CommonTimesParticipantDto[];
+  noCalendars: boolean;
+  /** У хронологічному порядку; `statuses` — у порядку `participants`. */
+  slots: OneOffCandidateDto[];
 }

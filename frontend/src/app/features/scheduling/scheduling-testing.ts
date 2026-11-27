@@ -98,6 +98,7 @@ export function session(patch: Partial<SessionDto> = {}): SessionDto {
     gameId: 7,
     startsAt: '2030-03-07T17:00:00.000Z',
     durationMinutes: 240,
+    startWindowMinutes: null,
     status: 'scheduled',
     origin: 'rule',
     rescheduled: false,

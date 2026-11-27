@@ -13,6 +13,7 @@ import {
 } from './sessions.service.js';
 import { setRsvp } from './rsvp.js';
 import { getSessionAlternatives } from '../scheduling/reschedule.service.js';
+import { getSessionWindowSlots } from './start-window.js';
 
 /** Монтується на `/api/games/:id`: список сесій гри. */
 export function gameSessionsRouter(deps: AppDeps): Router {
@@ -49,6 +50,10 @@ export function sessionsRouter(deps: AppDeps): Router {
   // Розумне перенесення: альтернативи на тижні сесії (лише майстер).
   router.get('/:id/alternatives', auth, requireActive, async (req, res) => {
     res.json(await getSessionAlternatives(deps, req.user!.userId, numericId(req.params.id)));
+  });
+  // Приблизний час: хто може на кожен 30-хв старт у вікні (лише майстер).
+  router.get('/:id/window-slots', auth, requireActive, async (req, res) => {
+    res.json(await getSessionWindowSlots(deps, req.user!.userId, numericId(req.params.id)));
   });
   router.put('/:id/rsvp', auth, requireActive, async (req, res) => {
     const id = numericId(req.params.id);
