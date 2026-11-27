@@ -111,6 +111,8 @@ function ruleFor(ev: EventRow): Rule | null {
   // Автоскасування сесій разом із грою (завершення, скасування, нове правило) не сповіщають
   // окремо: учасники вже отримують сповіщення про саму гру — інакше по одному на кожну сесію.
   if (ev.type === 'session.cancelled' && p.auto === true) return null;
+  // Майстер уточнив час сесії, що вже почалась чи минула, — учасникам це вже не новина.
+  if (ev.type === 'session.rescheduled' && p.pastPin === true) return null;
   // Відкликання одразу після подання (див. `withdrawApplication`) майстра не турбує.
   if (ev.type === 'application.withdrawn' && p.quick === true) return null;
   // Голосування закрилось разом із грою (завершення/скасування) — майстру підсумок не потрібен.

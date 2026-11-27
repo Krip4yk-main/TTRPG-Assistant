@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 import { toZoned, zonedToUtc, type GameDto, type SessionDto } from '@nri/shared';
 import { createApp } from '../../src/app.js';
 import {
@@ -12,6 +12,7 @@ import {
 import { runDispatch } from '../../src/notifications/dispatcher.js';
 import { sendReminders, sendUnpinnedReminders } from '../../src/notifications/reminders.js';
 import { getSessionWindowSlots } from '../../src/sessions/start-window.js';
+import { gameBusyIntervals } from '../../src/calendar/game-busy.service.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
 
@@ -218,21 +219,136 @@ describe('approximate start time: start / finish guards', () => {
     expect(res.body.error.details).toEqual({ sessionId: s1!.id });
   });
 
-  it('finish of a windowed session → 409; after pinning it finishes', async () => {
+  it('finish of a windowed session → 409; pin to a past time inside the window, then finish', async () => {
+    // Вікно 19:00–21:00 уже минуло (почалось 4 год тому); зіграли о 19:30, уточнюють «о 23:00».
     const { gm, gameId } = await windowed();
+    const p = await userWithAge(25, 'p');
+    await join(gm, gameId, p);
     const [s1] = await rows(gameId);
-    const past = new Date(Math.floor((Date.now() - 3 * HOUR) / MIN) * MIN);
-    await db.update(gameSessions).set({ startsAt: past }).where(eq(gameSessions.id, s1!.id));
+    // «Буду» — ще до сесії.
+    await ok(call('put', `/api/sessions/${s1!.id}/rsvp`, p.cookie, { status: 'going' }));
+    const windowStart = new Date(Math.floor((Date.now() - 4 * HOUR) / MIN) * MIN);
+    await db.update(gameSessions).set({ startsAt: windowStart }).where(eq(gameSessions.id, s1!.id));
     const body = { attendance: [], summary: null };
     const res = await call('post', `/api/sessions/${s1!.id}/finish`, gm.cookie, body);
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('SESSION_TIME_APPROXIMATE');
-    // Уточнили (напряму в БД — минулий час перенесенням не задати).
+    expect(res.body).toEqual({
+      error: { code: 'SESSION_TIME_APPROXIMATE', details: { sessionId: s1!.id } },
+    });
+    // Минулий час поза вікном чи без уточнення (вікно лишається) — як і раніше, 422.
+    const pin = (at: Date, extra: Record<string, unknown> = { startWindowMinutes: null }) =>
+      call('post', `/api/sessions/${s1!.id}/reschedule`, gm.cookie, {
+        startsAt: at.toISOString(),
+        ...extra,
+      });
+    expect((await pin(new Date(windowStart.getTime() - 30 * MIN))).status).toBe(422);
+    expect((await pin(new Date(windowStart.getTime() + 150 * MIN))).status).toBe(422);
+    expect((await pin(new Date(windowStart.getTime() + 30 * MIN), {})).status).toBe(422);
+    // 19:30 — усередині вікна, хоч і в минулому.
+    const played = new Date(windowStart.getTime() + 30 * MIN);
+    const pinned = await ok<SessionDto>(pin(played));
+    expect(pinned).toMatchObject({ startsAt: played.toISOString(), startWindowMinutes: null });
+    // Уточнення вже зіграного часу: RSVP лишаються, учасникам сповіщення немає.
+    const [rsvp] = await ok<SessionDto[]>(call('get', `/api/games/${gameId}/sessions`, p.cookie));
+    expect(rsvp!.myRsvp).toBe('going');
+    const [ev] = await db.select().from(events).where(eq(events.type, 'session.rescheduled'));
+    expect(ev!.payload).toMatchObject({ pastPin: true, fromWindowMinutes: 120 });
+    await runDispatch(deps);
+    expect(await notesOf(p.id, 'session.rescheduled')).toHaveLength(0);
+    await ok(call('post', `/api/sessions/${s1!.id}/finish`, gm.cookie, body));
+  });
+
+  it('start is allowed once the nearest window is pinned in progress; a passed window is skipped', async () => {
+    const { gm, gameId } = await windowed();
+    const [s1, s2] = await rows(gameId);
+    // Вікно першої сесії йде зараз (почалось годину тому): уточнили на «пів години тому».
+    const windowStart = new Date(Math.floor((Date.now() - HOUR) / MIN) * MIN);
+    await db.update(gameSessions).set({ startsAt: windowStart }).where(eq(gameSessions.id, s1!.id));
+    await ok(
+      call('post', `/api/sessions/${s1!.id}/reschedule`, gm.cookie, {
+        startsAt: new Date(windowStart.getTime() + 30 * MIN).toISOString(),
+        startWindowMinutes: null,
+      }),
+    );
+    // Найближча тепер — друга (з вікном): уточнена перша вже почалась і не рахується.
+    const res = await call('post', `/api/games/${gameId}/start`, gm.cookie);
+    expect(res.body.error.details).toEqual({ sessionId: s2!.id });
+    // Вікно, що вже повністю минуло (незавершена сесія з вікном), — пропускається.
+    await db
+      .update(gameSessions)
+      .set({ startsAt: new Date(Math.floor((Date.now() - 5 * HOUR) / MIN) * MIN) })
+      .where(eq(gameSessions.id, s2!.id));
     await db
       .update(gameSessions)
       .set({ startWindowMinutes: null })
-      .where(eq(gameSessions.id, s1!.id));
-    await ok(call('post', `/api/sessions/${s1!.id}/finish`, gm.cookie, body));
+      .where(and(eq(gameSessions.gameId, gameId), gt(gameSessions.startsAt, new Date())));
+    await ok(call('post', `/api/games/${gameId}/start`, gm.cookie));
+  });
+
+  it('oneshot finish with a windowed session → 409; after pinning the game finishes', async () => {
+    const gm = await userWithAge(30, 'gm');
+    const gameId = await createGame(
+      gm.cookie,
+      {
+        kind: 'oneshot',
+        recurrence: 'none',
+        weekdays: [],
+        startsAt: kyivAt(3).startsAt,
+        startWindowMinutes: 60,
+      },
+      true,
+    );
+    const [s] = await rows(gameId);
+    expect(s!.startWindowMinutes).toBe(60);
+    // Старт заблоковано вікном — гра «йде» напряму в БД.
+    await db.update(games).set({ status: 'started' }).where(eq(games.id, gameId));
+    const res = await call('post', `/api/games/${gameId}/finish`, gm.cookie);
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: { code: 'SESSION_TIME_APPROXIMATE', details: { sessionId: s!.id } },
+    });
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.status).toBe('started');
+    expect((await rows(gameId))[0]!.status).toBe('scheduled');
+    await ok(
+      call('post', `/api/sessions/${s!.id}/reschedule`, gm.cookie, {
+        startsAt: s!.startsAt.toISOString(),
+        startWindowMinutes: null,
+      }),
+    );
+    await ok(call('post', `/api/games/${gameId}/finish`, gm.cookie));
+    expect((await rows(gameId))[0]!.status).toBe('done');
+  });
+});
+
+describe('approximate start time: busy intervals of other games', () => {
+  it('windowed sessions and windowed virtual rule slots are busy until window end + duration', async () => {
+    const { gm, gameId } = await windowed({ durationMinutes: 180 });
+    const r = await rows(gameId);
+    const from = new Date(Date.now());
+    const to = new Date(Date.now() + 60 * DAY);
+    const busy = await gameBusyIntervals(deps, gm.id, from, to);
+    const real = busy.filter((b) => b.sessionId !== null);
+    expect(real).toHaveLength(r.length);
+    for (const b of real) {
+      expect(b.end.getTime() - b.start.getTime()).toBe((120 + 180) * MIN);
+    }
+    const virtual = busy.filter((b) => b.sessionId === null);
+    expect(virtual.length).toBeGreaterThan(0);
+    for (const b of virtual) {
+      expect(b.end.getTime() - b.start.getTime()).toBe((120 + 180) * MIN);
+    }
+    // Точна (уточнена) сесія — лише тривалість.
+    await ok(
+      call('post', `/api/sessions/${r[0]!.id}/reschedule`, gm.cookie, {
+        startsAt: r[0]!.startsAt.toISOString(),
+        startWindowMinutes: null,
+      }),
+    );
+    const [first] = (await gameBusyIntervals(deps, gm.id, from, to)).filter(
+      (b) => b.sessionId === r[0]!.id,
+    );
+    expect(first!.end.getTime() - first!.start.getTime()).toBe(180 * MIN);
   });
 });
 

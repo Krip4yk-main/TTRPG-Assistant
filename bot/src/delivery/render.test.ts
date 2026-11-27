@@ -246,6 +246,17 @@ describe('renderNotification', () => {
     expect(text).toContain('початок між 02:00 і 06:00');
   });
 
+  it('approximate time across midnight: the end is «наступного дня»', () => {
+    // 22:00 за Києвом (20:00 UTC) + 240 хв = 02:00 наступного дня.
+    const text = render('session.reminder', {
+      ...base,
+      startsAt: '2026-11-27T20:00:00.000Z',
+      startWindowMinutes: 240,
+      offsetMin: 60,
+    }).text;
+    expect(text).toContain('пт, 27 листопада, початок між 22:00 і 02:00 наступного дня');
+  });
+
   it('session.rescheduled shows old and new time; cancelled shows the reason', () => {
     const r = render('session.rescheduled');
     expect(r.text).toContain('18:30');

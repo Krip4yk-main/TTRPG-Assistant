@@ -26,6 +26,7 @@ export const REMINDER_GRACE_MS = 15 * 60_000;
 
 const MIN = 60_000;
 const RUNNING_GAME_STATUSES = ['recruiting', 'started'] as const;
+const RUNNING = new Set<string>(RUNNING_GAME_STATUSES);
 
 type SessionCandidate = {
   id: number;
@@ -280,14 +281,30 @@ async function remindUnpinned(
   now: Date,
 ): Promise<NotificationRow | null> {
   return deps.db.transaction(async (tx) => {
-    const [r] = await tx
-      .select({ s: gameSessions, gameId: games.id, title: games.title, gmUserId: games.gmUserId })
+    const [ref] = await tx
+      .select({ gameId: gameSessions.gameId })
       .from(gameSessions)
-      .innerJoin(games, eq(games.id, gameSessions.gameId))
       .where(eq(gameSessions.id, sessionId));
-    if (!r) return null;
-    // Порядок блокувань як у діях майстра: гра (FOR SHARE) → сесія (FOR UPDATE).
-    await tx.select({ id: games.id }).from(games).where(eq(games.id, r.gameId)).for('share');
+    if (!ref) return null;
+    // Порядок блокувань як у діях майстра: гра (FOR SHARE) → сесія (FOR UPDATE). Під
+    // блокуванням — ті самі умови, що й у вибірці (гра йде, майстер активний).
+    const [r] = await tx
+      .select({
+        gameId: games.id,
+        title: games.title,
+        gmUserId: games.gmUserId,
+        status: games.status,
+        publishedAt: games.publishedAt,
+      })
+      .from(games)
+      .where(eq(games.id, ref.gameId))
+      .for('share');
+    if (!r || !RUNNING.has(r.status) || r.publishedAt === null) return null;
+    const [gm] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, r.gmUserId), eq(users.status, 'active'), eq(users.isBanned, false)));
+    if (!gm) return null;
     const [s] = await tx
       .select()
       .from(gameSessions)
@@ -298,6 +315,7 @@ async function remindUnpinned(
           isNotNull(gameSessions.startWindowMinutes),
           isNull(gameSessions.unpinnedRemindedAt),
           gt(gameSessions.startsAt, now),
+          lte(gameSessions.startsAt, new Date(now.getTime() + UNPINNED_REMINDER_BEFORE_MS)),
         ),
       )
       .for('update');

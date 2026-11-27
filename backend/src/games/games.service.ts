@@ -805,16 +805,22 @@ async function activeCount(tx: Tx, gameId: number): Promise<number> {
 
 /**
  * «Завершити гру» для ваншота завершує й його єдину сесію (`scheduled` → `done`). Сесію,
- * якої ще немає (гру опубліковано до матеріалізації), спершу створюємо з правила.
+ * якої ще немає (гру опубліковано до матеріалізації), спершу створюємо з правила. Сесія з
+ * приблизним часом → 409 `SESSION_TIME_APPROXIMATE` (спершу уточнити час).
  */
 async function finishOneshotSession(tx: Tx, row: GameRow, now: Date): Promise<number[]> {
   await materializeForRow(tx, row, now, row.startsAt ?? undefined);
   const open = await tx
-    .select({ id: gameSessions.id })
+    .select({ id: gameSessions.id, startWindowMinutes: gameSessions.startWindowMinutes })
     .from(gameSessions)
     .where(and(eq(gameSessions.gameId, row.id), eq(gameSessions.status, 'scheduled')))
     .for('update');
   if (open.length === 0) return [];
+  // Сесію з приблизним часом не завершити, доки майстер не уточнить час (як `finishSession`).
+  const approximate = open.find((s) => s.startWindowMinutes !== null);
+  if (approximate) {
+    throw new AppError(409, 'SESSION_TIME_APPROXIMATE', { sessionId: approximate.id });
+  }
   const ids = open.map((s) => s.id);
   await tx
     .update(gameSessions)

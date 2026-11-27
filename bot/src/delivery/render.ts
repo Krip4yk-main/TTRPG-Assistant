@@ -75,7 +75,8 @@ const MINUTE_MS = 60_000;
 
 /**
  * Час сесії для тексту: з вікном початку (`windowMinutes`) — `пт, 28 листопада, початок між
- * 19:00 і 21:00` (шаблон `notify.window`; кінець вікна — у UTC-мілісекундах, тож перехід на
+ * 19:00 і 21:00` (шаблон `notify.window`, через північ — `notify.window_overnight` з «наступного
+ * дня»; кінець вікна — у UTC-мілісекундах, тож перехід на
  * літній час його не зсуває), без вікна — як `formatWhen`. Зіпсована дата — `null`.
  */
 export function formatWhenWindow(
@@ -89,8 +90,12 @@ export function formatWhenWindow(
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const end = new Date(d.getTime() + windowMinutes * MINUTE_MS);
-  const render = (zone: string) =>
-    t('notify.window', { date: dateIn(d, zone), start: timeIn(d, zone), end: timeIn(end, zone) });
+  // Вікно через північ (≤ 12 год — кінець щонайбільше наступного дня): «… наступного дня».
+  const render = (zone: string) => {
+    const date = dateIn(d, zone);
+    const key = dateIn(end, zone) === date ? 'notify.window' : 'notify.window_overnight';
+    return t(key, { date, start: timeIn(d, zone), end: timeIn(end, zone) });
+  };
   try {
     return render(timeZone);
   } catch {

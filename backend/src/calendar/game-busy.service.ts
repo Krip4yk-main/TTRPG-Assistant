@@ -1,5 +1,11 @@
 import { and, asc, eq, exists, gt, inArray, isNull, lt, max, or, sql } from 'drizzle-orm';
-import { expandOccurrences, type GameBusyDto, type PinnedGamesDto } from '@nri/shared';
+import {
+  expandOccurrences,
+  START_WINDOW_MAX,
+  windowEnd,
+  type GameBusyDto,
+  type PinnedGamesDto,
+} from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
   calendarPinnedGames,
@@ -12,8 +18,11 @@ import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
 
 const MINUTE_MS = 60_000;
-/** Найдовша сесія (`durationMinutes ≤ 720`): межа SQL-префільтра за `starts_at`. */
-const MAX_SESSION_MS = 720 * MINUTE_MS;
+/**
+ * Найдовша зайнятість від сесії: тривалість ≤ 720 хв плюс вікно початку ≤ 720 хв — межа
+ * SQL-префільтра за `starts_at`.
+ */
+const MAX_SESSION_MS = (720 + START_WINDOW_MAX) * MINUTE_MS;
 
 /** Зайнятий проміжок від гри (внутрішня форма `GameBusyDto`). */
 export interface GameBusy {
@@ -115,6 +124,7 @@ export async function gameBusyIntervalsForUsers(
         gameId: gameSessions.gameId,
         startsAt: gameSessions.startsAt,
         durationMinutes: gameSessions.durationMinutes,
+        startWindowMinutes: gameSessions.startWindowMinutes,
       })
       .from(gameSessions)
       .where(
@@ -137,7 +147,10 @@ export async function gameBusyIntervalsForUsers(
   const byId = new Map(mine.map((g) => [g.id, g]));
   const perGame = new Map<number, GameBusy[]>(gameIds.map((id) => [id, []]));
   for (const s of sessions) {
-    const end = new Date(s.startsAt.getTime() + s.durationMinutes * MINUTE_MS);
+    // Приблизний час: зайнято від початку вікна до кінця вікна + тривалість.
+    const end = new Date(
+      windowEnd(s.startsAt, s.startWindowMinutes).getTime() + s.durationMinutes * MINUTE_MS,
+    );
     if (end <= from) continue;
     perGame.get(s.gameId)!.push({
       gameId: s.gameId,
@@ -153,8 +166,10 @@ export async function gameBusyIntervalsForUsers(
     if (g.startsAt === null) continue;
     const after = last.get(g.id) ?? null;
     const duration = g.durationMinutes * MINUTE_MS;
+    // Вікно початку правила: віртуальний слот зайнятий до кінця вікна + тривалість.
+    const windowMs = (g.startWindowMinutes ?? 0) * MINUTE_MS;
     // Віртуальні слоти — лише ті, що ще не закінчились і йдуть після матеріалізованих.
-    const lower = Math.max(from.getTime(), now.getTime()) - duration;
+    const lower = Math.max(from.getTime(), now.getTime()) - duration - windowMs;
     const occ = expandOccurrences(
       {
         startsAt: g.startsAt.toISOString(),
@@ -173,7 +188,7 @@ export async function gameBusyIntervalsForUsers(
         gameTitle: g.title,
         sessionId: null,
         start: o.start,
-        end: o.end,
+        end: new Date(o.end.getTime() + windowMs),
       });
     }
   }

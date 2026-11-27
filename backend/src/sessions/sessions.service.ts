@@ -7,6 +7,7 @@ import {
   summaryExcerpt,
   type SeenState,
   type SessionDto,
+  windowEnd,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import type { Tx } from '../applications/applications.rules.js';
@@ -188,7 +189,9 @@ async function afterGmSessionChange(
 /**
  * Перенесення: новий час (ціла хвилина, у майбутньому), за бажанням — тривалість і вікно
  * початку (`startWindowMinutes`; без поля — лишається поточне, `null` — точний час). «Уточнити
- * час» сесії з вікном — це перенесення на точний час. Нагадування майстру уточнити час
+ * час» сесії з вікном — це перенесення на точний час; він може бути будь-яким усередині вікна,
+ * навіть минулим (тоді RSVP лишаються, а учасники не отримують сповіщення — подія з
+ * `pastPin`). Нагадування майстру уточнити час
  * (`session.time_unpinned`) після перенесення — знову за новим часом.
  */
 export async function rescheduleSession(
@@ -201,9 +204,17 @@ export async function rescheduleSession(
   const g = await loadForGm(deps, userId, sessionId);
   const now = new Date();
   const startsAt = new Date(input.startsAt);
-  if (startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
-  const from = await deps.db.transaction(async (tx) => {
+  const { from, pastPin } = await deps.db.transaction(async (tx) => {
     const { session } = await lockScheduled(tx, g.id, sessionId);
+    // Уточнення часу (вікно → точний) — будь-який момент усередині вікна, навіть якщо вікно
+    // вже почалось чи минуло (сесію зіграли, а час уточнюють потім); інакше — лише майбутнє.
+    const pinInWindow =
+      input.startWindowMinutes === null &&
+      session.startWindowMinutes !== null &&
+      startsAt >= session.startsAt &&
+      startsAt <= windowEnd(session.startsAt, session.startWindowMinutes);
+    if (startsAt <= now && !pinInWindow) throw new AppError(422, 'GAME_IN_PAST');
+    const pastPin = startsAt <= now;
     await tx
       .update(gameSessions)
       .set({
@@ -217,9 +228,12 @@ export async function rescheduleSession(
       })
       .where(eq(gameSessions.id, sessionId));
     // RSVP відповідали на старий час — після перенесення учасники відповідають наново.
-    await tx.delete(sessionRsvp).where(eq(sessionRsvp.sessionId, sessionId));
-    await clearRsvpDeclines(tx, sessionId);
-    return session;
+    // Уточнення вже зіграного (почалось) часу — лише запис факту: RSVP лишаються.
+    if (!pastPin) {
+      await tx.delete(sessionRsvp).where(eq(sessionRsvp.sessionId, sessionId));
+      await clearRsvpDeclines(tx, sessionId);
+    }
+    return { from: session, pastPin };
   });
   await logEvent(deps.db, {
     type: 'session.rescheduled',
@@ -235,6 +249,8 @@ export async function rescheduleSession(
       fromWindowMinutes: from.startWindowMinutes,
       startWindowMinutes:
         input.startWindowMinutes !== undefined ? input.startWindowMinutes : from.startWindowMinutes,
+      // Уточнення часу, що вже настав: учасників не сповіщаємо (сесія вже йде чи минула).
+      ...(pastPin ? { pastPin: true } : {}),
     },
   });
   await afterGmSessionChange(deps, userId, g.id, sessionId);

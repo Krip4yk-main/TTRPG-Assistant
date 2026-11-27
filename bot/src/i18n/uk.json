@@ -120,6 +120,7 @@
     "unknownGame": "без назви",
     "unknownTime": "невідомий час",
     "window": "{date}, початок між {start} і {end}",
+    "window_overnight": "{date}, початок між {start} і {end} наступного дня",
     "someone": "Хтось",
     "offset": {
       "15": "за 15 хвилин",
