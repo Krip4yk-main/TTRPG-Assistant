@@ -280,7 +280,7 @@ describe('MyApplications', () => {
     });
 
     it('shows «updated» badges and marks them viewed', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         await create(list.map((a) => (a.id === 3 ? { ...a, seen: 'updated' as const } : a)));
         expect(card$(3).querySelector('.nri-seen-badge')!.textContent).toContain(

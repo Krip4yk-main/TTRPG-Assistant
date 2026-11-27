@@ -407,7 +407,7 @@ describe('GameApplications', () => {
     });
 
     it('shows «new» on unseen applications and marks them viewed', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         await create([member('m1')], [rejected, { ...pending, seen: 'new' }]);
         expect(card(pending.id).querySelector('.nri-seen-badge')!.textContent).toContain(

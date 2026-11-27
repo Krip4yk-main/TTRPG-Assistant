@@ -96,7 +96,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('клік по аркушу: спершу анімація відривання, потім перехід на гру', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     click(article(f).querySelector('.sys')!);
     f.detectChanges();
     expect(article(f).classList).toContain('qb-tearing');
@@ -108,7 +108,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('подвійний клік — один перехід', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     click(article(f));
     click(article(f));
     vi.advanceTimersByTime(TEAR_MS * 2);
@@ -117,7 +117,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('назва (і Enter на ній) — та сама анімація замість звичайного переходу посилання', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     const link = article(f).querySelector<HTMLAnchorElement>('h2 a')!;
     expect(link.getAttribute('href')).toBe('/games/7');
     const ev = click(link, { detail: 0 });
@@ -179,7 +179,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     outside.textContent = 'Заголовок сторінки';
     document.body.appendChild(outside);
     document.getSelection()!.selectAllChildren(outside);
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     click(article(f));
     vi.advanceTimersByTime(TEAR_MS);
     expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
@@ -198,7 +198,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
   it('два оголошення поспіль під час анімації — перехід лише на перше', async () => {
     const f = await mount();
     const other = await create(8);
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     click(article(f));
     click(article(other));
     vi.advanceTimersByTime(TEAR_MS * 2);
@@ -209,7 +209,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
 
   it('інший перехід під час анімації скасовує відривання й повертає аркуш', async () => {
     const f = await mount();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     click(article(f));
     // Справжній перехід деінде (маршрутів у тесті немає — він завершиться помилкою, але
     // NavigationStart уже прозвучить).

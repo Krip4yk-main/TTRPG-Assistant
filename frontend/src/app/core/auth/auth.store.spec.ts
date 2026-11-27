@@ -277,7 +277,7 @@ describe('AuthStore', () => {
     });
 
     it('5xx зберігає користувача; для revoked пробує перепідключити сокет', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] });
       try {
         await login();
         socket.connect.mockClear();
@@ -327,7 +327,7 @@ describe('AuthStore', () => {
     });
 
     it('5xx після connect_error не перепідключає сокет', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] });
       try {
         await login();
         socket.connect.mockClear();

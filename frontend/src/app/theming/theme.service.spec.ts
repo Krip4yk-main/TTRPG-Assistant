@@ -292,7 +292,7 @@ describe('ThemeService', () => {
     setup();
     auth.setMe(user);
     await service.init();
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       const done = choose('neon-signs');
       // Без vi.waitFor: з фальшивими таймерами він сам просуває час.
@@ -594,7 +594,7 @@ describe('ThemeService', () => {
       setup();
       auth.setMe(user);
       await service.init();
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         const done = choose('neon-signs');
         for (let i = 0; i < 50 && links().length < 2; i++) await Promise.resolve();
@@ -651,7 +651,7 @@ describe('ThemeService', () => {
         .setAttribute(THEME_LINK_SETTLED_ATTR, 'error');
       fontLoad.mockResolvedValue([]);
       auth.setMe(user);
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         let ready = false;
         const init = service.init().then(() => (ready = true));
@@ -668,7 +668,7 @@ describe('ThemeService', () => {
       setup();
       bootFromCache('night-city', 'theme-night-city.css?v=1');
       auth.setMe(user);
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         let ready = false;
         const init = service.init().then(() => (ready = true));

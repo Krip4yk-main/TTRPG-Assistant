@@ -489,7 +489,7 @@ describe('SessionsList', () => {
 
   describe('badges', () => {
     it('a member sees «new»/«updated» and the sessions are marked viewed', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
       try {
         await create(false, true, [
           { ...upcoming, seen: 'new' },
