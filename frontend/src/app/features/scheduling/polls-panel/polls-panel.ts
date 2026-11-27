@@ -40,6 +40,8 @@ import {
   type PollCreateDialogData,
 } from '../poll-create-dialog/poll-create-dialog';
 import { openSessionAlternatives } from '../session-alternatives-dialog/open-session-alternatives';
+import { openPinTime } from '../pin-time-dialog/open-pin-time';
+import { SessionsApi } from '../../../core/sessions/sessions.api';
 
 /** Гра для панелі: правило розкладу (для «Застосувати як розклад») і стан. */
 export type PollsPanelGame = ScheduleRuleDialogData['game'] & Pick<GameDto, 'status'>;
@@ -82,6 +84,7 @@ const DIALOG = {
 })
 export class PollsPanel implements PollsPanelHandle {
   private readonly api = inject(SchedulingApi);
+  private readonly sessionsApi = inject(SessionsApi);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
@@ -164,7 +167,8 @@ export class PollsPanel implements PollsPanelHandle {
         this.focus(`[data-poll-id="${id}"] h3`);
       });
     });
-    // `?session=` — майстру альтернативи сесії (посилання зі сповіщення «не буду»).
+    // `?session=` — майстру альтернативи сесії (посилання зі сповіщення «не буду»); сесії з
+    // приблизним часом (сповіщення «уточніть час») — «Уточнити час».
     effect(() => {
       const raw = this.sessionId();
       if (!raw) {
@@ -297,6 +301,18 @@ export class PollsPanel implements PollsPanelHandle {
   }
 
   private async alternatives(sessionId: number): Promise<void> {
+    // Те саме посилання веде й зі сповіщення «уточніть час»: спершу дізнаємось, чи час сесії
+    // приблизний (помилка — як раніше, альтернативи самі пояснять, що сесія вже не актуальна).
+    const slots = await firstValueFrom(this.sessionsApi.windowSlots(sessionId)).catch(() => null);
+    if (slots && slots.startWindowMinutes !== null) {
+      const pinned = await openPinTime(this.dialog, {
+        sessionId,
+        viewerTimezone: this.viewerZone(),
+        slots,
+      });
+      if (pinned) this.afterChange('sessions.done.pin');
+      return;
+    }
     const session: SessionDto | null = await openSessionAlternatives(this.dialog, {
       sessionId,
       viewerTimezone: this.viewerZone(),

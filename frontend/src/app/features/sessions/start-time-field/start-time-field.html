@@ -1,0 +1,78 @@
+<div class="start-time" role="group" [attr.aria-labelledby]="uid + '-label'">
+  <span class="group-label" [id]="uid + '-label'">{{ 'sessions.window.label' | translate }}</span>
+  <mat-button-toggle-group
+    class="mode"
+    hideSingleSelectionIndicator
+    [value]="approx()"
+    [disabled]="disabled()"
+    [attr.aria-labelledby]="uid + '-label'"
+    (change)="setMode($event.value)"
+  >
+    <mat-button-toggle class="mode-exact" [value]="false">{{
+      'sessions.window.exact' | translate
+    }}</mat-button-toggle>
+    <mat-button-toggle class="mode-approx" [value]="true">{{
+      'sessions.window.approx' | translate
+    }}</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  @if (!approx()) {
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ label() | translate }}</mat-label>
+      <input
+        matInput
+        class="time"
+        type="time"
+        step="60"
+        [formControl]="time()"
+        [required]="required()"
+      />
+      @if (hint(); as h) {
+        <mat-hint>{{ h }}</mat-hint>
+      }
+      @if (timeError(); as key) {
+        <mat-error>{{ key | translate }}</mat-error>
+      }
+    </mat-form-field>
+  } @else {
+    <div class="window">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'sessions.window.from' | translate }}</mat-label>
+        <select matNativeControl class="window-from" [formControl]="time()" [required]="required()">
+          @if (offGrid()) {
+            <option value=""></option>
+          }
+          @for (t of starts; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+        @if (timeError(); as key) {
+          <mat-error>{{ key | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'sessions.window.to' | translate }}</mat-label>
+        <select matNativeControl class="window-to" [formControl]="window()">
+          @for (o of ends(); track o.minutes) {
+            <option [ngValue]="o.minutes">
+              @if (o.time === null) {
+                {{ 'sessions.window.length' | translate: { h: hours(o.minutes) } }}
+              } @else {
+                {{
+                  (o.nextDay ? 'sessions.window.endNextDay' : 'sessions.window.end')
+                    | translate: { time: o.time, h: hours(o.minutes) }
+                }}
+              }
+            </option>
+          }
+        </select>
+      </mat-form-field>
+    </div>
+    <p class="nri-muted hint">
+      @if (hint(); as h) {
+        {{ h }}
+      }
+      {{ 'sessions.window.hint' | translate }}
+    </p>
+  }
+</div>

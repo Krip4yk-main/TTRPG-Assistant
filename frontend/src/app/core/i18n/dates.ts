@@ -11,6 +11,7 @@ import {
   toZoned,
   weekdayOf,
   zonedToUtc,
+  windowEnd,
   type Weekday,
 } from '@nri/shared';
 
@@ -96,13 +97,8 @@ export interface FormatDateTimeOptions {
   showZone?: boolean;
 }
 
-/** Момент часу для показу (`2 бер. 2027 р., 19:00`) у поясі `timeZone`. */
-export function formatDateTime(
-  iso: string,
-  timeZone: string | null | undefined,
-  { showZone = false }: FormatDateTimeOptions = {},
-): string {
-  const opts: Intl.DateTimeFormatOptions = showZone
+function dateTimeOptions(showZone: boolean): Intl.DateTimeFormatOptions {
+  return showZone
     ? {
         year: 'numeric',
         month: 'short',
@@ -112,14 +108,43 @@ export function formatDateTime(
         timeZoneName: 'short',
       }
     : { dateStyle: 'medium', timeStyle: 'short' };
+}
+
+/** Форматер `uk-UA` у поясі `timeZone`; невідомий пояс — пояс браузера. */
+function zonedFormat(timeZone: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
   try {
-    return new Intl.DateTimeFormat('uk-UA', { ...opts, timeZone: timeZone ?? undefined }).format(
-      new Date(iso),
-    );
+    return new Intl.DateTimeFormat('uk-UA', { ...opts, timeZone: timeZone ?? undefined });
   } catch {
-    // Невідомий пояс — показуємо в поясі браузера.
-    return new Intl.DateTimeFormat('uk-UA', opts).format(new Date(iso));
+    return new Intl.DateTimeFormat('uk-UA', opts);
   }
+}
+
+/** Момент часу для показу (`2 бер. 2027 р., 19:00`) у поясі `timeZone`. */
+export function formatDateTime(
+  iso: string,
+  timeZone: string | null | undefined,
+  { showZone = false }: FormatDateTimeOptions = {},
+): string {
+  return zonedFormat(timeZone, dateTimeOptions(showZone)).format(new Date(iso));
+}
+
+/**
+ * Час початку сесії: точний момент (як `formatDateTime`) або, якщо задано вікно початку
+ * (`windowMinutes`), проміжок «5 груд. 2026 р., 18:00–21:00» (через північ — з обома датами).
+ * Кінець вікна — у UTC-мілісекундах (`windowEnd`), тож перехід на літній час його не зсуває.
+ */
+export function formatWindow(
+  iso: string,
+  windowMinutes: number | null | undefined,
+  timeZone: string | null | undefined,
+  { showZone = false }: FormatDateTimeOptions = {},
+): string {
+  if (!windowMinutes) return formatDateTime(iso, timeZone, { showZone });
+  const start = new Date(iso);
+  return zonedFormat(timeZone, dateTimeOptions(showZone)).formatRange(
+    start,
+    windowEnd(start, windowMinutes),
+  );
 }
 
 /** Лише час (`19:00`) моменту `iso` у поясі `timeZone`. */

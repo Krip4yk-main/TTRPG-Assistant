@@ -976,6 +976,31 @@ describe('GameDetails', () => {
       expect(el().querySelector('.schedule-zone')!.textContent!.trim()).toBe('о 18:00');
     });
 
+    it('a windowed rule: schedule «between … and …», next session as a range with «TBD»', async () => {
+      vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
+      await open(null, (r) => r.flush({ ...game, startWindowMinutes: 180 }));
+      const tr = TestBed.inject(TranslateService);
+      tr.setTranslation(
+        'uk',
+        { games: { details: { scheduleWindow: 'між {{time}} і {{end}}' } } },
+        true,
+      );
+      tr.use('uk');
+      await settle();
+      expect(el().querySelector('.schedule-zone')!.textContent!.trim()).toBe('між 18:00 і 21:00');
+      expect(nextSessionText()).toContain('18:00–21:00');
+      expect(nextSessionText()).toContain('sessions.window.approxBadge');
+    });
+
+    it('a next session moved to another time of day is shown exactly', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, startWindowMinutes: 180, nextSessionAt: '2027-03-03T15:00:00.000Z' }),
+      );
+      expect(nextSessionText()).toContain('17:00');
+      expect(nextSessionText()).not.toContain('–');
+      expect(nextSessionText()).not.toContain('sessions.window.approxBadge');
+    });
+
     it('a draft without a start date: «date not set yet», weekdays without a time', async () => {
       await open(me, (r) => r.flush({ ...game, startsAt: null, nextSessionAt: null }));
       expect(nextSessionText()).toContain('games.my.noStartDate');

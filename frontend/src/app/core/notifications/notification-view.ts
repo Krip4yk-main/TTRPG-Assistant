@@ -5,7 +5,7 @@ import {
   type NotificationDto,
   type NotificationType,
 } from '@nri/shared';
-import { formatDateTime } from '../i18n/dates';
+import { formatDateTime, formatWindow } from '../i18n/dates';
 
 /** Коди причин (а не текст майстра), які бекенд кладе в `params.reason`. */
 export const NOTIFICATION_REASON_CODES = ['account_deleted'] as const;
@@ -74,7 +74,14 @@ export interface NotificationView {
   key: string;
   game: string | null;
   actor: string | null;
+  /** Початок сесії; з вікном початку — проміжок «5 груд. 2026 р., 18:00–21:00». */
   when: string | null;
+  /**
+   * `when` — приблизний час (вікно): у тексті — з позначкою «час уточнюється»
+   * (`notifications.approxTime`).
+   */
+  whenApprox: boolean;
+  /** Старий час перенесеної сесії; з вікном — проміжок, як `when`. */
   from: string | null;
   /** Ключ фрази «за годину» тощо (лише для нагадувань). */
   offset: Translatable | null;
@@ -126,8 +133,9 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     key: 'notifications.generic',
     game: p.gameTitle || null,
     actor: p.actor?.nickname || null,
-    when: p.startsAt ? formatDateTime(p.startsAt, timeZone) : null,
-    from: p.from ? formatDateTime(p.from, timeZone) : null,
+    when: p.startsAt ? formatWindow(p.startsAt, p.startWindowMinutes, timeZone) : null,
+    whenApprox: !!p.startsAt && !!p.startWindowMinutes,
+    from: p.from ? formatWindow(p.from, p.fromWindowMinutes, timeZone) : null,
     offset: null,
     reason: null,
     thanksKey: null,
@@ -192,6 +200,15 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
   if (n.type === 'session.summary') {
     view.excerpt = p.excerpt || null;
     view.icon = 'history_edu';
+  }
+  // Приблизний час: майстер уточнив час (вікно → точний) — окремий текст (як у боті).
+  if (n.type === 'session.rescheduled' && p.fromWindowMinutes && !p.startWindowMinutes) {
+    view.key = 'notifications.session.rescheduled_pinned';
+  }
+  // «Уточніть час» майстру: текст сам каже, що час приблизний.
+  if (n.type === 'session.time_unpinned') {
+    view.whenApprox = false;
+    view.icon = 'schedule';
   }
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {

@@ -297,7 +297,14 @@
           <dl class="facts nri-card">
             <div>
               <dt>{{ 'games.details.nextSession' | translate }}</dt>
-              <dd>{{ nextSession() ?? (noNextKey() | translate) }}</dd>
+              <dd>
+                {{ nextSession() ?? (noNextKey() | translate) }}
+                @if (nextSessionApprox()) {
+                  <span class="nri-muted approx"
+                    >· {{ 'sessions.window.approxBadge' | translate }}</span
+                  >
+                }
+              </dd>
             </div>
             <div>
               <dt>{{ 'games.details.duration' | translate }}</dt>
@@ -320,7 +327,8 @@
                       </ul>
                       @if (s.time) {
                         <span class="schedule-zone">{{
-                          'games.details.scheduleAt' | translate: s
+                          (s.end ? 'games.details.scheduleWindow' : 'games.details.scheduleAt')
+                            | translate: s
                         }}</span>
                       }
                     </dd>

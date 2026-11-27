@@ -15,12 +15,12 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import { localDate, type RescheduleSessionInput, type SessionDto } from '@nri/shared';
+import { localDate, windowEnd, type RescheduleSessionInput, type SessionDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import {
   differentZones,
-  formatDateTime,
+  formatWindow,
   fromIsoDate,
   provideUkDates,
   utcToZonedInput,
@@ -28,6 +28,7 @@ import {
 } from '../../../core/i18n/dates';
 import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { SESSION_DURATIONS } from '../session-durations';
+import { StartTimeField } from '../start-time-field/start-time-field';
 
 export interface RescheduleDialogData {
   session: SessionDto;
@@ -39,8 +40,10 @@ export interface RescheduleDialogData {
 
 /**
  * «Перенести сесію»: дата й час — місцевий час у поясі гри, перетворюється на UTC (ціла
- * хвилина); за бажанням — нова тривалість. Минулий час відхиляється біля поля без запиту.
- * Закривається з оновленою `SessionDto`.
+ * хвилина); точний час або вікно початку «з … до …»; за бажанням — нова тривалість. Минулий
+ * час відхиляється біля поля без запиту — крім уточнення (вікно → точний час) у межах
+ * поточного вікна, що вже почалось: тоді можна вказати й минулий момент, коли сесія
+ * фактично почалась. Закривається з оновленою `SessionDto`.
  */
 @Component({
   selector: 'nri-reschedule-dialog',
@@ -52,6 +55,7 @@ export interface RescheduleDialogData {
     MatFormFieldModule,
     MatInputModule,
     TranslatePipe,
+    StartTimeField,
   ],
   providers: [provideUkDates()],
   templateUrl: './reschedule-dialog.html',
@@ -77,7 +81,10 @@ export class RescheduleDialog {
       validators: [Validators.required],
     }),
     durationMinutes: new FormControl(this.data.session.durationMinutes, { nonNullable: true }),
+    startWindowMinutes: new FormControl<number | null>(this.data.session.startWindowMinutes),
   });
+  /** Знімок значень форми (контроли не сигнали) — для підписів «до» вікна. */
+  protected readonly value = signal(this.form.getRawValue());
 
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -93,6 +100,7 @@ export class RescheduleDialog {
     });
     this.updatePreview();
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.value.set(this.form.getRawValue());
       this.updatePreview();
     });
   }
@@ -116,13 +124,19 @@ export class RescheduleDialog {
       this.focus('input[aria-invalid="true"]');
       return;
     }
-    if (Date.parse(startsAt) <= Date.now()) {
+    if (
+      Date.parse(startsAt) <= Date.now() &&
+      !this.pinsInsideWindow(startsAt, v.startWindowMinutes)
+    ) {
       this.markPast();
       return;
     }
     const input: RescheduleSessionInput = { startsAt };
     if (v.durationMinutes !== this.data.session.durationMinutes) {
       input.durationMinutes = v.durationMinutes;
+    }
+    if (v.startWindowMinutes !== this.data.session.startWindowMinutes) {
+      input.startWindowMinutes = v.startWindowMinutes;
     }
     this.submitting.set(true);
     try {
@@ -136,6 +150,18 @@ export class RescheduleDialog {
       }
       this.submitting.set(false);
     }
+  }
+
+  /**
+   * Уточнення часу (вікно → точний) у межах поточного вікна сесії: сервер дозволяє й минулий
+   * момент (сесія вже почалась), RSVP учасників лишаються.
+   */
+  private pinsInsideWindow(startsAt: string, window: number | null): boolean {
+    const s = this.data.session;
+    if (window !== null || s.startWindowMinutes === null) return false;
+    const t = Date.parse(startsAt);
+    const start = new Date(s.startsAt);
+    return t >= start.getTime() && t <= windowEnd(start, s.startWindowMinutes).getTime();
   }
 
   /** Момент у минулому: помилка біля поля дати (mat-error, aria-invalid) і фокус на ньому. */
@@ -155,7 +181,9 @@ export class RescheduleDialog {
     const v = this.form.getRawValue();
     const iso = zonedInputToUtc(v.date, v.time, this.data.timezone);
     this.preview.set(
-      iso ? formatDateTime(iso, this.data.viewerTimezone, { showZone: true }) : null,
+      iso
+        ? formatWindow(iso, v.startWindowMinutes, this.data.viewerTimezone, { showZone: true })
+        : null,
     );
   }
 

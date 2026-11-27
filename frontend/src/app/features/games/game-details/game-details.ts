@@ -21,6 +21,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   isRestrictedGame,
+  windowEnd,
   type ApplicationConstraintDto,
   type GameChangeScope,
   type GameDto,
@@ -40,7 +41,13 @@ import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { RatingsApi } from '../../../core/ratings/ratings.api';
 import { SeoService } from '../../../core/seo/seo.service';
-import { formatDateTime, viewerTimeZone, weeklyInZone } from '../../../core/i18n/dates';
+import {
+  formatDateTime,
+  formatTime,
+  formatWindow,
+  viewerTimeZone,
+  weeklyInZone,
+} from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import {
   ConfirmDialog,
@@ -311,11 +318,22 @@ export class GameDetails {
       .map((id) => list.find((w) => w.id === id)?.slug)
       .filter((s): s is string => !!s);
   });
+  /**
+   * Найближча сесія має приблизний час правила: гра з вікном початку, а сесія — у час правила
+   * (місцевий час доби збігається з першою сесією; перенесена на інший час — уже не за
+   * правилом). Вікна самої сесії у відповіді гри немає — точно його показує список сесій.
+   */
+  protected readonly nextSessionApprox = computed(() => {
+    const g = this.game();
+    if (!g?.nextSessionAt || !g.startsAt || g.startWindowMinutes === null) return false;
+    return formatTime(g.nextSessionAt, g.timezone) === formatTime(g.startsAt, g.timezone);
+  });
   /** Найближча сесія — у поясі глядача, без назви поясу (як на картці пошуку). */
   protected readonly nextSession = computed(() => {
     const g = this.game();
     if (!g?.nextSessionAt) return null;
-    return formatDateTime(g.nextSessionAt, viewerTimeZone(this.auth.me()));
+    const window = this.nextSessionApprox() ? g.startWindowMinutes : null;
+    return formatWindow(g.nextSessionAt, window, viewerTimeZone(this.auth.me()));
   });
   /** Підпис, коли найближчої сесії немає: чернетка без дати — «Дату ще не визначено». */
   protected readonly noNextKey = computed(() =>
@@ -326,12 +344,23 @@ export class GameDetails {
    * переводяться кожен окремо (сесія може припасти на сусідній день).
    */
   protected readonly schedule = computed(
-    (): { weekdays: Weekday[]; time: string | null } | null => {
+    (): { weekdays: Weekday[]; time: string | null; end: string | null } | null => {
       const g = this.game();
       if (!g) return null;
       // Без дати старту (чернетка) часу ще немає — лише дні тижня в поясі гри.
-      if (g.startsAt === null) return { weekdays: [...g.weekdays], time: null };
-      return weeklyInZone(g.startsAt, g.timezone, g.weekdays, viewerTimeZone(this.auth.me()));
+      if (g.startsAt === null) return { weekdays: [...g.weekdays], time: null, end: null };
+      const viewer = viewerTimeZone(this.auth.me());
+      const weekly = weeklyInZone(g.startsAt, g.timezone, g.weekdays, viewer);
+      // Вікно початку: кінець — той самий розрахунок від кінця вікна першої сесії.
+      const end = g.startWindowMinutes
+        ? weeklyInZone(
+            windowEnd(new Date(g.startsAt), g.startWindowMinutes).toISOString(),
+            g.timezone,
+            g.weekdays,
+            viewer,
+          ).time
+        : null;
+      return { ...weekly, end };
     },
   );
   protected readonly durationHours = computed(() => (this.game()?.durationMinutes ?? 0) / 60);

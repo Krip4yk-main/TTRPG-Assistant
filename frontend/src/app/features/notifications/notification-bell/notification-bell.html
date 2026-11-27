@@ -125,7 +125,11 @@
                             game: row.view.game ?? ('notifications.unknownGame' | translate),
                             actor: row.view.actor ?? ('notifications.someone' | translate),
                             ratee: row.view.ratee ?? ('notifications.someone' | translate),
-                            when: row.view.when ?? ('notifications.unknownTime' | translate),
+                            when: row.view.when
+                              ? row.view.whenApprox
+                                ? ('notifications.approxTime' | translate: { when: row.view.when })
+                                : row.view.when
+                              : ('notifications.unknownTime' | translate),
                             from: row.view.from ?? ('notifications.unknownTime' | translate),
                             offset: row.view.offset
                               ? (row.view.offset.key | translate: row.view.offset.params)

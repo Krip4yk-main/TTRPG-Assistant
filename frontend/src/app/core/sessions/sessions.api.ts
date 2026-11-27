@@ -8,6 +8,7 @@ import type {
   RsvpStatus,
   SessionDto,
   SessionSummaryInput,
+  SessionWindowSlotsDto,
 } from '@nri/shared';
 
 /** Тонкий шар над HTTP API сесій гри. */
@@ -22,6 +23,14 @@ export class SessionsApi {
 
   reschedule(id: number, input: RescheduleSessionInput): Observable<SessionDto> {
     return this.http.post<SessionDto>(`/api/sessions/${id}/reschedule`, input);
+  }
+
+  /**
+   * Сесія з приблизним часом (лише майстер): хто може на кожен 30-хв старт у вікні (лише
+   * майбутні старти).
+   */
+  windowSlots(id: number): Observable<SessionWindowSlotsDto> {
+    return this.http.get<SessionWindowSlotsDto>(`/api/sessions/${id}/window-slots`);
   }
 
   cancel(id: number, input: CancelSessionInput): Observable<SessionDto> {

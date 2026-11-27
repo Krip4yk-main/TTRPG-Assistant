@@ -10,7 +10,8 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { ScheduleRuleDialog } from '../../sessions/schedule-rule-dialog/schedule-rule-dialog';
 import { CommonTimesDialog } from '../common-times-dialog/common-times-dialog';
 import { PollCreateDialog } from '../poll-create-dialog/poll-create-dialog';
-import { poll, session } from '../scheduling-testing';
+import { poll, session, windowSlots } from '../scheduling-testing';
+import { PinTimeDialog } from '../pin-time-dialog/pin-time-dialog';
 import { SessionAlternativesDialog } from '../session-alternatives-dialog/session-alternatives-dialog';
 import { PollsPanel, type PollsPanelGame } from './polls-panel';
 
@@ -22,6 +23,7 @@ const game: PollsPanelGame = {
   startsAt: '2030-03-01T17:00:00.000Z',
   nextSessionAt: '2030-03-07T17:00:00.000Z',
   durationMinutes: 240,
+  startWindowMinutes: null,
   recurrence: 'weekly',
   weekdays: [3],
 };
@@ -144,6 +146,10 @@ describe('PollsPanel', () => {
       [SessionAlternativesDialog, session({ rescheduled: true })],
     ]);
     http.expectOne('/api/games/7/polls').flush([]);
+    // Спершу — чи час сесії приблизний (точний — звичайні альтернативи).
+    http
+      .expectOne('/api/sessions/41/window-slots')
+      .flush(windowSlots({ startWindowMinutes: null }));
     // Діалог вантажиться окремим чанком — чекаємо, поки його відкриють і закриють.
     await vi.waitFor(() => expect(changed).toBe(1));
     await settle();
@@ -157,6 +163,18 @@ describe('PollsPanel', () => {
       replaceUrl: true,
     });
     expect(changed).toBe(1);
+  });
+
+  it('?session= of a session with an approximate time opens «pin time» with the loaded slots', async () => {
+    await open(true, { sessionId: '41' }, [[PinTimeDialog, session({ startWindowMinutes: null })]]);
+    http.expectOne('/api/games/7/polls').flush([]);
+    const slots = windowSlots();
+    http.expectOne('/api/sessions/41/window-slots').flush(slots);
+    await vi.waitFor(() => expect(changed).toBe(1));
+    await settle();
+    expect(opened.map((o) => o.component)).toEqual([PinTimeDialog]);
+    expect(opened[0]!.data).toEqual({ sessionId: 41, viewerTimezone: 'Europe/Kyiv', slots });
+    expect(el.textContent).toContain('sessions.done.pin');
   });
 
   it('?session= is ignored for a member', async () => {

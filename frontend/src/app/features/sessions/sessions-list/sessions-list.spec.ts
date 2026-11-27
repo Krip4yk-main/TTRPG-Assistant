@@ -9,8 +9,9 @@ import type { MeDto, SessionDto } from '@nri/shared';
 import { SessionsList } from './sessions-list';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
-import { formatDateTime } from '../../../core/i18n/dates';
-import { FinishSessionDialog } from '../finish-session-dialog/finish-session-dialog';
+import { formatDateTime, formatWindow } from '../../../core/i18n/dates';
+import { FinishSessionDialog, PIN_FIRST } from '../finish-session-dialog/finish-session-dialog';
+import { PinTimeDialog } from '../../scheduling/pin-time-dialog/pin-time-dialog';
 import { RescheduleDialog } from '../session-actions/reschedule-dialog';
 import { CancelSessionDialog } from '../session-actions/cancel-session-dialog';
 import { SessionSummaryDialog } from '../session-actions/session-summary-dialog';
@@ -288,6 +289,72 @@ describe('SessionsList', () => {
     await settle();
     expect(el.textContent).toContain('sessions.done.cancel');
   });
+  describe('approximate start time', () => {
+    const approxUpcoming: SessionDto = { ...upcoming, id: 8, startWindowMinutes: 180 };
+    const approxStarted: SessionDto = { ...started, id: 9, startWindowMinutes: 120 };
+
+    it('shows the window as a range with «time TBD»; exact sessions stay as they were', async () => {
+      await create(false, true, [approxUpcoming, upcoming]);
+      const time = row(8)!.querySelector('time')!.textContent!.trim();
+      expect(time).toBe(formatWindow(approxUpcoming.startsAt, 180, 'Europe/Warsaw'));
+      // 2 бер. 2027, 18:00–21:00 за Варшавою.
+      expect(time).toContain('18:00–21:00');
+      expect(row(8)!.querySelector('.approx')!.textContent).toContain(
+        'sessions.window.approxBadge',
+      );
+      expect(row(3)!.querySelector('.approx')).toBeNull();
+    });
+
+    it('the GM gets «pin time» first on windowed sessions only', async () => {
+      await create(true, true, [approxUpcoming, approxStarted, upcoming]);
+      expect(buttons(8)).toEqual(['pin', 'alternatives', 'reschedule', 'cancel']);
+      expect(buttons(9)).toEqual(['pin', 'reschedule', 'cancel', 'finish']);
+      expect(buttons(3)).toEqual(['alternatives', 'reschedule', 'cancel']);
+    });
+
+    it('«pin time» opens the dialog; afterwards the list reloads', async () => {
+      await create(true, true, [approxUpcoming]);
+      dialogOpen.mockReturnValueOnce({
+        afterClosed: () => of({ ...approxUpcoming, startWindowMinutes: null }),
+      });
+      row(8)!.querySelector<HTMLButtonElement>('button[data-action="pin"]')!.click();
+      // Діалог вантажиться окремим чанком.
+      await vi.waitFor(() => expect(dialogOpen).toHaveBeenCalled());
+      expect(dialogOpen).toHaveBeenCalledWith(
+        PinTimeDialog,
+        expect.objectContaining({ data: { sessionId: 8, viewerTimezone: 'Europe/Warsaw' } }),
+      );
+      await settle();
+      http
+        .expectOne('/api/games/3/sessions')
+        .flush([{ ...approxUpcoming, startWindowMinutes: null }]);
+      await settle();
+      await settle();
+      expect(el.textContent).toContain('sessions.done.pin');
+      expect(row(8)!.querySelector('.approx')).toBeNull();
+    });
+
+    it('finish refused for an approximate time leads straight to «pin time»', async () => {
+      await create(true, true, [approxStarted]);
+      dialogOpen
+        .mockReturnValueOnce({ afterClosed: () => of(PIN_FIRST) })
+        .mockReturnValueOnce({
+          afterClosed: () => of({ ...approxStarted, startWindowMinutes: null }),
+        });
+      row(9)!.querySelector<HTMLButtonElement>('button[data-action="finish"]')!.click();
+      await vi.waitFor(() => expect(dialogOpen).toHaveBeenCalledTimes(2));
+      expect(dialogOpen.mock.calls[0]![0]).toBe(FinishSessionDialog);
+      expect(dialogOpen.mock.calls[1]![0]).toBe(PinTimeDialog);
+      await settle();
+      http
+        .expectOne('/api/games/3/sessions')
+        .flush([{ ...approxStarted, startWindowMinutes: null }]);
+      await settle();
+      await settle();
+      expect(el.textContent).toContain('sessions.done.pin');
+    });
+  });
+
   describe('a live clock', () => {
     afterEach(() => vi.useRealTimers());
 

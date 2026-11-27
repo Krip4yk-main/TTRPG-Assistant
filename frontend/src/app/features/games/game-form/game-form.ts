@@ -71,6 +71,7 @@ import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
 import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
 import { DeadGamesNotice } from '../dead-games/dead-games-notice';
+import { StartTimeField } from '../../sessions/start-time-field/start-time-field';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -105,11 +106,18 @@ const CLOSED_STATUSES = new Set<GameStatus>(['finished', 'cancelled']);
 const RULE_CONTROLS = [
   'startDate',
   'startTime',
+  'startWindowMinutes',
   'durationMinutes',
   'recurrence',
   'weekdays',
 ] as const;
-const RULE_FIELDS = ['startsAt', 'durationMinutes', 'recurrence', 'weekdays'] as const;
+const RULE_FIELDS = [
+  'startsAt',
+  'startWindowMinutes',
+  'durationMinutes',
+  'recurrence',
+  'weekdays',
+] as const;
 
 /** Поле схеми → контрол форми (решта збігаються за назвою). */
 const FIELD_TO_CONTROL: Partial<Record<string, string>> = {
@@ -159,6 +167,7 @@ const CONTROL_SECTION: Record<string, Section> = {
   kind: 'schedule',
   startDate: 'schedule',
   startTime: 'schedule',
+  startWindowMinutes: 'schedule',
   durationMinutes: 'schedule',
   recurrence: 'schedule',
   weekdays: 'schedule',
@@ -227,6 +236,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
     WarningChip,
     SanctionActiveNotice,
     DeadGamesNotice,
+    StartTimeField,
   ],
   providers: [provideUkDates()],
   templateUrl: './game-form.html',
@@ -333,6 +343,8 @@ export class GameForm {
     kind: new FormControl<GameKind>('oneshot', { nonNullable: true }),
     startDate: new FormControl<Date | null>(null),
     startTime: new FormControl('', { nonNullable: true }),
+    /** Вікно початку «з … до …», хв; `null` — точний час. */
+    startWindowMinutes: new FormControl<number | null>(null),
     durationMinutes: new FormControl(180, { nonNullable: true }),
     recurrence: new FormControl<Recurrence>('none', { nonNullable: true }),
     weekdays: new FormControl<number[]>([], { nonNullable: true }),
@@ -629,6 +641,10 @@ export class GameForm {
       fieldErrors[this.controlName(d.field)] = 'errors.GAME_FIELD_LOCKED';
     } else if (code === 'AGE_RESTRICTED_CREATE') {
       fieldErrors['ageRating'] = 'errors.AGE_RESTRICTED_CREATE';
+    } else if (code === 'GAME_IN_PAST' && !this.isDraft() && this.startUnchanged()) {
+      // Опублікована гра, дату не змінювали (напр. лише вікно чи тривалість): правило з минулою
+      // першою сесією змінити не можна — пояснюємо, що треба обрати нову дату.
+      fieldErrors['startDate'] = 'games.form.errors.ruleInPast';
     } else if (code === 'GAME_IN_PAST' || code === 'GAME_START_REQUIRED') {
       fieldErrors['startDate'] = `errors.${code}`;
     } else if (code === 'IMAGE_URL_INVALID') {
@@ -655,6 +671,13 @@ export class GameForm {
     } else {
       this.formError.set(`errors.${code}`);
     }
+  }
+
+  /** Дата й час старту ті самі, що на сервері. */
+  private startUnchanged(): boolean {
+    const v = this.form.getRawValue();
+    const saved = this.game()?.startsAt ?? null;
+    return saved !== null && this.startsAt(v.startDate, v.startTime) === saved;
   }
 
   private setApiErrors(errors: Record<string, string>): void {
@@ -786,6 +809,7 @@ export class GameForm {
       platform: offline ? null : v.platform,
       kind: v.kind,
       startsAt: this.startsAt(v.startDate, v.startTime),
+      startWindowMinutes: v.startWindowMinutes,
       durationMinutes: v.durationMinutes,
       recurrence,
       weekdays: weekly ? v.weekdays : [],
@@ -869,6 +893,7 @@ export class GameForm {
       kind: g.kind,
       startDate: start ? new Date(start.year, start.month - 1, start.day) : null,
       startTime: start ? `${pad(start.hour)}:${pad(start.minute)}` : '',
+      startWindowMinutes: g.startWindowMinutes,
       durationMinutes: g.durationMinutes,
       recurrence: g.recurrence,
       weekdays: [...g.weekdays],
@@ -992,6 +1017,7 @@ export class GameForm {
       set(c[name], values[name], nullableNumber);
     }
     set(c.durationMinutes, values['durationMinutes'], isNumber);
+    set(c.startWindowMinutes, values['startWindowMinutes'], nullableNumber);
     set(c.weekdays, values['weekdays'], isNumberArray);
     set(c.contentWarningIds, values['contentWarningIds'], isNumberArray);
     set(c.showWhenFull, values['showWhenFull'], (x) => typeof x === 'boolean');

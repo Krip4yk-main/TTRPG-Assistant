@@ -61,7 +61,8 @@ h3 {
 }
 
 .status,
-.rescheduled {
+.rescheduled,
+.approx {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -93,6 +94,13 @@ h3 {
 .rescheduled {
   border-color: var(--nri-primary);
   color: var(--nri-primary-text);
+}
+
+// Приблизний час: пунктирна рамка — «ще не остаточно» (не лише колір).
+.approx {
+  border-style: dashed;
+  border-color: var(--nri-accent);
+  color: var(--nri-accent-text);
 }
 
 .reason,

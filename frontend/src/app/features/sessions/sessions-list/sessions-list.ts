@@ -24,14 +24,16 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { NotesApi, type NoteSource } from '../../../core/notes/notes.api';
-import { formatDateTime, viewerTimeZone } from '../../../core/i18n/dates';
+import { formatDateTime, formatWindow, viewerTimeZone } from '../../../core/i18n/dates';
 import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
 import { ViewsService } from '../../../core/views/views.service';
 import { NoteEditor } from '../../notes/note-editor/note-editor';
 import {
   FinishSessionDialog,
+  PIN_FIRST,
   type FinishSessionDialogData,
+  type FinishSessionResult,
 } from '../finish-session-dialog/finish-session-dialog';
 import {
   CancelSessionDialog,
@@ -43,9 +45,10 @@ import {
   type SessionSummaryDialogData,
 } from '../session-actions/session-summary-dialog';
 import { openSessionAlternatives } from '../../scheduling/session-alternatives-dialog/open-session-alternatives';
+import { openPinTime } from '../../scheduling/pin-time-dialog/open-pin-time';
 
-/** Дія майстра над сесією. */
-export type SessionAction = 'alternatives' | 'reschedule' | 'cancel' | 'finish';
+/** Дія майстра над сесією; `pin` — «Уточнити час» сесії з приблизним часом. */
+export type SessionAction = 'pin' | 'alternatives' | 'reschedule' | 'cancel' | 'finish';
 
 /** Дія майстра над підсумком проведеної сесії. */
 export type SummaryAction = 'edit' | 'send';
@@ -327,8 +330,14 @@ export class SessionsList {
     return ok;
   }
 
+  /** Точний час або вікно початку («5 груд. 2026 р., 18:00–21:00»). */
   protected when(s: SessionDto): string {
-    return formatDateTime(s.startsAt, this.viewerZone());
+    return formatWindow(s.startsAt, s.startWindowMinutes, this.viewerZone());
+  }
+
+  /** Час ще приблизний (вікно) — позначка «час уточнюється» на запланованій сесії. */
+  protected approximate(s: SessionDto): boolean {
+    return s.status === 'scheduled' && s.startWindowMinutes !== null;
   }
 
   protected hours(s: SessionDto): number {
@@ -346,7 +355,10 @@ export class SessionsList {
     return this.now() - Date.parse(s.doneAt ?? s.startsAt) <= SESSION_RATING_WINDOW_MS;
   }
 
-  /** Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. */
+  /**
+   * Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. Сесії з
+   * приблизним часом — спершу «Уточнити час» (без нього не почати гру й не завершити сесію).
+   */
   protected actions(s: SessionDto): SessionAction[] {
     if (!this.isGm() || !this.manageable() || s.status !== 'scheduled') return [];
     const started = Date.parse(s.startsAt) <= this.now();
@@ -354,7 +366,7 @@ export class SessionsList {
     const list: SessionAction[] = started
       ? ['reschedule', 'cancel', 'finish']
       : ['alternatives', 'reschedule', 'cancel'];
-    return list;
+    return s.startWindowMinutes !== null ? ['pin', ...list] : list;
   }
 
   /**
@@ -380,15 +392,22 @@ export class SessionsList {
     this.busy.set(true);
     this.message.set(null);
     try {
-      const result =
+      let done: string = action === 'alternatives' ? 'reschedule' : action;
+      let result =
         action === 'alternatives'
           ? await openSessionAlternatives(this.dialog, {
               sessionId: s.id,
               viewerTimezone: this.viewerZone(),
             })
-          : await firstValueFrom(this.openDialog(s, action).afterClosed());
+          : action === 'pin'
+            ? await this.pin(s.id)
+            : await firstValueFrom(this.openDialog(s, action).afterClosed());
+      // «Завершити» відмовило (409 SESSION_TIME_APPROXIMATE): майстер обрав «Уточнити час».
+      if (result === PIN_FIRST) {
+        result = await this.pin(s.id);
+        done = 'pin';
+      }
       if (!result) return;
-      const done = action === 'alternatives' ? 'reschedule' : action;
       // Завершення зсуває вікно матеріалізації — беремо список із сервера.
       await this.load(this.gameId(), true);
       this.message.set({ kind: 'info', key: `sessions.done.${done}` });
@@ -403,7 +422,11 @@ export class SessionsList {
     await this.load(this.gameId());
   }
 
-  private openDialog(s: SessionDto, action: Exclude<SessionAction, 'alternatives'>) {
+  private pin(sessionId: number): Promise<SessionDto | null> {
+    return openPinTime(this.dialog, { sessionId, viewerTimezone: this.viewerZone() });
+  }
+
+  private openDialog(s: SessionDto, action: Exclude<SessionAction, 'alternatives' | 'pin'>) {
     const when = this.when(s);
     switch (action) {
       case 'reschedule':
@@ -420,7 +443,7 @@ export class SessionsList {
           { ...DIALOG_OPTIONS, data: { sessionId: s.id, when } },
         );
       case 'finish':
-        return this.dialog.open<FinishSessionDialog, FinishSessionDialogData, SessionDto>(
+        return this.dialog.open<FinishSessionDialog, FinishSessionDialogData, FinishSessionResult>(
           FinishSessionDialog,
           { ...DIALOG_OPTIONS, data: { sessionId: s.id, gameId: this.gameId(), when } },
         );

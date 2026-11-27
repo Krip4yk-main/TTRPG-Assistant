@@ -361,4 +361,70 @@ describe('notificationView', () => {
     expect(notificationTime('2026-11-25T11:00:00.000Z', 'UTC', now).relative).toMatch(/годин/);
     expect(notificationTime('2026-11-01T11:00:00.000Z', 'UTC', now).relative).toBeNull();
   });
+
+  describe('approximate start time', () => {
+    const tz = 'Europe/Kyiv';
+    // 5 груд. 2026, 18:00 за Києвом.
+    const startsAt = '2026-12-05T16:00:00.000Z';
+
+    it('a windowed session shows the range and asks for «time TBD»', () => {
+      const v = notificationView(dto('session.created', { startsAt, startWindowMinutes: 180 }), tz);
+      expect(v.when).toBe('5 груд. 2026 р., 18:00–21:00');
+      expect(v.whenApprox).toBe(true);
+      expect(lookup('notifications.approxTime')).toContain('{{when}}');
+      const exact = notificationView(dto('session.created', { startsAt }), tz);
+      expect(exact.when).toBe('5 груд. 2026 р., 18:00');
+      expect(exact.whenApprox).toBe(false);
+    });
+
+    it('a window across midnight shows both dates', () => {
+      const v = notificationView(
+        dto('session.reminder', { startsAt: '2026-12-05T20:00:00.000Z', startWindowMinutes: 240 }),
+        tz,
+      );
+      expect(v.when).toBe('5 груд. 2026 р., 22:00 – 6 груд. 2026 р., 02:00');
+    });
+
+    it('window → exact time is «the GM pinned the time»; the old window is the «from»', () => {
+      const v = notificationView(
+        dto('session.rescheduled', {
+          startsAt: '2026-12-05T17:00:00.000Z',
+          startWindowMinutes: null,
+          from: startsAt,
+          fromWindowMinutes: 180,
+        }),
+        tz,
+      );
+      expect(v.key).toBe('notifications.session.rescheduled_pinned');
+      expect(lookup(v.key)).toEqual(expect.stringContaining('{{when}}'));
+      expect(v.when).toBe('5 груд. 2026 р., 19:00');
+      expect(v.whenApprox).toBe(false);
+      expect(v.from).toBe('5 груд. 2026 р., 18:00–21:00');
+    });
+
+    it('an ordinary move into a window keeps the regular text', () => {
+      const v = notificationView(
+        dto('session.rescheduled', {
+          startsAt,
+          startWindowMinutes: 120,
+          from: '2026-12-04T16:00:00.000Z',
+          fromWindowMinutes: null,
+        }),
+        tz,
+      );
+      expect(v.key).toBe('notifications.session.rescheduled');
+      expect(v.whenApprox).toBe(true);
+    });
+
+    it('session.time_unpinned: the range without the «TBD» suffix (the text says so)', () => {
+      const v = notificationView(
+        dto('session.time_unpinned', { sessionId: 3, startsAt, startWindowMinutes: 180 }),
+        tz,
+      );
+      expect(v.key).toBe('notifications.session.time_unpinned');
+      expect(v.when).toBe('5 груд. 2026 р., 18:00–21:00');
+      expect(v.whenApprox).toBe(false);
+      expect(v.icon).toBe('schedule');
+    });
+  });
 });

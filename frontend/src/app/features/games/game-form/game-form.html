@@ -286,22 +286,6 @@
           </div>
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
-              <input
-                matInput
-                type="time"
-                formControlName="startTime"
-                step="60"
-                [required]="startTimeRequired()"
-              />
-              <mat-hint>{{ 'games.form.timezoneHint' | translate: { tz: timezone() } }}</mat-hint>
-              @if (errorKey('startTime'); as key) {
-                <mat-error>{{ key | translate }}</mat-error>
-              }
-            </mat-form-field>
-          </div>
-          <div class="field">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
               <select matNativeControl formControlName="durationMinutes">
                 @for (m of durations; track m) {
@@ -313,6 +297,17 @@
             </mat-form-field>
           </div>
         </div>
+
+        <nri-start-time-field
+          class="field"
+          [time]="c.startTime"
+          [window]="c.startWindowMinutes"
+          [date]="value().startDate"
+          [timezone]="timezone()"
+          [required]="startTimeRequired()"
+          [hint]="'games.form.timezoneHint' | translate: { tz: timezone() }"
+          [timeError]="errorKey('startTime') ?? errorKey('startWindowMinutes')"
+        />
 
         @if (value().kind === 'campaign') {
           <div class="field">

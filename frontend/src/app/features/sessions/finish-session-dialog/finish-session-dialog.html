@@ -54,7 +54,14 @@
     >
 
     <div aria-live="assertive">
-      @if (error(); as key) {
+      @if (needsPin()) {
+        <div class="nri-alert needs-pin" role="alert">
+          <span>{{ 'errors.SESSION_TIME_APPROXIMATE' | translate }}</span>
+          <button mat-stroked-button type="button" class="pin-first" (click)="pinFirst()">
+            {{ 'sessions.actions.pin' | translate }}
+          </button>
+        </div>
+      } @else if (error(); as key) {
         <p class="nri-alert" role="alert">{{ key | translate }}</p>
       }
     </div>

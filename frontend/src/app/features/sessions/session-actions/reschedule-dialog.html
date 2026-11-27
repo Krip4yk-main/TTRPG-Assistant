@@ -27,13 +27,6 @@
         }
       </mat-form-field>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>{{ 'sessions.reschedule.time' | translate }}</mat-label>
-        <input matInput class="time" type="time" step="60" required formControlName="time" />
-        @if (form.controls.time.invalid && form.controls.time.touched) {
-          <mat-error>{{ 'games.form.errors.required' | translate }}</mat-error>
-        }
-      </mat-form-field>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
         <select matNativeControl formControlName="durationMinutes">
           @for (m of durations; track m) {
@@ -42,6 +35,18 @@
         </select>
       </mat-form-field>
     </div>
+    <nri-start-time-field
+      label="sessions.reschedule.time"
+      [time]="form.controls.time"
+      [window]="form.controls.startWindowMinutes"
+      [date]="value().date"
+      [timezone]="data.timezone"
+      [timeError]="
+        form.controls.time.invalid && form.controls.time.touched
+          ? 'games.form.errors.required'
+          : null
+      "
+    />
     @if (preview(); as p) {
       <p class="nri-muted preview" aria-live="polite">
         {{ 'sessions.viewerPreview' | translate: { when: p } }}

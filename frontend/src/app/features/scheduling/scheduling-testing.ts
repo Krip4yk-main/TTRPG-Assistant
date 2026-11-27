@@ -1,4 +1,11 @@
-import type { CommonTimesDto, PollDto, SessionAlternativesDto, SessionDto } from '@nri/shared';
+import type {
+  CommonTimesDto,
+  OneOffCandidateDto,
+  PollDto,
+  SessionAlternativesDto,
+  SessionDto,
+  SessionWindowSlotsDto,
+} from '@nri/shared';
 
 /** Тестові дані спільного часу (лише для spec-файлів). */
 
@@ -88,6 +95,41 @@ export function alternatives(patch: Partial<SessionAlternativesDto> = {}): Sessi
     participants,
     noCalendars: false,
     alternatives: ct.oneOff,
+    ...patch,
+  };
+}
+
+/** Старт вікна з оцінкою: `can` перших учасників можуть, решта — невідомо. */
+function windowSlot(startsAt: string, can: number): OneOffCandidateDto {
+  const statuses = participants.map((p, i) => ({
+    userId: p.userId,
+    status: i < can ? ('can' as const) : ('unknown' as const),
+  }));
+  return {
+    startsAt,
+    endsAt: new Date(Date.parse(startsAt) + 240 * 60_000).toISOString(),
+    can,
+    cannot: 0,
+    unknown: participants.length - can,
+    statuses,
+  };
+}
+
+/** Вікно 19:00–20:00 за Києвом (3 старти), усі в майбутньому. */
+export function windowSlots(patch: Partial<SessionWindowSlotsDto> = {}): SessionWindowSlotsDto {
+  return {
+    sessionId: 41,
+    startsAt: '2030-03-07T17:00:00.000Z',
+    startWindowMinutes: 60,
+    timezone: 'Europe/Kyiv',
+    durationMinutes: 240,
+    participants,
+    noCalendars: false,
+    slots: [
+      windowSlot('2030-03-07T17:00:00.000Z', 1),
+      windowSlot('2030-03-07T17:30:00.000Z', 2),
+      windowSlot('2030-03-07T18:00:00.000Z', 3),
+    ],
     ...patch,
   };
 }

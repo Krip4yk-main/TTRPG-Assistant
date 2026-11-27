@@ -20,10 +20,17 @@ export interface FinishSessionDialogData {
   when: string;
 }
 
+/** Результат діалогу «спершу уточнити час»: сесія ще має приблизний час (409). */
+export const PIN_FIRST = 'pin' as const;
+/** Завершена сесія або прохання відкрити «Уточнити час». */
+export type FinishSessionResult = SessionDto | typeof PIN_FIRST;
+
 /**
  * «Завершити сесію»: присутність кожного активного учасника (типово — присутній) і
  * необов'язковий підсумок, який бачать лише майстер і учасники; за бажанням — одразу надіслати
  * його учасникам (один раз). Присутність надсилається для всіх учасників. Закривається з оновленою `SessionDto`.
+ * Сесію з приблизним часом завершити не можна (409 `SESSION_TIME_APPROXIMATE`): пояснення й
+ * кнопка «Уточнити час» — діалог закривається з `PIN_FIRST`.
  */
 @Component({
   selector: 'nri-finish-session-dialog',
@@ -42,7 +49,8 @@ export interface FinishSessionDialogData {
 })
 export class FinishSessionDialog {
   protected readonly data = inject<FinishSessionDialogData>(MAT_DIALOG_DATA);
-  private readonly ref = inject<MatDialogRef<FinishSessionDialog, SessionDto>>(MatDialogRef);
+  private readonly ref =
+    inject<MatDialogRef<FinishSessionDialog, FinishSessionResult>>(MatDialogRef);
   private readonly api = inject(SessionsApi);
   private readonly membersApi = inject(MembersApi);
 
@@ -58,6 +66,8 @@ export class FinishSessionDialog {
   });
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Сервер відмовив: час сесії ще приблизний — треба спершу уточнити. */
+  protected readonly needsPin = signal(false);
   private readonly summaryValue = toSignal(this.form.controls.summary.valueChanges, {
     initialValue: '',
   });
@@ -103,11 +113,16 @@ export class FinishSessionDialog {
       this.ref.close(dto);
     } catch (err) {
       const { code } = toApiError(err);
-      if (code !== 'UNAUTHENTICATED') this.error.set(`errors.${code}`);
+      if (code === 'SESSION_TIME_APPROXIMATE') this.needsPin.set(true);
+      else if (code !== 'UNAUTHENTICATED') this.error.set(`errors.${code}`);
       // Склад міг змінитися (учасник вийшов) — оновлюємо список.
       if (code === 'VALIDATION') void this.load();
       this.submitting.set(false);
     }
+  }
+
+  protected pinFirst(): void {
+    this.ref.close(PIN_FIRST);
   }
 
   protected cancel(): void {

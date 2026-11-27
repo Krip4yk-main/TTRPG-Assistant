@@ -9,6 +9,11 @@
         [attr.role]="msg.kind === 'error' ? 'alert' : null"
       >
         {{ msg.key | translate }}
+        @if (msg.pin; as pin) {
+          <button mat-stroked-button type="button" class="pin-time" (click)="pinTime(pin)">
+            {{ 'sessions.actions.pin' | translate }}
+          </button>
+        }
       </p>
     }
   </div>

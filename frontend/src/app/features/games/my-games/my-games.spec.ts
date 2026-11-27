@@ -9,6 +9,7 @@ import type { MeDto, MyGameCardDto } from '@nri/shared';
 import { MyGames } from './my-games';
 import { PauseDialog } from '../pause/pause-dialog';
 import { ResumeDialog } from '../pause/resume-dialog';
+import { PinTimeDialog } from '../../scheduling/pin-time-dialog/pin-time-dialog';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { ViewModeStore } from '../../../core/view-mode/view-mode.store';
@@ -232,6 +233,28 @@ describe('MyGames', () => {
     await settle();
     expect(el.textContent).toContain('games.my.done.start');
     http.expectOne('/api/games/mine').flush([{ ...card(5, 'started'), memberCount: 2 }]);
+    await settle();
+  });
+
+  it('start refused for an approximate session time offers «pin time» for that session', async () => {
+    open.mockReturnValueOnce({ afterClosed: () => of(true) });
+    article(5).querySelector<HTMLButtonElement>('[data-action="start"]')!.click();
+    await settle();
+    http
+      .expectOne('/api/games/5/start')
+      .flush(
+        { error: { code: 'SESSION_TIME_APPROXIMATE', details: { sessionId: 77 } } },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+    expect(el.textContent).toContain('games.my.timeApproximate.start');
+    open.mockReturnValueOnce({ afterClosed: () => of({ id: 77, startWindowMinutes: null }) });
+    el.querySelector<HTMLButtonElement>('button.pin-time')!.click();
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    expect(open.mock.calls[1]![0]).toBe(PinTimeDialog);
+    expect(open.mock.calls[1]![1].data).toEqual({ sessionId: 77, viewerTimezone: 'Europe/Kyiv' });
+    await vi.waitFor(() => expect(el.textContent).toContain('games.my.pinned.start'));
+    http.expectOne('/api/games/mine').flush([{ ...card(5, 'recruiting'), memberCount: 2 }]);
     await settle();
   });
 

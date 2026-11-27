@@ -1,4 +1,4 @@
-import { weeklyInZone } from './dates';
+import { formatWindow, weeklyInZone } from './dates';
 
 describe('weeklyInZone', () => {
   // Пн 1 бер. 2027, 19:00 за Києвом (UTC+2) = 17:00 UTC.
@@ -35,5 +35,26 @@ describe('weeklyInZone', () => {
       weekdays: [1],
       time: '01:00',
     });
+  });
+});
+
+describe('formatWindow', () => {
+  it('без вікна — як formatDateTime; з вікном — проміжок', () => {
+    expect(formatWindow('2026-12-05T16:00:00.000Z', null, 'Europe/Kyiv')).toBe(
+      '5 груд. 2026 р., 18:00',
+    );
+    expect(formatWindow('2026-12-05T16:00:00.000Z', 180, 'Europe/Kyiv')).toBe(
+      '5 груд. 2026 р., 18:00–21:00',
+    );
+  });
+
+  it('через північ — обидві дати; кінець — у UTC-мс через перехід на літній час', () => {
+    expect(formatWindow('2026-12-05T20:00:00.000Z', 240, 'Europe/Kyiv')).toBe(
+      '5 груд. 2026 р., 22:00 – 6 груд. 2026 р., 02:00',
+    );
+    // 28 бер. 2027, 01:00 за Києвом (EET) + 4 год → 06:00 EEST (03:00 → 04:00).
+    expect(formatWindow('2027-03-27T23:00:00.000Z', 240, 'Europe/Kyiv')).toBe(
+      '28 бер. 2027 р., 01:00–06:00',
+    );
   });
 });

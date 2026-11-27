@@ -36,10 +36,10 @@ describe('RescheduleDialog', () => {
     fixture.detectChanges();
   };
 
-  beforeEach(async () => {
+  async function create(s: SessionDto = session) {
     close = vi.fn();
     const data: RescheduleDialogData = {
-      session,
+      session: s,
       timezone: 'America/New_York',
       viewerTimezone: 'Europe/Kyiv',
     };
@@ -57,6 +57,10 @@ describe('RescheduleDialog', () => {
     fixture = TestBed.createComponent(RescheduleDialog);
     el = fixture.nativeElement as HTMLElement;
     await settle();
+  }
+
+  beforeEach(async () => {
+    await create();
   });
 
   afterEach(() => http.verify());
@@ -108,5 +112,75 @@ describe('RescheduleDialog', () => {
     http.expectNone('/api/sessions/41/reschedule');
     expect(el.textContent).toContain('sessions.reschedule.past');
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it('approximate: sends the window start and its width', async () => {
+    el.querySelector<HTMLElement>('.mode-approx button')!.click();
+    await settle();
+    form().patchValue({ date: new Date(2027, 2, 10), time: '18:00', startWindowMinutes: 120 });
+    await submit();
+    const req = http.expectOne('/api/sessions/41/reschedule');
+    expect(req.request.body).toEqual({
+      startsAt: '2027-03-10T23:00:00.000Z',
+      startWindowMinutes: 120,
+    });
+    req.flush({ ...session, startWindowMinutes: 120 });
+    await settle();
+  });
+
+  it('a window across midnight labels «to» as the next day', async () => {
+    el.querySelector<HTMLElement>('.mode-approx button')!.click();
+    await settle();
+    form().patchValue({ time: '22:00' });
+    await settle();
+    const to = [...el.querySelectorAll<HTMLOptionElement>('select.window-to option')].map((o) =>
+      o.textContent!.trim(),
+    );
+    // 22:30, 23:00, 23:30 — того ж дня; 00:00 і далі — наступного.
+    expect(to.slice(0, 3)).toEqual(Array(3).fill('sessions.window.end'));
+    expect(to[3]).toBe('sessions.window.endNextDay');
+  });
+
+  describe('windowed session whose window has started', () => {
+    // «Зараз» — 10 бер. 2027, 15:10 у Нью-Йорку; вікно 14:00–16:00 почалось годину тому.
+    const now = new Date('2027-03-10T20:10:00.000Z');
+    const start = new Date('2027-03-10T19:00:00.000Z');
+    const windowed = { ...session, startsAt: start.toISOString(), startWindowMinutes: 120 };
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(now);
+      TestBed.resetTestingModule();
+      await create(windowed);
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    it('pinning to a past moment inside the window is allowed', async () => {
+      el.querySelector<HTMLElement>('.mode-exact button')!.click();
+      await settle();
+      expect(form().getRawValue().startWindowMinutes).toBeNull();
+      // 14:30 — уже минуло, але в межах вікна.
+      form().patchValue({ time: '14:30' });
+      await submit();
+      const req = http.expectOne('/api/sessions/41/reschedule');
+      expect(req.request.body).toEqual({
+        startsAt: '2027-03-10T19:30:00.000Z',
+        startWindowMinutes: null,
+      });
+      req.flush({ ...windowed, startsAt: '2027-03-10T19:30:00.000Z', startWindowMinutes: null });
+      await settle();
+      expect(close).toHaveBeenCalled();
+    });
+
+    it('a past moment outside the window or keeping the window is rejected', async () => {
+      await submit();
+      http.expectNone('/api/sessions/41/reschedule');
+      expect(el.textContent).toContain('sessions.reschedule.past');
+      el.querySelector<HTMLElement>('.mode-exact button')!.click();
+      form().patchValue({ time: '13:30' });
+      await submit();
+      http.expectNone('/api/sessions/41/reschedule');
+    });
   });
 });

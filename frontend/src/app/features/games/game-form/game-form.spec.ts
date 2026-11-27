@@ -165,7 +165,7 @@ describe('GameForm', () => {
     await type('input[formcontrolname="title"]', 'Тіні Найт-Сіті');
     await choose('system', 'Cyberpunk RED');
     await type('input[formcontrolname="startDate"]', '02.03.2027');
-    await type('input[formcontrolname="startTime"]', '19:00');
+    await type('nri-start-time-field input.time', '19:00');
   }
 
   beforeEach(() => {
@@ -270,7 +270,7 @@ describe('GameForm', () => {
   it('a dateless draft opens with empty date and time fields', async () => {
     await setup(5, game({ startsAt: null, nextSessionAt: null }));
     expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').value).toBe('');
-    expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').value).toBe('');
+    expect(q<HTMLInputElement>('nri-start-time-field input.time').value).toBe('');
     expect(el.querySelector('button.clear-start')).toBeNull();
   });
 
@@ -400,7 +400,7 @@ describe('GameForm', () => {
   it('started game: the schedule rule is read-only with a hint; PATCH omits it', async () => {
     await setup(5, game({ status: 'started' }));
     expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(true);
-    expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').disabled).toBe(true);
+    expect(q<HTMLInputElement>('nri-start-time-field input.time').disabled).toBe(true);
     expect(selectOf('durationMinutes').disabled).toBe(true);
     expect(selectOf('recurrence').disabled).toBe(true);
     const hint = q<HTMLElement>('.schedule-locked');
@@ -411,18 +411,25 @@ describe('GameForm', () => {
     await submit();
     const req = http.expectOne('/api/games/5');
     expect(req.request.body).toMatchObject({ title: 'Нова назва' });
-    for (const field of ['startsAt', 'durationMinutes', 'recurrence', 'weekdays']) {
+    for (const field of [
+      'startsAt',
+      'startWindowMinutes',
+      'durationMinutes',
+      'recurrence',
+      'weekdays',
+    ]) {
       expect(req.request.body).not.toHaveProperty(field);
     }
+    // Перемикач «Точний / Приблизно» теж вимкнено.
+    expect(q<HTMLButtonElement>('.mode-approx button').disabled).toBe(true);
     req.flush(game({ status: 'started', title: 'Нова назва' }));
     await settle();
   });
 
   it('paused campaign: other fields editable, schedule disabled with the «changes on resume» hint', async () => {
     await setup(5, game({ status: 'paused', kind: 'campaign' }));
-    for (const name of ['startDate', 'startTime']) {
-      expect(q<HTMLInputElement>(`input[formcontrolname="${name}"]`).disabled).toBe(true);
-    }
+    expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(true);
+    expect(q<HTMLInputElement>('nri-start-time-field input.time').disabled).toBe(true);
     expect(selectOf('durationMinutes').disabled).toBe(true);
     expect(selectOf('recurrence').disabled).toBe(true);
     expect(selectOf('system').disabled).toBe(true);
@@ -523,6 +530,66 @@ describe('GameForm', () => {
     expect(dateField().textContent).not.toContain('errors.GAME_IN_PAST');
   });
 
+  describe('approximate start time', () => {
+    it('«approximately» sends the window; a windowed game opens with «from» and «to»', async () => {
+      await setup(5, game({ status: 'draft' }));
+      q<HTMLElement>('.mode-approx button').click();
+      await settle();
+      // 19:00 за Києвом; типове вікно — 3 год.
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+      expect(el.querySelector('nri-start-time-field input.time')).toBeNull();
+      const to = q<HTMLSelectElement>('select.window-to');
+      to.selectedIndex = 3; // 2 год
+      to.dispatchEvent(new Event('change'));
+      await settle();
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.body).toMatchObject({
+        startsAt: '2027-03-02T17:00:00.000Z',
+        startWindowMinutes: 120,
+      });
+      req.flush(game({ status: 'draft', startWindowMinutes: 120 }));
+      await settle();
+    });
+
+    it('a windowed game prefills the window; «exact time» clears it', async () => {
+      await setup(5, game({ status: 'draft', startWindowMinutes: 90 }));
+      expect(q<HTMLSelectElement>('select.window-to').selectedIndex).toBe(2);
+      q<HTMLElement>('.mode-exact button').click();
+      await settle();
+      expect(q<HTMLInputElement>('nri-start-time-field input.time').value).toBe('19:00');
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.body).toMatchObject({ startWindowMinutes: null });
+      req.flush(game({ status: 'draft' }));
+      await settle();
+    });
+
+    it('switching to «approximately» snaps an off-grid start down to 30 minutes', async () => {
+      await setup(5, game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z' }));
+      q<HTMLElement>('.mode-approx button').click();
+      await settle();
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+    });
+
+    it('a published game whose first session passed: changing only the window explains why it fails', async () => {
+      await setup(5, game({ status: 'recruiting', startWindowMinutes: 60 }));
+      const to = q<HTMLSelectElement>('select.window-to');
+      to.selectedIndex = 3;
+      to.dispatchEvent(new Event('change'));
+      await settle();
+      await submit();
+      http
+        .expectOne('/api/games/5')
+        .flush({ error: { code: 'GAME_IN_PAST' } }, { status: 422, statusText: 'Unprocessable' });
+      await settle();
+      const dateField = q<HTMLInputElement>('input[formcontrolname="startDate"]').closest(
+        '.field',
+      )!;
+      expect(dateField.textContent).toContain('games.form.errors.ruleInPast');
+    });
+  });
+
   it('min > max players: error next to the max field, publish hint names the section', async () => {
     await setup();
     await fillValid();
@@ -609,7 +676,7 @@ describe('GameForm', () => {
       });
       await setup();
       expect(titleInput().value).toBe('Збережена назва');
-      expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').value).toBe('19:00');
+      expect(q<HTMLInputElement>('nri-start-time-field input.time').value).toBe('19:00');
       expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').value).toBe('02.03.2027');
       expect(q<HTMLInputElement>('input[formcontrolname="url"]').value).toBe(
         'https://discord.gg/x',

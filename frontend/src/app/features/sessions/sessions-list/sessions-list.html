@@ -58,6 +58,12 @@
         when(s)
       }}</time>
       <span class="nri-muted duration">{{ 'games.form.hours' | translate: { h: hours(s) } }}</span>
+      @if (approximate(s)) {
+        <span class="approx">
+          <mat-icon aria-hidden="true">schedule</mat-icon>
+          {{ 'sessions.window.approxBadge' | translate }}
+        </span>
+      }
       <span class="status" [attr.data-status]="s.status">{{ statusKey(s) | translate }}</span>
       @if (badge(s); as b) {
         <span class="nri-seen-badge" [attr.data-seen]="b">{{ 'live.badge.' + b | translate }}</span>

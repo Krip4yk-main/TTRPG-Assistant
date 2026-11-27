@@ -1,0 +1,10 @@
+@import '../scheduling-shared';
+
+.current {
+  font-weight: 600;
+}
+
+// Минулий старт (вікно вже почалось): лише вибір, без оцінки зайнятості.
+.candidate.past .when {
+  color: var(--nri-text-muted);
+}

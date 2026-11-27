@@ -14,6 +14,7 @@ const game = {
   startsAt: '2027-03-02T17:00:00.000Z',
   nextSessionAt: '2027-03-02T17:00:00.000Z',
   durationMinutes: 240,
+  startWindowMinutes: null,
   recurrence: 'weekly',
   weekdays: [1],
 } as GameDto;
@@ -117,6 +118,7 @@ describe('ScheduleRuleDialog', () => {
     expect(req.request.body).toEqual({
       startsAt: '2027-03-04T17:00:00.000Z',
       durationMinutes: 240,
+      startWindowMinutes: null,
       recurrence: 'weekly',
       weekdays: [1, 3],
     });
@@ -154,11 +156,52 @@ describe('ScheduleRuleDialog', () => {
     expect(req.request.body).toEqual({
       startsAt: '2027-03-02T17:00:00.000Z',
       durationMinutes: 240,
+      startWindowMinutes: null,
       recurrence: 'weekly',
       weekdays: [1],
     });
     req.flush({ ...game, kind: 'campaign' });
     await settle();
     expect(close).toHaveBeenCalled();
+  });
+
+  it('approximate time: «from» on a 30-min grid and «to» send a start window', async () => {
+    await create({ game, mode: 'schedule' });
+    // 19:00 за Києвом; «Приблизно» — типове вікно 3 год.
+    el.querySelector<HTMLElement>('.mode-approx button')!.click();
+    await settle();
+    expect(form().getRawValue().startWindowMinutes).toBe(180);
+    const from = el.querySelector<HTMLSelectElement>('select.window-from')!;
+    expect(from.value).toBe('19:00');
+    const to = [...el.querySelectorAll<HTMLOptionElement>('select.window-to option')].map((o) =>
+      o.textContent!.trim(),
+    );
+    // 30 хв … 12 год; після півночі — «наступного дня».
+    expect(to.length).toBe(24);
+    expect(to[0]).toBe('sessions.window.end');
+    expect(to.at(-1)).toBe('sessions.window.endNextDay');
+    form().patchValue({ startWindowMinutes: 120 });
+    await submit();
+    const req = http.expectOne('/api/games/7/schedule');
+    expect(req.request.body).toMatchObject({
+      startsAt: '2027-03-02T17:00:00.000Z',
+      startWindowMinutes: 120,
+    });
+    req.flush({ ...game, startWindowMinutes: 120 });
+    await settle();
+  });
+
+  it('a windowed rule opens in «approximate» mode; «exact» clears the window', async () => {
+    await create({ game: { ...game, startWindowMinutes: 90 }, mode: 'schedule' });
+    expect(el.querySelector('select.window-to')).not.toBeNull();
+    el.querySelector<HTMLElement>('.mode-exact button')!.click();
+    await settle();
+    expect(el.querySelector('select.window-to')).toBeNull();
+    expect(el.querySelector('input.time')).not.toBeNull();
+    await submit();
+    const req = http.expectOne('/api/games/7/schedule');
+    expect(req.request.body).toMatchObject({ startWindowMinutes: null });
+    req.flush(game);
+    await settle();
   });
 });

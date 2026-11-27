@@ -21,6 +21,7 @@ import {
 import { confirmCloseDead } from '../dead-games/dead-game-close';
 import { openPauseDialog, openResumeDialog, resumedNoticeKey } from '../pause/pause-flow';
 import { viewerTimeZone } from '../../../core/i18n/dates';
+import { openPinTime } from '../../scheduling/pin-time-dialog/open-pin-time';
 import { Slot } from '../../../theming/slot';
 import type { SlotLinkAction, SlotOutputEvent } from '../../../theming/slots';
 
@@ -47,6 +48,11 @@ const EMPTY_ACTION: SlotLinkAction = {
 interface Message {
   kind: 'error' | 'info';
   key: string;
+  /**
+   * Перехід відмовив через приблизний час сесії (409 `SESSION_TIME_APPROXIMATE`): кнопка
+   * «Уточнити час» для цієї сесії.
+   */
+  pin?: { sessionId: number; action: GameAction };
 }
 
 /**
@@ -261,11 +267,36 @@ export class MyGames {
       // Перехід змінює й лічильники (скасовані заявки, склад) — беремо їх із сервера.
       void this.refresh();
     } catch (err) {
-      const { code } = toApiError(err);
-      // 401 уже обробив authInterceptor.
-      if (code !== 'UNAUTHENTICATED') this.message.set({ kind: 'error', key: `errors.${code}` });
+      const { code, details } = toApiError(err);
+      const sessionId = (details as { sessionId?: unknown } | undefined)?.sessionId;
+      if (code === 'SESSION_TIME_APPROXIMATE' && typeof sessionId === 'number') {
+        // Почати гру / завершити ваншот не можна, поки час найближчої сесії приблизний.
+        this.message.set({
+          kind: 'error',
+          key: `games.my.timeApproximate.${action === 'start' ? 'start' : 'finish'}`,
+          pin: { sessionId, action },
+        });
+      } else if (code !== 'UNAUTHENTICATED') {
+        // 401 уже обробив authInterceptor.
+        this.message.set({ kind: 'error', key: `errors.${code}` });
+      }
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  /** «Уточнити час» з повідомлення про відмову переходу; після уточнення — пояснення, що далі. */
+  protected async pinTime(pin: NonNullable<Message['pin']>): Promise<void> {
+    if (this.busyId() !== null) return;
+    const dto = await openPinTime(this.dialog, {
+      sessionId: pin.sessionId,
+      viewerTimezone: viewerTimeZone(this.auth.me()),
+    });
+    if (!dto) return;
+    this.message.set({
+      kind: 'info',
+      key: `games.my.pinned.${pin.action === 'start' ? 'start' : 'finish'}`,
+    });
+    void this.refresh();
   }
 }

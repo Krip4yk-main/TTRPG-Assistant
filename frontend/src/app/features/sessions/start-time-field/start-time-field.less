@@ -1,0 +1,39 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.start-time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+}
+
+.group-label {
+  font-weight: 600;
+}
+
+.mode {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.window {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm) var(--nri-space-md);
+
+  > * {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.875rem;
+}

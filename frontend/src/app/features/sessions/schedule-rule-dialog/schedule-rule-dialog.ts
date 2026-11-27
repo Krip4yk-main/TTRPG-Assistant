@@ -34,6 +34,7 @@ import {
   zonedInputToUtc,
 } from '../../../core/i18n/dates';
 import { SESSION_DURATIONS } from '../session-durations';
+import { StartTimeField } from '../start-time-field/start-time-field';
 
 export interface ScheduleRuleDialogData {
   game: Pick<
@@ -44,6 +45,7 @@ export interface ScheduleRuleDialogData {
     | 'startsAt'
     | 'nextSessionAt'
     | 'durationMinutes'
+    | 'startWindowMinutes'
     | 'recurrence'
     | 'weekdays'
   >;
@@ -62,7 +64,7 @@ const isWeekly = (r: Recurrence) => r === 'weekly' || r === 'biweekly';
 /**
  * Нове правило розкладу («Змінити розклад» для кампанії, «Перетворити на кампанію» для
  * ваншота): перша сесія (дата й час у поясі гри, лише в майбутньому — сервер інакше
- * відповідає `GAME_IN_PAST`), тривалість, регулярність і дні тижня. Перенесені й завершені
+ * відповідає `GAME_IN_PAST`; точний час чи вікно початку), тривалість, регулярність і дні тижня. Перенесені й завершені
  * сесії правило не чіпає. Закривається з оновленою `GameDto`.
  */
 @Component({
@@ -76,6 +78,7 @@ const isWeekly = (r: Recurrence) => r === 'weekly' || r === 'biweekly';
     MatFormFieldModule,
     MatInputModule,
     TranslatePipe,
+    StartTimeField,
   ],
   providers: [provideUkDates()],
   templateUrl: './schedule-rule-dialog.html',
@@ -116,6 +119,7 @@ export class ScheduleRuleDialog {
       validators: [Validators.required],
     }),
     durationMinutes: new FormControl(this.data.game.durationMinutes, { nonNullable: true }),
+    startWindowMinutes: new FormControl<number | null>(this.data.game.startWindowMinutes),
     recurrence: new FormControl<Recurrence>(this.startRecurrence, { nonNullable: true }),
     weekdays: new FormControl<number[]>(
       isWeekly(this.startRecurrence)
@@ -190,6 +194,7 @@ export class ScheduleRuleDialog {
     const input: ScheduleRuleInput = {
       startsAt,
       durationMinutes: v.durationMinutes,
+      startWindowMinutes: v.startWindowMinutes,
       recurrence: v.recurrence,
       weekdays: weekly ? [...v.weekdays].sort((a, b) => a - b) : [],
     };

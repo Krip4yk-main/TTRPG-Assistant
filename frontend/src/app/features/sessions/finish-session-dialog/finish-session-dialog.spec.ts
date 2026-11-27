@@ -4,7 +4,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { MemberDto } from '@nri/shared';
-import { FinishSessionDialog, type FinishSessionDialogData } from './finish-session-dialog';
+import {
+  FinishSessionDialog,
+  PIN_FIRST,
+  type FinishSessionDialogData,
+} from './finish-session-dialog';
 
 const member = (publicId: string, nickname: string | null): MemberDto => ({
   publicId,
@@ -56,6 +60,22 @@ describe('FinishSessionDialog', () => {
 
   const box = (publicId: string) =>
     el.querySelector<HTMLInputElement>(`[data-member-id="${publicId}"] input[type="checkbox"]`)!;
+
+  it('an approximate session time: explanation and «pin time» instead of a dead end', async () => {
+    el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+    await settle();
+    http
+      .expectOne('/api/sessions/41/finish')
+      .flush(
+        { error: { code: 'SESSION_TIME_APPROXIMATE', details: { sessionId: 41 } } },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+    const alert = el.querySelector('.needs-pin')!;
+    expect(alert.textContent).toContain('errors.SESSION_TIME_APPROXIMATE');
+    alert.querySelector<HTMLButtonElement>('button.pin-first')!.click();
+    expect(close).toHaveBeenCalledWith(PIN_FIRST);
+  });
 
   it('lists every member checked as present by default', () => {
     expect(box('aaaaaaaaaa').checked).toBe(true);
