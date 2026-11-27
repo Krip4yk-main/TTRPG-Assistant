@@ -1,7 +1,7 @@
 import { fakeAnimate } from '../../testing/fake-animate';
-import { openEffectStage } from './effect-stage';
+import { runEffectStage, type EffectStage } from './effect-stage';
 
-describe('openEffectStage (сцена фірмового ефекту)', () => {
+describe('runEffectStage (сцена фірмового ефекту)', () => {
   let source: HTMLElement;
   const original = Element.prototype.animate;
 
@@ -18,10 +18,15 @@ describe('openEffectStage (сцена фірмового ефекту)', () => {
     document.querySelectorAll('.fx-test').forEach((o) => o.remove());
   });
 
-  it('decorative overlay with a box over the source; finish waits for animations, then removes it', async () => {
+  it('decorative overlay with a box over the source; waits for the animations, then removes it', async () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
-    const stage = openEffectStage(source, new AbortController().signal, 'fx-test')!;
+    let stage!: EffectStage;
+    let done = false;
+    const run = runEffectStage(source, new AbortController().signal, 'fx-test', (s) => {
+      stage = s;
+      s.play(s.add('dot'), [{ opacity: 0 }, { opacity: 1 }], [100, 300]);
+    }).then(() => (done = true));
     expect(stage.root.getAttribute('aria-hidden')).toBe('true');
     expect(stage.root.inert).toBe(true);
     expect(stage.root.parentElement).toBe(document.body);
@@ -29,18 +34,14 @@ describe('openEffectStage (сцена фірмового ефекту)', () => {
     expect(stage.box.style.top).toBe('30px');
     expect(stage.box.style.width).toBe('500px');
     expect(stage.box.style.height).toBe('400px');
-    const dot = stage.add('dot');
-    expect(dot.parentElement).toBe(stage.box);
-    stage.play(dot, [{ opacity: 0 }, { opacity: 1 }], [100, 300]);
+    expect(stage.box.querySelector('.dot')).not.toBeNull();
     expect(anims[0]!.options).toMatchObject({ delay: 100, duration: 200 });
 
-    let done = false;
-    const finished = stage.finish().then(() => (done = true));
     await Promise.resolve();
     expect(done).toBe(false);
     expect(document.querySelector('.fx-test')).not.toBeNull();
     anims[0]!.resolve();
-    await finished;
+    await run;
     expect(document.querySelector('.fx-test')).toBeNull();
     // Звичайне завершення анімацій не скасовує (стан `source` лишається до закриття).
     expect(anims[0]!.cancel).not.toHaveBeenCalled();
@@ -50,26 +51,43 @@ describe('openEffectStage (сцена фірмового ефекту)', () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const abort = new AbortController();
-    const stage = openEffectStage(source, abort.signal, 'fx-test')!;
-    stage.play(source, [{ opacity: 1 }, { opacity: 0 }], [0, 200]);
-    stage.play(stage.add('dot'), [{ opacity: 0 }, { opacity: 1 }], [0, 200]);
-    const finished = stage.finish();
+    const run = runEffectStage(source, abort.signal, 'fx-test', ({ add, play }) => {
+      play(source, [{ opacity: 1 }, { opacity: 0 }], [0, 200]);
+      play(add('dot'), [{ opacity: 0 }, { opacity: 1 }], [0, 200]);
+    });
     abort.abort();
-    await finished;
+    await run;
+    expect(anims).toHaveLength(2);
     expect(anims.every((a) => a.cancel.mock.calls.length === 1)).toBe(true);
     expect(document.querySelector('.fx-test')).toBeNull();
   });
 
-  it('no stage without Web Animations, for a zero-sized source or an aborted signal', () => {
+  it('a setup error removes the overlay, cancels started animations (also on the source) and rethrows', async () => {
+    const { animate, anims } = fakeAnimate(false);
+    Element.prototype.animate = animate;
+    const boom = new Error('boom');
+    const run = runEffectStage(source, new AbortController().signal, 'fx-test', ({ play }) => {
+      play(source, [{ opacity: 1 }, { opacity: 0 }], [0, 200]);
+      throw boom;
+    });
+    await expect(run).rejects.toBe(boom);
+    expect(document.querySelector('.fx-test')).toBeNull();
+    expect(anims[0]!.target).toBe(source);
+    expect(anims[0]!.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('nothing happens without Web Animations, for a zero-sized source or an aborted signal', async () => {
+    const setup = vi.fn();
     (Element.prototype as { animate?: unknown }).animate = undefined;
-    expect(openEffectStage(source, new AbortController().signal, 'fx-test')).toBeNull();
+    await runEffectStage(source, new AbortController().signal, 'fx-test', setup);
 
     Element.prototype.animate = fakeAnimate(true).animate;
     const aborted = new AbortController();
     aborted.abort();
-    expect(openEffectStage(source, aborted.signal, 'fx-test')).toBeNull();
+    await runEffectStage(source, aborted.signal, 'fx-test', setup);
     source.getBoundingClientRect = () => ({ width: 0, height: 0 }) as DOMRect;
-    expect(openEffectStage(source, new AbortController().signal, 'fx-test')).toBeNull();
+    await runEffectStage(source, new AbortController().signal, 'fx-test', setup);
+    expect(setup).not.toHaveBeenCalled();
     expect(document.querySelector('.fx-test')).toBeNull();
   });
 });

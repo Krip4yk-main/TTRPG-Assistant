@@ -25,7 +25,7 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const done = paintBrushTag(source, new AbortController().signal, text);
-    const overlay = document.querySelector('.pc-send')!;
+    const overlay = await stageOpened();
     expect(overlay.getAttribute('aria-hidden')).toBe('true');
     expect(overlay.querySelector('.pc-send-text')!.textContent).toBe('Я в грі!');
     // Мазок — по літері, зліва направо; пробіли не малюються (пензель відривається).
@@ -36,8 +36,15 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     const gaps = Array.from(overlay.querySelectorAll('.pc-send-gap'));
     expect(gaps).toHaveLength(2);
     expect(anims.some((a) => gaps.includes(a.target))).toBe(false);
-    // Патьоки — з «Я» та «і»; підкреслення й бризки.
-    expect(overlay.querySelectorAll('.pc-send-drip')).toHaveLength(2);
+    // Патьоки — з «Я» та «і» (стікають за 60 мс після своєї літери); підкреслення й бризки.
+    const drips = Array.from(overlay.querySelectorAll('.pc-send-drip'));
+    expect(drips).toHaveLength(2);
+    const endOf = (el: Element) => {
+      const o = anims.find((a) => a.target === el)!.options;
+      return Number(o.delay) + Number(o.duration);
+    };
+    const dripStarts = drips.map((d) => Number(anims.find((a) => a.target === d)!.options.delay));
+    expect(dripStarts).toEqual([endOf(letters[0]) + 60, endOf(letters[4]) + 60]);
     expect(overlay.querySelector('.pc-send-swoosh')).not.toBeNull();
     expect(overlay.querySelectorAll('.pc-send-splat')).toHaveLength(3);
     expect(overlay.querySelector('.pc-send-brush')).not.toBeNull();
@@ -49,11 +56,53 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     expect(document.querySelector('.pc-send')).toBeNull();
   });
 
+  describe('шрифт тегу', () => {
+    afterEach(() => {
+      delete (document as { fonts?: unknown }).fonts;
+      vi.useRealTimers();
+    });
+
+    function fakeFonts(load: () => Promise<unknown>) {
+      const spy = vi.fn(load);
+      Object.defineProperty(document, 'fonts', { value: { load: spy }, configurable: true });
+      return spy;
+    }
+
+    it('waits for the font faces of the rendered caption (cyrillic too) before measuring', async () => {
+      let loaded!: () => void;
+      const load = fakeFonts(() => new Promise<void>((resolve) => (loaded = resolve)));
+      const { animate } = fakeAnimate(true);
+      Element.prototype.animate = animate;
+      const done = paintBrushTag(source, new AbortController().signal, text);
+      // Зразок — сам напис: без нього вантажиться лише латинська грань.
+      expect(load).toHaveBeenCalledWith("400 1em 'Rubik Wet Paint'", 'Я в грі!');
+      await Promise.resolve();
+      expect(document.querySelector('.pc-send')).toBeNull();
+      loaded();
+      await done;
+      expect(animate).toHaveBeenCalled();
+    });
+
+    it('does not wait for the font longer than 300 ms', async () => {
+      vi.useFakeTimers();
+      fakeFonts(() => new Promise(() => undefined));
+      const { animate } = fakeAnimate(true);
+      Element.prototype.animate = animate;
+      const done = paintBrushTag(source, new AbortController().signal, text);
+      await vi.advanceTimersByTimeAsync(299);
+      expect(animate).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await done;
+      expect(animate).toHaveBeenCalled();
+    });
+  });
+
   it('abort cancels the animations and removes the tag at once', async () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const abort = new AbortController();
     const done = paintBrushTag(source, abort.signal, text);
+    await stageOpened();
     abort.abort();
     await done;
     expect(document.querySelector('.pc-send')).toBeNull();
@@ -66,6 +115,12 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     expect(document.querySelector('.pc-send')).toBeNull();
   });
 });
+
+/** Сцена відкривається після (обмеженого) чекання шрифту — асинхронно. */
+async function stageOpened(): Promise<Element> {
+  await vi.waitFor(() => expect(document.querySelector('.pc-send')).not.toBeNull());
+  return document.querySelector('.pc-send')!;
+}
 
 function lastEnd(anims: { options: KeyframeAnimationOptions }[]): number {
   return Math.max(

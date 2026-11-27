@@ -1,4 +1,4 @@
-import { openEffectStage } from '../../../effect-stage';
+import { runEffectStage } from '../../../effect-stage';
 import type { ThemeEffect } from '../../../theme.registry';
 
 /**
@@ -40,104 +40,100 @@ const LIT: Keyframe = {
 };
 
 export const lightNeonSign: ThemeEffect = async (source, signal, text) => {
-  const stage = openEffectStage(source, signal, 'ns-send');
-  if (!stage) return;
-  const { add, play, rect } = stage;
+  await runEffectStage(source, signal, 'ns-send', ({ add, play, rect }) => {
+    const words = text('theme.effects.neonSigns.sign').trim().split(/\s+/).filter(Boolean);
+    const longest = Math.max(1, ...words.map((w) => w.length));
+    const signW = Math.min(MAX_SIGN_W, rect.width - 16);
+    // Літера M PLUS Rounded з розрядкою ≈ 0.86em завширшки.
+    const font = Math.max(20, Math.min(MAX_FONT, Math.floor(signW / (longest * 0.86))));
 
-  const words = text('theme.effects.neonSigns.sign').trim().split(/\s+/).filter(Boolean);
-  const longest = Math.max(1, ...words.map((w) => w.length));
-  const signW = Math.min(MAX_SIGN_W, rect.width - 16);
-  // Літера M PLUS Rounded з розрядкою ≈ 0.86em завширшки.
-  const font = Math.max(20, Math.min(MAX_FONT, Math.floor(signW / (longest * 0.86))));
-
-  const sign = add('ns-send-sign');
-  Object.assign(sign.style, { width: `${signW}px`, fontSize: `${font}px` });
-  const glow = add('ns-send-glow', sign);
-  add('ns-send-wire ns-send-wire-l', sign);
-  add('ns-send-wire ns-send-wire-r', sign);
-  const lines = add('ns-send-lines', sign);
-  const letters: HTMLElement[] = [];
-  for (const word of words) {
-    const line = add('ns-send-line', lines);
-    for (const ch of word) {
-      const letter = add('ns-send-letter', line, 'span');
-      letter.textContent = ch;
-      letters.push(letter);
+    const sign = add('ns-send-sign');
+    Object.assign(sign.style, { width: `${signW}px`, fontSize: `${font}px` });
+    const glow = add('ns-send-glow', sign);
+    add('ns-send-wire ns-send-wire-l', sign);
+    add('ns-send-wire ns-send-wire-r', sign);
+    const lines = add('ns-send-lines', sign);
+    const letters: HTMLElement[] = [];
+    for (const word of words) {
+      const line = add('ns-send-line', lines);
+      for (const ch of word) {
+        const letter = add('ns-send-letter', line, 'span');
+        letter.textContent = ch;
+        letters.push(letter);
+      }
     }
-  }
-  const tube = add('ns-send-tube', sign);
-  const reflection = add('ns-send-reflection', sign);
-  for (const word of words) add('ns-send-line', reflection).textContent = word;
-  const check = add('ns-send-check', sign);
-  check.textContent = '✓';
+    const tube = add('ns-send-tube', sign);
+    const reflection = add('ns-send-reflection', sign);
+    for (const word of words) add('ns-send-line', reflection).textContent = word;
+    const check = add('ns-send-check', sign);
+    check.textContent = '✓';
 
-  // Діалог гасне (після ефекту викликач його закриває; переривання повертає як було).
-  play(source, [{ opacity: 1 }, { opacity: 0 }], T.dialogOut, 'ease-out', 'forwards');
-  play(sign, [{ opacity: 0 }, { opacity: 1 }], T.signIn, 'ease-out');
+    // Діалог гасне (після ефекту викликач його закриває; переривання повертає як було).
+    play(source, [{ opacity: 1 }, { opacity: 0 }], T.dialogOut, 'ease-out', 'forwards');
+    play(sign, [{ opacity: 0 }, { opacity: 1 }], T.signIn, 'ease-out');
 
-  // Трубка, що заїкається: третя літера останнього слова («Д» у «ПОДАНО»), інакше остання.
-  const last = words.at(-1) ?? '';
-  const stutterAt = letters.length - last.length + Math.min(2, last.length - 1);
-  const step = (T.letters[1] - T.letters[0] - LETTER_MS) / Math.max(1, letters.length - 1);
-  letters.forEach((letter, i) => {
-    const from = T.letters[0] + Math.round(i * step);
-    const flick: Keyframe[] = [
-      COLD,
-      { ...LIT, offset: 0.3 },
-      { ...COLD, offset: 0.5 },
-      { ...LIT, offset: 0.75 },
-      LIT,
-    ];
-    if (i !== stutterAt) {
-      play(letter, flick, [from, from + LETTER_MS], 'steps(1, end)', 'both');
-      return;
-    }
-    // Заїкання: загоряється й двічі гасне, перш ніж засвітитися рівно.
-    play(
-      letter,
-      [
+    // Трубка, що заїкається: третя літера останнього слова («Д» у «ПОДАНО»), інакше остання.
+    const last = words.at(-1) ?? '';
+    const stutterAt = letters.length - last.length + Math.min(2, last.length - 1);
+    const step = (T.letters[1] - T.letters[0] - LETTER_MS) / Math.max(1, letters.length - 1);
+    letters.forEach((letter, i) => {
+      const from = T.letters[0] + Math.round(i * step);
+      const flick: Keyframe[] = [
         COLD,
-        { ...COLD, offset: 0.12 },
-        { ...LIT, offset: 0.16 },
-        { ...LIT, offset: 0.4 },
-        { ...COLD, offset: 0.46 },
-        { ...LIT, offset: 0.58 },
-        { ...LIT, offset: 0.74 },
-        { ...COLD, offset: 0.8 },
-        { ...LIT, offset: 0.9 },
+        { ...LIT, offset: 0.3 },
+        { ...COLD, offset: 0.5 },
+        { ...LIT, offset: 0.75 },
         LIT,
+      ];
+      if (i !== stutterAt) {
+        play(letter, flick, [from, from + LETTER_MS], 'steps(1, end)', 'both');
+        return;
+      }
+      // Заїкання: загоряється й двічі гасне, перш ніж засвітитися рівно.
+      play(
+        letter,
+        [
+          COLD,
+          { ...COLD, offset: 0.12 },
+          { ...LIT, offset: 0.16 },
+          { ...LIT, offset: 0.4 },
+          { ...COLD, offset: 0.46 },
+          { ...LIT, offset: 0.58 },
+          { ...LIT, offset: 0.74 },
+          { ...COLD, offset: 0.8 },
+          { ...LIT, offset: 0.9 },
+          LIT,
+        ],
+        [from, T.stutter[1]],
+        'steps(1, end)',
+        'both',
+      );
+    });
+
+    play(
+      tube,
+      [
+        { opacity: 0.25, boxShadow: 'none' },
+        { opacity: 1, offset: 0.3, boxShadow: '0 0 6px #25dcff, 0 0 18px #25dcff' },
+        { opacity: 0.25, offset: 0.5, boxShadow: 'none' },
+        { opacity: 1, boxShadow: '0 0 6px #25dcff, 0 0 18px #25dcff' },
       ],
-      [from, T.stutter[1]],
+      T.tube,
       'steps(1, end)',
-      'both',
     );
+    play(glow, [{ opacity: 0 }, { opacity: 1 }], T.glow, 'ease-in');
+    play(reflection, [{ opacity: 0 }, { opacity: 0.4 }], T.reflection, 'ease-out');
+    play(
+      check,
+      [
+        { opacity: 0, transform: 'scale(0.4)' },
+        { opacity: 1, offset: 0.7, transform: 'scale(1.15)' },
+        { opacity: 1, transform: 'scale(1)' },
+      ],
+      T.check,
+      'ease-out',
+    );
+    // Тихо гасне вся вивіска.
+    play(sign, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
   });
-
-  play(
-    tube,
-    [
-      { opacity: 0.25, boxShadow: 'none' },
-      { opacity: 1, offset: 0.3, boxShadow: '0 0 6px #25dcff, 0 0 18px #25dcff' },
-      { opacity: 0.25, offset: 0.5, boxShadow: 'none' },
-      { opacity: 1, boxShadow: '0 0 6px #25dcff, 0 0 18px #25dcff' },
-    ],
-    T.tube,
-    'steps(1, end)',
-  );
-  play(glow, [{ opacity: 0 }, { opacity: 1 }], T.glow, 'ease-in');
-  play(reflection, [{ opacity: 0 }, { opacity: 0.4 }], T.reflection, 'ease-out');
-  play(
-    check,
-    [
-      { opacity: 0, transform: 'scale(0.4)' },
-      { opacity: 1, offset: 0.7, transform: 'scale(1.15)' },
-      { opacity: 1, transform: 'scale(1)' },
-    ],
-    T.check,
-    'ease-out',
-  );
-  // Тихо гасне вся вивіска.
-  play(sign, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
-
-  await stage.finish();
 };

@@ -1,27 +1,5 @@
+import { fakeAnimate } from '../../../../../testing/fake-animate';
 import { DUST_MS, sendInEnvelope } from './application-sent';
-
-/** Підробна анімація WAAPI: завершується, коли тест скаже (або одразу). */
-function fakeAnimate(autoFinish: boolean) {
-  const anims: { cancel: ReturnType<typeof vi.fn>; resolve: () => void }[] = [];
-  const animate = vi.fn(function (this: Element) {
-    let resolve!: () => void;
-    let reject!: (e: unknown) => void;
-    const finished = new Promise<void>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    finished.catch(() => undefined);
-    const a = {
-      finished,
-      cancel: vi.fn(() => reject(new DOMException('', 'AbortError'))),
-      resolve,
-    };
-    anims.push(a);
-    if (autoFinish) resolve();
-    return a as unknown as Animation;
-  });
-  return { animate, anims };
-}
 
 describe('sendInEnvelope («Магіпанк»: конверт заявки)', () => {
   let source: HTMLElement;

@@ -231,6 +231,40 @@ describe('ApplyDialog', () => {
     });
   });
 
+  it('while the effect plays, «Скасувати» is a no-op and the dialog is inert: it still closes with the success', async () => {
+    await create();
+    let finish!: () => void;
+    themes.playEffect.mockImplementation((_name, _source, onStart) => {
+      onStart?.();
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    });
+    await accept();
+    await type('textarea.answer', 'Багато');
+    await submit();
+    http
+      .expectOne('/api/games/7/applications')
+      .flush(created, { status: 201, statusText: 'Created' });
+    await settle();
+    const source = themes.playEffect.mock.calls[0]![1];
+    expect(source.inert).toBe(true);
+    const cancel = Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+      b.textContent?.includes('common.cancel'),
+    )!;
+    cancel.click();
+    await settle();
+    expect(close).not.toHaveBeenCalled();
+    finish();
+    await settle();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledWith({
+      status: 'applied',
+      application: created,
+      announced: true,
+    });
+  });
+
   it('an API error plays no effect and keeps the form filled', async () => {
     await create();
     await accept();

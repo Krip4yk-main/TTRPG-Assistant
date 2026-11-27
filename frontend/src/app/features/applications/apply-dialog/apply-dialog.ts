@@ -171,6 +171,8 @@ export class ApplyDialog {
   /** Помилка поля від сервера (на випадок розбіжності з клієнтською перевіркою). */
   protected readonly serverField = signal<ErrorCode | null>(null);
   protected readonly submitted = signal(false);
+  /** Заявку прийнято, грає ефект надсилання: діалог закриється лише з результатом. */
+  private handingOff = false;
 
   constructor() {
     // Чанк ефекту — наперед, поки гравець заповнює форму.
@@ -324,6 +326,8 @@ export class ApplyDialog {
   }
 
   protected cancel(): void {
+    // Заявку вже прийнято й грає ефект: закриття без результату загубило б успіх.
+    if (this.handingOff) return;
     this.ref.close();
   }
 
@@ -332,15 +336,19 @@ export class ApplyDialog {
    * закривається Escape чи кліком поза ним — інакше успіх загубився б. Ефект ніколи не
    * відхиляється. Оверлей ефекту декоративний (`aria-hidden`), а діалог під ним прихований,
    * тож про успіх одразу на старті ввічливо повідомляє `LiveAnnouncer` (його регіон CDK
-   * відкриває й модальним діалогам). `true` — ефект стартував (успіх озвучено).
+   * відкриває й модальним діалогам). Поки ефект грає, діалог ще й `inert`, а «Скасувати» —
+   * no-op: ні кнопки, ні поля під оверлеєм (він пропускає кліки) не загублять успіх.
+   * `true` — ефект стартував (успіх озвучено).
    */
   private async playSent(): Promise<boolean> {
     const host = this.host.nativeElement;
     const surface = host.closest<HTMLElement>('.mat-mdc-dialog-surface') ?? host;
     let started = false;
+    this.handingOff = true;
     await this.themes.playEffect('applicationSent', surface, () => {
       started = true;
       this.ref.disableClose = true;
+      surface.inert = true;
       void this.announcer.announce(
         this.translate.instant('games.applications.apply.sent') as string,
         'polite',

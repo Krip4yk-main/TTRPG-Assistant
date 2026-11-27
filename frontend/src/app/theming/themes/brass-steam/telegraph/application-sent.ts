@@ -1,4 +1,4 @@
-import { openEffectStage } from '../../../effect-stage';
+import { runEffectStage } from '../../../effect-stage';
 import type { ThemeEffect } from '../../../theme.registry';
 
 /**
@@ -26,102 +26,98 @@ const NEEDLE = { rest: -60, peak: 78, settle: 38 } as const;
 const STEAM_PUFFS = 4;
 
 export const printTelegraphTape: ThemeEffect = async (source, signal, text) => {
-  const stage = openEffectStage(source, signal, 'bs-send');
-  if (!stage) return;
-  const { add, play } = stage;
+  await runEffectStage(source, signal, 'bs-send', ({ add, play }) => {
+    const brass = add('bs-send-brass');
+    add('bs-send-slot', brass);
+    const well = add('bs-send-well', brass);
+    const tape = add('bs-send-tape', well);
+    const message = text('theme.effects.brassSteam.tape');
+    tape.textContent = message;
+    const stamp = add('bs-send-stamp');
+    stamp.textContent = text('theme.effects.brassSteam.stamp');
+    const gauge = add('bs-send-gauge', brass);
+    const needle = add('bs-send-needle', gauge);
+    const puffs = Array.from({ length: STEAM_PUFFS }, () => add('bs-send-steam', gauge));
 
-  const brass = add('bs-send-brass');
-  add('bs-send-slot', brass);
-  const well = add('bs-send-well', brass);
-  const tape = add('bs-send-tape', well);
-  const message = text('theme.effects.brassSteam.tape');
-  tape.textContent = message;
-  const stamp = add('bs-send-stamp');
-  stamp.textContent = text('theme.effects.brassSteam.stamp');
-  const gauge = add('bs-send-gauge', brass);
-  const needle = add('bs-send-needle', gauge);
-  const puffs = Array.from({ length: STEAM_PUFFS }, () => add('bs-send-steam', gauge));
+    play(brass, [{ opacity: 0 }, { opacity: 1 }], T.brassIn, 'ease-out');
 
-  play(brass, [{ opacity: 0 }, { opacity: 1 }], T.brassIn, 'ease-out');
-
-  // Друк: стрічка висувається зі щілини ривками — крок на літеру.
-  const chars = Math.max(1, [...message].length);
-  play(
-    tape,
-    [{ transform: 'translateY(-100%)' }, { transform: 'translateY(0)' }],
-    T.tape,
-    `steps(${chars}, end)`,
-  );
-  // Стрічка відривається й падає, крутнувшись.
-  play(
-    tape,
-    [
-      { opacity: 1, transform: 'translateY(0) rotate(0deg)' },
-      { opacity: 1, offset: 0.2, transform: 'translateY(4px) rotate(-3deg)' },
-      { opacity: 0, transform: 'translate(-14px, 70px) rotate(14deg)' },
-    ],
-    T.tear,
-    'ease-in',
-    'forwards',
-  );
-
-  // Штамп: падає й вдавлюється.
-  play(
-    stamp,
-    [
-      { opacity: 0, transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.9)' },
-      { opacity: 1, offset: 0.65, transform: 'translate(-50%, -50%) rotate(-8deg) scale(0.94)' },
-      { opacity: 1, transform: 'translate(-50%, -50%) rotate(-8deg) scale(1)' },
-    ],
-    T.stamp,
-    'ease-in',
-  );
-
-  // Манометр: стрибок у червоне, тремтіння й осідання.
-  const turn = (deg: number): Keyframe => ({ transform: `rotate(${deg}deg)` });
-  play(
-    needle,
-    [turn(NEEDLE.rest), turn(NEEDLE.peak)],
-    T.gaugeJump,
-    'cubic-bezier(0.2, 1.4, 0.5, 1)',
-  );
-  play(
-    needle,
-    [
-      turn(NEEDLE.peak),
-      { ...turn(NEEDLE.peak - 14), offset: 0.3 },
-      { ...turn(NEEDLE.settle + 6), offset: 0.6 },
-      turn(NEEDLE.settle),
-    ],
-    T.gaugeSettle,
-    'ease-out',
-    'forwards',
-  );
-
-  // Пшик пари: клуби ростуть і розтають угору.
-  puffs.forEach((puff, i) => {
-    const dx = (i - (STEAM_PUFFS - 1) / 2) * 9;
-    const from = T.steam[0] + i * 40;
+    // Друк: стрічка висувається зі щілини ривками — крок на літеру.
+    const chars = Math.max(1, [...message].length);
     play(
-      puff,
-      [
-        { opacity: 0, transform: 'translate(-50%, 0) scale(0.4)' },
-        {
-          opacity: 0.85,
-          offset: 0.3,
-          transform: `translate(calc(-50% + ${dx / 2}px), -14px) scale(1)`,
-        },
-        { opacity: 0, transform: `translate(calc(-50% + ${dx}px), -40px) scale(2.2)` },
-      ],
-      [from, T.steam[1]],
-      'ease-out',
+      tape,
+      [{ transform: 'translateY(-100%)' }, { transform: 'translateY(0)' }],
+      T.tape,
+      `steps(${chars}, end)`,
     );
+    // Стрічка відривається й падає, крутнувшись.
+    play(
+      tape,
+      [
+        { opacity: 1, transform: 'translateY(0) rotate(0deg)' },
+        { opacity: 1, offset: 0.2, transform: 'translateY(4px) rotate(-3deg)' },
+        { opacity: 0, transform: 'translate(-14px, 70px) rotate(14deg)' },
+      ],
+      T.tear,
+      'ease-in',
+      'forwards',
+    );
+
+    // Штамп: падає й вдавлюється.
+    play(
+      stamp,
+      [
+        { opacity: 0, transform: 'translate(-50%, -50%) rotate(-8deg) scale(1.9)' },
+        { opacity: 1, offset: 0.65, transform: 'translate(-50%, -50%) rotate(-8deg) scale(0.94)' },
+        { opacity: 1, transform: 'translate(-50%, -50%) rotate(-8deg) scale(1)' },
+      ],
+      T.stamp,
+      'ease-in',
+    );
+
+    // Манометр: стрибок у червоне, тремтіння й осідання.
+    const turn = (deg: number): Keyframe => ({ transform: `rotate(${deg}deg)` });
+    play(
+      needle,
+      [turn(NEEDLE.rest), turn(NEEDLE.peak)],
+      T.gaugeJump,
+      'cubic-bezier(0.2, 1.4, 0.5, 1)',
+    );
+    play(
+      needle,
+      [
+        turn(NEEDLE.peak),
+        { ...turn(NEEDLE.peak - 14), offset: 0.3 },
+        { ...turn(NEEDLE.settle + 6), offset: 0.6 },
+        turn(NEEDLE.settle),
+      ],
+      T.gaugeSettle,
+      'ease-out',
+      'forwards',
+    );
+
+    // Пшик пари: клуби ростуть і розтають угору.
+    puffs.forEach((puff, i) => {
+      const dx = (i - (STEAM_PUFFS - 1) / 2) * 9;
+      const from = T.steam[0] + i * 40;
+      play(
+        puff,
+        [
+          { opacity: 0, transform: 'translate(-50%, 0) scale(0.4)' },
+          {
+            opacity: 0.85,
+            offset: 0.3,
+            transform: `translate(calc(-50% + ${dx / 2}px), -14px) scale(1)`,
+          },
+          { opacity: 0, transform: `translate(calc(-50% + ${dx}px), -40px) scale(2.2)` },
+        ],
+        [from, T.steam[1]],
+        'ease-out',
+      );
+    });
+
+    // Латунь і штамп згасають наприкінці.
+    for (const el of [brass, stamp]) {
+      play(el, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
+    }
   });
-
-  // Латунь і штамп згасають наприкінці.
-  for (const el of [brass, stamp]) {
-    play(el, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
-  }
-
-  await stage.finish();
 };

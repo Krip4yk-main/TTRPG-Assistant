@@ -1,4 +1,4 @@
-import { openEffectStage } from '../../../effect-stage';
+import { runEffectStage } from '../../../effect-stage';
 import type { ThemeEffect } from '../../../theme.registry';
 
 /**
@@ -42,77 +42,74 @@ const DIODE_LIME: Keyframe = {
 };
 
 export const pulseAlongBus: ThemeEffect = async (source, signal, text) => {
-  const stage = openEffectStage(source, signal, 'nc-send');
-  if (!stage) return;
-  const { add, play, rect } = stage;
-  const w = rect.width;
+  await runEffectStage(source, signal, 'nc-send', ({ add, play, rect, doc }) => {
+    const w = rect.width;
 
-  const bus = add('nc-send-bus');
-  bus.style.top = `${rect.top + BUS_ABOVE >= 4 ? BUS_ABOVE : BUS_INSIDE}px`;
-  add('nc-send-rail', bus);
-  const diode = (at: number) => {
-    const clamp = add('nc-send-clamp', bus);
-    clamp.style.left = `${Math.round(w * at)}px`;
-    return add('nc-send-diode', clamp);
-  };
-  const home = diode(NODES.home);
-  const mid = diode(NODES.mid);
-  const far = diode(NODES.far);
-  const pulse = add('nc-send-pulse', bus);
-  const frame = add('nc-send-frame');
-  frame.style.borderRadius = stage.doc.defaultView?.getComputedStyle(source).borderRadius ?? '';
-  const status = add('nc-send-status');
-  status.textContent = text('theme.effects.nightCity.status');
+    const bus = add('nc-send-bus');
+    bus.style.top = `${rect.top + BUS_ABOVE >= 4 ? BUS_ABOVE : BUS_INSIDE}px`;
+    add('nc-send-rail', bus);
+    const diode = (at: number) => {
+      const clamp = add('nc-send-clamp', bus);
+      clamp.style.left = `${Math.round(w * at)}px`;
+      return add('nc-send-diode', clamp);
+    };
+    const home = diode(NODES.home);
+    const mid = diode(NODES.mid);
+    const far = diode(NODES.far);
+    const pulse = add('nc-send-pulse', bus);
+    const frame = add('nc-send-frame');
+    frame.style.borderRadius = doc.defaultView?.getComputedStyle(source).borderRadius ?? '';
+    const status = add('nc-send-status');
+    status.textContent = text('theme.effects.nightCity.status');
 
-  play(bus, [{ opacity: 0 }, { opacity: 1 }], T.busIn, 'ease-out');
-  play(home, [DIODE_OFF, DIODE_PINK], T.homeArm, 'ease-out');
+    play(bus, [{ opacity: 0 }, { opacity: 1 }], T.busIn, 'ease-out');
+    play(home, [DIODE_OFF, DIODE_PINK], T.homeArm, 'ease-out');
 
-  // Імпульс — від свого затискача до дальнього (кометою, хвіст позаду).
-  const fromX = w * NODES.home;
-  const toX = w * NODES.far;
-  play(
-    pulse,
-    [
-      { opacity: 0, transform: `translateX(${fromX}px) scaleX(0.3)` },
-      { opacity: 1, offset: 0.15, transform: `translateX(${fromX + 12}px) scaleX(1)` },
-      { opacity: 1, offset: 0.85, transform: `translateX(${toX - 12}px) scaleX(1)` },
-      { opacity: 0, transform: `translateX(${toX}px) scaleX(0.3)` },
-    ],
-    T.pulse,
-    'cubic-bezier(0.5, 0, 0.6, 1)',
-  );
-  // Сусіди квитують: короткі спалахи бірюзою.
-  const ack = (el: HTMLElement, span: readonly [number, number]) =>
+    // Імпульс — від свого затискача до дальнього (кометою, хвіст позаду).
+    const fromX = w * NODES.home;
+    const toX = w * NODES.far;
     play(
-      el,
+      pulse,
       [
-        DIODE_OFF,
-        { ...DIODE_CYAN, offset: 0.25 },
-        { ...DIODE_OFF, offset: 0.5 },
-        { ...DIODE_CYAN, offset: 0.75 },
-        DIODE_OFF,
+        { opacity: 0, transform: `translateX(${fromX}px) scaleX(0.3)` },
+        { opacity: 1, offset: 0.15, transform: `translateX(${fromX + 12}px) scaleX(1)` },
+        { opacity: 1, offset: 0.85, transform: `translateX(${toX - 12}px) scaleX(1)` },
+        { opacity: 0, transform: `translateX(${toX}px) scaleX(0.3)` },
       ],
-      span,
-      'steps(1, end)',
+      T.pulse,
+      'cubic-bezier(0.5, 0, 0.6, 1)',
     );
-  ack(mid, T.midAck);
-  ack(far, T.farAck);
-  // Свій вузол — зелений; рамка діалогу й табличка статусу.
-  play(home, [DIODE_PINK, DIODE_LIME], T.green, 'ease-out', 'forwards');
-  play(frame, [{ opacity: 0 }, { opacity: 1 }], T.green, 'ease-out');
-  play(
-    status,
-    [
-      { opacity: 0, transform: 'translateY(6px)' },
-      { opacity: 1, transform: 'translateY(0)' },
-    ],
-    T.green,
-    'ease-out',
-  );
-  // Усе згасає разом.
-  for (const el of [bus, frame, status]) {
-    play(el, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
-  }
-
-  await stage.finish();
+    // Сусіди квитують: короткі спалахи бірюзою.
+    const ack = (el: HTMLElement, span: readonly [number, number]) =>
+      play(
+        el,
+        [
+          DIODE_OFF,
+          { ...DIODE_CYAN, offset: 0.25 },
+          { ...DIODE_OFF, offset: 0.5 },
+          { ...DIODE_CYAN, offset: 0.75 },
+          DIODE_OFF,
+        ],
+        span,
+        'steps(1, end)',
+      );
+    ack(mid, T.midAck);
+    ack(far, T.farAck);
+    // Свій вузол — зелений; рамка діалогу й табличка статусу.
+    play(home, [DIODE_PINK, DIODE_LIME], T.green, 'ease-out', 'forwards');
+    play(frame, [{ opacity: 0 }, { opacity: 1 }], T.green, 'ease-out');
+    play(
+      status,
+      [
+        { opacity: 0, transform: 'translateY(6px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      T.green,
+      'ease-out',
+    );
+    // Усе згасає разом.
+    for (const el of [bus, frame, status]) {
+      play(el, [{ opacity: 1 }, { opacity: 0 }], T.out, 'ease-in', 'forwards');
+    }
+  });
 };
