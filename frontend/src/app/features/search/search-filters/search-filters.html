@@ -271,6 +271,12 @@
       (change)="patch({ hasFreeSlots: $event.checked })"
       >{{ 'search.filters.freeSlots' | translate }}</mat-checkbox
     >
+    <mat-checkbox
+      name="hasSafetyTools"
+      [checked]="f.hasSafetyTools"
+      (change)="patch({ hasSafetyTools: $event.checked })"
+      >{{ 'search.filters.safetyTools' | translate }}</mat-checkbox
+    >
   </fieldset>
 
   <!-- Попередження -->

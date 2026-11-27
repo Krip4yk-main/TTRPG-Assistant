@@ -39,6 +39,8 @@ export interface SearchFilterState {
   platform?: string;
   language?: GameLanguage;
   hasFreeSlots: boolean;
+  /** Лише ігри, де майстер зазначив інструменти безпеки, межі чи завіси. */
+  hasSafetyTools: boolean;
   excludeWarningIds: number[];
   /** Не задано — типовий режим (`mine`, якщо в користувача є слоти). */
   calendar?: UrlCalendarMode;
@@ -52,6 +54,7 @@ export const EMPTY_FILTERS: SearchFilterState = {
   priceMode: 'any',
   ageRatings: [],
   hasFreeSlots: false,
+  hasSafetyTools: false,
   excludeWarningIds: [],
   includePartial: false,
   sort: 'soonest',
@@ -73,6 +76,7 @@ const P = {
   platform: 'platform',
   language: 'lang',
   free: 'free',
+  safety: 'safety',
   noWarnings: 'noWarn',
   calendar: 'cal',
   partial: 'partial',
@@ -133,6 +137,7 @@ export function parseSearchParams(params: ParamMap): SearchFilterState {
     platform: text(params.get(P.platform), 60),
     language: oneOf(GAME_LANGUAGES, params.get(P.language)),
     hasFreeSlots: params.get(P.free) === '1',
+    hasSafetyTools: params.get(P.safety) === '1',
     excludeWarningIds: idList(params.get(P.noWarnings)),
     calendar: oneOf(['off', 'mine'] as const, params.get(P.calendar)),
     includePartial: params.get(P.partial) === '1',
@@ -158,6 +163,7 @@ export function toSearchParams(f: SearchFilterState): Params {
     [P.platform]: f.platform ?? null,
     [P.language]: f.language ?? null,
     [P.free]: f.hasFreeSlots ? '1' : null,
+    [P.safety]: f.hasSafetyTools ? '1' : null,
     [P.noWarnings]: list(f.excludeWarningIds),
     [P.calendar]: f.calendar ?? null,
     [P.partial]: f.includePartial ? '1' : null,
@@ -234,6 +240,7 @@ export function toSearchRequest(
   if (f.platform) req.platform = f.platform;
   if (f.language) req.language = f.language;
   if (f.hasFreeSlots) req.hasFreeSlots = true;
+  if (f.hasSafetyTools) req.hasSafetyTools = true;
   if (f.excludeWarningIds.length) req.excludeWarningIds = f.excludeWarningIds;
   return req;
 }

@@ -49,6 +49,8 @@ import {
   weeklyInZone,
 } from '../../../core/i18n/dates';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
+import { SafetySummary } from '../safety/safety-summary';
+import { toSafetyView } from '../safety/safety-view';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -113,6 +115,7 @@ type FullGame = PublicGameDto &
     MatIconModule,
     TranslatePipe,
     WarningChip,
+    SafetySummary,
     MembersPanel,
     SessionsList,
     CalendarPin,
@@ -317,6 +320,11 @@ export class GameDetails {
     return g.contentWarningIds
       .map((id) => list.find((w) => w.id === id)?.slug)
       .filter((s): s is string => !!s);
+  });
+  /** Безпека гри для показу; майстер нічого не заповнив — `null` (блоку немає). */
+  protected readonly safety = computed(() => {
+    const g = this.game();
+    return g ? toSafetyView(g, this.catalog.catalog()?.contentWarnings ?? []) : null;
   });
   /** Найближча сесія має приблизний час (вікно цієї сесії з сервера). */
   protected readonly nextSessionApprox = computed(() => {
@@ -711,6 +719,7 @@ export class GameDetails {
         warningSlugs: this.warningSlugs(),
         customWarnings: g.customWarnings,
         questions: g.applicationQuestions,
+        safety: this.safety(),
       };
       const ref = this.dialog.open<ApplyDialog, ApplyDialogData, ApplyDialogResult>(ApplyDialog, {
         data,

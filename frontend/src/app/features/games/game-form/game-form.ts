@@ -51,6 +51,10 @@ import {
   type GameStatus,
   RECURRENCES,
   type Recurrence,
+  SAFETY_TOOLS,
+  type SafetyList,
+  type SafetyTool,
+  emptySafetyList,
   ageOn,
   gameInputSchema,
   isRestrictedGame,
@@ -72,6 +76,7 @@ import { sanctionActiveDetails } from '../../../core/moderation/sanction-active'
 import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
 import { DeadGamesNotice } from '../dead-games/dead-games-notice';
 import { StartTimeField } from '../../sessions/start-time-field/start-time-field';
+import { GameSafetyFields, type SafetyChange } from './safety-fields/game-safety-fields';
 import {
   ConfirmDialog,
   type ConfirmDialogData,
@@ -132,7 +137,11 @@ const CUSTOM_ERROR: Partial<Record<string, string>> = {
   city: 'cityRequired',
   weekdays: 'weekdays',
   minPlayers: 'players',
+  veils: 'safetyOverlap',
 };
+
+/** Поля безпеки гри: контрол тримає ціле значення (помилки вкладених шляхів — на ньому). */
+const SAFETY_CONTROLS = new Set(['safetyTools', 'lines', 'veils']);
 
 /** Причини `VALIDATION { reason }` з бекенду → контрол. */
 const REASON_TO_CONTROL: Partial<Record<string, string>> = {
@@ -148,6 +157,7 @@ const SECTIONS = [
   'schedule',
   'players',
   'warnings',
+  'safety',
   'channels',
   'questions',
 ] as const;
@@ -180,6 +190,9 @@ const CONTROL_SECTION: Record<string, Section> = {
   showWhenFull: 'players',
   contentWarningIds: 'warnings',
   customWarnings: 'warnings',
+  safetyTools: 'safety',
+  lines: 'safety',
+  veils: 'safety',
   channelLinks: 'channels',
   applicationQuestions: 'questions',
 };
@@ -197,6 +210,14 @@ const isString = (x: unknown): x is string => typeof x === 'string';
 const isNumber = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const isStringArray = (x: unknown): x is string[] => Array.isArray(x) && x.every(isString);
 const isNumberArray = (x: unknown): x is number[] => Array.isArray(x) && x.every(isNumber);
+const isSafetyTools = (x: unknown): x is SafetyTool[] =>
+  Array.isArray(x) && x.every((t) => (SAFETY_TOOLS as readonly unknown[]).includes(t));
+const isSafetyList = (x: unknown): x is SafetyList => {
+  const l = x as Partial<SafetyList> | null;
+  return (
+    typeof l === 'object' && l !== null && isNumberArray(l.warningIds) && isStringArray(l.custom)
+  );
+};
 
 /** Календарна дата datepicker-а ↔ `YYYY-MM-DD` для збереження. */
 function dateToStored(d: Date | null): string | null {
@@ -237,6 +258,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
     SanctionActiveNotice,
     DeadGamesNotice,
     StartTimeField,
+    GameSafetyFields,
   ],
   providers: [provideUkDates()],
   templateUrl: './game-form.html',
@@ -358,6 +380,9 @@ export class GameForm {
     coverUrl: new FormControl('', { nonNullable: true }),
     contentWarningIds: new FormControl<number[]>([], { nonNullable: true }),
     customWarnings: new FormArray<FormControl<string>>([]),
+    safetyTools: new FormControl<SafetyTool[]>([], { nonNullable: true }),
+    lines: new FormControl<SafetyList>(emptySafetyList(), { nonNullable: true }),
+    veils: new FormControl<SafetyList>(emptySafetyList(), { nonNullable: true }),
     channelLinks: new FormArray<
       FormGroup<{ label: FormControl<string>; url: FormControl<string> }>
     >([]),
@@ -503,6 +528,18 @@ export class GameForm {
     );
     this.c.contentWarningIds.markAsDirty();
     this.c.contentWarningIds.markAsTouched();
+  }
+
+  /** Зміна в секції «Безпека гри» (кілька полів разом — напр. тему перенесено з меж у завіси). */
+  protected onSafetyChange(change: SafetyChange): void {
+    for (const name of ['safetyTools', 'lines', 'veils'] as const) {
+      const value = change[name];
+      if (value === undefined) continue;
+      const control = this.c[name] as FormControl<typeof value>;
+      control.setValue(value);
+      control.markAsDirty();
+      control.markAsTouched();
+    }
   }
 
   protected addCustomWarning(): void {
@@ -742,7 +779,9 @@ export class GameForm {
     // min > max показуємо біля «Максимум».
     const name =
       field === 'minPlayers' && issue.code === 'custom' ? 'maxPlayers' : this.controlName(field);
-    const control = this.form.get([name, ...(path.slice(1) as (string | number)[])]);
+    const control = SAFETY_CONTROLS.has(name)
+      ? this.form.get(name)
+      : this.form.get([name, ...(path.slice(1) as (string | number)[])]);
     if (!control || control.disabled) return null;
     this.mark(control, this.issueKey(field, issue));
     return name;
@@ -825,6 +864,10 @@ export class GameForm {
       applicationQuestions: v.applicationQuestions,
       customWarnings: v.customWarnings,
       contentWarningIds: v.contentWarningIds,
+      // PATCH замінює списки цілком — завжди надсилаємо обидва вкладені масиви.
+      safetyTools: v.safetyTools,
+      lines: v.lines,
+      veils: v.veils,
       showWhenFull: v.showWhenFull,
     };
   }
@@ -906,6 +949,9 @@ export class GameForm {
       requirements: g.requirements ?? '',
       coverUrl: g.coverUrl ?? '',
       contentWarningIds: [...g.contentWarningIds],
+      safetyTools: [...g.safetyTools],
+      lines: { warningIds: [...g.lines.warningIds], custom: [...g.lines.custom] },
+      veils: { warningIds: [...g.veils.warningIds], custom: [...g.veils.custom] },
       showWhenFull: g.showWhenFull,
     });
     this.c.customWarnings.clear();
@@ -1021,6 +1067,9 @@ export class GameForm {
     set(c.weekdays, values['weekdays'], isNumberArray);
     set(c.contentWarningIds, values['contentWarningIds'], isNumberArray);
     set(c.showWhenFull, values['showWhenFull'], (x) => typeof x === 'boolean');
+    set(c.safetyTools, values['safetyTools'], isSafetyTools);
+    set(c.lines, values['lines'], isSafetyList);
+    set(c.veils, values['veils'], isSafetyList);
     const date = dateFromStored(values['startDate']);
     if (date !== undefined && !c.startDate.disabled) c.startDate.setValue(date);
     set(this.newCustomWarning, values['newCustomWarning'], isString);

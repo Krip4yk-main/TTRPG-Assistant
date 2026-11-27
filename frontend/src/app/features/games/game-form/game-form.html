@@ -510,6 +510,20 @@
         </div>
       </fieldset>
 
+      <!-- Безпека гри (необов'язково, згорнуто) -->
+      <nri-game-safety-fields
+        class="nri-card section safety"
+        [tools]="value().safetyTools"
+        [lines]="value().lines"
+        [veils]="value().veils"
+        [warnings]="catalog()?.contentWarnings ?? []"
+        [disabled]="closed()"
+        [toolsError]="looseError('safetyTools') ?? apiError('safetyTools')"
+        [linesError]="looseError('lines') ?? apiError('lines')"
+        [veilsError]="looseError('veils') ?? apiError('veils')"
+        (changed)="onSafetyChange($event)"
+      />
+
       <!-- Канали -->
       <fieldset class="nri-card section" formArrayName="channelLinks">
         <legend>{{ 'games.form.sections.channels' | translate }}</legend>

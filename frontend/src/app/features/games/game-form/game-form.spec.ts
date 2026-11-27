@@ -697,6 +697,139 @@ describe('GameForm', () => {
     expect(disabled).toEqual(['games.ageRating.16+', 'games.ageRating.18+', 'games.ageRating.21+']);
   });
 
+  describe('safety (optional)', () => {
+    const details = () => q<HTMLDetailsElement>('nri-game-safety-fields details.safety');
+    const kind = (k: 'lines' | 'veils') => `nri-game-safety-fields fieldset[data-kind="${k}"]`;
+    const chip = (k: 'lines' | 'veils', i: number) =>
+      el.querySelectorAll<HTMLButtonElement>(`${kind(k)} nri-warning-chip button.toggle`)[i]!;
+    const addCustom = async (k: 'lines' | 'veils', text: string) => {
+      await type(`${kind(k)} input.custom-input`, text);
+      q<HTMLButtonElement>(`${kind(k)} button.add-custom`).click();
+      await settle();
+    };
+
+    it('a new game: the section is collapsed and nothing is required', async () => {
+      await setup();
+      expect(details().open).toBe(false);
+      expect(el.textContent).toContain('games.safety.optional');
+      await fillValid();
+      expect(publishButton().disabled).toBe(false);
+      await submit();
+      const req = http.expectOne('/api/games');
+      expect(req.request.body).toMatchObject({
+        safetyTools: [],
+        lines: { warningIds: [], custom: [] },
+        veils: { warningIds: [], custom: [] },
+      });
+      req.flush(game());
+      await settle();
+    });
+
+    it('tools, lines and veils are sent; a topic picked as a veil leaves the lines', async () => {
+      await setup();
+      await fillValid();
+      details().open = true;
+      details().dispatchEvent(new Event('toggle'));
+      await settle();
+      q<HTMLInputElement>('li[data-tool="script_change"] input').click();
+      await settle();
+      q<HTMLInputElement>('li[data-tool="x_card"] input').click();
+      await settle();
+      chip('lines', 0).click(); // violence → межа
+      await settle();
+      chip('lines', 1).click(); // gore → межа
+      await settle();
+      chip('veils', 0).click(); // violence → завіса (зникає з меж)
+      await settle();
+      expect(chip('lines', 0).getAttribute('aria-pressed')).toBe('false');
+      expect(chip('veils', 0).getAttribute('aria-pressed')).toBe('true');
+      await addCustom('lines', '  Павуки  ');
+      await addCustom('lines', 'павуки'); // повтор без урахування регістру — ігнорується
+      await addCustom('veils', 'Павуки'); // переноситься із меж у завіси
+      await addCustom('lines', 'Насильство над дітьми');
+      await submit();
+      const req = http.expectOne('/api/games');
+      expect(req.request.body).toMatchObject({
+        safetyTools: ['x_card', 'script_change'],
+        lines: { warningIds: [2], custom: ['Насильство над дітьми'] },
+        veils: { warningIds: [1], custom: ['Павуки'] },
+      });
+      req.flush(game());
+      await settle();
+    });
+
+    it('a game with safety data opens the section; PATCH sends both lists whole', async () => {
+      await setup(
+        5,
+        game({
+          status: 'recruiting',
+          safetyTools: ['open_door'],
+          lines: { warningIds: [], custom: ['Павуки'] },
+          veils: { warningIds: [2], custom: [] },
+        }),
+      );
+      expect(details().open).toBe(true);
+      expect(q<HTMLInputElement>('li[data-tool="open_door"] input').checked).toBe(true);
+      expect(chip('veils', 1).getAttribute('aria-pressed')).toBe('true');
+      q<HTMLButtonElement>(`${kind('lines')} button.remove-custom`).click();
+      await settle();
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.body).toMatchObject({
+        safetyTools: ['open_door'],
+        lines: { warningIds: [], custom: [] },
+        veils: { warningIds: [2], custom: [] },
+      });
+      req.flush(game({ status: 'recruiting' }));
+      await settle();
+    });
+
+    it('at most 10 custom texts per list', async () => {
+      await setup();
+      for (let i = 1; i <= 10; i++) await addCustom('lines', `Тема ${i}`);
+      expect(el.querySelectorAll(`${kind('lines')} li.custom-chip`).length).toBe(10);
+      expect(q<HTMLButtonElement>(`${kind('lines')} button.add-custom`).disabled).toBe(true);
+    });
+
+    it('a server validation issue on lines is shown in the safety section', async () => {
+      await setup(5, game({ status: 'draft', lines: { warningIds: [], custom: ['Павуки'] } }));
+      await submit();
+      http.expectOne('/api/games/5').flush(
+        {
+          error: {
+            code: 'VALIDATION',
+            details: [{ code: 'too_big', path: ['lines', 'custom', 0], message: 'x' }],
+          },
+        },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      await settle();
+      expect(q<HTMLElement>(kind('lines')).textContent).toContain('games.form.errors.invalid');
+    });
+
+    it('a restored local copy brings back the safety values', async () => {
+      localStorage.setItem(
+        'nri.gameDraft.1.new',
+        JSON.stringify({
+          v: 1,
+          savedAt: Date.now(),
+          updatedAt: null,
+          values: {
+            title: 'Чернетка',
+            safetyTools: ['check_ins', 'bogus'],
+            veils: { warningIds: [1], custom: ['Павуки'] },
+          },
+        }),
+      );
+      await setup();
+      expect(details().open).toBe(true);
+      // Некоректний список інструментів пропускається цілком.
+      expect(q<HTMLInputElement>('li[data-tool="check_ins"] input').checked).toBe(false);
+      expect(chip('veils', 0).getAttribute('aria-pressed')).toBe('true');
+      expect(q<HTMLElement>(kind('veils')).textContent).toContain('Павуки');
+    });
+  });
+
   describe('autosave', () => {
     const NEW_KEY = 'nri.gameDraft.1.new';
     const debounce = () => new Promise((r) => setTimeout(r, 600));

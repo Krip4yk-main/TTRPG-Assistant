@@ -114,6 +114,34 @@ describe('ApplyDialog', () => {
     expect(el.textContent).toContain('Який у вас досвід?');
   });
 
+  it('no game safety info: no safety section', async () => {
+    await create();
+    expect(el.querySelector('section.safety')).toBeNull();
+  });
+
+  it('shows the game safety info briefly when the GM filled it', async () => {
+    await create({
+      ...data,
+      safety: {
+        tools: ['x_card'],
+        lines: { slugs: [], custom: ['Павуки'] },
+        veils: { slugs: ['gore'], custom: [] },
+      },
+    });
+    const section = el.querySelector<HTMLElement>('section.safety')!;
+    expect(section.textContent).toContain('games.safety.title');
+    expect(section.textContent).toContain('games.safety.tool.x_card.label');
+    expect(section.textContent).toContain('Павуки');
+    expect(section.querySelector('[data-kind="veils"] nri-warning-chip')).not.toBeNull();
+  });
+
+  it('your limits are marked as visible to the GM only', async () => {
+    await create();
+    expect(el.querySelector('.private-note')!.textContent).toContain(
+      'games.applications.apply.constraintsPrivate',
+    );
+  });
+
   it('cannot submit without accepting the warnings: no request, error next to the checkbox', async () => {
     await create();
     await type('textarea.answer', 'Багато');

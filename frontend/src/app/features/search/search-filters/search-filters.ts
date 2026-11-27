@@ -108,6 +108,7 @@ export class SearchFilters {
       f.platform,
       f.language,
       f.hasFreeSlots,
+      f.hasSafetyTools,
       f.excludeWarningIds.length,
     ].filter(Boolean).length;
   });

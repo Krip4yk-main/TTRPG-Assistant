@@ -1,0 +1,32 @@
+@let s = safety();
+@if (s.tools.length) {
+  <ul class="tools" [attr.aria-label]="'games.safety.tools' | translate">
+    @for (t of s.tools; track t) {
+      <li>
+        <details class="tool">
+          <summary>{{ 'games.safety.tool.' + t + '.label' | translate }}</summary>
+          <p class="nri-muted tool-hint">{{ 'games.safety.tool.' + t + '.hint' | translate }}</p>
+        </details>
+      </li>
+    }
+  </ul>
+}
+@for (kind of ['lines', 'veils']; track kind) {
+  @let topics = kind === 'lines' ? s.lines : s.veils;
+  @if (hasTopics(topics)) {
+    <div class="topics" [attr.data-kind]="kind">
+      <p class="topics-label">
+        <strong>{{ 'games.safety.' + kind | translate }}</strong>
+        <span class="nri-muted"> — {{ 'games.safety.' + kind + 'Hint' | translate }}</span>
+      </p>
+      <ul class="chips">
+        @for (slug of topics.slugs; track slug) {
+          <li><nri-warning-chip [slug]="slug" /></li>
+        }
+        @for (w of topics.custom; track $index) {
+          <li><nri-warning-chip [custom]="w" /></li>
+        }
+      </ul>
+    </div>
+  }
+}

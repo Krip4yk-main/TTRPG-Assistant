@@ -32,6 +32,15 @@
       </fieldset>
     }
 
+    @if (data.safety; as safety) {
+      <section class="section safety" aria-labelledby="apply-safety-title">
+        <h3 id="apply-safety-title" class="section-title">
+          {{ 'games.safety.title' | translate }}
+        </h3>
+        <nri-safety-summary [safety]="safety" />
+      </section>
+    }
+
     @if (data.questions.length) {
       <fieldset class="section" formArrayName="answers">
         <legend>{{ 'games.applications.apply.questionsTitle' | translate }}</legend>
@@ -78,6 +87,10 @@
 
     <fieldset class="section" formArrayName="constraints">
       <legend>{{ 'games.applications.apply.constraintsTitle' | translate }}</legend>
+      <p class="private-note">
+        <mat-icon aria-hidden="true">lock</mat-icon>
+        {{ 'games.applications.apply.constraintsPrivate' | translate }}
+      </p>
       <p class="nri-muted hint">
         {{
           'games.applications.apply.constraintsHint'

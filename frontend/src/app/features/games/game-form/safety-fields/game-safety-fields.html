@@ -1,0 +1,105 @@
+<details class="safety" [open]="expanded()" (toggle)="onToggle($event)">
+  <summary>
+    <mat-icon class="chevron" aria-hidden="true">expand_more</mat-icon>
+    <span class="title">{{ 'games.safety.title' | translate }}</span>
+    <span class="optional">{{ 'games.safety.optional' | translate }}</span>
+  </summary>
+  <div class="body">
+    <p class="nri-muted hint">{{ 'games.safety.formHint' | translate }}</p>
+
+    <fieldset class="group tools field">
+      <legend>{{ 'games.safety.tools' | translate }}</legend>
+      <ul class="tool-list">
+        @for (t of allTools; track t) {
+          <li class="tool" [attr.data-tool]="t">
+            <mat-checkbox
+              [checked]="toolChecked(t)"
+              [disabled]="disabled()"
+              (change)="setTool(t, $event.checked)"
+              >{{ 'games.safety.tool.' + t + '.label' | translate }}</mat-checkbox
+            >
+            <button
+              type="button"
+              class="info"
+              [matTooltip]="'games.safety.tool.' + t + '.hint' | translate"
+              [attr.aria-label]="
+                'games.safety.toolInfo'
+                  | translate: { name: 'games.safety.tool.' + t + '.label' | translate }
+              "
+            >
+              <mat-icon aria-hidden="true">info</mat-icon>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (toolsError(); as key) {
+        <p class="field-error" role="alert">{{ key | translate }}</p>
+      }
+    </fieldset>
+
+    @for (kind of kinds; track kind) {
+      @let l = list(kind);
+      <fieldset class="group topics field" [attr.data-kind]="kind">
+        <legend>
+          {{ 'games.safety.' + kind | translate }}
+          <span class="legend-hint">— {{ 'games.safety.' + kind + 'Hint' | translate }}</span>
+        </legend>
+        <ul class="chips" [attr.aria-label]="'games.safety.' + kind | translate">
+          @for (w of warnings(); track w.id) {
+            <li>
+              <nri-warning-chip
+                [slug]="w.slug"
+                [selectable]="!disabled()"
+                [selected]="warningSelected(kind, w.id)"
+                (toggled)="toggleWarning(kind, w.id)"
+              />
+            </li>
+          }
+        </ul>
+        @if (l.custom.length > 0) {
+          <ul class="chips custom">
+            @for (text of l.custom; track $index) {
+              <li class="custom-chip">
+                <nri-warning-chip [custom]="text" />
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="remove-custom"
+                  [disabled]="disabled()"
+                  [attr.aria-label]="'games.safety.removeCustom' | translate: { name: text }"
+                  (click)="removeCustom(kind, $index)"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <div class="add-row">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ 'games.safety.' + kind + 'Custom' | translate }}</mat-label>
+            <input
+              matInput
+              class="custom-input"
+              [formControl]="newCustom[kind]"
+              [attr.maxlength]="maxLength"
+              (keydown.enter)="$event.preventDefault(); addCustom(kind)"
+            />
+          </mat-form-field>
+          <button
+            mat-stroked-button
+            type="button"
+            class="add-custom"
+            [disabled]="disabled() || l.custom.length >= maxCustom"
+            (click)="addCustom(kind)"
+          >
+            {{ 'common.add' | translate }}
+          </button>
+        </div>
+        @if (error(kind); as key) {
+          <p class="field-error" role="alert">{{ key | translate: { max: maxLength } }}</p>
+        }
+      </fieldset>
+    }
+  </div>
+</details>

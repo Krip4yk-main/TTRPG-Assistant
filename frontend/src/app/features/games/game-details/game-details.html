@@ -483,6 +483,13 @@
             </section>
           }
 
+          @if (safety(); as safety) {
+            <section class="block safety" aria-labelledby="safety-title">
+              <h2 id="safety-title">{{ 'games.safety.title' | translate }}</h2>
+              <nri-safety-summary [safety]="safety" />
+            </section>
+          }
+
           @if (g.channelLinks?.length) {
             <section class="block">
               <h2>{{ 'games.form.sections.channels' | translate }}</h2>

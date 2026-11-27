@@ -1,0 +1,151 @@
+:host {
+  display: block;
+}
+
+summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--nri-space-sm);
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  .chevron {
+    color: var(--nri-accent-text);
+    transform: rotate(-90deg);
+    transition: transform 150ms ease;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+  border-radius: var(--nri-radius-sm);
+
+  &:focus-visible {
+    outline: 2px solid var(--nri-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .title {
+    font-family: var(--nri-font-heading);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--nri-accent-text);
+  }
+
+  .optional {
+    color: var(--nri-text-muted);
+    font-size: 0.95rem;
+  }
+}
+
+details[open] > summary .chevron {
+  transform: none;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+  margin-top: var(--nri-space-sm);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    margin-bottom: var(--nri-space-xs);
+    padding: 0;
+    font-weight: 600;
+  }
+
+  .legend-hint {
+    color: var(--nri-text-muted);
+    font-weight: 400;
+  }
+}
+
+.tool-list,
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-xs) var(--nri-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+}
+
+.info {
+  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nri-text-muted);
+  cursor: help;
+
+  mat-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    font-size: 1.1rem;
+  }
+
+  &:hover {
+    color: var(--nri-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nri-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--nri-radius-sm);
+    color: var(--nri-text);
+  }
+}
+
+.custom-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 var(--nri-space-md);
+
+  mat-form-field {
+    flex: 1 1 240px;
+  }
+
+  button {
+    margin-top: var(--nri-space-sm);
+  }
+}
+
+.field-error {
+  margin: 0;
+  color: var(--nri-danger-text);
+  font-size: 0.875rem;
+}

@@ -3,6 +3,7 @@ import {
   EMPTY_FILTERS,
   MAX_RANGE_DAYS,
   dateRangeError,
+  hasActiveFilters,
   parseSearchParams,
   resolveCalendarMode,
   toSearchParams,
@@ -62,6 +63,20 @@ describe('search-query', () => {
       expect(f.includePartial).toBe(false);
       expect(f.sort).toBe('soonest');
       expect(f.city).toBeUndefined();
+    });
+
+    it('safety=1 enables the «GM uses safety tools» filter; it is sent and written back', () => {
+      expect(parse({}).hasSafetyTools).toBe(false);
+      expect(parse({ safety: 'yes' }).hasSafetyTools).toBe(false);
+      const f = parse({ safety: '1' });
+      expect(f.hasSafetyTools).toBe(true);
+      expect(toSearchParams(f)['safety']).toBe('1');
+      expect(toSearchParams(EMPTY_FILTERS)['safety']).toBeNull();
+      expect(toSearchRequest(f, { mode: 'off' }, 'UTC').hasSafetyTools).toBe(true);
+      expect(toSearchRequest(EMPTY_FILTERS, { mode: 'off' }, 'UTC')).not.toHaveProperty(
+        'hasSafetyTools',
+      );
+      expect(hasActiveFilters(f)).toBe(true);
     });
 
     it('treats an empty or non-integer priceMax as not set', () => {

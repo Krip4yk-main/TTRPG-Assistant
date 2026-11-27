@@ -43,6 +43,8 @@ import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
 import { SanctionActiveNotice } from '../../moderation/sanction-active-notice/sanction-active-notice';
 import { ThemeService } from '../../../theming/theme.service';
+import { SafetySummary } from '../../games/safety/safety-summary';
+import type { SafetyView } from '../../games/safety/safety-view';
 
 /** Дані гри, потрібні для заявки. */
 export interface ApplyDialogData {
@@ -52,6 +54,8 @@ export interface ApplyDialogData {
   warningSlugs: string[];
   customWarnings: string[];
   questions: string[];
+  /** Безпека гри (інструменти, межі, завіси); нічого не заповнено — `null`/немає. */
+  safety?: SafetyView | null;
 }
 
 /**
@@ -106,6 +110,7 @@ const FIELD_CODES = new Set<ErrorCode>(['WARNINGS_NOT_ACCEPTED', 'ANSWERS_REQUIR
     TranslatePipe,
     WarningChip,
     SanctionActiveNotice,
+    SafetySummary,
   ],
   templateUrl: './apply-dialog.html',
   styleUrl: './apply-dialog.less',

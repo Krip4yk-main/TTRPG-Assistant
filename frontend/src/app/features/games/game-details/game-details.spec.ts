@@ -218,6 +218,40 @@ describe('GameDetails', () => {
     expect(el().querySelector<HTMLImageElement>('img.cover')!.alt).toBeTruthy();
     expect(el().querySelectorAll('nri-warning-chip')).toHaveLength(3);
     expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
+    // Майстер нічого не зазначив про безпеку — блоку немає зовсім.
+    expect(el().querySelector('section.safety')).toBeNull();
+  });
+
+  it('a compact «game safety» block: tools with expandable explanations, lines and veils', async () => {
+    await open(me, (r) =>
+      r.flush({
+        ...game,
+        safetyTools: ['x_card', 'open_door'],
+        lines: { warningIds: [3], custom: [] },
+        veils: { warningIds: [], custom: ['Павуки в темряві'] },
+      }),
+    );
+    const block = el().querySelector<HTMLElement>('section.safety')!;
+    expect(block.querySelector('h2')!.textContent).toContain('games.safety.title');
+    const tools = block.querySelectorAll<HTMLDetailsElement>('details.tool');
+    expect(tools).toHaveLength(2);
+    expect(tools[0]!.open).toBe(false);
+    expect(tools[0]!.querySelector('summary')!.textContent).toContain(
+      'games.safety.tool.x_card.label',
+    );
+    expect(tools[0]!.textContent).toContain('games.safety.tool.x_card.hint');
+    expect(block.querySelector('[data-kind="lines"]')!.textContent).toContain(
+      'warnings.violence.label',
+    );
+    expect(block.querySelector('[data-kind="veils"]')!.textContent).toContain('Павуки в темряві');
+  });
+
+  it('only lines filled: no tools list, no veils row', async () => {
+    await open(me, (r) => r.flush({ ...game, lines: { warningIds: [], custom: ['Павуки'] } }));
+    const block = el().querySelector<HTMLElement>('section.safety')!;
+    expect(block.querySelector('.tools')).toBeNull();
+    expect(block.querySelector('[data-kind="veils"]')).toBeNull();
+    expect(block.querySelector('[data-kind="lines"]')!.textContent).toContain('Павуки');
   });
 
   it('a broken cover URL hides the image instead of leaving a broken one', async () => {
@@ -305,6 +339,7 @@ describe('GameDetails', () => {
             warningSlugs: ['violence', 'horror'],
             customWarnings: ['Павуки'],
             questions: ['Досвід?'],
+            safety: null,
           },
         }),
       );
@@ -312,6 +347,27 @@ describe('GameDetails', () => {
       expect(applyButton()).toBeNull();
       expect(el().querySelector('button.withdraw')).not.toBeNull();
       expect(el().querySelector('.notice-area')!.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('the dialog gets the game safety info when the GM filled it', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, safetyTools: ['session_zero'], veils: { warningIds: [4], custom: [] } }),
+      );
+      nextDialog(undefined);
+      applyButton()!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        ApplyDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            safety: {
+              tools: ['session_zero'],
+              lines: { slugs: [], custom: [] },
+              veils: { slugs: ['horror'], custom: [] },
+            },
+          }),
+        }),
+      );
     });
 
     it('success already announced by the dialog effect shows the notice without a second announcement', async () => {
