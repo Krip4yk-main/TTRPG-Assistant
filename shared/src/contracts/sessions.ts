@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { SeenState } from './views.js';
-import { startWindowMinutesSchema } from './games.js';
+import { startWindowMinutesSchema, windowEnd } from './games.js';
 import type { OneOffCandidateDto, CommonTimesParticipantDto } from './scheduling.js';
 
 export const SESSION_STATUSES = ['scheduled', 'done', 'cancelled'] as const;
@@ -126,6 +126,30 @@ export interface SessionDto {
   rsvpSummary: SessionRsvpSummary | null;
   /** Стан перегляду сесії глядачем (майстер чи активний учасник). */
   seen: SeenState;
+  /**
+   * Глядачу доступна X-Card на цій сесії: майстер увімкнув `x_card`, глядач — активний учасник
+   * (не майстер). Чи зараз вікно (`xCardWindow`), перевіряє клієнт за годинником.
+   */
+  xCard: boolean;
+}
+
+/** X-Card можна підняти за стільки хвилин до початку сесії і стільки ж після її кінця. */
+export const X_CARD_MARGIN_MINUTES = 30;
+/** Ліміт X-Card: одне натискання на користувача на сесію за стільки секунд. */
+export const X_CARD_COOLDOWN_SEC = 300;
+
+/**
+ * Вікно X-Card (`POST /api/sessions/:id/x-card`): від `startsAt − 30 хв` до кінця сесії
+ * (`windowEnd` + тривалість) `+ 30 хв`, обидві межі включно.
+ */
+export function xCardWindow(s: {
+  startsAt: Date;
+  startWindowMinutes: number | null;
+  durationMinutes: number;
+}): { from: Date; to: Date } {
+  const margin = X_CARD_MARGIN_MINUTES * 60_000;
+  const end = windowEnd(s.startsAt, s.startWindowMinutes).getTime() + s.durationMinutes * 60_000;
+  return { from: new Date(s.startsAt.getTime() - margin), to: new Date(end + margin) };
 }
 
 /**

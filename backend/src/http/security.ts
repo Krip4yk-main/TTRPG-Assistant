@@ -145,3 +145,27 @@ export function rateLimiters(env: Env, redis: Redis) {
     ),
   };
 }
+
+/**
+ * Ліміт «одна дія за `ttlSec`» за ключем (атомарно, `SET NX EX`): `true` — дозволено (ключ
+ * поставлено), `false` — ще не минуло. Для лімітів, які мають рахувати лише успішні дії
+ * (перевірки доступу й стану — до виклику), напр. X-Card.
+ */
+export async function takeOnce(redis: Redis, key: string, ttlSec: number): Promise<boolean> {
+  return (await redis.set(`rl:${key}`, '1', 'EX', ttlSec, 'NX')) === 'OK';
+}
+
+/** Знімає ліміт `takeOnce` (дія не вдалась — можна повторити одразу). */
+export async function releaseOnce(redis: Redis, key: string): Promise<void> {
+  await redis.del(`rl:${key}`);
+}
+
+/** Скільки секунд лишилось до кінця ліміту `takeOnce` (немає ключа чи без TTL — `fallbackSec`). */
+export async function onceRemainingSec(
+  redis: Redis,
+  key: string,
+  fallbackSec: number,
+): Promise<number> {
+  const ttl = await redis.ttl(`rl:${key}`);
+  return ttl > 0 ? ttl : fallbackSec;
+}

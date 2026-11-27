@@ -593,6 +593,21 @@ describe('smart reschedule and calendar reminder', () => {
     expect(many.text).toContain('Аня та ще 2 з групи не зможуть прийти');
   });
 
+  it('session.x_card: anonymous, names the game, links to the session, no buttons', () => {
+    const r = render('session.x_card', {
+      gameId: 12,
+      gameTitle: 'Гра',
+      sessionId: 56,
+      startsAt: '2026-11-27T17:00:00.000Z',
+      startWindowMinutes: null,
+    });
+    expect(r.text.split('\n')[0]).toBe(
+      '✋ Хтось із гравців підняв X-Card на сесії гри «Гра». Зупини або зміни сцену — без питань і без пошуку, хто це був.',
+    );
+    expect(r.text).toContain('Детальніше: https://nri.example/games/12?session=56');
+    expect(r.keyboard).toBeUndefined();
+  });
+
   it('calendar.empty: explains can/cannot/unknown, links to the calendar', () => {
     const r = render('calendar.empty', { gameId: 12, gameTitle: 'Гра' });
     expect(r.text).toContain('майстер гри «Гра»');

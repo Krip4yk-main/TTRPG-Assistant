@@ -110,6 +110,7 @@ describe('materialization on publish', () => {
       rsvpSummary: { going: 0, notGoing: 0, members: [] },
       // Сесії з публікації створив сам майстер — для нього не «нові».
       seen: 'seen',
+      xCard: false,
     } satisfies SessionDto);
     await call('get', `/api/games/${gameId}/sessions`, gm.cookie);
     expect(await rows(gameId)).toHaveLength(4);

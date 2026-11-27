@@ -42,6 +42,11 @@ export class SessionsApi {
     return this.http.put<SessionDto>(`/api/sessions/${id}/rsvp`, { status });
   }
 
+  /** X-Card: анонімний сигнал майстру під час сесії (лише активний учасник; 204). */
+  xCard(id: number): Observable<void> {
+    return this.http.post<void>(`/api/sessions/${id}/x-card`, {});
+  }
+
   /** Завершити сесію, що вже почалась: присутність кожного учасника + підсумок. */
   finish(id: number, input: FinishSessionInput): Observable<SessionDto> {
     return this.http.post<SessionDto>(`/api/sessions/${id}/finish`, input);

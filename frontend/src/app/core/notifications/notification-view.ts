@@ -213,6 +213,11 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.whenApprox = false;
     view.icon = 'schedule';
   }
+  // X-Card майстру: анонімно (без автора), власний значок.
+  if (n.type === 'session.x_card') {
+    view.actor = null;
+    view.icon = 'front_hand';
+  }
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {
     view.key = 'notifications.game.resumed_recruit';

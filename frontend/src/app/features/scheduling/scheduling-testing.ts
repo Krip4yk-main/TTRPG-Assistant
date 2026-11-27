@@ -151,6 +151,7 @@ export function session(patch: Partial<SessionDto> = {}): SessionDto {
     myRsvp: null,
     rsvpSummary: null,
     seen: 'seen',
+    xCard: false,
     ...patch,
   };
 }

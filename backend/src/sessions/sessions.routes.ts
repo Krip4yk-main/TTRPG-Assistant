@@ -12,6 +12,7 @@ import {
   setSessionSummary,
 } from './sessions.service.js';
 import { setRsvp } from './rsvp.js';
+import { raiseXCard } from './x-card.js';
 import { getSessionAlternatives } from '../scheduling/reschedule.service.js';
 import { getSessionWindowSlots } from './start-window.js';
 
@@ -26,7 +27,7 @@ export function gameSessionsRouter(deps: AppDeps): Router {
   return router;
 }
 
-/** Монтується на `/api/sessions`: дії майстра над окремою сесією та RSVP учасника. */
+/** Монтується на `/api/sessions`: дії майстра над окремою сесією, RSVP і X-Card учасника. */
 export function sessionsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAuth(deps);
@@ -59,6 +60,11 @@ export function sessionsRouter(deps: AppDeps): Router {
     const id = numericId(req.params.id);
     await setRsvp(deps, req.user!.userId, id, req.body);
     res.json(await reload(deps, req.user!.userId, id));
+  });
+  // X-Card: анонімний сигнал майстру від учасника під час сесії (ліміт — у сервісі).
+  router.post('/:id/x-card', auth, requireActive, async (req, res) => {
+    await raiseXCard(deps, req.user!.userId, numericId(req.params.id));
+    res.status(204).end();
   });
   return router;
 }

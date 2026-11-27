@@ -83,6 +83,20 @@ describe('notificationView', () => {
     }
   });
 
+  it('session.x_card: own text and icon, no actor even if one slipped into params', () => {
+    const v = notificationView(
+      dto('session.x_card', {
+        sessionId: 5,
+        startsAt: '2026-12-05T17:00:00Z',
+        actor: { publicId: 'p1', nickname: 'Аня' },
+      }),
+      'Europe/Kyiv',
+    );
+    expect(v.key).toBe('notifications.session.x_card');
+    expect(v.icon).toBe('front_hand');
+    expect(v.actor).toBeNull();
+  });
+
   it('session.summary: the excerpt as an extra line; without one — none', () => {
     const v = notificationView(
       dto('session.summary', {

@@ -211,6 +211,27 @@
         <mat-icon aria-hidden="true">{{ noteOpen ? 'expand_less' : 'edit_note' }}</mat-icon>
         {{ 'notes.session.toggle' | translate }}
       </button>
+      @if (canXCard(s)) {
+        @let xSent = xCardSent(s);
+        <button
+          mat-button
+          type="button"
+          class="x-card"
+          [matTooltip]="'sessions.xCard.hint' | translate"
+          [attr.aria-label]="'sessions.xCard.aria' | translate: { when: when(s) }"
+          [disabled]="xSent || xCardBusy() !== null"
+          [disabledInteractive]="true"
+          (click)="raiseXCard(s)"
+        >
+          <mat-icon aria-hidden="true">front_hand</mat-icon>
+          {{ 'sessions.xCard.label' | translate }}
+        </button>
+        <span class="x-card-sent nri-muted" role="status">
+          @if (xSent) {
+            {{ 'sessions.xCard.sent' | translate }}
+          }
+        </span>
+      }
       @if (canRate(s)) {
         <a
           mat-stroked-button

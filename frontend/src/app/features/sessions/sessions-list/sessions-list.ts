@@ -18,8 +18,15 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
-import { SESSION_RATING_WINDOW_DAYS, type RsvpStatus, type SessionDto } from '@nri/shared';
+import {
+  SESSION_RATING_WINDOW_DAYS,
+  X_CARD_COOLDOWN_SEC,
+  xCardWindow,
+  type RsvpStatus,
+  type SessionDto,
+} from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -96,6 +103,7 @@ const DIALOG_OPTIONS = {
     RouterLink,
     MatButtonModule,
     MatIconModule,
+    MatTooltipModule,
     TranslatePipe,
     NoteEditor,
   ],
@@ -146,8 +154,13 @@ export class SessionsList {
   protected readonly rsvpStatuses: readonly RsvpStatus[] = ['going', 'not_going'];
   /** Розгорнуті довгі підсумки. */
   protected readonly openSummaryTexts = signal<ReadonlySet<number>>(new Set());
+  /** X-Card: сесія, сигнал якої надсилається. */
+  protected readonly xCardBusy = signal<number | null>(null);
+  /** X-Card: до якого моменту (мс) кнопка неактивна після сигналу — ліміт сервера. */
+  protected readonly xCardSentUntil = signal<ReadonlyMap<number, number>>(new Map());
 
   private readonly viewerZone = computed(() => viewerTimeZone(this.auth.me()));
+  private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
   protected readonly upcoming = computed(() =>
     (this.sessions() ?? []).filter((s) => Date.parse(s.startsAt) > this.now()),
@@ -165,6 +178,7 @@ export class SessionsList {
     const clock = setInterval(() => this.now.set(Date.now()), CLOCK_MS);
     inject(DestroyRef).onDestroy(() => {
       clearInterval(clock);
+      for (const t of this.timers) clearTimeout(t);
       this.flash.dispose();
     });
   }
@@ -176,6 +190,53 @@ export class SessionsList {
   /** RSVP — учаснику (не майстру) на заплановану майбутню сесію. */
   protected canRsvp(s: SessionDto): boolean {
     return !this.isGm() && s.status === 'scheduled' && Date.parse(s.startsAt) > this.now();
+  }
+
+  /**
+   * X-Card — учаснику (не майстру), коли майстер її увімкнув, на нескасованій сесії у вікні:
+   * від пів години до початку до пів години після кінця (як перевіряє сервер).
+   */
+  protected canXCard(s: SessionDto): boolean {
+    if (this.isGm() || !s.xCard || s.status === 'cancelled') return false;
+    const { from, to } = xCardWindow({ ...s, startsAt: new Date(s.startsAt) });
+    const now = this.now();
+    return now >= from.getTime() && now <= to.getTime();
+  }
+
+  /** Сигнал уже надіслано й ліміт ще не минув — кнопка неактивна, поруч «Майстер отримав…». */
+  protected xCardSent(s: SessionDto): boolean {
+    return (this.xCardSentUntil().get(s.id) ?? 0) > this.now();
+  }
+
+  /** Без підтвердження й пояснень: одне натискання — анонімний сигнал майстру. */
+  protected async raiseXCard(s: SessionDto): Promise<void> {
+    if (this.xCardBusy() !== null || this.xCardSent(s)) return;
+    this.xCardBusy.set(s.id);
+    this.message.set(null);
+    try {
+      await firstValueFrom(this.api.xCard(s.id));
+      this.markXCardSent(s.id, X_CARD_COOLDOWN_SEC);
+    } catch (err) {
+      const { code, details } = toApiError(err);
+      if (code === 'RATE_LIMITED') {
+        // Сигнал із цієї сесії вже дійшов (напр. з іншої вкладки) — той самий стан.
+        const after = (details as { retryAfterSec?: unknown } | undefined)?.retryAfterSec;
+        this.markXCardSent(s.id, typeof after === 'number' ? after : X_CARD_COOLDOWN_SEC);
+      } else if (code !== 'UNAUTHENTICATED') {
+        this.message.set({ kind: 'error', key: `errors.${code}` });
+      }
+    } finally {
+      this.xCardBusy.set(null);
+    }
+  }
+
+  private markXCardSent(sessionId: number, seconds: number): void {
+    const now = Date.now();
+    this.now.set(now);
+    this.xCardSentUntil.update((m) => new Map(m).set(sessionId, now + seconds * 1000));
+    // «Зараз» оновлюється щохвилини — кнопка знову стане активною точно в кінці ліміту.
+    const timer = setTimeout(() => this.now.set(Date.now()), seconds * 1000 + 50);
+    this.timers.push(timer);
   }
 
   /** Зведення RSVP майстру — на заплановані майбутні. */

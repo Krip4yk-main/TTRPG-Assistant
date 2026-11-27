@@ -26,6 +26,8 @@ describe('notification contracts', () => {
       'session.reminder',
       'session.summary',
       'session.time_unpinned',
+      // Анонімно: подія в журналі не пишеться (хто натиснув, не зберігається).
+      'session.x_card',
       'complaint.resolved',
       'moderation.digest',
       'sanction.imposed',

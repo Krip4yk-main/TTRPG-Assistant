@@ -34,6 +34,7 @@ import { materializeSessions, sessionsWindow } from './materialize.js';
 import { sessionsChanged } from '../realtime/game-rooms.js';
 import { markGameSessionsViewed, markOwnChange, seenFor } from '../views/views.service.js';
 import { rsvpOf, rsvpViews, type RsvpView } from './rsvp.js';
+import { xCardFor } from './x-card.js';
 import { clearRsvpDeclines } from '../scheduling/reschedule.service.js';
 
 type GameRow = typeof games.$inferSelect;
@@ -43,7 +44,12 @@ const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
 const NO_RSVP: RsvpView = { myRsvp: null, rsvpSummary: null };
 
-export function toSessionDto(s: SessionRow, seen: SeenState, rsvp: RsvpView = NO_RSVP): SessionDto {
+export function toSessionDto(
+  s: SessionRow,
+  seen: SeenState,
+  rsvp: RsvpView = NO_RSVP,
+  xCard = false,
+): SessionDto {
   return {
     id: s.id,
     gameId: s.gameId,
@@ -60,6 +66,7 @@ export function toSessionDto(s: SessionRow, seen: SeenState, rsvp: RsvpView = NO
     myRsvp: rsvp.myRsvp,
     rsvpSummary: rsvp.rsvpSummary,
     seen,
+    xCard,
   };
 }
 
@@ -111,7 +118,8 @@ export async function listGameSessions(
     ),
     seenFor(deps, userId, 'session', rows),
   ]);
-  return rows.map((r) => toSessionDto(r, seen.get(r.id) ?? 'new', rsvpOf(views, r.id)));
+  const xCard = xCardFor(g, userId);
+  return rows.map((r) => toSessionDto(r, seen.get(r.id) ?? 'new', rsvpOf(views, r.id), xCard));
 }
 
 // ---------- дії майстра над сесією ----------
@@ -163,7 +171,7 @@ export async function reload(
   sessionId: number,
 ): Promise<SessionDto> {
   const [r] = await deps.db
-    .select({ s: gameSessions, gmUserId: games.gmUserId })
+    .select({ s: gameSessions, gmUserId: games.gmUserId, safetyTools: games.safetyTools })
     .from(gameSessions)
     .innerJoin(games, eq(games.id, gameSessions.gameId))
     .where(eq(gameSessions.id, sessionId));
@@ -172,7 +180,12 @@ export async function reload(
     rsvpViews(deps, userId, { id: r.s.gameId, gmUserId: r.gmUserId }, [sessionId]),
     seenFor(deps, userId, 'session', [r.s]),
   ]);
-  return toSessionDto(r.s, seen.get(sessionId) ?? 'new', rsvpOf(views, sessionId));
+  return toSessionDto(
+    r.s,
+    seen.get(sessionId) ?? 'new',
+    rsvpOf(views, sessionId),
+    xCardFor(r, userId),
+  );
 }
 
 /** Після коміту дії майстра: власна зміна не «оновлення» для нього; пінги учасникам. */

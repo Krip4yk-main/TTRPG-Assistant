@@ -53,7 +53,10 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * подій, `schedule`): `session.summary` — учасникам гри на час сесії, один раз (`sessionId`,
  * `startsAt`, `excerpt` — початок підсумку). Приблизний час (не з подій, `sessions`):
  * `session.time_unpinned` — майстру за 24 год до початку вікна, один раз на час сесії:
- * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Відгуки про сайт (не з
+ * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). X-Card (не з подій,
+ * `sessions`): `session.x_card` — майстру, коли хтось із гравців підняв X-Card (`sessionId`,
+ * `startsAt`, назва гри); анонімно — без `actor` і без жодних даних про того, хто натиснув;
+ * термінове (тихі години не затримують). Відгуки про сайт (не з
  * подій, `moderation`; на dev — звіти тестерів, на prod — відгуки користувачів): `tester.report` — власнику платформи на кожен новий звіт
  * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Текст — `notifications.<type>`.
  */
@@ -75,6 +78,7 @@ export const NOTIFICATION_TYPES = [
   'session.reminder',
   'session.summary',
   'session.time_unpinned',
+  'session.x_card',
   'game.started',
   'game.finished',
   'game.cancelled',
@@ -338,6 +342,7 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
       return p.pollId !== undefined ? `/games/${p.gameId}?poll=${p.pollId}` : `/games/${p.gameId}`;
     case 'session.rsvp_declined':
     case 'session.time_unpinned':
+    case 'session.x_card':
       return p.sessionId !== undefined
         ? `/games/${p.gameId}?session=${p.sessionId}`
         : `/games/${p.gameId}`;

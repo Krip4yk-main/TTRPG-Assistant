@@ -52,6 +52,7 @@ const base: SessionDto = {
   myRsvp: null,
   rsvpSummary: null,
   seen: 'seen',
+  xCard: false,
 };
 const done: SessionDto = {
   ...base,
@@ -610,6 +611,96 @@ describe('SessionsList', () => {
       await create(true, true, [{ ...done, summarySentAt: '2026-11-02T10:00:00.000Z' }]);
       expect(summaryButtons(1)).toEqual(['edit']);
       expect(row(1)!.querySelector('.summary-sent')).not.toBeNull();
+    });
+  });
+
+  describe('X-Card', () => {
+    const MIN = 60_000;
+    const at = (offsetMin: number): string =>
+      new Date(Math.floor(Date.now() / MIN) * MIN + offsetMin * MIN).toISOString();
+    // Почалась 10 хв тому; тривалість 3 год.
+    const live: SessionDto = { ...base, id: 7, startsAt: at(-10), xCard: true };
+    const xButton = (id = 7) =>
+      el.querySelector<HTMLButtonElement>(`[data-session-id="${id}"] button.x-card`);
+
+    // `disabledInteractive`: неактивна кнопка лишається у фокусі (aria-disabled, не disabled).
+    it('member, x_card on, inside the window → small button with a tooltip hint', async () => {
+      await create(false, true, [live]);
+      const b = xButton();
+      expect(b).not.toBeNull();
+      expect(b!.textContent).toContain('sessions.xCard.label');
+      expect(b!.getAttribute('aria-label')).toContain('sessions.xCard.aria');
+      expect(b!.getAttribute('aria-disabled')).not.toBe('true');
+    });
+
+    it('no button: GM, x_card off, cancelled, too early or long after the end', async () => {
+      await create(true, true, [live]);
+      expect(xButton()).toBeNull();
+      TestBed.resetTestingModule();
+      await create(false, true, [
+        { ...live, id: 8, xCard: false },
+        { ...live, id: 9, status: 'cancelled' },
+        { ...live, id: 10, startsAt: at(31) },
+        // Кінець: −10 хв + 3 год → +170 хв; +30 хв запасу → недоступно з −10 −180 −31.
+        { ...live, id: 11, startsAt: at(-180 - 31) },
+        // На межі: за 29 хв до початку й 29 хв після кінця — ще можна.
+        { ...live, id: 12, startsAt: at(29) },
+        { ...live, id: 13, startsAt: at(-180 - 29) },
+      ]);
+      expect([8, 9, 10, 11].map((id) => xButton(id))).toEqual([null, null, null, null]);
+      expect(xButton(12)).not.toBeNull();
+      expect(xButton(13)).not.toBeNull();
+    });
+
+    it('one click, no confirm → POST; then «sent anonymously» and disabled until the limit ends', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'Date'] });
+      try {
+        await create(false, true, [live]);
+        xButton()!.click();
+        await settle();
+        const req = http.expectOne('/api/sessions/7/x-card');
+        expect(req.request.method).toBe('POST');
+        expect(dialogOpen).not.toHaveBeenCalled();
+        req.flush(null, { status: 204, statusText: 'No Content' });
+        await settle();
+        expect(xButton()!.getAttribute('aria-disabled')).toBe('true');
+        expect(el.querySelector('.x-card-sent')!.textContent).toContain('sessions.xCard.sent');
+        // Ще одне натискання в межах ліміту нічого не надсилає.
+        xButton()!.click();
+        await settle();
+        http.expectNone('/api/sessions/7/x-card');
+        vi.advanceTimersByTime(5 * MIN + 100);
+        await settle();
+        expect(xButton()!.getAttribute('aria-disabled')).not.toBe('true');
+        expect(el.querySelector('.x-card-sent')!.textContent!.trim()).toBe('');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('429 (already sent from elsewhere) → the same «sent» state; other errors are shown', async () => {
+      await create(false, true, [live, { ...live, id: 14 }]);
+      xButton()!.click();
+      await settle();
+      http
+        .expectOne('/api/sessions/7/x-card')
+        .flush(
+          { error: { code: 'RATE_LIMITED', details: { retryAfterSec: 120 } } },
+          { status: 429, statusText: 'Too Many Requests' },
+        );
+      await settle();
+      expect(xButton()!.getAttribute('aria-disabled')).toBe('true');
+      expect(xButton()!.closest('li')!.querySelector('.x-card-sent')!.textContent).toContain(
+        'sessions.xCard.sent',
+      );
+      xButton(14)!.click();
+      await settle();
+      http
+        .expectOne('/api/sessions/14/x-card')
+        .flush({ error: { code: 'X_CARD_NOT_NOW' } }, { status: 409, statusText: 'Conflict' });
+      await settle();
+      expect(el.textContent).toContain('errors.X_CARD_NOT_NOW');
+      expect(xButton(14)!.getAttribute('aria-disabled')).not.toBe('true');
     });
   });
 });
