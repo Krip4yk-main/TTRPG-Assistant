@@ -5,6 +5,7 @@ import { toZoned, type Weekday } from '../schedule/tz.js';
 import type { Recurrence } from '../schedule/occurrences.js';
 import type { SeenState } from './views.js';
 import type { StalenessState } from './dead-games.js';
+import { emptySafetyList, safetyListSchema, safetyOverlap, safetyToolsSchema } from './safety.js';
 
 export const GAME_FORMATS = ['online', 'offline'] as const;
 export type GameFormat = (typeof GAME_FORMATS)[number];
@@ -154,6 +155,12 @@ const shape = {
     .max(30)
     .transform((ids) => uniqueSorted(ids)),
   showWhenFull: z.boolean(),
+  /** Інструменти безпеки (див. `SAFETY_TOOLS`); публічні, як і решта опису гри. */
+  safetyTools: safetyToolsSchema,
+  /** Межі (lines): теми, яких у грі не буде. Тема не може бути водночас межею й завісою. */
+  lines: safetyListSchema,
+  /** Завіси (veils): теми лише «за кадром». */
+  veils: safetyListSchema,
 };
 
 const gameObject = z.object(shape).strict();
@@ -180,6 +187,9 @@ const GAME_DEFAULTS = {
   contentWarningIds: [],
   showWhenFull: false,
   startWindowMinutes: null,
+  safetyTools: [],
+  lines: emptySafetyList(),
+  veils: emptySafetyList(),
 } as const satisfies Partial<z.output<typeof gameObject>>;
 
 /** Нормалізовані поля гри (вихід `gameInputSchema`). */
@@ -223,6 +233,10 @@ export function gameInputSchema(timezone: string) {
         issue('weekdays', 'Weekdays apply only to weekly/biweekly');
       }
       if (g.minPlayers > g.maxPlayers) issue('minPlayers', 'minPlayers must be ≤ maxPlayers');
+      const overlap = safetyOverlap(g.lines, g.veils);
+      if (overlap.warningIds.length || overlap.custom.length) {
+        issue('veils', 'A topic cannot be both a line and a veil');
+      }
     });
 }
 
@@ -470,6 +484,7 @@ const calendarSchema = z
  * - видимі: `recruiting` (повна — лише з `showWhenFull`), `started` — лише з `showWhenFull`;
  * - гра з віковою позначкою, якої глядач не проходить, з будь-яким детальним фільтром
  *   (усе, крім `ageRatings`/`sort`/`cursor`/`limit`) не видається взагалі;
+ * - `hasSafetyTools` — лише ігри з хоча б одним інструментом безпеки, межею чи завісою;
  * - `calendar` — фільтр відповідності календарю гравця на 4 тижні (`FIT_HORIZON_DAYS`):
  *   `full` проходить завжди, `partial` — лише з `includePartial`;
  * - `cursor` — непрозорий рядок з `nextCursor` попередньої сторінки (з тим самим `sort`).
@@ -491,6 +506,8 @@ export const searchFiltersSchema = z
     language: z.enum(GAME_LANGUAGES).optional(),
     hasFreeSlots: z.boolean().optional(),
     excludeWarningIds: idList.optional(),
+    /** Лише ігри з хоча б одним інструментом безпеки, межею чи завісою. */
+    hasSafetyTools: z.boolean().optional(),
     calendar: calendarSchema.default({ mode: 'off', includePartial: false }),
     sort: z.enum(SEARCH_SORTS).default('soonest'),
     cursor: z.string().max(512).optional(),

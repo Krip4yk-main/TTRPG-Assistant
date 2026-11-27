@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   gte,
   inArray,
@@ -40,7 +41,13 @@ import type { AppDeps } from '../app.js';
 import type { SessionUser } from '../auth/session.service.js';
 import { getAvailability } from '../availability/availability.service.js';
 import { gameBusyIntervals, type GameBusy } from '../calendar/game-busy.service.js';
-import { gameContentWarnings, gameMembers, games, publishedRatings } from '../db/schema/index.js';
+import {
+  gameContentWarnings,
+  gameMembers,
+  gameSafetyTopics,
+  games,
+  publishedRatings,
+} from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { importedBusyForUsers } from '../scheduling/ical/calendar-import.service.js';
 import { loadGames, resolveViewer, toCardDto, type Loaded } from './games.service.js';
@@ -280,6 +287,22 @@ function sqlFilters(deps: AppDeps, f: SearchFilters, now: Date): SQL[] {
       ),
     );
   }
+  // «Є інструменти безпеки»: інструмент, власна межа/завіса чи тема каталогу як межа/завіса.
+  if (f.hasSafetyTools) {
+    c.push(
+      or(
+        sql`json_length(${games.safetyTools}) > 0`,
+        sql`json_length(${games.linesCustom}) > 0`,
+        sql`json_length(${games.veilsCustom}) > 0`,
+        exists(
+          deps.db
+            .select({ one: sql`1` })
+            .from(gameSafetyTopics)
+            .where(eq(gameSafetyTopics.gameId, games.id)),
+        ),
+      ),
+    );
+  }
   // Грубий префільтр дат; точна перевірка (є сесія у вікні) — у пам'яті.
   if (f.dateTo) c.push(lt(games.startsAt, new Date(f.dateTo)));
   if (f.dateFrom) {
@@ -402,6 +425,7 @@ function hasDetailFilters(f: SearchFilters): boolean {
     f.language ||
     f.hasFreeSlots ||
     f.excludeWarningIds?.length ||
+    f.hasSafetyTools ||
     f.calendar.mode !== 'off',
   );
 }

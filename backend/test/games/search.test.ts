@@ -7,6 +7,7 @@ import {
   contentWarnings,
   gameContentWarnings,
   gameMembers,
+  gameSafetyTopics,
   games,
   gameSystems,
   genres,
@@ -128,6 +129,30 @@ describe('POST /api/games/search — filters', () => {
     expect(ids(await search({ excludeWarningIds: [warnings[0]!] })).sort()).toEqual(
       [clean, w2].sort(),
     );
+  });
+
+  it('hasSafetyTools keeps games with a safety tool, a line or a veil', async () => {
+    const { warnings } = await catalog();
+    const none = await insertGame();
+    const tool = await insertGame({ safetyTools: ['x_card'] });
+    const lineCustom = await insertGame({ linesCustom: ['Павуки'] });
+    const veilCustom = await insertGame({ veilsCustom: ['Тортури'] });
+    const lineTopic = await insertGame();
+    const veilTopic = await insertGame();
+    await db.insert(gameSafetyTopics).values([
+      { gameId: lineTopic, warningId: warnings[0]!, kind: 'line' },
+      { gameId: veilTopic, warningId: warnings[1]!, kind: 'veil' },
+    ]);
+    const withSafety = [tool, lineCustom, veilCustom, lineTopic, veilTopic].sort();
+    expect(ids(await search({ hasSafetyTools: true })).sort()).toEqual(withSafety);
+    // `false` чи відсутній фільтр — без обмеження.
+    expect(ids(await search({ hasSafetyTools: false })).sort()).toEqual(
+      [none, ...withSafety].sort(),
+    );
+    expect(ids(await search({})).sort()).toEqual([none, ...withSafety].sort());
+    // Поєднується з іншими фільтрами.
+    expect(ids(await search({ hasSafetyTools: true, excludeWarningIds: [] }))).toHaveLength(5);
+    expect((await search({ hasSafetyTools: 'yes' })).status).toBe(400);
   });
 
   it('full games: hidden unless show_when_full; hasFreeSlots hides all full games', async () => {
@@ -346,6 +371,21 @@ describe('POST /api/games/search — paging and visibility', () => {
     return pages;
   }
 
+  it('hasSafetyTools pages with a cursor without duplicates or gaps', async () => {
+    const base = Date.now() + 10 * DAY_MS;
+    const expected: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const withTool = await insertGame({
+        startsAt: new Date(base + i * 2 * DAY_MS),
+        safetyTools: ['check_ins'],
+      });
+      expected.push(withTool);
+      await insertGame({ startsAt: new Date(base + (i * 2 + 1) * DAY_MS) });
+    }
+    const pages = await collect({ hasSafetyTools: true, limit: 2 });
+    expect(pages).toEqual([expected.slice(0, 2), expected.slice(2, 4), expected.slice(4)]);
+  });
+
   it('25 games, limit 20 → 20 + cursor → 5 and null, no duplicates (soonest)', async () => {
     const base = Date.now() + 10 * DAY_MS;
     const created: { id: number; at: number }[] = [];
@@ -476,6 +516,7 @@ describe('POST /api/games/search — paging and visibility', () => {
       { excludeWarningIds: [warnings[0]!] },
       { calendar },
       { hasFreeSlots: true },
+      { hasSafetyTools: true },
     ];
     for (const probe of probes) {
       expect(ids(await search(probe))).toEqual([]);

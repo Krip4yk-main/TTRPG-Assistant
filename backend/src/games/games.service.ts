@@ -25,6 +25,7 @@ import {
   type RestrictedGameDto,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
+import type { Db } from '../db/client.js';
 import type { SessionUser } from '../auth/session.service.js';
 import {
   contentWarnings,
@@ -32,6 +33,7 @@ import {
   gameBans,
   gameContentWarnings,
   gameMembers,
+  gameSafetyTopics,
   games,
   gmBlacklist,
   gameSessions,
@@ -215,13 +217,60 @@ async function loadOne(deps: AppDeps, id: number): Promise<Loaded | null> {
   return g ?? null;
 }
 
-async function warningIdsOf(deps: AppDeps, gameId: number): Promise<number[]> {
-  const rows = await deps.db
+/** Теми каталогу попереджень, прив'язані до гри: попередження, межі й завіси. */
+interface CatalogRefs {
+  contentWarningIds: number[];
+  lineWarningIds: number[];
+  veilWarningIds: number[];
+}
+
+async function catalogRefsOf(db: Db | Tx, gameId: number): Promise<CatalogRefs> {
+  // Послідовно: у транзакції обидва запити йдуть одним з'єднанням.
+  const warnings = await db
     .select({ id: gameContentWarnings.warningId })
     .from(gameContentWarnings)
     .where(eq(gameContentWarnings.gameId, gameId))
     .orderBy(asc(gameContentWarnings.warningId));
-  return rows.map((r) => r.id);
+  const topics = await db
+    .select({ id: gameSafetyTopics.warningId, kind: gameSafetyTopics.kind })
+    .from(gameSafetyTopics)
+    .where(eq(gameSafetyTopics.gameId, gameId))
+    .orderBy(asc(gameSafetyTopics.warningId));
+  return {
+    contentWarningIds: warnings.map((r) => r.id),
+    lineWarningIds: topics.filter((t) => t.kind === 'line').map((t) => t.id),
+    veilWarningIds: topics.filter((t) => t.kind === 'veil').map((t) => t.id),
+  };
+}
+
+/**
+ * Записує теми каталогу гри. `replace` — спершу видаляє наявні (лише ті набори, що змінено
+ * патчем: `warnings` — попередження, `safety` — межі й завіси).
+ */
+async function writeCatalogRefs(
+  tx: Tx,
+  gameId: number,
+  g: GameInput,
+  replace?: { warnings: boolean; safety: boolean },
+): Promise<void> {
+  const warnings = !replace || replace.warnings;
+  const safety = !replace || replace.safety;
+  if (warnings) {
+    if (replace) await tx.delete(gameContentWarnings).where(eq(gameContentWarnings.gameId, gameId));
+    if (g.contentWarningIds.length) {
+      await tx
+        .insert(gameContentWarnings)
+        .values(g.contentWarningIds.map((warningId) => ({ gameId, warningId })));
+    }
+  }
+  if (safety) {
+    if (replace) await tx.delete(gameSafetyTopics).where(eq(gameSafetyTopics.gameId, gameId));
+    const topics = [
+      ...g.lines.warningIds.map((warningId) => ({ gameId, warningId, kind: 'line' as const })),
+      ...g.veils.warningIds.map((warningId) => ({ gameId, warningId, kind: 'veil' as const })),
+    ];
+    if (topics.length) await tx.insert(gameSafetyTopics).values(topics);
+  }
 }
 
 /**
@@ -286,7 +335,7 @@ function omit<T extends object, K extends keyof T>(o: T, ...keys: K[]): Omit<T, 
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
-function toInput(row: GameRow, contentWarningIds: number[]): GameInput {
+function toInput(row: GameRow, refs: CatalogRefs): GameInput {
   return {
     title: row.title,
     description: row.description,
@@ -314,8 +363,11 @@ function toInput(row: GameRow, contentWarningIds: number[]): GameInput {
     channelLinks: row.channelLinks,
     applicationQuestions: row.applicationQuestions,
     customWarnings: row.customWarnings,
-    contentWarningIds,
+    contentWarningIds: refs.contentWarningIds,
     showWhenFull: row.showWhenFull,
+    safetyTools: row.safetyTools,
+    lines: { warningIds: refs.lineWarningIds, custom: row.linesCustom },
+    veils: { warningIds: refs.veilWarningIds, custom: row.veilsCustom },
   };
 }
 
@@ -327,10 +379,10 @@ function systemRef(l: Loaded): GameDto['system'] {
 
 const freeSlots = (l: Loaded) => Math.max(0, l.row.maxPlayers - l.memberCount);
 
-function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
+function toGameDto(l: Loaded, refs: CatalogRefs, now: Date): GameDto {
   return {
     id: l.row.id,
-    ...omit(toInput(l.row, warningIds), 'systemId'),
+    ...omit(toInput(l.row, refs), 'systemId'),
     system: systemRef(l),
     gm: l.gm,
     timezone: l.row.timezone,
@@ -381,7 +433,7 @@ export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
 async function gmView(deps: AppDeps, id: number): Promise<GameDto> {
   const l = await loadOne(deps, id);
   if (!l) throw new AppError(404, 'NOT_FOUND');
-  return toGameDto(l, await warningIdsOf(deps, id), new Date());
+  return toGameDto(l, await catalogRefsOf(deps.db, id), new Date());
 }
 
 // ---------- перевірки ----------
@@ -427,12 +479,16 @@ async function assertCatalogRefs(deps: AppDeps, g: GameInput, prev?: GameInput):
   }
   const [genre] = await db.select({ id: genres.id }).from(genres).where(eq(genres.id, g.genreId));
   if (!genre) fail('UNKNOWN_GENRE');
-  if (g.contentWarningIds.length) {
+  // Теми каталогу попереджень (самі попередження, межі й завіси) мають існувати.
+  const warningIds = [
+    ...new Set([...g.contentWarningIds, ...g.lines.warningIds, ...g.veils.warningIds]),
+  ];
+  if (warningIds.length) {
     const found = await db
       .select({ id: contentWarnings.id })
       .from(contentWarnings)
-      .where(inArray(contentWarnings.id, g.contentWarningIds));
-    if (found.length !== g.contentWarningIds.length) fail('UNKNOWN_WARNING');
+      .where(inArray(contentWarnings.id, warningIds));
+    if (found.length !== warningIds.length) fail('UNKNOWN_WARNING');
   }
 }
 
@@ -450,7 +506,9 @@ export async function loadOwned(deps: AppDeps, userId: number, id: number): Prom
 
 function columns(g: GameInput) {
   return {
-    ...omit(g, 'contentWarningIds'),
+    ...omit(g, 'contentWarningIds', 'lines', 'veils'),
+    linesCustom: g.lines.custom,
+    veilsCustom: g.veils.custom,
     startsAt: g.startsAt === null ? null : new Date(g.startsAt),
   };
 }
@@ -477,11 +535,7 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
       .values({ ...columns(input), gmUserId: userId, timezone: gm.timezone, status: 'draft' })
       .$returningId();
     const gameId = res!.id;
-    if (input.contentWarningIds.length) {
-      await tx
-        .insert(gameContentWarnings)
-        .values(input.contentWarningIds.map((warningId) => ({ gameId, warningId })));
-    }
+    await writeCatalogRefs(tx, gameId, input);
     return gameId;
   });
   await logEvent(db, { type: 'game.created', userId, entityType: 'game', entityId: id });
@@ -511,7 +565,7 @@ export async function cloneGame(deps: AppDeps, userId: number, id: number): Prom
   const deadGameIds = await deadGameIdsOf(db, userId);
   if (deadGameIds.length) throw new AppError(409, 'GAME_CREATION_BLOCKED', { deadGameIds });
   const now = new Date();
-  const prev = toInput(source, await warningIdsOf(deps, id));
+  const prev = toInput(source, await catalogRefsOf(db, id));
   // Пояс копії — пояс джерела: дні тижня правила перевірені саме в ньому.
   const tz = source.timezone;
   const input = gameInputSchema(tz).parse({
@@ -529,11 +583,7 @@ export async function cloneGame(deps: AppDeps, userId: number, id: number): Prom
       .values({ ...columns(input), gmUserId: userId, timezone: tz, status: 'draft' })
       .$returningId();
     const gameId = res!.id;
-    if (input.contentWarningIds.length) {
-      await tx
-        .insert(gameContentWarnings)
-        .values(input.contentWarningIds.map((warningId) => ({ gameId, warningId })));
-    }
+    await writeCatalogRefs(tx, gameId, input);
     return gameId;
   });
   await logEvent(db, {
@@ -577,14 +627,7 @@ export async function updateGame(
     // (опублікували/скасували) — 409, заблоковані поля не змінюються.
     const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
     if (!row || row.status !== seen.status) throw new AppError(409, 'GAME_INVALID_TRANSITION');
-    const warningIds = (
-      await tx
-        .select({ id: gameContentWarnings.warningId })
-        .from(gameContentWarnings)
-        .where(eq(gameContentWarnings.gameId, id))
-        .orderBy(asc(gameContentWarnings.warningId))
-    ).map((w) => w.id);
-    const current = toInput(row, warningIds);
+    const current = toInput(row, await catalogRefsOf(tx, id));
     if (row.status !== 'draft') {
       for (const field of GAME_LOCKED_AFTER_PUBLISH) {
         if (patch[field] !== undefined && patch[field] !== current[field]) {
@@ -617,14 +660,11 @@ export async function updateGame(
     if (next.maxPlayers < current.maxPlayers && next.maxPlayers < (await activeCount(tx, id))) {
       throw new AppError(409, 'MAX_BELOW_MEMBERS');
     }
-    if (patch.contentWarningIds !== undefined) {
-      await tx.delete(gameContentWarnings).where(eq(gameContentWarnings.gameId, id));
-      if (next.contentWarningIds.length) {
-        await tx
-          .insert(gameContentWarnings)
-          .values(next.contentWarningIds.map((warningId) => ({ gameId: id, warningId })));
-      }
-    }
+    const replace = {
+      warnings: patch.contentWarningIds !== undefined,
+      safety: patch.lines !== undefined || patch.veils !== undefined,
+    };
+    if (replace.warnings || replace.safety) await writeCatalogRefs(tx, id, next, replace);
     const ruleCancelled = ruleChanged
       ? await replaceRuleSessions(tx, { ...row, ...columns(next) }, now)
       : [];
@@ -740,14 +780,7 @@ export async function changeScheduleRule(
     const [row] = await tx.select().from(games).where(eq(games.id, id)).for('update');
     if (!row) throw new AppError(404, 'NOT_FOUND');
     check(row);
-    const warningIds = (
-      await tx
-        .select({ id: gameContentWarnings.warningId })
-        .from(gameContentWarnings)
-        .where(eq(gameContentWarnings.gameId, id))
-        .orderBy(asc(gameContentWarnings.warningId))
-    ).map((w) => w.id);
-    const current = toInput(row, warningIds);
+    const current = toInput(row, await catalogRefsOf(tx, id));
     const next = gameInputSchema(row.timezone).parse({
       ...current,
       kind: 'campaign',
@@ -1144,7 +1177,7 @@ export async function getGameView(deps: AppDeps, viewer: Viewer, id: number): Pr
   const l = await loadOne(deps, id);
   if (!l) throw new AppError(404, 'NOT_FOUND');
   const now = new Date();
-  const dto = toGameDto(l, await warningIdsOf(deps, id), now);
+  const dto = toGameDto(l, await catalogRefsOf(deps.db, id), now);
   const base = toGameView(dto, l.row.gmUserId, viewer, false, now);
   if (!base) throw new AppError(404, 'NOT_FOUND');
   // Стосунок (4 запити) — лише для автентифікованого глядача з повним видом.

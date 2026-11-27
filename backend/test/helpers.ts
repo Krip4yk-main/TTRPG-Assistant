@@ -77,6 +77,7 @@ const TABLES = [
   'game_bans',
   'game_members',
   'game_content_warnings',
+  'game_safety_topics',
   'game_staleness_log',
   'games',
   'availability_busy_dates',

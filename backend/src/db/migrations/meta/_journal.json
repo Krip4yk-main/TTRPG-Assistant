@@ -351,6 +351,13 @@
       "when": 1795782392781,
       "tag": "0049_drop_legacy_purge_job",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1795785072815,
+      "tag": "0050_plan17_safety_tools",
+      "breakpoints": true
     }
   ]
 }

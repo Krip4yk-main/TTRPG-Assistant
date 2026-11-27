@@ -27,6 +27,7 @@ import type {
   MemberRole,
   PauseReason,
   Recurrence,
+  SafetyTool,
   Weekday,
 } from '@nri/shared';
 import { contentWarnings, gameSystems, genres } from './catalog.js';
@@ -104,6 +105,20 @@ export const games = mysqlTable(
       .notNull()
       .default(sql`(json_array())`),
     customWarnings: json('custom_warnings')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`(json_array())`),
+    // Безпека гри (План 17): інструменти й власні формулювання меж/завіс; теми каталогу — у
+    // `game_safety_topics`.
+    safetyTools: json('safety_tools')
+      .$type<SafetyTool[]>()
+      .notNull()
+      .default(sql`(json_array())`),
+    linesCustom: json('lines_custom')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`(json_array())`),
+    veilsCustom: json('veils_custom')
       .$type<string[]>()
       .notNull()
       .default(sql`(json_array())`),
@@ -186,6 +201,27 @@ export const gameContentWarnings = mysqlTable(
     warningId: id('warning_id')
       .notNull()
       .references(() => contentWarnings.id),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.warningId] })],
+);
+
+const SAFETY_TOPIC_KINDS = ['line', 'veil'] as const;
+export type SafetyTopicKind = (typeof SAFETY_TOPIC_KINDS)[number];
+
+/**
+ * Межі й завіси гри з каталогу попереджень. PK (гра, тема): одна тема не може бути водночас
+ * межею й завісою.
+ */
+export const gameSafetyTopics = mysqlTable(
+  'game_safety_topics',
+  {
+    gameId: id('game_id')
+      .notNull()
+      .references(() => games.id, { onDelete: 'cascade' }),
+    warningId: id('warning_id')
+      .notNull()
+      .references(() => contentWarnings.id),
+    kind: mysqlEnum('kind', SAFETY_TOPIC_KINDS).notNull(),
   },
   (t) => [primaryKey({ columns: [t.gameId, t.warningId] })],
 );
