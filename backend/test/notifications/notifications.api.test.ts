@@ -119,6 +119,54 @@ describe('read state', () => {
   });
 });
 
+describe('delete', () => {
+  it('DELETE /:id removes own only (foreign/missing/invalid → 404) and updates the unread count', async () => {
+    const u = await userWithAge(25);
+    const other = await userWithAge(25);
+    const mine = await seed(u.id, 3);
+    const [theirs] = await seed(other.id, 1);
+    const count = async (c: string) =>
+      (await call('get', '/api/me/notifications/unread-count', c)).body.count;
+
+    expect((await call('delete', `/api/me/notifications/${mine[0]}`, u.cookie)).status).toBe(204);
+    expect(await count(u.cookie)).toBe(2);
+    expect((await call('delete', `/api/me/notifications/${mine[0]}`, u.cookie)).status).toBe(404);
+    expect((await call('delete', `/api/me/notifications/${theirs}`, u.cookie)).status).toBe(404);
+    expect((await call('delete', '/api/me/notifications/999999', u.cookie)).status).toBe(404);
+    expect((await call('delete', '/api/me/notifications/abc', u.cookie)).status).toBe(404);
+    expect(await count(other.cookie)).toBe(1);
+    expect((await call('delete', '/api/me/notifications/1', undefined)).status).toBe(401);
+  });
+
+  it('DELETE /read removes own read ones, returns the count, keeps unread and foreign', async () => {
+    const u = await userWithAge(25);
+    const other = await userWithAge(25);
+    const mine = await seed(u.id, 4);
+    await seed(other.id, 2);
+    await call('post', `/api/me/notifications/${mine[0]}/read`, u.cookie);
+    await call('post', `/api/me/notifications/${mine[1]}/read`, u.cookie);
+    await call('post', '/api/me/notifications/read-all', other.cookie);
+
+    const res = await call('delete', '/api/me/notifications/read', u.cookie);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deleted: 2 });
+    const left = await call('get', '/api/me/notifications', u.cookie);
+    expect(left.body.items.map((n: { id: number }) => n.id)).toEqual([mine[3], mine[2]]);
+    expect((await call('get', '/api/me/notifications/unread-count', u.cookie)).body.count).toBe(2);
+    expect((await call('get', '/api/me/notifications', other.cookie)).body.items).toHaveLength(2);
+    expect((await call('delete', '/api/me/notifications/read', u.cookie)).body).toEqual({
+      deleted: 0,
+    });
+  });
+
+  it('mutations require CSRF', async () => {
+    const u = await userWithAge(25);
+    const request = (await import('supertest')).default;
+    const res = await request(app).delete('/api/me/notifications/read').set('Cookie', u.cookie);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('/api/me/notification-prefs', () => {
   const telegram = {
     applications: true,

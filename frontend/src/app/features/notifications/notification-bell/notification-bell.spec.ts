@@ -313,6 +313,57 @@ describe('NotificationBell', () => {
     expect(el.querySelector('.mat-badge-hidden')).not.toBeNull();
   });
 
+  it('per-item delete button (aria-label) removes the notification and updates the badge', async () => {
+    await start(2);
+    await open([notification(3), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })], 1);
+    const buttons = panel()!.querySelectorAll<HTMLButtonElement>('button.remove');
+    expect(buttons.length).toBe(2);
+    expect(buttons[0]!.getAttribute('aria-label')).toBe(uk.notifications.panel.remove);
+    buttons[0]!.click();
+    http
+      .expectOne('/api/me/notifications/3')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await flushAsync();
+    await settle();
+    expect(panel()!.querySelectorAll('a.item').length).toBe(1);
+  });
+
+  it('«Видалити прочитані» is disabled without read items; confirms before deleting', async () => {
+    await start(1);
+    await open([notification(3)], 1);
+    const btn = () => panel()!.querySelector<HTMLButtonElement>('button.remove-read')!;
+    expect(btn().disabled).toBe(true);
+    http.expectNone('/api/me/notifications/read');
+    panel()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle();
+
+    await open([notification(3), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })], 1);
+    expect(btn().disabled).toBe(false);
+    btn().click();
+    await flushAsync();
+    await settle();
+    const confirm = document.querySelector<HTMLButtonElement>(
+      'mat-dialog-actions button.mat-warn, mat-dialog-actions button:last-of-type',
+    )!;
+    http.expectNone('/api/me/notifications/read');
+    confirm.click();
+    await new Promise((r) => setTimeout(r, 300));
+    await settle();
+    http.expectOne('/api/me/notifications/read').flush({ deleted: 1 });
+    await flushAsync();
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 1 });
+    await flushAsync();
+    http
+      .expectOne((r) => r.url === '/api/me/notifications')
+      .flush({
+        items: [notification(3)],
+        nextCursor: null,
+      });
+    await flushAsync();
+    await settle();
+    expect(panel()!.querySelectorAll('a.item').length).toBe(1);
+  });
+
   it('empty state and Escape closes', async () => {
     await start(0);
     await open([]);

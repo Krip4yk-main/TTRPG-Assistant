@@ -59,6 +59,15 @@
       >
         {{ 'notifications.panel.markAll' | translate }}
       </button>
+      <button
+        mat-button
+        type="button"
+        class="remove-read"
+        [disabled]="!hasRead()"
+        (click)="removeRead()"
+      >
+        {{ 'notifications.panel.removeRead.label' | translate }}
+      </button>
       <a
         mat-icon-button
         class="settings-link"
@@ -104,7 +113,7 @@
       } @else {
         <ul class="list">
           @for (row of rows(); track row.n.id) {
-            <li>
+            <li class="row">
               <a
                 class="item"
                 [class.unread]="!row.n.readAt"
@@ -178,6 +187,15 @@
                   <span class="dot" aria-hidden="true"></span>
                 }
               </a>
+              <button
+                mat-icon-button
+                type="button"
+                class="remove"
+                [attr.aria-label]="'notifications.panel.remove' | translate"
+                (click)="remove(row.n)"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
               @if (row.view.actions.length) {
                 <div class="item-actions">
                   @for (act of row.view.actions; track act.action) {

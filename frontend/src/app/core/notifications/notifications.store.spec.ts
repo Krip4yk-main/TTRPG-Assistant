@@ -174,6 +174,66 @@ describe('NotificationsStore', () => {
     expect(store.items().every((n) => n.readAt === null)).toBe(true);
   });
 
+  it('remove drops the item and decrements the count only for an unread one', async () => {
+    await login(2);
+    await loadFirst([notification(1), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })]);
+    const p1 = store.remove(notification(1));
+    expect(store.unreadCount()).toBe(1);
+    expect(store.items().map((n) => n.id)).toEqual([2]);
+    const req = http.expectOne('/api/me/notifications/1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    await p1;
+    const p2 = store.remove(notification(2, { readAt: '2026-11-25T11:00:00.000Z' }));
+    http
+      .expectOne('/api/me/notifications/2')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await p2;
+    expect(store.unreadCount()).toBe(1);
+    expect(store.items()).toEqual([]);
+  });
+
+  it('remove failure reloads the list and the count', async () => {
+    await login(1);
+    await loadFirst([notification(1)]);
+    const p = store.remove(notification(1));
+    http.expectOne('/api/me/notifications/1').flush(null, { status: 500, statusText: 'err' });
+    await p;
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 1 });
+    http
+      .expectOne((r) => r.url === '/api/me/notifications')
+      .flush({
+        items: [notification(1)],
+        nextCursor: null,
+      });
+    await flushAsync();
+    expect(store.items().map((n) => n.id)).toEqual([1]);
+    expect(store.unreadCount()).toBe(1);
+  });
+
+  it('removeRead drops read items and re-reads the count', async () => {
+    await login(1);
+    await loadFirst([notification(1), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })]);
+    const p = store.removeRead();
+    const req = http.expectOne('/api/me/notifications/read');
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ deleted: 1 });
+    await flushAsync();
+    http.expectOne('/api/me/notifications/unread-count').flush({ count: 1 });
+    await p;
+    expect(store.items().map((n) => n.id)).toEqual([1]);
+    expect(store.unreadCount()).toBe(1);
+  });
+
+  it('removeRead failure changes nothing', async () => {
+    await login(0);
+    await loadFirst([notification(2, { readAt: '2026-11-25T11:00:00.000Z' })]);
+    const p = store.removeRead();
+    http.expectOne('/api/me/notifications/read').flush(null, { status: 500, statusText: 'err' });
+    await p;
+    expect(store.items().length).toBe(1);
+  });
+
   it('a stale unread-count response does not overwrite a newer one', async () => {
     await login(1);
     const first = store.refreshUnread();

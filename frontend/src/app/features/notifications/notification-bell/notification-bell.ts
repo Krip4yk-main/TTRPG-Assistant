@@ -20,7 +20,8 @@ import {
   type UrlTree,
   RouterLink,
 } from '@angular/router';
-import { filter, take } from 'rxjs';
+import { filter, firstValueFrom, take } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
   CdkConnectedOverlay,
@@ -41,6 +42,10 @@ import {
   notificationTime,
   notificationView,
 } from '../../../core/notifications/notification-view';
+import {
+  ConfirmDialog,
+  type ConfirmDialogData,
+} from '../../../shared/confirm-dialog/confirm-dialog';
 import { NotificationsStore } from '../../../core/notifications/notifications.store';
 
 /** Найбільше число на бейджі; більше — «99+». */
@@ -79,6 +84,7 @@ export class NotificationBell {
   protected readonly store = inject(NotificationsStore);
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
   private readonly injector = inject(Injector);
   private readonly document = inject(DOCUMENT);
   private readonly trigger = viewChild.required('trigger', {
@@ -87,6 +93,7 @@ export class NotificationBell {
 
   protected readonly open = signal(false);
   protected readonly count = this.store.unreadCount;
+  protected readonly hasRead = computed(() => this.store.items().some((n) => n.readAt));
   protected readonly badge = computed(() => {
     const c = this.count();
     return c > BADGE_MAX ? `${BADGE_MAX}+` : String(c);
@@ -151,6 +158,8 @@ export class NotificationBell {
 
   /** Клік поза панеллю; клік по самому дзвіночку обробляє `toggle()`. */
   protected onOutsideClick(event: MouseEvent): void {
+    // Клік у діалозі підтвердження (він над панеллю) не закриває панель.
+    if (this.dialog.openDialogs.length > 0) return;
     const target = event.target as Node | null;
     if (target && this.trigger().nativeElement.contains(target)) return;
     this.close();
@@ -204,6 +213,26 @@ export class NotificationBell {
 
   protected markAll(): void {
     void this.store.markAllRead();
+  }
+
+  protected remove(n: NotificationDto): void {
+    void this.store.remove(n);
+  }
+
+  /** Видалити прочитані — лише після підтвердження (діалог відкривається над панеллю). */
+  protected async removeRead(): Promise<void> {
+    const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
+      data: {
+        title: 'notifications.panel.removeRead.title',
+        text: 'notifications.panel.removeRead.text',
+        confirm: 'notifications.panel.removeRead.confirm',
+        danger: true,
+      },
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+    if (!(await firstValueFrom(ref.afterClosed()))) return;
+    await this.store.removeRead();
   }
 
   protected loadMore(): void {

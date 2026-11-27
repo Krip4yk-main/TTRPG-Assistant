@@ -185,6 +185,37 @@ export class NotificationsStore {
     await this.refreshUnread();
   }
 
+  /** Видалити сповіщення: оптимістично; при помилці — повернути список і лічильник із сервера. */
+  async remove(n: NotificationDto): Promise<void> {
+    const gen = this.generation;
+    this._items.update((items) => items.filter((x) => x.id !== n.id));
+    if (!n.readAt) {
+      this.unreadSeq++;
+      this._unread.update((c) => Math.max(0, c - 1));
+    }
+    try {
+      await firstValueFrom(this.api.remove(n.id));
+    } catch (err) {
+      if (gen !== this.generation) return;
+      // 404 — уже видалене (інша вкладка): список правильний, лічильник перечитуємо.
+      if ((err as { status?: number }).status !== 404) void this.loadFirst();
+      void this.refreshUnread();
+    }
+  }
+
+  /** Видалити всі прочитані; список — з сервера (довантажені сторінки могли розійтися). */
+  async removeRead(): Promise<void> {
+    const gen = this.generation;
+    try {
+      await firstValueFrom(this.api.removeRead());
+    } catch {
+      return;
+    }
+    if (gen !== this.generation) return;
+    this._items.update((items) => items.filter((n) => !n.readAt));
+    await Promise.all([this.refreshUnread(), this._panelOpen() ? this.loadFirst() : undefined]);
+  }
+
   private patch(id: number, changes: Partial<NotificationDto>): void {
     this._items.update((items) => items.map((n) => (n.id === id ? { ...n, ...changes } : n)));
   }

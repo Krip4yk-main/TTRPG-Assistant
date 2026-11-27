@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import {
   NOTIFICATION_NEW_EVENT,
   defaultNotificationPrefs,
@@ -222,6 +222,25 @@ export async function markAllRead(deps: AppDeps, userId: number): Promise<void> 
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+}
+
+/** Видаляє своє сповіщення; чуже чи неіснуюче — 404. */
+export async function deleteNotification(deps: AppDeps, userId: number, id: number): Promise<void> {
+  const [res] = await deps.db
+    .delete(notifications)
+    .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  if (res.affectedRows === 0) throw new AppError(404, 'NOT_FOUND');
+}
+
+/** Видаляє всі свої прочитані сповіщення; повертає кількість. */
+export async function deleteReadNotifications(
+  deps: AppDeps,
+  userId: number,
+): Promise<{ deleted: number }> {
+  const [res] = await deps.db
+    .delete(notifications)
+    .where(and(eq(notifications.userId, userId), isNotNull(notifications.readAt)));
+  return { deleted: res.affectedRows };
 }
 
 // ---------- налаштування ----------

@@ -34,6 +34,15 @@ export class NotificationsApi {
     return this.http.post<void>('/api/me/notifications/read-all', {});
   }
 
+  remove(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/me/notifications/${id}`);
+  }
+
+  /** Видаляє всі прочитані; повертає кількість видалених. */
+  removeRead(): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>('/api/me/notifications/read');
+  }
+
   prefs(): Observable<NotificationPrefsDto> {
     return this.http.get<NotificationPrefsDto>('/api/me/notification-prefs');
   }

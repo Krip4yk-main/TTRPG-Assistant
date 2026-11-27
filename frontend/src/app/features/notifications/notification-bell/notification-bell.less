@@ -22,6 +22,7 @@
 .panel-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--nri-space-xs);
   padding: var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-sm) var(--nri-space-md);
   border-bottom: 1px solid var(--nri-border);
@@ -59,12 +60,23 @@
   }
 }
 
+.row {
+  position: relative;
+}
+
+// Кнопка видалення — у правому верхньому куті рядка, поза посиланням.
+.remove {
+  position: absolute;
+  top: var(--nri-space-xs);
+  right: var(--nri-space-xs);
+}
+
 .item {
   display: flex;
   align-items: flex-start;
   gap: var(--nri-space-sm);
   min-height: 72px;
-  padding: var(--nri-space-sm) var(--nri-space-md);
+  padding: var(--nri-space-sm) 56px var(--nri-space-sm) var(--nri-space-md);
   color: var(--nri-text);
   text-decoration: none;
   transition: background var(--nri-transition);
