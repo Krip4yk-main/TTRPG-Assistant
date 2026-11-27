@@ -2,7 +2,9 @@ import { and, asc, count, desc, eq, inArray, isNotNull, isNull, sql, type SQL } 
 import { ZodError } from 'zod';
 import {
   CAMPAIGN_PAUSED_REASON,
+  dayNumber,
   expandOccurrences,
+  fromDayNumber,
   GAME_LOCKED_AFTER_PUBLISH,
   gameInputSchema,
   gamePatchSchema,
@@ -12,6 +14,7 @@ import {
   resumeInputSchema,
   scheduleRuleInputSchema,
   toZoned,
+  zonedToUtc,
   type GameAction,
   type GameCardDto,
   type MyGameCardDto,
@@ -455,6 +458,70 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
   await logEvent(db, { type: 'game.created', userId, entityType: 'game', entityId: id });
   await markOwnChange(deps, userId, 'game', [id]);
   return gmView(deps, id);
+}
+
+const COPY_SUFFIX = ' (копія)';
+
+/**
+ * Початок копії: та сама локальна година й день тижня, що в оригіналу, але першого ж тижня
+ * після `now`. Колонка `starts_at` обов'язкова, а правило розкладу має містити день тижня
+ * першої сесії, тож порожньої дати в чернетці бути не може; майстер уточнює дату у формі.
+ */
+function copyStartsAt(source: Date, tz: string, now: Date): Date {
+  const z = toZoned(source, tz);
+  let n = dayNumber(z.year, z.month, z.day);
+  let at = source;
+  while (at <= now) {
+    n += 7;
+    const d = fromDayNumber(n);
+    at = zonedToUtc({ ...d, hour: z.hour, minute: z.minute }, tz);
+  }
+  return at;
+}
+
+/** Копія гри майстра: чернетка з описом і правилом розкладу, без учасників, сесій і паузи. */
+export async function cloneGame(deps: AppDeps, userId: number, id: number): Promise<GameDto> {
+  const { db } = deps;
+  const { row: source } = await loadOwned(deps, userId, id);
+  if (source.status === 'finished' || source.status === 'cancelled') {
+    throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  }
+  const gm = await loadGm(deps, userId);
+  const deadGameIds = await deadGameIdsOf(db, userId);
+  if (deadGameIds.length) throw new AppError(409, 'GAME_CREATION_BLOCKED', { deadGameIds });
+  const now = new Date();
+  const prev = toInput(source, await warningIdsOf(deps, id));
+  const input = gameInputSchema(gm.timezone).parse({
+    ...prev,
+    title: `${source.title.slice(0, 120 - COPY_SUFFIX.length).trimEnd()}${COPY_SUFFIX}`,
+    startsAt: copyStartsAt(source.startsAt, gm.timezone, now).toISOString(),
+  });
+  assertGmAge(gm, input, now);
+  await assertCatalogRefs(deps, input, prev);
+  if (isPaid(input.priceUah)) await assertNoSanction(db, userId, 'no_paid_create', now);
+  // Обкладинку вже перевірено при збереженні оригіналу: те саме посилання без нового запиту.
+  const copyId = await db.transaction(async (tx) => {
+    const [res] = await tx
+      .insert(games)
+      .values({ ...columns(input), gmUserId: userId, timezone: gm.timezone, status: 'draft' })
+      .$returningId();
+    const gameId = res!.id;
+    if (input.contentWarningIds.length) {
+      await tx
+        .insert(gameContentWarnings)
+        .values(input.contentWarningIds.map((warningId) => ({ gameId, warningId })));
+    }
+    return gameId;
+  });
+  await logEvent(db, {
+    type: 'game.created',
+    userId,
+    entityType: 'game',
+    entityId: copyId,
+    payload: { clonedFrom: id },
+  });
+  await markOwnChange(deps, userId, 'game', [copyId]);
+  return gmView(deps, copyId);
 }
 
 /** Точка для тестів гонки: викликається між читанням гри й записом `PATCH`. */

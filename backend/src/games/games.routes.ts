@@ -6,6 +6,7 @@ import { AppError } from '../http/errors.js';
 import { searchGames } from './games.search.js';
 import {
   changeScheduleRule,
+  cloneGame,
   createGame,
   getGameView,
   listMyGames,
@@ -42,6 +43,9 @@ export function gamesRouter(deps: AppDeps): Router {
   });
   router.patch('/:id', auth, requireActive, async (req, res) => {
     res.json(await updateGame(deps, req.user!.userId, gameId(req.params.id), req.body));
+  });
+  router.post('/:id/clone', auth, requireActive, async (req, res) => {
+    res.status(201).json(await cloneGame(deps, req.user!.userId, gameId(req.params.id)));
   });
   router.put('/:id/schedule', auth, requireActive, async (req, res) => {
     const id = gameId(req.params.id);

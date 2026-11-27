@@ -130,6 +130,18 @@
                   {{ 'games.actions.edit' | translate }}
                 </a>
               }
+              @if (canEdit()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="clone"
+                  [disabled]="busy()"
+                  (click)="clone()"
+                >
+                  <mat-icon aria-hidden="true">content_copy</mat-icon>
+                  {{ 'games.actions.clone' | translate }}
+                </button>
+              }
               @if (g.status !== 'draft') {
                 <a
                   mat-stroked-button

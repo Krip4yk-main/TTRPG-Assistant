@@ -56,6 +56,11 @@ export class GamesApi {
     return this.http.post<GameDto>(`/api/games/${id}/convert-to-campaign`, input);
   }
 
+  /** Копія гри майстра: нова чернетка (без учасників, сесій і паузи). */
+  clone(id: number): Observable<GameDto> {
+    return this.http.post<GameDto>(`/api/games/${id}/clone`, {});
+  }
+
   transition(id: number, action: GameAction): Observable<GameTransitionDto> {
     return this.http.post<GameTransitionDto>(`/api/games/${id}/${action}`, {});
   }

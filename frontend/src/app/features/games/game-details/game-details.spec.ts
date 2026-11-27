@@ -637,6 +637,62 @@ describe('GameDetails', () => {
     expect(el().querySelector('header .gm')!.textContent).toContain('ratings.gmRating.none');
   });
 
+  describe('clone', () => {
+    const own = { ...game, gm: { ...game.gm, publicId: me.publicId } };
+    const flushGmExtras = async () => {
+      http.expectOne('/api/games/7/members').flush([]);
+      http.expectOne('/api/games/7/sessions').flush([]);
+      flushNotesAndCalendar(true);
+      await settle();
+    };
+    const cloneButton = () => el().querySelector<HTMLButtonElement>('button.clone');
+
+    it('only the GM of an editable game sees «Create a copy»', async () => {
+      await open(me, (r) => r.flush(game));
+      http.match('/api/games/7/members').forEach((r) => r.flush([]));
+      http.match('/api/games/7/sessions').forEach((r) => r.flush([]));
+      http.match('/api/me/applications').forEach((r) => r.flush([]));
+      http.match('/api/me/settings').forEach((r) => r.flush({ calendarAutoBusy: true }));
+      http.match('/api/games/7/notes/shared').forEach((r) => r.flush({ pages: [] }));
+      await settle();
+      expect(cloneButton()).toBeNull();
+      TestBed.resetTestingModule();
+      await open(me, (r) => r.flush({ ...own, status: 'finished', nextSessionAt: null }));
+      await flushGmExtras();
+      expect(cloneButton()).toBeNull();
+      TestBed.resetTestingModule();
+      await open(me, (r) => r.flush(own));
+      await flushGmExtras();
+      expect(cloneButton()!.textContent).toContain('games.actions.clone');
+    });
+
+    it('click → POST /clone, then the copy edit form opens', async () => {
+      await open(me, (r) => r.flush(own));
+      await flushGmExtras();
+      cloneButton()!.click();
+      await settle();
+      http.expectOne({ method: 'POST', url: '/api/games/7/clone' }).flush({ ...own, id: 99 });
+      await settle();
+      await settle();
+      expect(TestBed.inject(Router).url).toBe('/games/99/edit');
+    });
+
+    it('a rejected clone shows the error and stays on the page', async () => {
+      await open(me, (r) => r.flush(own));
+      await flushGmExtras();
+      cloneButton()!.click();
+      await settle();
+      http
+        .expectOne({ method: 'POST', url: '/api/games/7/clone' })
+        .flush({ error: { code: 'GAME_CREATION_BLOCKED' } }, { status: 409, statusText: 'x' });
+      await settle();
+      expect(TestBed.inject(Router).url).toBe('/games/7');
+      expect(el().querySelector('.notice-area')!.textContent).toContain(
+        'errors.GAME_CREATION_BLOCKED',
+      );
+    });
+  });
+
   describe('campaign pause', () => {
     const own = { ...game, gm: { ...game.gm, publicId: me.publicId } };
     const paused = {

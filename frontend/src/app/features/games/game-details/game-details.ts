@@ -13,11 +13,12 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   isRestrictedGame,
   type ApplicationConstraintDto,
@@ -131,6 +132,8 @@ export class GameDetails {
   private readonly injector = inject(Injector);
   private readonly notes = inject(NotesApi);
   private readonly router = inject(Router);
+  private readonly announcer = inject(LiveAnnouncer);
+  private readonly translate = inject(TranslateService);
   private readonly sessionsList = viewChild(SessionsList);
   private readonly membersPanel = viewChild(MembersPanel);
   /** Панель «Спільний час» вантажиться відкладено (@defer) — без посилання на клас. */
@@ -232,6 +235,27 @@ export class GameDetails {
   );
 
   protected readonly paused = computed(() => this.game()?.status === 'paused');
+  /** «Створити копію»: нова чернетка майстра → одразу її форма редагування. */
+  protected async clone(): Promise<void> {
+    const g = this.game();
+    if (!g || this.busy() || !this.canEdit()) return;
+    this.busy.set(true);
+    this.notice.set(null);
+    try {
+      const copy = await firstValueFrom(this.api.clone(g.id));
+      void this.announcer.announce(this.translate.instant('games.details.cloned'), 'polite');
+      await this.router.navigate(['/games', copy.id, 'edit']);
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') {
+        this.notice.set({ kind: 'error', key: `errors.${code}` });
+        this.focusNotice();
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   /** «Поставити на паузу» — лише майстру кампейну, що набирає чи триває. */
   protected readonly canPause = computed(
     () => this.isGm() && this.game()?.kind === 'campaign' && this.manageable(),
