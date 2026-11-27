@@ -2,9 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, isNull, sql, type SQL } 
 import { ZodError } from 'zod';
 import {
   CAMPAIGN_PAUSED_REASON,
-  dayNumber,
   expandOccurrences,
-  fromDayNumber,
   GAME_LOCKED_AFTER_PUBLISH,
   gameInputSchema,
   gamePatchSchema,
@@ -14,7 +12,6 @@ import {
   resumeInputSchema,
   scheduleRuleInputSchema,
   toZoned,
-  zonedToUtc,
   type GameAction,
   type GameCardDto,
   type MyGameCardDto,
@@ -234,8 +231,9 @@ function nextSessionAt(l: Pick<Loaded, 'row' | 'sessions'>, now: Date): string |
   return (scheduled ?? fromRule)?.toISOString() ?? null;
 }
 
-/** Перший слот правила ≥ `now` і пізніший за `after` (останній матеріалізований). */
+/** Перший слот правила ≥ `now` і пізніший за `after` (останній матеріалізований); без дати — `null`. */
 function ruleNext(row: GameRow, after: Date | null, now: Date): Date | null {
+  if (row.startsAt === null) return null;
   const fromMs = after ? Math.max(now.getTime(), after.getTime() + 1) : now.getTime();
   const from = new Date(fromMs);
   const to = new Date(Math.max(fromMs, row.startsAt.getTime()) + NEXT_SESSION_HORIZON_MS);
@@ -273,7 +271,7 @@ function toInput(row: GameRow, contentWarningIds: number[]): GameInput {
     address: row.address,
     platform: row.platform,
     kind: row.kind,
-    startsAt: row.startsAt.toISOString(),
+    startsAt: iso(row.startsAt),
     durationMinutes: row.durationMinutes,
     recurrence: row.recurrence,
     weekdays: row.weekdays,
@@ -423,7 +421,10 @@ export async function loadOwned(deps: AppDeps, userId: number, id: number): Prom
 }
 
 function columns(g: GameInput) {
-  return { ...omit(g, 'contentWarningIds'), startsAt: new Date(g.startsAt) };
+  return {
+    ...omit(g, 'contentWarningIds'),
+    startsAt: g.startsAt === null ? null : new Date(g.startsAt),
+  };
 }
 
 // ---------- операції ----------
@@ -470,23 +471,9 @@ export function copyTitle(title: string): string {
 }
 
 /**
- * Початок копії: та сама локальна година й день тижня, що в оригіналу, але першого ж тижня
- * після `now`. Колонка `starts_at` обов'язкова, а правило розкладу має містити день тижня
- * першої сесії, тож порожньої дати в чернетці бути не може; майстер уточнює дату у формі.
+ * Копія гри майстра: чернетка з описом і правилом розкладу, але без дати старту (`startsAt =
+ * null` — майстер задає її у формі перед публікацією), без учасників, сесій і паузи.
  */
-export function copyStartsAt(source: Date, tz: string, now: Date): Date {
-  const z = toZoned(source, tz);
-  let n = dayNumber(z.year, z.month, z.day);
-  let at = source;
-  while (at <= now) {
-    n += 7;
-    const d = fromDayNumber(n);
-    at = zonedToUtc({ ...d, hour: z.hour, minute: z.minute }, tz);
-  }
-  return at;
-}
-
-/** Копія гри майстра: чернетка з описом і правилом розкладу, без учасників, сесій і паузи. */
 export async function cloneGame(deps: AppDeps, userId: number, id: number): Promise<GameDto> {
   const { db } = deps;
   const { row: source } = await loadOwned(deps, userId, id);
@@ -502,7 +489,7 @@ export async function cloneGame(deps: AppDeps, userId: number, id: number): Prom
   const input = gameInputSchema(tz).parse({
     ...prev,
     title: copyTitle(source.title),
-    startsAt: copyStartsAt(source.startsAt, tz, now).toISOString(),
+    startsAt: null,
   });
   assertGmAge(gm, input, now);
   await assertCatalogRefs(deps, input, prev);
@@ -578,6 +565,10 @@ export async function updateGame(
       }
     }
     const next = gameInputSchema(row.timezone).parse({ ...current, ...patch });
+    // Порожня дата старту — лише в чернетці.
+    if (next.startsAt === null && row.status !== 'draft') {
+      throw new AppError(422, 'GAME_START_REQUIRED');
+    }
     assertGmAge(gm, next, now);
     // `no_paid_create`: безплатну гру не зробити платною (наявна платна лишається як є).
     if (isPaid(next.priceUah) && !isPaid(row.priceUah)) {
@@ -590,7 +581,7 @@ export async function updateGame(
     // Розклад кампейну на паузі змінюється лише відновленням (`resume` з новою датою).
     if (ruleChanged && row.status === 'paused') throw new AppError(409, 'GAME_PAUSED');
     const startsMoved = row.status === 'recruiting' && next.startsAt !== current.startsAt;
-    if ((ruleChanged || startsMoved) && new Date(next.startsAt) <= now) {
+    if ((ruleChanged || startsMoved) && next.startsAt !== null && new Date(next.startsAt) <= now) {
       throw new AppError(422, 'GAME_IN_PAST');
     }
     await tx.update(games).set(columns(next)).where(eq(games.id, id));
@@ -726,8 +717,8 @@ export async function changeScheduleRule(
       recurrence: input.recurrence,
       weekdays: input.weekdays,
     });
-    if (new Date(next.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
-    const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(next.startsAt) };
+    if (new Date(input.startsAt) <= now) throw new AppError(422, 'GAME_IN_PAST');
+    const set = { kind: next.kind, ...pickRule(next), startsAt: new Date(input.startsAt) };
     await tx.update(games).set(set).where(eq(games.id, id));
     const ruleCancelled = await replaceRuleSessions(tx, { ...row, ...set }, now);
     return { current, next, ruleCancelled };
@@ -800,7 +791,7 @@ async function activeCount(tx: Tx, gameId: number): Promise<number> {
  * якої ще немає (гру опубліковано до матеріалізації), спершу створюємо з правила.
  */
 async function finishOneshotSession(tx: Tx, row: GameRow, now: Date): Promise<number[]> {
-  await materializeForRow(tx, row, now, row.startsAt);
+  await materializeForRow(tx, row, now, row.startsAt ?? undefined);
   const open = await tx
     .select({ id: gameSessions.id })
     .from(gameSessions)
@@ -993,7 +984,11 @@ export async function applyTransition(
   const t = TRANSITIONS[action];
   if (!t.from.includes(row.status)) throw new AppError(409, 'GAME_INVALID_TRANSITION');
   const now = new Date();
-  if (action === 'publish' && row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
+  if (action === 'publish') {
+    // Чернетку без дати старту не опублікувати.
+    if (row.startsAt === null) throw new AppError(422, 'GAME_START_REQUIRED');
+    if (row.startsAt <= now) throw new AppError(422, 'GAME_IN_PAST');
+  }
   const endReason =
     action === 'cancel' ? 'game_cancelled' : action === 'finish' ? 'game_finished' : null;
   const ends = endReason
@@ -1005,7 +1000,14 @@ export async function applyTransition(
       const [res] = await tx
         .update(games)
         .set({ status: t.to, [t.stamp]: now, ...ends })
-        .where(and(eq(games.id, id), eq(games.status, row.status)));
+        .where(
+          and(
+            eq(games.id, id),
+            eq(games.status, row.status),
+            // Паралельний PATCH міг прибрати дату чернетки — тоді не публікуємо.
+            action === 'publish' ? isNotNull(games.startsAt) : undefined,
+          ),
+        );
       if (res.affectedRows === 0) throw new AppError(409, 'GAME_INVALID_TRANSITION');
       // Публікація й старт зсувають вікно сесій (рядок гри вже під X-блокуванням).
       if (action === 'publish' || action === 'start') {
@@ -1156,6 +1158,7 @@ export async function listMyGames(deps: AppDeps, userId: number): Promise<MyGame
   );
   return loaded.map((l) => ({
     ...toCardDto(l, now),
+    startsAt: iso(l.row.startsAt),
     minPlayers: l.row.minPlayers,
     memberCount: l.memberCount,
     pendingApplications: byGame.get(l.row.id) ?? 0,

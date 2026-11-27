@@ -975,6 +975,12 @@ describe('GameDetails', () => {
       expect(el().querySelector('.schedule-zone')!.textContent!.trim()).toBe('о 18:00');
     });
 
+    it('a draft without a start date: «date not set yet», weekdays without a time', async () => {
+      await open(me, (r) => r.flush({ ...game, startsAt: null, nextSessionAt: null }));
+      expect(nextSessionText()).toContain('games.my.noStartDate');
+      expect(el().querySelector('.schedule-zone')).toBeNull();
+    });
+
     it('signed-in viewer uses the account zone, not the browser', async () => {
       vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
       await open(me, (r) => r.flush(game));

@@ -1,8 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
-import { toZoned } from '@nri/shared';
-import { copyStartsAt, copyTitle } from '../../src/games/games.service.js';
+import { copyTitle } from '../../src/games/games.service.js';
 import {
   gameApplications,
   gameMembers,
@@ -11,7 +10,7 @@ import {
   users,
 } from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
-import { harness } from './fixtures.js';
+import { futureMondayKyiv, harness } from './fixtures.js';
 
 const checked: string[] = [];
 const deps = {
@@ -71,17 +70,19 @@ describe('POST /api/games/:id/clone', () => {
       expect(copy![k]).toEqual(src![k]);
     }
     expect(copy!.coverUrl).toBe(COVER);
-    // Той самий день тижня й час, але не в минулому (дата старту — не з оригіналу).
-    expect(copy!.startsAt.getTime()).toBeGreaterThan(Date.now());
-    expect((copy!.startsAt.getTime() - src!.startsAt.getTime()) % (7 * 86_400_000)).toBe(
-      (copy!.startsAt.getUTCHours() - src!.startsAt.getUTCHours()) * 3_600_000,
-    );
+    // Дата старту не копіюється: майстер задає її перед публікацією.
+    expect(copy!.startsAt).toBeNull();
     expect(copy!.publishedAt).toBeNull();
     expect(copy!.deadAt).toBeNull();
     expect(copy!.pausedAt).toBeNull();
     // Обкладинка не перевіряється повторно.
     expect(checked).toEqual([]);
-    // Копію можна опублікувати без змін.
+    // Без дати копію не опублікувати; з датою — можна.
+    const noDate = await call('post', `/api/games/${copyId}/publish`, gm.cookie);
+    expect(noDate.status).toBe(422);
+    expect(noDate.body.error.code).toBe('GAME_START_REQUIRED');
+    const startsAt = futureMondayKyiv();
+    expect((await call('patch', `/api/games/${copyId}`, gm.cookie, { startsAt })).status).toBe(200);
     expect((await call('post', `/api/games/${copyId}/publish`, gm.cookie)).status).toBe(200);
   });
 
@@ -179,7 +180,7 @@ describe('POST /api/games/:id/clone', () => {
     const [copy] = await db.select().from(games).where(eq(games.id, res.body.id));
     expect(copy!.timezone).toBe('Europe/Kyiv');
     expect(copy!.weekdays).toEqual([0]);
-    expect(toZoned(copy!.startsAt, 'Europe/Kyiv').weekday).toBe(0);
+    expect(copy!.startsAt).toBeNull();
   });
 
   it('title cut counts code points (no lone surrogate)', () => {
@@ -191,26 +192,6 @@ describe('POST /api/games/:id/clone', () => {
         (c) => c.length === 2 || c.charCodeAt(0) < 0xd800 || c.charCodeAt(0) > 0xdfff,
       ),
     ).toBe(true);
-  });
-
-  it('copyStartsAt: weekly far in the past keeps the local slot; DST crossing', () => {
-    const tz = 'Europe/Kyiv';
-    const now = new Date('2026-11-27T10:00:00Z');
-    const winter = copyStartsAt(new Date('2024-01-08T17:00:00Z'), tz, now);
-    const z = toZoned(winter, tz);
-    expect([z.weekday, z.hour, z.minute]).toEqual([0, 19, 0]);
-    expect(winter.getTime()).toBeGreaterThan(now.getTime());
-    expect(winter.getTime() - now.getTime()).toBeLessThanOrEqual(7 * 86_400_000);
-    // Літній слот (UTC+3, 19:00) -> зимовий час із тими ж 19:00 локально.
-    const summer = copyStartsAt(new Date('2026-07-06T16:00:00Z'), tz, now);
-    expect(summer.toISOString()).toBe('2026-11-30T17:00:00.000Z');
-    // Зимовий слот -> після переходу на літній час (29.03.2027): 19:00 локально = 16:00 UTC.
-    const march = copyStartsAt(
-      new Date('2027-03-01T17:00:00Z'),
-      tz,
-      new Date('2027-03-28T00:00:00Z'),
-    );
-    expect(march.toISOString()).toBe('2027-03-29T16:00:00.000Z');
   });
 
   it('creation limits apply: a dead game blocks the clone', async () => {

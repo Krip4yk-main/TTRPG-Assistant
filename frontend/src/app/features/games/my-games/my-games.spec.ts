@@ -45,6 +45,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
     format: 'online',
     city: null,
     nextSessionAt: '2027-03-02T17:00:00.000Z',
+    startsAt: '2027-03-02T17:00:00.000Z',
     timezone: 'Europe/Kyiv',
     freeSlots: 4,
     maxPlayers: 5,

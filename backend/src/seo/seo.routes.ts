@@ -151,7 +151,7 @@ export function ogRouter(deps: AppDeps): Router {
     const open =
       (g.status === 'recruiting' || g.status === 'started') &&
       g.ageRating === 'none' &&
-      (g.recurrence !== 'none' || g.startsAt > new Date());
+      (g.recurrence !== 'none' || (g.startsAt !== null && g.startsAt > new Date()));
     if (!open) {
       sendHtml(res, neutral(`${base}/games/${g.id}`));
       return;

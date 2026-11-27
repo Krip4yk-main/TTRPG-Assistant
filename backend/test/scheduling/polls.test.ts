@@ -406,9 +406,9 @@ describe('polls: apply (GM, closed only, idempotent)', () => {
     expect(res.body.poll).toMatchObject({ appliedOptionId: o.id, appliedSessionId: null });
     const [g] = await db.select().from(games).where(eq(games.id, gameId));
     expect(g!.weekdays).toEqual([target]);
-    const gz = toZoned(g!.startsAt, KYIV);
+    const gz = toZoned(g!.startsAt!, KYIV);
     expect([gz.weekday, gz.hour, gz.minute]).toEqual([target, 18, 30]);
-    expect(g!.startsAt.getTime()).toBeGreaterThan(Date.now());
+    expect(g!.startsAt!.getTime()).toBeGreaterThan(Date.now());
 
     const again = await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {
       optionId: poll.options[1]!.id,
@@ -591,7 +591,7 @@ describe('polls: review fixes', () => {
     expect(ok.status).toBe(200);
     const [g] = await db.select().from(games).where(eq(games.id, gameId));
     expect(g!.weekdays).toEqual([...days].sort((x, y) => x - y));
-    const z = toZoned(g!.startsAt, KYIV);
+    const z = toZoned(g!.startsAt!, KYIV);
     expect([z.weekday, z.hour, z.minute]).toEqual([target, 20, 0]);
   });
 

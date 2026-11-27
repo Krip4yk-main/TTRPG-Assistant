@@ -50,6 +50,52 @@ describe('games lifecycle', () => {
     expect(res.body.error.code).toBe('GAME_IN_PAST');
   });
 
+  it('a draft may be saved without a start date; it shows up in my games and cannot be published', async () => {
+    const gm = await userWithAge(30);
+    const created = await call(
+      'post',
+      '/api/games',
+      gm.cookie,
+      await validGame({ startsAt: null }),
+    );
+    expect(created.status).toBe(201);
+    expect(created.body.startsAt).toBeNull();
+    expect(created.body.nextSessionAt).toBeNull();
+    const id = created.body.id as number;
+    // Редагування чернетки без дати — без змін дати.
+    const patched = await call('patch', `/api/games/${id}`, gm.cookie, { title: 'Нова' });
+    expect(patched.status).toBe(200);
+    expect(patched.body.startsAt).toBeNull();
+    const mine = await call('get', '/api/games/mine', gm.cookie);
+    expect(mine.status).toBe(200);
+    expect(mine.body[0]).toMatchObject({ id, nextSessionAt: null, status: 'draft' });
+    const pub = await call('post', `/api/games/${id}/publish`, gm.cookie);
+    expect(pub.status).toBe(422);
+    expect(pub.body.error.code).toBe('GAME_START_REQUIRED');
+    const [row] = await db.select().from(games).where(eq(games.id, id));
+    expect(row!.status).toBe('draft');
+    // Задали дату — публікується.
+    const dated = await call('patch', `/api/games/${id}`, gm.cookie, {
+      startsAt: (await validGame()).startsAt,
+    });
+    expect(dated.status).toBe(200);
+    expect((await call('post', `/api/games/${id}/publish`, gm.cookie)).status).toBe(200);
+  });
+
+  it('clearing the date of a draft is allowed; of a published game → 422 GAME_START_REQUIRED', async () => {
+    const gm = await userWithAge(30);
+    const draft = await createGame(gm.cookie);
+    const cleared = await call('patch', `/api/games/${draft}`, gm.cookie, { startsAt: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.startsAt).toBeNull();
+    const published = await createGame(gm.cookie, {}, true);
+    const res = await call('patch', `/api/games/${published}`, gm.cookie, { startsAt: null });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('GAME_START_REQUIRED');
+    const [row] = await db.select().from(games).where(eq(games.id, published));
+    expect(row!.startsAt).not.toBeNull();
+  });
+
   it('runs start → finish; invalid transitions → 409', async () => {
     const gm = await userWithAge(30);
     const id = await createGame(gm.cookie, {}, true);

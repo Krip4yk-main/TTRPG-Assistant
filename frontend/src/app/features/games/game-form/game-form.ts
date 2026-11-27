@@ -290,6 +290,11 @@ export class GameForm {
 
   protected readonly status = computed<GameStatus>(() => this.game()?.status ?? 'draft');
   protected readonly isDraft = computed(() => this.status() === 'draft');
+  /** Дату старту можна лишити порожньою лише в чернетці; час обов'язковий, коли дату задано. */
+  protected readonly startDateRequired = computed(() => !this.isDraft());
+  protected readonly startTimeRequired = computed(
+    () => !this.isDraft() || this.value().startDate !== null,
+  );
   protected readonly locked = computed(() => LOCKED_STATUSES.has(this.status()));
   protected readonly closed = computed(() => CLOSED_STATUSES.has(this.status()));
   /** Гра йде: правило розкладу тут не редагується (див. `RULE_CONTROLS`). */
@@ -525,6 +530,13 @@ export class GameForm {
     await this.persist(false);
   }
 
+  /** Очищає дату й час старту (лише чернетка: «дату ще не визначено»). */
+  protected clearStart(): void {
+    this.c.startDate.setValue(null);
+    this.c.startTime.setValue('');
+    this.c.startDate.markAsDirty();
+  }
+
   protected async publish(): Promise<void> {
     await this.persist(true);
   }
@@ -535,6 +547,12 @@ export class GameForm {
     this.form.markAllAsTouched();
     const input = this.validate();
     if (!input) {
+      this.focusFirstInvalid();
+      return;
+    }
+    // Чернетку без дати можна зберегти, але не опублікувати.
+    if (publish && input.startsAt === null) {
+      this.setApiErrors({ startDate: 'errors.GAME_START_REQUIRED' });
       this.focusFirstInvalid();
       return;
     }
@@ -611,8 +629,8 @@ export class GameForm {
       fieldErrors[this.controlName(d.field)] = 'errors.GAME_FIELD_LOCKED';
     } else if (code === 'AGE_RESTRICTED_CREATE') {
       fieldErrors['ageRating'] = 'errors.AGE_RESTRICTED_CREATE';
-    } else if (code === 'GAME_IN_PAST') {
-      fieldErrors['startDate'] = 'errors.GAME_IN_PAST';
+    } else if (code === 'GAME_IN_PAST' || code === 'GAME_START_REQUIRED') {
+      fieldErrors['startDate'] = `errors.${code}`;
     } else if (code === 'IMAGE_URL_INVALID') {
       // Посилання на обкладинку не пройшло перевірку сервера: причина — біля поля.
       const reason = (IMAGE_URL_INVALID_REASONS as readonly unknown[]).includes(d.reason)
@@ -787,8 +805,12 @@ export class GameForm {
     };
   }
 
-  /** Дата (календарна) + `HH:mm` у поясі гри → UTC ISO; неповні дані — `undefined`. */
-  private startsAt(date: Date | null, time: string): string | undefined {
+  /**
+   * Дата (календарна) + `HH:mm` у поясі гри → UTC ISO; неповні дані — `undefined`. Порожня
+   * дата в чернетці — `null` («дату ще не визначено»), час тоді ігнорується.
+   */
+  private startsAt(date: Date | null, time: string): string | null | undefined {
+    if (date === null && this.isDraft()) return null;
     const m = /^(\d{2}):(\d{2})$/.exec(time);
     if (!date || Number.isNaN(date.getTime()) || !m) return undefined;
     return zonedToUtc(
@@ -833,7 +855,7 @@ export class GameForm {
 
   private prefill(g: GameDto): void {
     this.prefilling = true;
-    const start = toZoned(new Date(g.startsAt), g.timezone);
+    const start = g.startsAt === null ? null : toZoned(new Date(g.startsAt), g.timezone);
     this.form.patchValue({
       title: g.title,
       description: g.description,
@@ -845,8 +867,8 @@ export class GameForm {
       address: g.address ?? '',
       platform: g.platform ?? '',
       kind: g.kind,
-      startDate: new Date(start.year, start.month - 1, start.day),
-      startTime: `${pad(start.hour)}:${pad(start.minute)}`,
+      startDate: start ? new Date(start.year, start.month - 1, start.day) : null,
+      startTime: start ? `${pad(start.hour)}:${pad(start.minute)}` : '',
       durationMinutes: g.durationMinutes,
       recurrence: g.recurrence,
       weekdays: [...g.weekdays],

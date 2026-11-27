@@ -256,11 +256,26 @@
                 [matDatepicker]="picker"
                 [min]="isDraft() ? minDate() : null"
                 formControlName="startDate"
-                required
+                [required]="startDateRequired()"
               />
+              @if (isDraft() && value().startDate !== null && !c.startDate.disabled) {
+                <button
+                  matIconSuffix
+                  mat-icon-button
+                  type="button"
+                  class="clear-start"
+                  [attr.aria-label]="'games.form.clearStart' | translate"
+                  (click)="clearStart()"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              }
               <mat-datepicker-toggle matIconSuffix [for]="picker" />
               <mat-datepicker #picker />
-              <mat-hint>{{ 'games.form.startDateHint' | translate }}</mat-hint>
+              <mat-hint>{{
+                (isDraft() ? 'games.form.startDateDraftHint' : 'games.form.startDateHint')
+                  | translate
+              }}</mat-hint>
               @if (errorKey('startDate'); as key) {
                 <mat-error>{{ key | translate }}</mat-error>
               }
@@ -272,7 +287,13 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.startTime' | translate }}</mat-label>
-              <input matInput type="time" formControlName="startTime" step="60" required />
+              <input
+                matInput
+                type="time"
+                formControlName="startTime"
+                step="60"
+                [required]="startTimeRequired()"
+              />
               <mat-hint>{{ 'games.form.timezoneHint' | translate: { tz: timezone() } }}</mat-hint>
               @if (errorKey('startTime'); as key) {
                 <mat-error>{{ key | translate }}</mat-error>

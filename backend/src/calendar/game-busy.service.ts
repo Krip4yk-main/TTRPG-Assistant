@@ -149,6 +149,8 @@ export async function gameBusyIntervalsForUsers(
   }
   const last = new Map(lastSlots.map((r) => [r.gameId, r.last ? new Date(r.last) : null]));
   for (const g of mine) {
+    // Без дати старту правило не має слотів (чернетки сюди й так не потрапляють).
+    if (g.startsAt === null) continue;
     const after = last.get(g.id) ?? null;
     const duration = g.durationMinutes * MINUTE_MS;
     // Віртуальні слоти — лише ті, що ще не закінчились і йдуть після матеріалізованих.

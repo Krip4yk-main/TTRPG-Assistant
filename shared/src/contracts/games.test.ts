@@ -98,6 +98,18 @@ describe('gameInputSchema', () => {
     expect(parse({ startsAt: '2027-01-04T17:00:00.500Z' }).success).toBe(false);
     expect(parse({ startsAt: 'tomorrow' }).success).toBe(false);
   });
+  it('startsAt may be null (draft without a date); weekly rule then needs only non-empty weekdays', () => {
+    expect(parse({ startsAt: null }).data?.startsAt).toBeNull();
+    expect(parse({ startsAt: null, weekdays: [2, 4] }).success).toBe(true);
+    expect(parse({ startsAt: null, weekdays: [] }).success).toBe(false);
+    expect(parse({ startsAt: null, recurrence: 'none', weekdays: [] }).success).toBe(true);
+    expect(gameInputSchema(TZ).safeParse({ ...ok, startsAt: undefined }).success).toBe(false);
+    expect(gamePatchSchema.parse({ startsAt: null })).toEqual({ startsAt: null });
+    expect(scheduleRuleInputSchema.safeParse({ startsAt: null, recurrence: 'none' }).success).toBe(
+      false,
+    );
+    expect(resumeInputSchema.safeParse({ startsAt: null, recruit: false }).success).toBe(false);
+  });
   it('limits application questions and custom warnings', () => {
     expect(parse({ applicationQuestions: Array(11).fill('q') }).success).toBe(false);
     expect(parse({ applicationQuestions: ['x'.repeat(301)] }).success).toBe(false);

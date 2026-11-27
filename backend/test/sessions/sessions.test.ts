@@ -637,7 +637,7 @@ describe('PATCH of the schedule on a published game (R4)', () => {
     expect(res.status).toBe(200);
     const [g] = await db.select().from(games).where(eq(games.id, gameId));
     expect(g!.title).toBe('Нова назва');
-    expect(g!.startsAt.toISOString()).toBe(sched.startsAt);
+    expect(g!.startsAt!.toISOString()).toBe(sched.startsAt);
     expect(g!.weekdays).toEqual([sched.weekday]);
   });
 

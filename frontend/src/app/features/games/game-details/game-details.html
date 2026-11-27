@@ -297,7 +297,7 @@
           <dl class="facts nri-card">
             <div>
               <dt>{{ 'games.details.nextSession' | translate }}</dt>
-              <dd>{{ nextSession() ?? ('search.card.noNext' | translate) }}</dd>
+              <dd>{{ nextSession() ?? (noNextKey() | translate) }}</dd>
             </div>
             <div>
               <dt>{{ 'games.details.duration' | translate }}</dt>
@@ -318,9 +318,11 @@
                           <li>{{ 'games.weekdaysLong.' + d | translate }}</li>
                         }
                       </ul>
-                      <span class="schedule-zone">{{
-                        'games.details.scheduleAt' | translate: s
-                      }}</span>
+                      @if (s.time) {
+                        <span class="schedule-zone">{{
+                          'games.details.scheduleAt' | translate: s
+                        }}</span>
+                      }
                     </dd>
                   }
                 </div>

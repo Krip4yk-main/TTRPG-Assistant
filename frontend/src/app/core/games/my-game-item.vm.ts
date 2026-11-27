@@ -73,6 +73,8 @@ export interface MyGameItemVm {
   systemLine: LinePart[];
   /** Найближча сесія в поясі глядача, або `null`. */
   nextSession: string | null;
+  /** Ключ підпису, коли найближчої сесії немає (чернетка без дати — «Дату ще не визначено»). */
+  noNextKey: string;
   freeSlots: number;
   maxPlayers: number;
   /** Місця за видом (гравцю — зайняті, майстру — вільні): текст і заповнення індикатора. */
@@ -188,6 +190,7 @@ export function toMyGameItemVm(
       { key: kindKey },
     ],
     nextSession,
+    noNextKey: game.startsAt === null ? 'games.my.noStartDate' : 'games.my.noNextSession',
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
     seats: toSeatsVm(game.freeSlots, game.maxPlayers, viewMode),

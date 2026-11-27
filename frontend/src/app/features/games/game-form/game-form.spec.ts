@@ -232,6 +232,55 @@ describe('GameForm', () => {
     await settle();
   });
 
+  it('a new draft may be saved without a start date (startsAt: null)', async () => {
+    await setup();
+    await type('input[formcontrolname="title"]', 'Тіні Найт-Сіті');
+    await choose('system', 'Cyberpunk RED');
+    expect(el.textContent).toContain('games.form.startDateDraftHint');
+    await submit();
+    const req = http.expectOne('/api/games');
+    expect(req.request.body).toMatchObject({ startsAt: null });
+    req.flush(game({ startsAt: null, nextSessionAt: null }));
+    await settle();
+  });
+
+  it('a draft date can be cleared; publishing without a date shows GAME_START_REQUIRED and sends nothing', async () => {
+    await setup(5, game({ status: 'draft' }));
+    const clear = q<HTMLButtonElement>('button.clear-start');
+    clear.click();
+    await settle();
+    expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').value).toBe('');
+    expect(el.querySelector('button.clear-start')).toBeNull();
+    expect(publishButton().disabled).toBe(false);
+    publishButton().click();
+    await settle();
+    http.expectNone('/api/games/5');
+    const dateField = q<HTMLInputElement>('input[formcontrolname="startDate"]').closest('.field')!;
+    expect(dateField.textContent).toContain('errors.GAME_START_REQUIRED');
+    expect(String(uk.errors.GAME_START_REQUIRED)).toContain('дату');
+    // Зберегти чернетку без дати — можна.
+    await submit();
+    const req = http.expectOne('/api/games/5');
+    expect(req.request.body).toMatchObject({ startsAt: null });
+    req.flush(game({ startsAt: null, nextSessionAt: null }));
+    await settle();
+  });
+
+  it('a dateless draft opens with empty date and time fields', async () => {
+    await setup(5, game({ startsAt: null, nextSessionAt: null }));
+    expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').value).toBe('');
+    expect(q<HTMLInputElement>('input[formcontrolname="startTime"]').value).toBe('');
+    expect(el.querySelector('button.clear-start')).toBeNull();
+  });
+
+  it('a published game: the date cannot be cleared (no clear button, empty date is required)', async () => {
+    await setup(5, game({ status: 'recruiting' }));
+    expect(el.querySelector('button.clear-start')).toBeNull();
+    await type('input[formcontrolname="startDate"]', '');
+    await submit();
+    http.expectNone('/api/games/5');
+  });
+
   describe('creation blocked by «dead» games', () => {
     const dead = (id: number, title: string, status: 'recruiting' | 'started') => ({
       id,

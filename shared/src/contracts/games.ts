@@ -95,7 +95,8 @@ const shape = {
   address: optText(255),
   platform: optText(60),
   kind: z.enum(GAME_KINDS),
-  startsAt,
+  /** `null` — дату ще не визначено (лише чернетка; публікація без дати — 422 `GAME_START_REQUIRED`). */
+  startsAt: startsAt.nullable(),
   durationMinutes: z.number().int().min(30).max(720).multipleOf(30),
   recurrence: z.enum(RECURRENCES),
   weekdays: z
@@ -161,8 +162,9 @@ export type GameInput = z.output<typeof gameObject>;
  * Повна валідація гри. `timezone` — пояс гри (майстра на момент створення), потрібен для
  * перевірки, що день тижня першої сесії входить у `weekdays`.
  * Правила: рівно одне з `systemId`/`systemOther`; offline → `city`; `oneshot` → лише `none`;
- * weekly/biweekly → непорожні `weekdays`, що містять день `startsAt`; none/monthly → `[]`;
- * `minPlayers ≤ maxPlayers`; `startsAt` — ціла хвилина.
+ * weekly/biweekly → непорожні `weekdays`, що містять день `startsAt` (якщо дату задано);
+ * none/monthly → `[]`; `minPlayers ≤ maxPlayers`; `startsAt` — ціла хвилина або `null`
+ * (чернетка без дати; заборону поза чернеткою перевіряє бекенд).
  */
 export function gameInputSchema(timezone: string) {
   return gameObject
@@ -183,8 +185,11 @@ export function gameInputSchema(timezone: string) {
         issue('recurrence', 'Oneshot cannot recur');
       }
       if (g.recurrence === 'weekly' || g.recurrence === 'biweekly') {
-        const wd = toZoned(new Date(g.startsAt), timezone).weekday;
-        if (!g.weekdays.includes(wd)) {
+        if (g.weekdays.length === 0) issue('weekdays', 'Weekly rule requires weekdays');
+        else if (
+          g.startsAt !== null &&
+          !g.weekdays.includes(toZoned(new Date(g.startsAt), timezone).weekday)
+        ) {
           issue('weekdays', 'Weekdays must include the weekday of startsAt');
         }
       } else if (g.weekdays.length > 0) {
@@ -288,6 +293,8 @@ export interface GameCardDto {
 
 /** Картка «Мої ігри» (`GET /api/games/mine`, лише майстру): склад і нові заявки. */
 export interface MyGameCardDto extends GameCardDto {
+  /** Дата старту (перша сесія правила, ISO UTC); `null` — чернетка, дату ще не визначено. */
+  startsAt: string | null;
   minPlayers: number;
   /** Активні учасники (без майстра). */
   memberCount: number;

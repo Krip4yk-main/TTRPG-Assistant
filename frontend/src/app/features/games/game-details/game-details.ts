@@ -30,6 +30,7 @@ import {
   type GameViewerDto,
   type PublicGameDto,
   type RestrictedGameDto,
+  type Weekday,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
@@ -316,16 +317,23 @@ export class GameDetails {
     if (!g?.nextSessionAt) return null;
     return formatDateTime(g.nextSessionAt, viewerTimeZone(this.auth.me()));
   });
+  /** Підпис, коли найближчої сесії немає: чернетка без дати — «Дату ще не визначено». */
+  protected readonly noNextKey = computed(() =>
+    this.game()?.startsAt === null ? 'games.my.noStartDate' : 'search.card.noNext',
+  );
   /**
    * Тижневий розклад (дні й час) — теж у поясі глядача: дні задані в поясі гри й
    * переводяться кожен окремо (сесія може припасти на сусідній день).
    */
-  protected readonly schedule = computed(() => {
-    const g = this.game();
-    return g
-      ? weeklyInZone(g.startsAt, g.timezone, g.weekdays, viewerTimeZone(this.auth.me()))
-      : null;
-  });
+  protected readonly schedule = computed(
+    (): { weekdays: Weekday[]; time: string | null } | null => {
+      const g = this.game();
+      if (!g) return null;
+      // Без дати старту (чернетка) часу ще немає — лише дні тижня в поясі гри.
+      if (g.startsAt === null) return { weekdays: [...g.weekdays], time: null };
+      return weeklyInZone(g.startsAt, g.timezone, g.weekdays, viewerTimeZone(this.auth.me()));
+    },
+  );
   protected readonly durationHours = computed(() => (this.game()?.durationMinutes ?? 0) / 60);
   protected readonly returnTo = computed(() => `/games/${this.id()}`);
 

@@ -23,7 +23,7 @@
     @if (game.nextSession; as at) {
       {{ 'games.my.nextSession' | translate: { date: at } }}
     } @else {
-      {{ 'games.my.noNextSession' | translate }}
+      {{ game.noNextKey | translate }}
     }
   </p>
   <p>

@@ -288,13 +288,21 @@ function sqlFilters(deps: AppDeps, f: SearchFilters, now: Date): SQL[] {
   return c.filter((x): x is SQL => x !== undefined);
 }
 
-const schedule = (row: Loaded['row']) => ({
-  startsAt: row.startsAt.toISOString(),
-  durationMinutes: row.durationMinutes,
-  recurrence: row.recurrence,
-  weekdays: row.weekdays,
-  timezone: row.timezone,
-});
+/** Слоти правила гри в `[from, to)`; гра без дати старту (чернетка) — без слотів. */
+const occurrences = (row: Loaded['row'], from: Date, to: Date) =>
+  row.startsAt === null
+    ? []
+    : expandOccurrences(
+        {
+          startsAt: row.startsAt.toISOString(),
+          durationMinutes: row.durationMinutes,
+          recurrence: row.recurrence,
+          weekdays: row.weekdays,
+          timezone: row.timezone,
+        },
+        from,
+        to,
+      );
 
 type Check = (l: Loaded) => { pass: boolean; fit?: 'full' | 'partial' };
 
@@ -309,18 +317,14 @@ function memoryFilter(
   if (f.dateFrom || f.dateTo) {
     const from = new Date(Math.max(now.getTime(), f.dateFrom ? Date.parse(f.dateFrom) : 0));
     const to = f.dateTo ? new Date(f.dateTo) : new Date(from.getTime() + DATE_ONLY_FROM_SPAN_MS);
-    checks.push((l) => ({ pass: expandOccurrences(schedule(l.row), from, to).length > 0 }));
+    checks.push((l) => ({ pass: occurrences(l.row, from, to).length > 0 }));
   }
   if (availability) {
     const horizon = new Date(now.getTime() + FIT_HORIZON_DAYS * DAY_MS);
     checks.push((l) => {
       // Зайнятість від власних ігор глядача; сесії самої гри-кандидата її не займають.
       const own = busy.filter((b) => b.gameId !== l.row.id);
-      const fit = availabilityFit(
-        expandOccurrences(schedule(l.row), now, horizon),
-        availability,
-        own,
-      );
+      const fit = availabilityFit(occurrences(l.row, now, horizon), availability, own);
       if (fit === 'full' || (fit === 'partial' && f.calendar.includePartial)) {
         return { pass: true, fit };
       }

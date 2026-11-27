@@ -188,7 +188,9 @@ export class ResumeDialog {
    * правила; без днів правила — за тиждень.
    */
   private initialStart(): { date: Date; time: string } {
-    const { time } = utcToZonedInput(this.data.game.startsAt, this.tz);
+    // Гра на паузі завжди має дату старту (порожня — лише в чернетці); без неї час обирає майстер.
+    const startsAt = this.data.game.startsAt;
+    const { time } = startsAt ? utcToZonedInput(startsAt, this.tz) : { time: '' };
     const today = fromIsoDate(localDate(new Date(), this.tz));
     const day = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
     for (let n = 1; n <= 7 && this.ruleDays.length; n++) {

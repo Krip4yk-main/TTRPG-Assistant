@@ -35,17 +35,19 @@ export async function materializeForRow(
   now: Date,
   from: Date = new Date(now.getTime() - DAY_MS),
 ): Promise<number> {
-  if (!isRunning(game)) return 0;
+  const startsAt = game.startsAt;
+  // Без дати старту (чернетка) правило не розгортається.
+  if (!isRunning(game) || startsAt === null) return 0;
   // Єдина сесія ваншота (`none`) створюється одразу, навіть за межами вікна.
   const to = new Date(
     Math.max(
       now.getTime() + SESSION_WINDOW_DAYS * DAY_MS,
-      game.recurrence === 'none' ? game.startsAt.getTime() + 60_000 : 0,
+      game.recurrence === 'none' ? startsAt.getTime() + 60_000 : 0,
     ),
   );
   const slots = expandOccurrences(
     {
-      startsAt: game.startsAt.toISOString(),
+      startsAt: startsAt.toISOString(),
       durationMinutes: game.durationMinutes,
       recurrence: game.recurrence,
       weekdays: game.weekdays,
@@ -199,7 +201,7 @@ export async function replaceRuleSessions(
         inArray(gameSessions.status, ['scheduled', 'cancelled']),
       ),
     );
-    await materializeForRow(tx, game, now, game.startsAt);
+    await materializeForRow(tx, game, now, game.startsAt ?? undefined);
     return cancelled;
   }
   const cancelled = await dropReplacedSessions(
@@ -261,7 +263,7 @@ export async function restartRuleAfterPause(tx: Tx, game: GameRow, now: Date): P
         future,
         or(
           eq(gameSessions.cancelReason, CAMPAIGN_PAUSED_REASON),
-          eq(gameSessions.ruleStartsAt, game.startsAt),
+          game.startsAt === null ? undefined : eq(gameSessions.ruleStartsAt, game.startsAt),
         ),
       ),
     );

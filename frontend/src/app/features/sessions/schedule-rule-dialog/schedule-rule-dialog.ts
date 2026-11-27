@@ -235,7 +235,8 @@ export class ScheduleRuleDialog {
       (iso): iso is string => !!iso && Date.parse(iso) > now,
     );
     if (future) return utcToZonedInput(future, this.tz);
-    const { time } = utcToZonedInput(g.startsAt, this.tz);
+    // Опублікована гра завжди має дату старту (порожня — лише в чернетці).
+    const { time } = g.startsAt ? utcToZonedInput(g.startsAt, this.tz) : { time: '' };
     const today = fromIsoDate(localDate(new Date(), this.tz));
     return { date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7), time };
   }

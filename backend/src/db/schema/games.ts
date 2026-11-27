@@ -77,7 +77,7 @@ export const games = mysqlTable(
     address: varchar('address', { length: 255 }),
     platform: varchar('platform', { length: 60 }),
     kind: mysqlEnum('kind', GAME_KINDS).notNull(),
-    startsAt: datetime('starts_at').notNull(),
+    startsAt: datetime('starts_at'),
     durationMinutes: smallint('duration_minutes').notNull(),
     recurrence: mysqlEnum('recurrence', RECURRENCES).notNull().default('none'),
     weekdays: json('weekdays')
