@@ -1,5 +1,13 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+} from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -52,6 +60,13 @@ export class TesterReport {
   protected readonly dev = computed(() => this.deployEnv() === 'dev');
   protected readonly visible = computed(() => this.dev() || this.auth.me() !== null);
 
+  constructor() {
+    // Поки кнопку видно — клас на <html>: підвали оболонок резервують під неї місце знизу.
+    const root = this.doc.documentElement;
+    effect(() => root.classList.toggle(RESERVE_CLASS, this.visible()));
+    inject(DestroyRef).onDestroy(() => root.classList.remove(RESERVE_CLASS));
+  }
+
   protected open(): void {
     if (this.dialog.getDialogById(DIALOG_ID)) return;
     this.dialog.open<TesterReportDialog, TesterReportDialogData, boolean>(TesterReportDialog, {
@@ -70,3 +85,6 @@ export class TesterReport {
 }
 
 const DIALOG_ID = 'nri-tester-report-dialog';
+
+/** Клас на `<html>`, поки плаваючу кнопку видно (див. `--nri-floating-reserve` у styles.less). */
+export const RESERVE_CLASS = 'nri-has-tester-report';

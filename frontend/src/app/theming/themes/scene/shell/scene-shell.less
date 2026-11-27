@@ -166,6 +166,8 @@ nri-guest-theme-toggle {
   justify-content: center;
   gap: var(--nri-space-lg);
   padding: var(--nri-space-lg) var(--nri-space-md);
+  // Місце під плаваючу кнопку «Відгук» (лише коли вона є) — не заступає останній рядок.
+  padding-bottom: calc(var(--nri-space-lg) + var(--nri-floating-reserve));
 }
 
 .connection-banner {

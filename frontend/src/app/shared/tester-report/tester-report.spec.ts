@@ -9,7 +9,7 @@ import uk from '../../../assets/i18n/uk.json';
 import { AuthStore } from '../../core/auth/auth.store';
 import { SocketService } from '../../core/realtime/socket.service';
 import { ThemeService } from '../../theming/theme.service';
-import { TesterReport } from './tester-report';
+import { RESERVE_CLASS, TesterReport } from './tester-report';
 
 const me: MeDto = {
   id: 1,
@@ -80,6 +80,18 @@ describe('TesterReport', () => {
   it.each(['local', 'prod'])('%s: renders nothing for a guest', async (env) => {
     const el = (await create(env)).nativeElement as HTMLElement;
     expect(el.querySelector('button')).toBeNull();
+  });
+
+  it('reserves bottom space (class on <html>) only while the button is shown', async () => {
+    const root = document.documentElement;
+    const guest = await create('prod');
+    expect(root.classList.contains(RESERVE_CLASS)).toBe(false);
+    guest.destroy();
+    TestBed.resetTestingModule();
+    const dev = await create('dev');
+    expect(root.classList.contains(RESERVE_CLASS)).toBe(true);
+    dev.destroy();
+    expect(root.classList.contains(RESERVE_CLASS)).toBe(false);
   });
 
   it.each(['local', 'prod'])('%s: logged in — neutral «Відгук» button and dialog', async (env) => {

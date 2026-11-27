@@ -184,7 +184,10 @@ nri-guest-theme-toggle {
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--nri-space-lg);
-  padding: var(--nri-space-lg) var(--nri-space-md);
+  // Знизу — ще й місце під плаваючу кнопку «Відгук» (лише коли вона є): не заступає останній
+  // рядок.
+  padding: var(--nri-space-lg) var(--nri-space-md)
+    calc(var(--nri-space-lg) + var(--nri-floating-reserve));
   background: linear-gradient(var(--qb-plank-dark), var(--qb-wood-dark));
   box-shadow: 0 -4px 0 var(--qb-plank-edge);
 }
