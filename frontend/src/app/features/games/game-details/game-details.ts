@@ -83,8 +83,6 @@ import {
   ComplaintDialog,
   type ComplaintDialogData,
 } from '../../moderation/complaint-dialog/complaint-dialog';
-import { GameOpenedMoment } from '../../../theming/moments/game-opened';
-import { ThemeService } from '../../../theming/theme.service';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled', 'paused']);
@@ -147,12 +145,6 @@ export class GameDetails {
   private readonly router = inject(Router);
   private readonly announcer = inject(LiveAnnouncer);
   private readonly translate = inject(TranslateService);
-  private readonly themes = inject(ThemeService);
-  /**
-   * Гра, яку відкрили з картки (момент `gameOpened`): після першого показу на обкладинці й
-   * шапці грає фірмова анімація дизайну. Пряма адреса чи оновлення — `null`.
-   */
-  private openedFromCard = inject(GameOpenedMoment).take();
   private readonly sessionsList = viewChild(SessionsList);
   private readonly membersPanel = viewChild(MembersPanel);
   /** Панель «Спільний час» вантажиться відкладено (@defer) — без посилання на клас. */
@@ -166,8 +158,6 @@ export class GameDetails {
   /** Підсвітити шапку гри після оновлення деталей. */
   protected readonly flashDetails = signal(false);
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Перериває фірмову анімацію `gameOpened`, коли сторінку знищено. */
-  private readonly effectCancel = new AbortController();
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
@@ -388,7 +378,6 @@ export class GameDetails {
 
   constructor() {
     void this.catalog.load();
-    if (this.openedFromCard !== null) this.themes.preloadEffect('gameOpened');
     effect(() => {
       const id = Number(this.id());
       void this.load(id);
@@ -420,8 +409,6 @@ export class GameDetails {
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.flashTimer) clearTimeout(this.flashTimer);
-      // Пішли зі сторінки — фірмова анімація відкриття гри більше не потрібна.
-      this.effectCancel.abort();
     });
     effect(() => {
       const g = this.game();
@@ -831,10 +818,6 @@ export class GameDetails {
   /** `silent` — оновити дані без стану «завантаження» (після дії на сторінці). */
   private async load(id: number, silent = false): Promise<boolean> {
     const seq = ++this.seq;
-    // Позначку картки знімає перше ж завантаження, хоч би чим воно скінчилось: «Повторити»
-    // після збою вже не перехід з картки.
-    const fromCard = this.openedFromCard === id;
-    this.openedFromCard = null;
     if (!silent) {
       this.state.set('loading');
       this.view.set(null);
@@ -850,7 +833,6 @@ export class GameDetails {
       this.view.set(g);
       this.state.set('ready');
       this.updateSeo(g);
-      if (fromCard) this.playGameOpened();
       return true;
     } catch (err) {
       if (seq !== this.seq) return true;
@@ -859,21 +841,6 @@ export class GameDetails {
       if (notFound) this.seo.set({ titleKey: 'games.details.notFound', noindex: true });
       return false;
     }
-  }
-
-  /** Перший показ гри, відкритої з картки, — фірмова анімація (без затримки сторінки). */
-  private playGameOpened(): void {
-    afterNextRender(
-      () => {
-        const target = this.host.nativeElement.querySelector<HTMLElement>(
-          'article.game, article.restricted',
-        );
-        if (target) {
-          void this.themes.playEffect('gameOpened', target, undefined, this.effectCancel.signal);
-        }
-      },
-      { injector: this.injector },
-    );
   }
 
   /** Назва гри у вкладці й превʼю; 16+/18+/21+, чернетки й скасовані — без індексації. */

@@ -1,59 +1,17 @@
 // «Голо-ринок»: вигляд ефекту «Згортання в проєктор» (рух — projector/game-opened.ts, Web
-// Animations API; оверлей і його розміщення — theming/effect-stage.ts). Область — шапка
-// сторінки гри; у ній голо-панель зі скан-лініями й назвою гри, шайба-проєктор (як .sc-d3 під
-// картками), світловий конус угору й ціанова лінія розгортки. Без текстур і зображень — лише
-// градієнти (скан-лінії — repeating-linear-gradient, жодних швів).
+// Animations API; оверлей і його розміщення — theming/effect-stage.ts). Область — від верху
+// картки до її шайби-проєктора (.sc-d3); у ній шайба (точно над .sc-d3), світловий конус угору
+// й ціанова лінія розгортки. Згортається сама картка (анімацією). Без текстур і зображень —
+// лише градієнти.
 
 .hm-open-region {
   position: absolute;
+  top: 0;
   right: 0;
   left: 0;
 }
 
-.hm-open-panel {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-  padding: 18px 22px;
-  overflow: hidden;
-  border: 1px solid var(--sc-neon-b);
-  background:
-    repeating-linear-gradient(0deg, rgba(94, 242, 255, 0.16) 0 1px, transparent 1px 4px),
-    linear-gradient(rgba(9, 26, 38, 0.97), rgba(6, 16, 26, 0.98));
-  box-shadow:
-    -2px 0 0 var(--sc-neon-a),
-    0 0 18px rgba(94, 242, 255, 0.35);
-  transform-origin: 50% 50%;
-}
-
-.hm-open-title {
-  max-width: 36ch;
-  color: var(--sc-ink);
-  font-family: var(--sc-font-display);
-  font-size: clamp(20px, 4.2vw, 34px);
-  font-weight: 700;
-  line-height: 1.15;
-  text-shadow:
-    -1px 0 rgba(255, 92, 180, 0.7),
-    1px 0 rgba(94, 242, 255, 0.7);
-  overflow-wrap: anywhere;
-}
-
-.hm-open-bar {
-  width: min(70%, 420px);
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(157, 191, 203, 0.35);
-}
-
-.hm-open-bar-short {
-  width: min(45%, 260px);
-}
-
-// Світловий конус: від лінзи шайби (унизу) на всю ширину шапки (угорі).
+// Світловий конус: від лінзи шайби (унизу) на всю ширину картки (угорі).
 .hm-open-beam {
   position: absolute;
   inset: 0;
@@ -67,7 +25,7 @@
   transform-origin: 50% 100%;
 }
 
-// Лінія розгортки: межа, до якої промінь уже розгорнув сторінку.
+// Лінія розгортки біжить від шайби вгору.
 .hm-open-scan {
   position: absolute;
   top: 0;
@@ -84,9 +42,10 @@
 // Шайба-проєктор: металевий брусок зі світною лінзою й зеленим діодом живлення.
 .hm-open-puck {
   position: absolute;
-  bottom: -5px;
+  bottom: -10px;
   left: 50%;
   height: 10px;
+  margin-left: -45px;
   border-radius: 2px;
   background: linear-gradient(#4a5462, #161b24);
   box-shadow: 0 2px 6px #000;

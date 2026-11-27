@@ -23,7 +23,6 @@ import { LinePipe } from '../../../../core/i18n/line.pipe';
 import { ThemeService } from '../../../theme.service';
 import { noticeTilt, paperVariant } from '../paper';
 import { isCardOpenClick } from '../../../shared/card-click';
-import { GameOpenedMoment } from '../../../moments/game-opened';
 
 /** Скільки бейджів-штампів видно в рядку (решта — «+N»): рядок не переноситься. */
 const MAX_STAMPS = 3;
@@ -85,7 +84,6 @@ export class QuestBoardGameCard implements GameCardSlot {
   private readonly router = inject(Router);
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
   private readonly themes = inject(ThemeService);
-  private readonly gameOpened = inject(GameOpenedMoment);
   protected readonly gameUrl = computed(() => `/games/${this.game().id}`);
   /** Анімацію ввімкнено в профілі (гість — так): тоді й текст оголошення не виділяється. */
   protected readonly tearEnabled = computed(() => this.themes.uiPrefs().tearAnimation);
@@ -133,7 +131,6 @@ export class QuestBoardGameCard implements GameCardSlot {
 
   private navigate(): void {
     this.timer = null;
-    this.gameOpened.fromCard(this.game().id);
     // Перехід скасовано (guard) чи впав — оголошення повертається на місце, а не лишається
     // «відірваним».
     this.router.navigateByUrl(this.gameUrl()).then(

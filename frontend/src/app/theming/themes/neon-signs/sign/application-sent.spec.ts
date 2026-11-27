@@ -36,7 +36,9 @@ describe('lightNeonSign («Неонові вивіски»: вивіска за�
     // Діалог гасне анімацією (не стилем) — переривання поверне його.
     expect(anims.some((a) => a.target === source)).toBe(true);
     expect(source.style.opacity).toBe('');
-    expect(lastEnd(anims)).toBeLessThanOrEqual(1600);
+    // Тривалість 2–3 с (запит власника: встигнути роздивитися).
+    expect(lastEnd(anims)).toBeGreaterThanOrEqual(2000);
+    expect(lastEnd(anims)).toBeLessThanOrEqual(3000);
     anims.forEach((a) => a.resolve());
     await done;
     expect(document.querySelector('.ns-send')).toBeNull();

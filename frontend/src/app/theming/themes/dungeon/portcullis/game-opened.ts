@@ -2,11 +2,11 @@ import { runEffectStage, type EffectStage } from '../../../effect-stage';
 import type { ThemeEffect } from '../../../theme.registry';
 
 /**
- * «Підземелля»: гру відкрито з картки — «Підйом ґрат». Сторінка вже показана; на обкладинку
- * (`img.cover` у `source`; без обкладинки — шапка `header.head`) з глухим ударом падають
- * залізні ґрати на двох ланцюгах і ривками (три смики) піднімаються під верхній край, з
- * каменю над ними сиплеться пил, наприкінці спалахує світло смолоскипа — прохід відкрито.
- * Сторінку ефект не чіпає (ґрати — в оверлеї, клік крізь них проходить). Разом ≈ 1.5 с.
+ * «Підземелля»: гру відкривають з картки — «Підйом ґрат». Грає на самій картці (`source` —
+ * хост картки), сторінка гри відкривається лише після нього. На панель картки (`.panel`) з
+ * глухим ударом падають залізні ґрати на двох ланцюгах і ривками (три смики) піднімаються під
+ * верхній край, з каменю над ними сиплеться пил, наприкінці спалахує світло смолоскипа —
+ * прохід відкрито. Картку ефект не чіпає (ґрати — в оверлеї). Разом ≈ 1.5 с.
  * Вигляд — класи `dg-open-*` (`game-opened.less`).
  */
 
@@ -20,13 +20,13 @@ const T = {
 const DUST_MS = 400;
 /** Порошин в одному викиді пилу. */
 const DUST_PER_BURST = 5;
-/** Крок прутів ґрат, px (кількість — за шириною обкладинки). */
+/** Крок прутів ґрат, px (кількість — за шириною панелі). */
 const BAR_PITCH = 38;
 /** Запас під гострі кінці прутів знизу, px. */
 const TIP = 16;
-/** Найдовший видимий ланцюг над обкладинкою, px. */
+/** Найдовший видимий ланцюг над карткою, px. */
 const CHAIN_MAX = 64;
-/** Найменша висота обкладинки, на якій ефект має сенс, px. */
+/** Найменша висота панелі, на якій ефект має сенс, px. */
 const MIN_HEIGHT = 40;
 /**
  * Підйом: частки `T.rise` → піднято на частку висоти ґрат. Три смики, після кожного ґрати
@@ -49,9 +49,9 @@ export const raisePortcullis: ThemeEffect = async (source, signal) => {
   await runEffectStage(source, signal, 'dg-open', (stage) => {
     const { add, play, rect, doc } = stage;
     const view = doc.defaultView!;
-    const target = coverOf(source);
+    const target = source.querySelector<HTMLElement>('.panel') ?? source;
     const t = target.getBoundingClientRect();
-    // Видима у вікні частина обкладинки, відносно `source`.
+    // Видима у вікні частина панелі, відносно `source`.
     const top = Math.max(t.top, 0) - rect.top;
     const bottom = Math.min(t.bottom, view.innerHeight) - rect.top;
     const height = bottom - top;
@@ -100,7 +100,7 @@ export const raisePortcullis: ThemeEffect = async (source, signal) => {
       'forwards',
     );
 
-    // Ланцюги: над обкладинкою, ланки біжать разом з ґратами (накручуються на ворот).
+    // Ланцюги: над карткою, ланки біжать разом з ґратами (накручуються на ворот).
     const chainLen = Math.min(CHAIN_MAX, top + rect.top);
     if (chainLen >= 12) {
       for (const x of [0.16, 0.84]) {
@@ -137,7 +137,7 @@ export const raisePortcullis: ThemeEffect = async (source, signal) => {
       }
     }
 
-    // Пил з каменю над обкладинкою: від удару і на кожному смику.
+    // Пил з каменю над карткою: від удару і на кожному смику.
     const bursts = [T.drop[0] + 190, ...JERKS.map((j) => T.rise[0] + j * span(T.rise))];
     bursts.forEach((at, b) => dust(stage, left, top, width, at, b));
 
@@ -151,15 +151,6 @@ export const raisePortcullis: ThemeEffect = async (source, signal) => {
     );
   });
 };
-
-/** Обкладинка гри на сторінці; без неї — шапка (чи весь `source`). */
-function coverOf(source: HTMLElement): HTMLElement {
-  return (
-    source.querySelector<HTMLElement>('img.cover') ??
-    source.querySelector<HTMLElement>('header.head') ??
-    source
-  );
-}
 
 function span(range: readonly [number, number]): number {
   return range[1] - range[0];
@@ -179,7 +170,7 @@ function shake(): Keyframe[] {
   return frames;
 }
 
-/** Викид пилу `b` у мить `at`: порошини падають з верхнього краю обкладинки й гаснуть. */
+/** Викид пилу `b` у мить `at`: порошини падають з верхнього краю панелі й гаснуть. */
 function dust(
   { add, play }: EffectStage,
   left: number,

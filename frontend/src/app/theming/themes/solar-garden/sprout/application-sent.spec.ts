@@ -44,7 +44,9 @@ describe('growSprout («Сонячний сад»: паросток)', () => {
     expect(stemAnims.map((a) => a.options.fill)).toEqual(['both', 'forwards']);
     // Сам діалог ефект не чіпає.
     expect(anims.some((a) => a.target === source)).toBe(false);
-    expect(lastEnd(anims)).toBeLessThanOrEqual(1600);
+    // Тривалість 2–3 с (запит власника: встигнути роздивитися).
+    expect(lastEnd(anims)).toBeGreaterThanOrEqual(2000);
+    expect(lastEnd(anims)).toBeLessThanOrEqual(3000);
     anims.forEach((a) => a.resolve());
     await done;
     expect(document.querySelector('.sg-send')).toBeNull();

@@ -1,13 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
   inject,
   input,
+  viewChildren,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { BadgeVm, GameCardVm } from '../../../../core/games/game-card.vm';
 import type { GameCardSlot } from '../../../slots';
@@ -18,7 +21,8 @@ import { SceneGmSignature } from '../gm-signature/scene-gm-signature';
 import { SceneAttachment } from '../attachment/scene-attachment';
 import { neonOf } from '../neon';
 import { isCardOpenClick } from '../../../shared/card-click';
-import { GameOpenedMoment } from '../../../moments/game-opened';
+import { ThemeService } from '../../../theme.service';
+import { EFFECT_ANIMATION_ID } from '../../../effect-stage';
 
 /** Скільки міток видно в рядку системи (решта — «+N»): рядок не переноситься. */
 const MAX_MARKS = 2;
@@ -43,6 +47,10 @@ const MAX_PIPS = 8;
  * дією для клавіатури й дає звичне «відкрити в новій вкладці»; його клік спливає сюди ж).
  * Клік по обкладинці, інших посиланнях і кнопках, з модифікатором чи після виділення тексту
  * картки гру не відкриває (спільне правило `isCardOpenClick`); без анімації відривання.
+ *
+ * Фірмова анімація «відкриття гри» (`gameOpened`, напр. «Згортання в проєктор» голо-ринку чи
+ * «Підйом ґрат» підземелля) грає на самій картці, і лише після неї відкривається сторінка гри.
+ * Немає ефекту / вимкнено — перехід одразу.
  */
 @Component({
   selector: 'nri-sc-game-card',
@@ -79,9 +87,19 @@ export class SceneGameCard implements GameCardSlot {
 
   private readonly router = inject(Router);
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
-  private readonly gameOpened = inject(GameOpenedMoment);
-  /** Перехід триває — повторний (подвійний) клік нічого не робить. */
+  private readonly themes = inject(ThemeService);
+  /** Перериває анімацію відкриття, коли картку знищено (пішли зі сторінки посеред неї). */
+  private readonly effectCancel = new AbortController();
+  /** Перехід (разом з анімацією перед ним) триває — повторний клік нічого не робить. */
   private navigating = false;
+  /** Підказки обрізаних рядків (`nriTruncateTooltip`) — ховаються, коли картка відкриває гру. */
+  private readonly tooltips = viewChildren(MatTooltip);
+
+  constructor() {
+    // Чанк ефекту — наперед, щоб у мить кліку анімація стартувала без затримки.
+    this.themes.preloadEffect('gameOpened');
+    inject(DestroyRef).onDestroy(() => this.effectCancel.abort());
+  }
 
   protected onCardClick(event: MouseEvent): void {
     if (!isCardOpenClick(event, this.host, { respectSelection: true })) return;
@@ -90,9 +108,25 @@ export class SceneGameCard implements GameCardSlot {
     this.navigating = true;
     // Перехід завершився (успішно, скасовано guard-ом чи впав) — наступний клік пробує знову:
     // картка може пережити перехід (повторне використання маршруту, та сама адреса).
-    const done = () => (this.navigating = false);
-    this.gameOpened.fromCard(this.game().id);
-    this.router.navigateByUrl(this.gameUrl()).then(done, done);
+    // Ефект може лишити картку «згорнутою» до кінця переходу — тепер вона знову як була.
+    const done = () => {
+      this.navigating = false;
+      this.host
+        .getAnimations?.({ subtree: true })
+        .filter((a) => a.id === EFFECT_ANIMATION_ID)
+        .forEach((a) => a.cancel());
+    };
+    const go = () => void this.router.navigateByUrl(this.gameUrl()).then(done, done);
+    if (!this.themes.effectEnabled('gameOpened')) {
+      go();
+      return;
+    }
+    // Підказка під курсором не висить над карткою, що згортається.
+    this.tooltips().forEach((t) => t.hide(0));
+    const cancel = this.effectCancel.signal;
+    void this.themes.playEffect('gameOpened', this.host, undefined, cancel).then(() => {
+      if (!cancel.aborted) go();
+    });
   }
 
   /**

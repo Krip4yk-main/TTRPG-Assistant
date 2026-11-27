@@ -18,8 +18,6 @@ import { ScheduleRuleDialog } from '../../sessions/schedule-rule-dialog/schedule
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { PauseDialog } from '../pause/pause-dialog';
 import { ResumeDialog } from '../pause/resume-dialog';
-import { GameOpenedMoment } from '../../../theming/moments/game-opened';
-import { ThemeService } from '../../../theming/theme.service';
 
 const me = {
   id: 1,
@@ -128,15 +126,10 @@ describe('GameDetails', () => {
   };
   const el = () => harness.routeNativeElement!;
 
-  /** Шпигуни ефектів дизайну (`ThemeService`), ставляться в кожному `open`. */
-  let effects: { preload: ReturnType<typeof vi.fn>; play: ReturnType<typeof vi.fn> };
-
   async function open(
     user: MeDto | null,
     respond: (r: ReturnType<typeof expectGame>) => void,
     url = '/games/7',
-    /** Гру відкрито з картки (момент `gameOpened`) — позначка картки перед переходом. */
-    fromCard: number | null = null,
   ) {
     // Типово діалог закривається без результату (напр. відкритий з `?action=`).
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
@@ -178,16 +171,8 @@ describe('GameDetails', () => {
       ],
     });
     TestBed.inject(AuthStore).setMe(user);
-    const themes = TestBed.inject(ThemeService);
-    effects = {
-      preload: vi.spyOn(themes, 'preloadEffect') as unknown as ReturnType<typeof vi.fn>,
-      play: vi.spyOn(themes, 'playEffect').mockResolvedValue() as unknown as ReturnType<
-        typeof vi.fn
-      >,
-    };
     http = TestBed.inject(HttpTestingController);
     harness = await RouterTestingHarness.create();
-    if (fromCard !== null) TestBed.inject(GameOpenedMoment).fromCard(fromCard);
     await harness.navigateByUrl(url, GameDetails);
     await settle();
     http.expectOne('/api/catalog').flush(catalog);
@@ -1107,68 +1092,6 @@ describe('GameDetails', () => {
       await open(me, (r) => r.flush(game));
       expect(nextSessionText()).toContain('19:00');
       expect(nextSessionText()).not.toMatch(/GMT|EET/);
-    });
-  });
-
-  describe('signature moment gameOpened', () => {
-    it('opened from a card: after the game shows, the effect plays on cover + header', async () => {
-      await open(null, (r) => r.flush(game), '/games/7', 7);
-      expect(effects.preload).toHaveBeenCalledWith('gameOpened');
-      expect(effects.play).toHaveBeenCalledTimes(1);
-      const [name, source] = effects.play.mock.calls[0]!;
-      expect(name).toBe('gameOpened');
-      expect(source).toBe(el().querySelector('article.game'));
-    });
-
-    it('leaving the page aborts the running effect', async () => {
-      await open(null, (r) => r.flush(game), '/games/7', 7);
-      const cancel = effects.play.mock.calls[0]![3] as AbortSignal;
-      expect(cancel).toBeInstanceOf(AbortSignal);
-      expect(cancel.aborted).toBe(false);
-      await harness.navigateByUrl('/elsewhere');
-      expect(cancel.aborted).toBe(true);
-    });
-
-    it('direct URL / refresh (no card mark) — no effect', async () => {
-      await open(null, (r) => r.flush(game));
-      expect(effects.preload).not.toHaveBeenCalledWith('gameOpened');
-      expect(effects.play).not.toHaveBeenCalled();
-    });
-
-    it('a mark for another game does not play here', async () => {
-      await open(null, (r) => r.flush(game), '/games/7', 8);
-      expect(effects.play).not.toHaveBeenCalled();
-    });
-
-    it('a failed first load clears the mark: a manual retry does not play', async () => {
-      await open(
-        null,
-        (r) => r.flush(null, { status: 500, statusText: 'Server Error' }),
-        '/games/7',
-        7,
-      );
-      el().querySelector<HTMLButtonElement>('.load-error button')!.click();
-      await settle();
-      expectGame().flush(game);
-      await settle();
-      expect(el().querySelector('article.game')).not.toBeNull();
-      expect(effects.play).not.toHaveBeenCalled();
-    });
-
-    it('a silent refresh after the first show does not replay', async () => {
-      await open(me, (r) => r.flush(game), '/games/7', 7);
-      expect(effects.play).toHaveBeenCalledTimes(1);
-      // Перечитування за банером «Є оновлення» (тихе, без стану завантаження).
-      pings.next({ gameId: 7, scope: 'details' });
-      await settle();
-      el()
-        .parentElement!.querySelector<HTMLButtonElement>('nri-update-banner button.refresh')!
-        .click();
-      await settle();
-      expectGame().flush({ ...game, title: 'Новий туман' });
-      await settle();
-      expect(el().textContent).toContain('Новий туман');
-      expect(effects.play).toHaveBeenCalledTimes(1);
     });
   });
 });

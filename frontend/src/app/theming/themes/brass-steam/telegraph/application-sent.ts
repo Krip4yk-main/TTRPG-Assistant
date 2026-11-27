@@ -7,19 +7,19 @@ import type { ThemeEffect } from '../../../theme.registry';
  * `theme.effects.brassSteam.tape`); на «STOP» бланк гупає гумовим штампом «ВІДПРАВЛЕНО»
  * (`…stamp`) червоним чорнилом, стрілка манометра внизу праворуч стрибає в червоне; далі
  * стрічка відривається й падає, стрілка осідає, з манометра — пшик пари. Діалог закриває
- * викликач. Разом ≈ 1.6 с. Вигляд — класи `bs-send-*` (`application-sent.less`).
+ * викликач. Разом ≈ 2.6 с. Вигляд — класи `bs-send-*` (`application-sent.less`).
  */
 
 /** Таймінги фаз, мс від початку. */
 const T = {
   brassIn: [0, 200],
-  tape: [220, 900],
-  stamp: [900, 1060],
-  gaugeJump: [900, 1080],
-  gaugeSettle: [1080, 1500],
-  tear: [1240, 1560],
-  steam: [1220, 1600],
-  out: [1420, 1600],
+  tape: [220, 1400],
+  stamp: [1400, 1580],
+  gaugeJump: [1400, 1600],
+  gaugeSettle: [1600, 2200],
+  tear: [1900, 2300],
+  steam: [1850, 2450],
+  out: [2350, 2600],
 } as const;
 /** Кути стрілки манометра (0 — вертикально вгору). */
 const NEEDLE = { rest: -60, peak: 78, settle: 38 } as const;
@@ -98,7 +98,7 @@ export const printTelegraphTape: ThemeEffect = async (source, signal, text) => {
     // Пшик пари: клуби ростуть і розтають угору.
     puffs.forEach((puff, i) => {
       const dx = (i - (STEAM_PUFFS - 1) / 2) * 9;
-      const from = T.steam[0] + i * 40;
+      const from = T.steam[0] + i * 60;
       play(
         puff,
         [

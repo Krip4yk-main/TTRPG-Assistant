@@ -6,6 +6,12 @@
  * Переривання (`signal`) — усі анімації скасовуються (і на `source` теж: він знову як був),
  * оверлей зникає одразу. Розкладку сторінки сцена не чіпає (лише `position: fixed`).
  */
+/**
+ * `id` усіх анімацій сцени: за ним власник `source` може зняти те, що ефект лишив на ньому
+ * (`fill: forwards`), — напр. картка гри після переходу, якщо вона пережила перехід.
+ */
+export const EFFECT_ANIMATION_ID = 'nri-effect';
+
 export interface EffectStage {
   readonly doc: Document;
   /** Прямокутник `source` на момент старту. */
@@ -109,7 +115,13 @@ function openEffectStage(
       return el;
     },
     play(el, frames, [from, to], easing = 'ease-in-out', fill = 'both') {
-      const a = el.animate(frames, { delay: from, duration: to - from, easing, fill });
+      const a = el.animate(frames, {
+        id: EFFECT_ANIMATION_ID,
+        delay: from,
+        duration: to - from,
+        easing,
+        fill,
+      });
       anims.push(a);
       return a;
     },

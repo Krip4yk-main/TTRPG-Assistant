@@ -9,7 +9,6 @@ import uk from '../../../../../assets/i18n/uk.json';
 import { toGameCardVm } from '../../../../core/games/game-card.vm';
 import { ThemeService } from '../../../theme.service';
 import { QuestBoardGameCard, TEAR_MS } from './quest-board-game-card';
-import { GameOpenedMoment } from '../../../moments/game-opened';
 
 const game = {
   id: 7,
@@ -105,19 +104,6 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     expect(navigate).not.toHaveBeenCalled();
     vi.advanceTimersByTime(TEAR_MS);
     expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/7');
-  });
-
-  it('перехід з оголошення позначає момент gameOpened (після відривання, перед переходом)', async () => {
-    const f = await mount();
-    const fromCard = vi.spyOn(TestBed.inject(GameOpenedMoment), 'fromCard');
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
-    click(article(f).querySelector('.sys')!);
-    expect(fromCard).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(TEAR_MS);
-    expect(fromCard).toHaveBeenCalledExactlyOnceWith(7);
-    expect(fromCard.mock.invocationCallOrder[0]!).toBeLessThan(
-      navigate.mock.invocationCallOrder[0]!,
-    );
   });
 
   it('подвійний клік — один перехід', async () => {

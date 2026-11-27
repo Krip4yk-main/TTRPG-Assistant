@@ -42,7 +42,9 @@ describe('printTelegraphTape («Латунь і пара»: телеграфна
     const end = Math.max(
       ...anims.map((a) => Number(a.options.delay ?? 0) + Number(a.options.duration ?? 0)),
     );
-    expect(end).toBeLessThanOrEqual(1600);
+    // Тривалість 2–3 с (запит власника: встигнути роздивитися).
+    expect(end).toBeGreaterThanOrEqual(2000);
+    expect(end).toBeLessThanOrEqual(3000);
     anims.forEach((a) => a.resolve());
     await done;
     expect(document.querySelector('.bs-send')).toBeNull();

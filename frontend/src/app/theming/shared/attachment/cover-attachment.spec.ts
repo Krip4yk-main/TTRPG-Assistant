@@ -82,7 +82,11 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
         // «Дошка»: анімацію відривання вимкнено — клік по аркушу перейшов би одразу.
         {
           provide: ThemeService,
-          useValue: { uiPrefs: signal({ tearAnimation: false, sendAnimation: true }) },
+          useValue: {
+            uiPrefs: signal({ tearAnimation: false, sendAnimation: true }),
+            preloadEffect: () => undefined,
+            effectEnabled: () => false,
+          },
         },
       ],
     }).compileComponents();

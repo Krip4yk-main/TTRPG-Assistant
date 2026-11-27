@@ -7,7 +7,7 @@ import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { SceneGameCard } from './scene-game-card';
-import { GameOpenedMoment } from '../../../moments/game-opened';
+import { ThemeService } from '../../../theme.service';
 import { browserZone } from '../../../../core/i18n/dates';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import {
@@ -315,23 +315,52 @@ describe('SceneGameCard (slot «game-card»)', () => {
       expect(navigate).toHaveBeenCalledWith('/games/5');
     });
 
-    it('opening from the card marks the gameOpened moment right before navigating', async () => {
+    it('signature gameOpened effect plays on the card first, then the game opens', async () => {
       await render(game);
-      const moment = TestBed.inject(GameOpenedMoment);
-      const fromCard = vi.spyOn(moment, 'fromCard');
-      navigate.mockImplementation(async () => {
-        expect(fromCard).toHaveBeenCalledExactlyOnceWith(5);
-        return true;
-      });
+      const themes = TestBed.inject(ThemeService);
+      vi.spyOn(themes, 'effectEnabled').mockReturnValue(true);
+      let finish!: () => void;
+      const play = vi
+        .spyOn(themes, 'playEffect')
+        .mockImplementation(() => new Promise<void>((r) => (finish = r)));
       click(el.querySelector('.facts')!);
-      expect(navigate).toHaveBeenCalledTimes(1);
+      click(el.querySelector('.facts')!); // подвійний клік — одна анімація
+      expect(play).toHaveBeenCalledTimes(1);
+      const [name, source, , cancel] = play.mock.calls[0]!;
+      expect(name).toBe('gameOpened');
+      expect(source).toBe(el);
+      expect(navigate).not.toHaveBeenCalled();
+      finish();
+      await fixture.whenStable();
+      expect(navigate).toHaveBeenCalledExactlyOnceWith('/games/5');
+      expect(cancel!.aborted).toBe(false);
     });
 
-    it('modifier clicks (new tab) do not mark the gameOpened moment', async () => {
+    it('card destroyed mid-effect: the effect is aborted and nothing navigates', async () => {
       await render(game);
-      const fromCard = vi.spyOn(TestBed.inject(GameOpenedMoment), 'fromCard');
+      const themes = TestBed.inject(ThemeService);
+      vi.spyOn(themes, 'effectEnabled').mockReturnValue(true);
+      let finish!: () => void;
+      const play = vi
+        .spyOn(themes, 'playEffect')
+        .mockImplementation(() => new Promise<void>((r) => (finish = r)));
+      click(el.querySelector('.facts')!);
+      fixture.destroy();
+      expect(play.mock.calls[0]![3]!.aborted).toBe(true);
+      finish();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('modifier clicks (new tab) play no effect', async () => {
+      await render(game);
+      const themes = TestBed.inject(ThemeService);
+      vi.spyOn(themes, 'effectEnabled').mockReturnValue(true);
+      const play = vi.spyOn(themes, 'playEffect').mockResolvedValue();
       click(el.querySelector('.facts')!, { ctrlKey: true });
-      expect(fromCard).not.toHaveBeenCalled();
+      expect(play).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
     });
 
     it('a click on the title link navigates once (link and card do not both navigate)', async () => {

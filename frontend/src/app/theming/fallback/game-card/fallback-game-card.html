@@ -6,7 +6,7 @@
     }
   </p>
   <h2>
-    <a [routerLink]="['/games', g.id]" (click)="onTitleClick($event)">{{ g.title }}</a>
+    <a [routerLink]="['/games', g.id]">{{ g.title }}</a>
   </h2>
   @if (g.restricted) {
     <p>{{ g.restrictedKey | translate }}</p>

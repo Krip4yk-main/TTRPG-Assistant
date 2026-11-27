@@ -3,23 +3,23 @@ import { foldIntoProjector } from './game-opened';
 
 const text = (key: string) => key;
 
-describe('foldIntoProjector («Голо-ринок»: згортання в проєктор)', () => {
+describe('foldIntoProjector («Голо-ринок»: згортання картки в проєктор)', () => {
   let source: HTMLElement;
-  let head: HTMLElement;
+  let panel: HTMLElement;
+  let puck: HTMLElement;
   const original = Element.prototype.animate;
 
   beforeEach(() => {
-    source = document.createElement('article');
-    source.className = 'game';
-    head = document.createElement('header');
-    head.className = 'head';
-    const h1 = document.createElement('h1');
-    h1.textContent = '  Підземелля, яке ми вигадаємо разом ';
-    head.append(h1);
-    source.append(head);
+    // Хост картки сцени: панель і шайба-проєктор під нею (`.sc-d3`).
+    source = document.createElement('nri-sc-game-card');
+    panel = document.createElement('article');
+    panel.className = 'panel';
+    puck = document.createElement('span');
+    puck.className = 'sc-d3';
+    source.append(puck, panel);
     document.body.append(source);
-    source.getBoundingClientRect = () => rect(20, 100, 700, 1400);
-    head.getBoundingClientRect = () => rect(20, 300, 700, 160);
+    source.getBoundingClientRect = () => rect(20, 100, 360, 380);
+    panel.getBoundingClientRect = () => rect(20, 100, 360, 380);
   });
 
   afterEach(() => {
@@ -28,54 +28,33 @@ describe('foldIntoProjector («Голо-ринок»: згортання в пр
     document.querySelectorAll('.hm-open').forEach((o) => o.remove());
   });
 
-  it('folds a holo panel with the title into the puck and unfolds the header upward; cleans up', async () => {
+  it('folds the card into its projector (the puck stays), beams up; cleans up', async () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const done = foldIntoProjector(source, new AbortController().signal, text);
     const overlay = document.querySelector('.hm-open')!;
     expect(overlay.getAttribute('aria-hidden')).toBe('true');
-    // Область — від верху статті до низу шапки (100…460 → 0…360 відносно статті).
+    // Область — від верху картки до верху шайби (22 px під карткою).
     const region = overlay.querySelector<HTMLElement>('.hm-open-region')!;
-    expect(region.style.top).toBe('0px');
-    expect(region.style.height).toBe('360px');
-    expect(overlay.querySelector('.hm-open-title')!.textContent).toBe(
-      'Підземелля, яке ми вигадаємо разом',
-    );
-    for (const cls of ['panel', 'puck', 'beam', 'scan']) {
+    expect(region.style.bottom).toBe('-22px');
+    for (const cls of ['puck', 'beam', 'scan']) {
       expect(overlay.querySelector(`.hm-open-${cls}`)).not.toBeNull();
     }
-    // Шапку ховає й розгортає clip-path на статті: від низу шапки догори; лише анімацією
-    // (`backwards`) — по ефекту стилю немає.
-    const reveal = anims.find((a) => a.target === source)!;
-    expect(reveal.options.fill).toBe('backwards');
-    expect(String(reveal.frames[0]!['clipPath'])).toMatch(/^inset\(360px /);
-    expect(String(reveal.frames.at(-1)!['clipPath'])).toMatch(/^inset\(-48px /);
-    expect(source.style.clipPath).toBe('');
-    // Лінія світла летить у шайбу (на низ області) і зникає.
-    const panel = anims.find((a) => a.target.classList.contains('hm-open-panel'))!;
-    expect(String(panel.frames.at(-1)!['transform'])).toContain('translateY(180px)');
-    expect(panel.frames.at(-1)!['opacity']).toBe(0);
+    // Згортається сама панель картки — лінією в лінзу шайби (центр панелі 290 → 502).
+    const fold = anims.find((a) => a.target === panel)!;
+    expect(fold.options.fill).toBe('forwards');
+    expect(String(fold.frames.at(-1)!['transform'])).toContain('translateY(212px)');
+    expect(fold.frames.at(-1)!['opacity']).toBe(0);
+    // Шайбу картки ефект не чіпає, і стилів по ефекту немає (лише анімації).
+    expect(anims.some((a) => a.target === puck)).toBe(false);
+    expect(panel.style.transform).toBe('');
     expect(lastEnd(anims)).toBeLessThanOrEqual(1600);
     anims.forEach((a) => a.resolve());
     await done;
     expect(document.querySelector('.hm-open')).toBeNull();
   });
 
-  it('only the part of the header inside the window', async () => {
-    const { animate, anims } = fakeAnimate(true);
-    Element.prototype.animate = animate;
-    source.getBoundingClientRect = () => rect(20, -60, 700, 1400);
-    head.getBoundingClientRect = () => rect(20, 140, 700, 160);
-    const done = foldIntoProjector(source, new AbortController().signal, text);
-    const region = document.querySelector<HTMLElement>('.hm-open-region')!;
-    expect(region.style.top).toBe('60px');
-    expect(region.style.height).toBe('300px');
-    const reveal = anims.find((a) => a.target === source)!;
-    expect(String(reveal.frames.at(-1)!['clipPath'])).toMatch(/^inset\(60px /);
-    await done;
-  });
-
-  it('abort cancels every animation (the header shows again) and removes the overlay at once', async () => {
+  it('abort cancels every animation (the card shows again) and removes the overlay at once', async () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const abort = new AbortController();
@@ -87,11 +66,10 @@ describe('foldIntoProjector («Голо-ринок»: згортання в пр
     expect(anims.every((a) => a.cancel.mock.calls.length === 1)).toBe(true);
   });
 
-  it('a header scrolled out of the window: nothing is animated', async () => {
+  it('a tiny card: nothing is animated', async () => {
     const { animate } = fakeAnimate(true);
     Element.prototype.animate = animate;
-    source.getBoundingClientRect = () => rect(20, -900, 700, 1400);
-    head.getBoundingClientRect = () => rect(20, -600, 700, 160);
+    source.getBoundingClientRect = () => rect(20, 100, 360, 30);
     await foldIntoProjector(source, new AbortController().signal, text);
     expect(animate).not.toHaveBeenCalled();
     expect(document.querySelector('.hm-open')).toBeNull();

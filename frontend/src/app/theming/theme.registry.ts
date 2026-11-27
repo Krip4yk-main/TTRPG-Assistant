@@ -20,18 +20,18 @@ export type ThemeEffect = (
 /**
  * Моменти, на які дизайн може відповісти фірмовою анімацією (кожен дизайн — однією):
  * - `applicationSent` — заявку надіслано (діалог заявки; `source` — поверхня діалогу);
- * - `gameOpened` — гру відкрито з картки пошуку чи профілю (`source` — обкладинка й шапка на
- *   сторінці гри; лише перехід з картки, не пряма адреса й не оновлення сторінки —
- *   `GameOpenedMoment`);
+ * - `gameOpened` — гру відкривають кліком по картці (пошук, профіль; `source` — хост картки):
+ *   ефект грає на картці, сторінка гри відкривається після нього (картка родини сцени);
  * - `acceptedNotice` — у списку сповіщень уперше показано непрочитане «вас прийнято»
  *   (`application.approved`; `source` — рядок сповіщення; один раз на сповіщення —
  *   `AcceptedNoticeMoment`).
  *
  * Як дизайн реєструє ефект: в описі дизайну (`THEMES` нижче) — `effects: { <момент>:
  * signatureEffect(() => import('./themes/<дизайн>/…').then((m) => m.<ефект>)) }`. Ефект —
- * функція `ThemeEffect`: малює власні елементи (`aria-hidden`, лише CSS/WAAPI, ≤ 1,6 с) поверх
- * чи довкола `source`, прибирає їх по завершенні або за `signal`. Чанк ефекту лінивий;
- * перемикач «Фірмові анімації дизайну» (`sendAnimation`) з'являється у «Вигляді» сам.
+ * функція `ThemeEffect`: малює власні елементи (`aria-hidden`, лише CSS/WAAPI, ≤ 3 с — менше
+ * за `EFFECT_TIMEOUT_MS`) поверх чи довкола `source`, прибирає їх по завершенні або за
+ * `signal`. Чанк ефекту лінивий; перемикач «Фірмові анімації дизайну» (`sendAnimation`)
+ * з'являється у «Вигляді» сам.
  * Як ефект програється: місце моменту викликає `ThemeService.preloadEffect(момент)` заздалегідь
  * і `ThemeService.playEffect(момент, source)` у мить події; дизайн без ефекту для моменту,
  * вимкнене налаштування чи `prefers-reduced-motion` — нічого не відбувається (no-op). Ефект
@@ -153,7 +153,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       import('./themes/neon-signs/sign/application-sent').then((m) => m.lightNeonSign),
     ),
   }),
-  // Фірмова анімація «відкриття гри»: голо-панель згортається в проєктор і розгортає сторінку.
+  // Фірмова анімація «відкриття гри»: картка згортається в проєктор, далі відкривається гра.
   'holo-market': theme('holo-market', 'dark', '700 1em Jura', loadSceneSlots, [], {
     gameOpened: signatureEffect(() =>
       import('./themes/holo-market/projector/game-opened').then((m) => m.foldIntoProjector),
@@ -166,7 +166,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     ),
   }),
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
-  // «Підземелля» — фірмова анімація «відкриття гри»: на обкладинці піднімаються ґрати.
+  // «Підземелля» — фірмова анімація «відкриття гри»: на картці піднімаються ґрати.
   dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots, [], {
     gameOpened: signatureEffect(() =>
       import('./themes/dungeon/portcullis/game-opened').then((m) => m.raisePortcullis),
