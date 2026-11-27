@@ -23,6 +23,12 @@ docker compose -f docker-compose.prod.yml up -d
 
 Порядок старту: `mysql` стає healthy → `migrate` виконує міграції й завершується → `backend` стартує лише після успішної міграції (і `redis` healthy) → `bot` чекає healthy `backend`. Окремо запускати міграції не потрібно.
 
+## Розгортання Плану 15
+
+- Безпосередньо перед оновленням зробіть бекап БД (`docker compose -f docker-compose.prod.yml run --rm backup backup`): міграції `0045`–`0048` змінюють схему, а DDL у MySQL не транзакційний — частково застосовану міграцію не відкотити, лише відновити з бекапу.
+- `DEPLOY_ENV` у compose за замовчуванням `prod`; для dev-сервера задайте `DEPLOY_ENV=dev` у його env-файлі (див. [environments.md](environments.md)).
+- Перезберіть фронтенд (`build`): `DEPLOY_ENV` потрапляє в нього як build-аргумент (банер dev, кнопка «Повідомити»).
+
 ## Якщо `migrate` впав
 
 `backend` не стартує. Дивіться причину:
