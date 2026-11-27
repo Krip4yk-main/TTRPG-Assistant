@@ -1,10 +1,10 @@
 # Перевірка кожного push і PR: typecheck, lint і тести всіх воркспейсів.
 name: CI
 
+# Тимчасово вимкнено автозапуск (рішення власника 2026-11-27): лише вручну з вкладки Actions.
+# Щоб увімкнути знову — повернути тригери push (main) і pull_request.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
