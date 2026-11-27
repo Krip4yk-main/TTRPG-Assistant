@@ -44,4 +44,17 @@ describe('THEMES: фірмові анімації', () => {
     expect(loaded).toBeTypeOf('function');
     expect(loaded.name).toBe(effect);
   });
+
+  it.each([
+    ['holo-market', 'foldIntoProjector'],
+    ['dungeon', 'raisePortcullis'],
+  ] as const)('%s — лише «відкриття гри»: %s (лінивий чанк)', async (id, effect) => {
+    const effects = THEMES[id].effects ?? {};
+    expect(Object.keys(effects)).toEqual(['gameOpened']);
+    expect(effects.gameOpened?.pref).toBe('sendAnimation');
+    expect(THEMES[id].options).toContain('sendAnimation');
+    const loaded = await effects.gameOpened!.load();
+    expect(loaded).toBeTypeOf('function');
+    expect(loaded.name).toBe(effect);
+  });
 });

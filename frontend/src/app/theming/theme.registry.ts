@@ -153,7 +153,12 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       import('./themes/neon-signs/sign/application-sent').then((m) => m.lightNeonSign),
     ),
   }),
-  'holo-market': theme('holo-market', 'dark', '700 1em Jura', loadSceneSlots),
+  // Фірмова анімація «відкриття гри»: голо-панель згортається в проєктор і розгортає сторінку.
+  'holo-market': theme('holo-market', 'dark', '700 1em Jura', loadSceneSlots, [], {
+    gameOpened: signatureEffect(() =>
+      import('./themes/holo-market/projector/game-opened').then((m) => m.foldIntoProjector),
+    ),
+  }),
   // Фірмова анімація «заявку подано»: рожевий імпульс біжить силовою шиною.
   'night-city': theme('night-city', 'dark', '500 1em Unbounded', loadSceneSlots, [], {
     applicationSent: signatureEffect(() =>
@@ -161,7 +166,12 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     ),
   }),
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
-  dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots),
+  // «Підземелля» — фірмова анімація «відкриття гри»: на обкладинці піднімаються ґрати.
+  dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots, [], {
+    gameOpened: signatureEffect(() =>
+      import('./themes/dungeon/portcullis/game-opened').then((m) => m.raisePortcullis),
+    ),
+  }),
   'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots),
   // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (фірмова
   // анімація; ефект — окремий лінивий чанк).
