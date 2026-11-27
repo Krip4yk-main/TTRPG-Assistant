@@ -15,6 +15,7 @@ import {
 } from '../../src/db/schema/index.js';
 import { maybePublish } from '../../src/ratings/ratings.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
+import { TEST_NOW } from '../test-now.js';
 
 const deps = await testDeps();
 const { db } = deps;
@@ -22,7 +23,7 @@ const { db } = deps;
 beforeEach(() => resetDb(db));
 afterAll(() => closeDeps(deps));
 
-const NOW = new Date('2026-11-25T12:00:00.000Z');
+const NOW = new Date(TEST_NOW);
 const OPTS = { scale: 0.2, seed: 42, now: NOW, unsafeSkipTargetGuard: true } as const;
 
 async function createOwner() {

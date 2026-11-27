@@ -1,11 +1,12 @@
 import { FormControl } from '@angular/forms';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TEST_NOW } from '../../../testing/test-now';
 import { minAgeValidatorFor } from './profile-validators';
 
 describe('minAgeValidatorFor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-11-23T11:00:00Z'));
+    vi.setSystemTime(new Date(TEST_NOW + 3_600_000));
   });
   afterEach(() => vi.useRealTimers());
 

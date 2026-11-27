@@ -9,6 +9,7 @@ import {
   type PollerDeps,
 } from './poller.js';
 import { renderNotification } from './render.js';
+import { TEST_NOW } from '../../test/test-now.js';
 
 const tgError = (code: number, description: string, parameters = {}) =>
   new GrammyError(
@@ -184,7 +185,7 @@ describe('deliverOnce', () => {
   });
 
   it('a reminder for a session that already started → failed stale, not sent', async () => {
-    const now = new Date('2026-11-25T10:00:00Z');
+    const now = new Date(TEST_NOW);
     const reminder = (id: number, startsAt: string) =>
       item(id, {
         kind: 'session.reminder',
@@ -192,7 +193,10 @@ describe('deliverOnce', () => {
         buttons: null,
       });
     const { client, sendMessage, deps } = setup(
-      [reminder(1, '2026-11-25T09:59:00Z'), reminder(2, '2026-11-25T11:00:00Z')],
+      [
+        reminder(1, new Date(TEST_NOW - 60_000).toISOString()),
+        reminder(2, new Date(TEST_NOW + 3_600_000).toISOString()),
+      ],
       async () => ({}),
     );
     await deliverOnce({ ...deps, now: () => now });

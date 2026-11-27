@@ -5,9 +5,10 @@ import {
   staleRule,
   type StaleInput,
 } from '../../src/games/dead-games/rules.js';
+import { TEST_NOW } from '../test-now.js';
 
 const DAY = 86_400_000;
-const NOW = new Date('2026-11-25T04:00:00.000Z');
+const NOW = new Date(TEST_NOW);
 const ago = (days: number, ms = 0) => new Date(NOW.getTime() - days * DAY - ms);
 const ahead = (days: number) => new Date(NOW.getTime() + days * DAY);
 

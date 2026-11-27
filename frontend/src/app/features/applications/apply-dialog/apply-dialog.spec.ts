@@ -12,6 +12,7 @@ import { SocketService } from '../../../core/realtime/socket.service';
 import { ThemeService } from '../../../theming/theme.service';
 import { browserTimeZone, formatDateTime, formatTime } from '../../../core/i18n/dates';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
+import { TEST_NOW } from '../../../../testing/test-now';
 
 const data: ApplyDialogData = {
   gameId: 7,
@@ -325,7 +326,7 @@ describe('ApplyDialog', () => {
     // Лише `Date` — таймери Angular лишаються справжніми.
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(new Date('2026-11-27T10:00:00.000Z'));
+      vi.setSystemTime(new Date(TEST_NOW));
     });
     afterEach(() => vi.useRealTimers());
 
@@ -351,7 +352,7 @@ describe('ApplyDialog', () => {
     }
 
     it('same day: only HH:mm in the viewer zone', async () => {
-      const retryAt = '2026-11-27T10:10:00.000Z';
+      const retryAt = new Date(TEST_NOW + 10 * 60_000).toISOString();
       const text = await cooldown(retryAt);
       const time = formatTime(retryAt, browserTimeZone());
       expect(time).toMatch(/^\d\d:\d\d$/);
@@ -359,7 +360,7 @@ describe('ApplyDialog', () => {
     });
 
     it('another day (after a rejection): date and time', async () => {
-      const retryAt = '2026-11-28T09:30:00.000Z';
+      const retryAt = new Date(TEST_NOW + 23.5 * 3_600_000).toISOString();
       const text = await cooldown(retryAt);
       const when = formatDateTime(retryAt, browserTimeZone());
       expect(when).not.toBe(formatTime(retryAt, browserTimeZone()));
