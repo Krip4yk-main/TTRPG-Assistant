@@ -48,8 +48,10 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
  * сесійний `TIMESTAMP`, тож щоразу, коли пул видає з'єднання (запит, `execute`, транзакція,
  * зокрема з'єднання з черги очікування), спершу ставимо `SET TIMESTAMP` = поточний `Date.now()`
  * тестового годинника — константного `TEST_NOW`, підміненого тестом (`vi.setSystemTime`) чи
- * реального (`vi.useRealTimers()`). Команди одного з'єднання виконуються по черзі, тож `SET`
- * завжди йде перед запитом. У межах транзакції час БД фіксується на її початку.
+ * реального (`vi.useRealTimers()`). З'єднання віддається лише після успішного `SET`; збій `SET`
+ * знищує з'єднання й передає помилку викликачу. У межах транзакції час БД фіксується на її
+ * початку (кілька `CURRENT_TIMESTAMP` у транзакції однакові — у проді вони могли б різнитися).
+ * `SYSDATE()` на `SET TIMESTAMP` не зважає (у коді не вживається).
  */
 export function syncDbClock(pool: Pool): void {
   const core = pool.pool;
@@ -57,10 +59,21 @@ export function syncDbClock(pool: Pool): void {
   core.getConnection = (cb) =>
     getConnection((err, conn) => {
       if (err) return cb(err, conn);
-      conn.query(`SET TIMESTAMP = ${(Date.now() / 1000).toFixed(3)}`, (setErr) => {
-        if (setErr) console.error('syncDbClock: SET TIMESTAMP failed', setErr);
+      const now = Date.now();
+      // `SET TIMESTAMP = 0` (і від'ємні) MySQL трактує як «повернути реальний час» — це тихо
+      // розсинхронізувало б БД із тестовим годинником.
+      if (!(now > 0)) {
+        conn.release();
+        return cb(new Error(`syncDbClock: тестовий Date.now() = ${now}, а має бути > 0`), conn);
+      }
+      // Запит іде лише після успішного SET: інакше він виконався б із чужим часом.
+      conn.query(`SET TIMESTAMP = ${(now / 1000).toFixed(3)}`, (setErr) => {
+        if (setErr) {
+          conn.destroy();
+          return cb(setErr, conn);
+        }
+        cb(null, conn);
       });
-      cb(null, conn);
     });
 }
 

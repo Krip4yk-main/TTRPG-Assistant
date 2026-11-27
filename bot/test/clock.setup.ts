@@ -18,8 +18,15 @@ function useTestClock(): void {
   // `shouldAdvanceTime` додає час кроками по 20 мс лише між макрозадачами, тож синхронний код
   // (бюджети часу, заміри тривалості) бачив би застиглий годинник. Присвоєння (`setSystemTime`,
   // `advanceTimersByTime`) переносять точку відліку.
-  const clock = (Date as unknown as { clock?: { now: number } }).clock;
-  if (!clock) throw new Error('test clock: fake Date без clock — змінився @sinonjs/fake-timers?');
+  const fail = (why: string): never => {
+    throw new Error(`test clock: ${why} — змінився @sinonjs/fake-timers у vitest?`);
+  };
+  const clock =
+    (Date as unknown as { clock?: { now: number } }).clock ?? fail('підмінений Date без clock');
+  const desc = Object.getOwnPropertyDescriptor(clock, 'now');
+  if (!desc || !('value' in desc) || typeof desc.value !== 'number' || !desc.writable) {
+    fail('clock.now — не звичайна числова властивість');
+  }
   let base = clock.now;
   let baseReal = real();
   Object.defineProperty(clock, 'now', {
@@ -31,6 +38,11 @@ function useTestClock(): void {
       baseReal = real();
     },
   });
+  // Перевіряємо, що підмінений Date справді читає наш геттер.
+  const probe = base + 86_400_000;
+  clock.now = probe;
+  if (Math.abs(Date.now() - probe) > 1000) fail('Date.now() не йде за clock.now');
+  clock.now = probe - 86_400_000;
 }
 
 useTestClock();

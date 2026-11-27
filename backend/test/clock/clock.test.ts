@@ -56,6 +56,16 @@ describe('тестовий годинник', () => {
     expect(await dbNow()).toBe(Date.parse('2030-03-07T18:00:00.000Z'));
   });
 
+  it('Date.now() ≤ 0 — запит не виконується (SET TIMESTAMP = 0 повернув би реальний час)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: 0 });
+    // drizzle загортає помилку драйвера: наша — у `cause`.
+    await expect(dbNow()).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: expect.stringMatching(/^syncDbClock/) }),
+    });
+    vi.setSystemTime(new Date('2030-03-07T17:40:00.000Z'));
+    expect(await dbNow()).toBe(Date.parse('2030-03-07T17:40:00.000Z'));
+  });
+
   it('після тесту, що змінив час, знову TEST_NOW', async () => {
     expect(Date.now() - TEST_NOW).toBeLessThan(10 * 60_000);
     expect(Math.abs((await dbNow()) - Date.now())).toBeLessThan(1000);
