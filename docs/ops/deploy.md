@@ -1,5 +1,7 @@
 # Розгортання (production)
 
+Той самий стек запускається і на окремому dev-сервері з іншим env-файлом — див. [environments.md](environments.md) (`DEPLOY_ENV`, `.env.dev.template`, `.env.prod.template`).
+
 Стек описано в `docker-compose.prod.yml`: `mysql`, `redis`, `migrate` (одноразово), `backend` (API + воркер джобів), `bot`, `frontend`, `backup` (зашифровані бекапи БД, див. [backups.md](backups.md)).
 Порти `backend` (3000) і `frontend` (8080) відкриті лише на `127.0.0.1` — `/api`, `/socket.io` і статику публікує зовнішній reverse proxy. `mysql` і `redis` назовні не публікуються.
 

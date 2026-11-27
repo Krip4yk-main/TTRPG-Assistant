@@ -79,6 +79,10 @@ export function seoRootRouter(deps: AppDeps): Router {
   const router = Router();
 
   router.get('/robots.txt', (_req, res) => {
+    if (env.DEPLOY_ENV === 'dev') {
+      res.set('Cache-Control', CACHE).type('text/plain').send('User-agent: *\nDisallow: /\n');
+      return;
+    }
     res
       .set('Cache-Control', CACHE)
       .type('text/plain')

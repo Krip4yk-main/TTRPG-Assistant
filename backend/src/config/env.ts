@@ -19,10 +19,19 @@ const calendarImportKey = z
 
 /** Повідомлення, які варто показати поруч із ключем (а не лише назву ключа). */
 const HTTPS_IN_PROD = 'must be an https:// URL in production';
+const PROD_IN_DEPLOY = 'must be production when DEPLOY_ENV is dev or prod';
+
+export const DEPLOY_ENVS = ['local', 'dev', 'prod'] as const;
+export type DeployEnv = (typeof DEPLOY_ENVS)[number];
 
 const schema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    /**
+     * Середовище розгортання: `local` (машина розробника), `dev` (окремий тестовий сервер),
+     * `prod`. `dev` і `prod` вимагають тих самих налаштувань, що й NODE_ENV=production.
+     */
+    DEPLOY_ENV: z.enum(DEPLOY_ENVS).default('local'),
     PORT: z.coerce.number().int().positive().default(3000),
     PUBLIC_BASE_URL: z.string().min(1).default('http://localhost:4200'),
     DATABASE_URL: z.string().min(1),
@@ -50,11 +59,18 @@ const schema = z
     /** Попередній ключ (ротація): лише для розшифрування; на наступній синхронізації — перешифрування. */
     CALENDAR_IMPORT_KEY_PREVIOUS: calendarImportKey,
   })
+  // Розгортання dev/prod працює як production (secure-cookie, https-посилання).
+  .refine((e) => e.DEPLOY_ENV === 'local' || e.NODE_ENV === 'production', {
+    path: ['NODE_ENV'],
+    message: PROD_IN_DEPLOY,
+  })
   // У production посилання в листах, Telegram та ICS ведуть на PUBLIC_BASE_URL — лише https.
-  .refine((e) => e.NODE_ENV !== 'production' || /^https:\/\/[^/]/i.test(e.PUBLIC_BASE_URL), {
-    path: ['PUBLIC_BASE_URL'],
-    message: HTTPS_IN_PROD,
-  });
+  .refine(
+    (e) =>
+      (e.NODE_ENV !== 'production' && e.DEPLOY_ENV === 'local') ||
+      /^https:\/\/[^/]/i.test(e.PUBLIC_BASE_URL),
+    { path: ['PUBLIC_BASE_URL'], message: HTTPS_IN_PROD },
+  );
 
 export type Env = z.infer<typeof schema>;
 
@@ -69,7 +85,9 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
       ...new Set(
         parsed.error.issues.map((i) => {
           const key = i.path.join('.');
-          return i.message === HTTPS_IN_PROD ? `${key} (${i.message})` : key;
+          return i.message === HTTPS_IN_PROD || i.message === PROD_IN_DEPLOY
+            ? `${key} (${i.message})`
+            : key;
         }),
       ),
     ];

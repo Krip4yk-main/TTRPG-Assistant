@@ -98,6 +98,23 @@ describe('sitemap.xml / robots.txt', () => {
   });
 });
 
+describe('dev environment indexing', () => {
+  it('sends noindex headers and Disallow: / on dev only', async () => {
+    const devApp = createApp({ ...deps, env: { ...deps.env, DEPLOY_ENV: 'dev' } });
+    const robots = await request(devApp).get('/robots.txt');
+    expect(robots.text).toContain('Disallow: /\n');
+    expect(robots.text).not.toContain('Allow: /\n');
+    expect(robots.text).not.toContain('Sitemap');
+    expect(robots.headers['x-robots-tag']).toBe('noindex, nofollow');
+    const health = await request(devApp).get('/api/health/live');
+    expect(health.headers['x-robots-tag']).toBe('noindex, nofollow');
+
+    const prodApp = createApp({ ...deps, env: { ...deps.env, DEPLOY_ENV: 'prod' } });
+    expect((await request(prodApp).get('/robots.txt')).headers['x-robots-tag']).toBeUndefined();
+    expect((await request(app).get('/api/health/live')).headers['x-robots-tag']).toBeUndefined();
+  });
+});
+
 describe('og previews', () => {
   it('escapes game title and builds og tags', async () => {
     const id = await insertGame({

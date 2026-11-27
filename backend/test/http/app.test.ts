@@ -87,6 +87,39 @@ describe('loadEnv', () => {
   });
 });
 
+describe('loadEnv DEPLOY_ENV', () => {
+  const base = {
+    DATABASE_URL: 'a',
+    REDIS_URL: 'b',
+    IDENTITY_PEPPER: TEST_PEPPER,
+    INTERNAL_API_KEY: 'test-internal-key-0123456789abcdefghij',
+  };
+  it('defaults to local and rejects unknown values', () => {
+    expect(loadEnv(base).DEPLOY_ENV).toBe('local');
+    expect(() => loadEnv({ ...base, DEPLOY_ENV: 'staging' })).toThrow(/DEPLOY_ENV/);
+  });
+  it('requires production rules for dev and prod', () => {
+    for (const DEPLOY_ENV of ['dev', 'prod']) {
+      expect(() => loadEnv({ ...base, DEPLOY_ENV })).toThrow(/NODE_ENV \(must be production/);
+      expect(() =>
+        loadEnv({
+          ...base,
+          DEPLOY_ENV,
+          NODE_ENV: 'production',
+          PUBLIC_BASE_URL: 'http://dev.nri.example.com',
+        }),
+      ).toThrow(/PUBLIC_BASE_URL \(must be an https/);
+      const ok = loadEnv({
+        ...base,
+        DEPLOY_ENV,
+        NODE_ENV: 'production',
+        PUBLIC_BASE_URL: 'https://dev.nri.example.com',
+      });
+      expect(ok.DEPLOY_ENV).toBe(DEPLOY_ENV);
+    }
+  });
+});
+
 describe('app', () => {
   it('GET /api/auth/ping returns ok and sets nri_csrf', async () => {
     const res = await request(makeApp()).get('/api/auth/ping');

@@ -1,0 +1,21 @@
+:host {
+  display: contents;
+}
+
+// Фіксована плашка в лівому нижньому куті: вміст сторінки не зсувається й не перекривається
+// клацаннями (pointer-events: none).
+.env-banner {
+  position: fixed;
+  left: var(--nri-space-sm);
+  bottom: var(--nri-space-sm);
+  z-index: 1000;
+  padding: 2px var(--nri-space-sm);
+  border-radius: var(--nri-radius-md);
+  background: var(--nri-danger, CanvasText);
+  color: var(--nri-on-danger, Canvas);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}

@@ -75,6 +75,13 @@ export function createApp(deps: AppDeps): express.Express {
   const limits = rateLimiters(env, redis);
 
   app.use(helmet());
+  // Тестовий сервер не індексується: заголовок на всіх відповідях (robots.txt — у seo.routes).
+  if (env.DEPLOY_ENV === 'dev') {
+    app.use((_req, res, next) => {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      next();
+    });
+  }
   app.use(cookieParser());
   // Health-check — до rate limiter, CSRF та сесії: без cookie, дешево, не залежить від них.
   app.use(healthRouter(deps));

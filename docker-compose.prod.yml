@@ -3,6 +3,9 @@
 # Секрети лише в .env-файлах (backend/.env, bot/.env, корінь) — не в цьому файлі.
 # Обов'язкові (${VAR:?…}): MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD — без них compose
 # не запуститься. BACKUP_* необов'язкові для старту: без них сервіс backup відмовляється працювати.
+# Середовище: DEPLOY_ENV=dev|prod у кореневому env-файлі (за замовчуванням prod). Dev-сервер
+# запускається тим самим файлом з іншим env: docker compose --env-file .env.dev -f docker-compose.prod.yml up -d
+# (див. docs/ops/environments.md). BACKUP_ENABLED=false вимикає сервіс backup (сидить без роботи).
 # /api і /socket.io на backend:3000 та статику з frontend:8080 віддає зовнішній reverse proxy.
 
 x-restart: &restart
@@ -12,6 +15,8 @@ x-restart: &restart
 x-backend-env: &backend-env
   DATABASE_URL: mysql://${MYSQL_USER:?set MYSQL_USER in the root .env}:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in the root .env}@mysql:3306/nri
   REDIS_URL: redis://redis:6379
+  # Одне джерело правди про середовище — кореневий env-файл (перекриває backend/.env)
+  DEPLOY_ENV: ${DEPLOY_ENV:-prod}
 
 services:
   mysql:
@@ -103,6 +108,15 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      # Налаштування фронтенду вшиваються на збірці (не секрети), див. frontend/.env.template
+      args:
+        NG_APP_DEPLOY_ENV: ${DEPLOY_ENV:-prod}
+        NG_APP_TELEGRAM_BOT_USERNAME: ${NG_APP_TELEGRAM_BOT_USERNAME:-}
+        NG_APP_GOOGLE_LOGIN: ${NG_APP_GOOGLE_LOGIN:-}
+        NG_APP_DISCORD_LOGIN: ${NG_APP_DISCORD_LOGIN:-}
+    environment:
+      # nginx: на dev додає X-Robots-Tag: noindex, nofollow
+      DEPLOY_ENV: ${DEPLOY_ENV:-prod}
     ports:
       - '127.0.0.1:8080:8080'
 
@@ -117,6 +131,8 @@ services:
       dockerfile: scripts/ops/Dockerfile.backup
     init: true
     environment:
+      # false — сервіс нічого не робить (dev-сервер); див. docs/ops/environments.md
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_DB_HOST: mysql
       BACKUP_DB_USER: ${BACKUP_DB_USER:-backup}
       BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-}

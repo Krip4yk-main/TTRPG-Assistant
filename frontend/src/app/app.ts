@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { EnvBanner } from './shared/env-banner/env-banner';
 import { Slot } from './theming/slot';
 
 /** Корінь: каркас сторінки — слот `shell` чинного дизайну. */
 @Component({
   selector: 'nri-root',
-  imports: [Slot],
+  imports: [Slot, EnvBanner],
   templateUrl: './app.html',
   styleUrl: './app.less',
   changeDetection: ChangeDetectionStrategy.OnPush,

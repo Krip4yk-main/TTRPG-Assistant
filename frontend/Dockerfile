@@ -13,15 +13,18 @@ ARG NG_APP_TELEGRAM_BOT_USERNAME=""
 ARG NG_APP_GOOGLE_LOGIN=""
 ARG NG_APP_DISCORD_LOGIN=""
 ARG NG_APP_DEV_LOGIN="false"
+ARG NG_APP_DEPLOY_ENV="prod"
 ENV NG_APP_TELEGRAM_BOT_USERNAME=${NG_APP_TELEGRAM_BOT_USERNAME} \
     NG_APP_GOOGLE_LOGIN=${NG_APP_GOOGLE_LOGIN} \
     NG_APP_DISCORD_LOGIN=${NG_APP_DISCORD_LOGIN} \
-    NG_APP_DEV_LOGIN=${NG_APP_DEV_LOGIN}
+    NG_APP_DEV_LOGIN=${NG_APP_DEV_LOGIN} \n    NG_APP_DEPLOY_ENV=${NG_APP_DEPLOY_ENV}
 RUN npm run build -w shared && npm run build -w frontend
 
 # Статика за nginx; /api і /socket.io проксіює зовнішній reverse proxy на бекенд.
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 COPY frontend/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Шаблон обробляє entrypoint nginx-образу (envsubst за змінною DEPLOY_ENV).
+ENV DEPLOY_ENV=prod
+COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/frontend/dist/frontend/browser /usr/share/nginx/html
 EXPOSE 8080

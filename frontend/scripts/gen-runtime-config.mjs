@@ -76,6 +76,9 @@ const config = {
   googleLogin: get('NG_APP_GOOGLE_LOGIN') === 'true',
   discordLogin: get('NG_APP_DISCORD_LOGIN') === 'true',
   devLogin: get('NG_APP_DEV_LOGIN') === 'true',
+  deployEnv: ['dev', 'prod'].includes(get('NG_APP_DEPLOY_ENV'))
+    ? get('NG_APP_DEPLOY_ENV')
+    : 'local',
   themeStyleVersion: themeStyleVersion(),
 };
 
@@ -89,6 +92,8 @@ export interface RuntimeConfig {
   readonly discordLogin: boolean;
   /** Показувати форму dev-входу. */
   readonly devLogin: boolean;
+  /** Середовище розгортання (local, dev або prod); на dev показується банер «Тестове середовище». */
+  readonly deployEnv: string;
   /** Версія бандлів стилів дизайнів для \`?v=\` (хеш вихідних стилів і пакетів шрифтів). */
   readonly themeStyleVersion: string;
 }

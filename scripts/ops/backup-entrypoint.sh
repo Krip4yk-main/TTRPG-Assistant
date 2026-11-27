@@ -1,6 +1,6 @@
 #!/bin/bash
 # Точка входу контейнера backup.
-#   schedule       (за замовчуванням) — планувальник: бекап щодня о 03:30 UTC,
+#   schedule       (за замовчуванням) — планувальник (BACKUP_ENABLED=false — простоює): бекап щодня о 03:30 UTC,
 #                  перевірка відновлення щонеділі о 04:30 UTC.
 #   backup         — разовий бекап зараз.
 #   restore-check  — разова перевірка відновлення зараз.
@@ -16,6 +16,15 @@ RESTORE_CHECK_AT=430 # 04:30 UTC, лише неділя
 hhmm() { echo $((10#$(date -u +%H%M))); }
 
 schedule() {
+  # BACKUP_ENABLED=false (dev-сервер): без помилок і без перезапусків — просто чекаємо сигналу.
+  if [ "${BACKUP_ENABLED:-true}" = "false" ]; then
+    log "backups disabled (BACKUP_ENABLED=false): scheduler idle"
+    trap 'log "scheduler stopped"; exit 0' TERM INT
+    while true; do
+      sleep 3600 &
+      wait $! || true
+    done
+  fi
   # Fail closed одразу на старті, а не о 03:30.
   require_passphrase
   log "scheduler started: backup daily 03:30 UTC, restore-check Sundays 04:30 UTC"

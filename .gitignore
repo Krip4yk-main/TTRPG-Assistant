@@ -4,6 +4,8 @@ node_modules/
 *.env
 !*.env.template
 !.env.template
+.env.dev
+.env.prod
 dist/
 .angular/
 coverage/
