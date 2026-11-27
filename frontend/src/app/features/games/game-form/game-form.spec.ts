@@ -597,6 +597,17 @@ describe('GameForm', () => {
       await settle();
     });
 
+    it('«approximately» on a game without a time starts at 18:00 and shows «to» as a clock time', async () => {
+      await setup(5, game({ status: 'draft', startsAt: null, nextSessionAt: null }));
+      q<HTMLElement>('.mode-approx button').click();
+      await settle();
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
+      const to = q<HTMLSelectElement>('select.window-to');
+      // Типове вікно 3 год: «до» — година завершення (ключ `end`), а не «через 3 год» (`length`).
+      expect(to.selectedOptions[0].textContent).toContain('sessions.window.end');
+      expect(to.selectedOptions[0].textContent).not.toContain('sessions.window.length');
+    });
+
     it('switching to «approximately» snaps an off-grid start down to 30 minutes', async () => {
       await setup(5, game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z' }));
       q<HTMLElement>('.mode-approx button').click();

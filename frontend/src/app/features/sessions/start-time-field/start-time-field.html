@@ -36,7 +36,7 @@
     </mat-form-field>
   } @else {
     <div class="window">
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" floatLabel="always">
         <mat-label>{{ 'sessions.window.from' | translate }}</mat-label>
         <select matNativeControl class="window-from" [formControl]="time()" [required]="required()">
           @if (offGrid()) {
@@ -50,7 +50,7 @@
           <mat-error>{{ key | translate }}</mat-error>
         }
       </mat-form-field>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" floatLabel="always">
         <mat-label>{{ 'sessions.window.to' | translate }}</mat-label>
         <select matNativeControl class="window-to" [formControl]="window()">
           @for (o of ends(); track o.minutes) {

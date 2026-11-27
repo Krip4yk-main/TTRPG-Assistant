@@ -20,6 +20,9 @@ export const WINDOW_LENGTHS: readonly number[] = Array.from(
 /** Ширина вікна, коли майстер щойно перемкнув на «Приблизно». */
 export const DEFAULT_WINDOW_MINUTES = 180;
 
+/** «З» за замовчуванням, коли майстер перемкнув на «Приблизно», а часу ще не було. */
+export const DEFAULT_WINDOW_START = '18:00';
+
 /** `HH:mm` → вниз до кроку 30 хв (`19:15` → `19:00`); некоректне — `null`. */
 export function snapToWindowStep(time: string): string | null {
   const m = /^(\d{2}):(\d{2})$/.exec(time);

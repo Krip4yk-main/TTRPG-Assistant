@@ -7,6 +7,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { merge } from 'rxjs';
 import {
   DEFAULT_WINDOW_MINUTES,
+  DEFAULT_WINDOW_START,
   snapToWindowStep,
   WINDOW_START_TIMES,
   windowEndOptions,
@@ -86,7 +87,9 @@ export class StartTimeField {
   protected setMode(approx: boolean): void {
     const window = this.window();
     if (approx === (window.value !== null)) return;
-    // «З» округлюється вниз до 30 хв у `sync`.
+    // «З» округлюється вниз до 30 хв у `sync`; без часу — типовий вечір, щоб «з» і «до» були
+    // справжніми годинами, а не порожнім полем із підписом «через N год».
+    if (approx && !this.time().value) this.time().setValue(DEFAULT_WINDOW_START);
     window.setValue(approx ? DEFAULT_WINDOW_MINUTES : null);
     window.markAsDirty();
   }

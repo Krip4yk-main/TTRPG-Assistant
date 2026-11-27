@@ -18,7 +18,7 @@
 
 .choices {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--nri-space-sm);
 }
 
@@ -53,6 +53,12 @@
     outline: 2px solid var(--nri-accent);
     outline-offset: 2px;
   }
+}
+
+.label {
+  // Підпис переноситься всередині картки, а не вилазить за її межі (ширина шрифтів різна).
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .preview {
