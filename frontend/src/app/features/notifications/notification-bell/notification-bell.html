@@ -113,7 +113,7 @@
       } @else {
         <ul class="list">
           @for (row of rows(); track row.n.id) {
-            <li class="row">
+            <li class="row" [attr.data-notification-id]="row.n.id">
               <a
                 class="item"
                 [class.unread]="!row.n.readAt"

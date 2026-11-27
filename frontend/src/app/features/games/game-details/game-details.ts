@@ -83,6 +83,8 @@ import {
   ComplaintDialog,
   type ComplaintDialogData,
 } from '../../moderation/complaint-dialog/complaint-dialog';
+import { GameOpenedMoment } from '../../../theming/moments/game-opened';
+import { ThemeService } from '../../../theming/theme.service';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled', 'paused']);
@@ -145,6 +147,12 @@ export class GameDetails {
   private readonly router = inject(Router);
   private readonly announcer = inject(LiveAnnouncer);
   private readonly translate = inject(TranslateService);
+  private readonly themes = inject(ThemeService);
+  /**
+   * Гра, яку відкрили з картки (момент `gameOpened`): після першого показу на обкладинці й
+   * шапці грає фірмова анімація дизайну. Пряма адреса чи оновлення — `null`.
+   */
+  private openedFromCard = inject(GameOpenedMoment).take();
   private readonly sessionsList = viewChild(SessionsList);
   private readonly membersPanel = viewChild(MembersPanel);
   /** Панель «Спільний час» вантажиться відкладено (@defer) — без посилання на клас. */
@@ -378,6 +386,7 @@ export class GameDetails {
 
   constructor() {
     void this.catalog.load();
+    if (this.openedFromCard !== null) this.themes.preloadEffect('gameOpened');
     effect(() => {
       const id = Number(this.id());
       void this.load(id);
@@ -833,6 +842,7 @@ export class GameDetails {
       this.view.set(g);
       this.state.set('ready');
       this.updateSeo(g);
+      this.playGameOpened(id);
       return true;
     } catch (err) {
       if (seq !== this.seq) return true;
@@ -841,6 +851,22 @@ export class GameDetails {
       if (notFound) this.seo.set({ titleKey: 'games.details.notFound', noindex: true });
       return false;
     }
+  }
+
+  /** Перший показ гри, відкритої з картки, — фірмова анімація (один раз, без затримки сторінки). */
+  private playGameOpened(id: number): void {
+    const fromCard = this.openedFromCard;
+    this.openedFromCard = null;
+    if (fromCard !== id) return;
+    afterNextRender(
+      () => {
+        const target = this.host.nativeElement.querySelector<HTMLElement>(
+          'article.game, article.restricted',
+        );
+        if (target) void this.themes.playEffect('gameOpened', target);
+      },
+      { injector: this.injector },
+    );
   }
 
   /** Назва гри у вкладці й превʼю; 16+/18+/21+, чернетки й скасовані — без індексації. */

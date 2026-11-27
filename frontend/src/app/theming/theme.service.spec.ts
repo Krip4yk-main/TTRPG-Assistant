@@ -7,7 +7,12 @@ import { AuthStore } from '../core/auth/auth.store';
 import { SocketService } from '../core/realtime/socket.service';
 import { FALLBACK_SLOTS } from './fallback/fallback-slots';
 import type { ThemeSlots } from './slots';
-import { THEME_REGISTRY, type ThemeDefinition, type ThemeEffect } from './theme.registry';
+import {
+  THEME_REGISTRY,
+  signatureEffect,
+  type ThemeDefinition,
+  type ThemeEffect,
+} from './theme.registry';
 import {
   EFFECT_LOAD_TIMEOUT_MS,
   EFFECT_TIMEOUT_MS,
@@ -959,6 +964,70 @@ describe('ThemeService', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(onStart).not.toHaveBeenCalled();
       expect(effect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signature moments (gameOpened, acceptedNotice)', () => {
+    const start = async (effects: ThemeDefinition['effects'], me: MeDto = user): Promise<void> => {
+      const reg = registry();
+      reg['night-city'] = { ...reg['night-city'], effects };
+      setup(reg);
+      bootFromCache('night-city', 'theme-night-city.css?v=1');
+      auth.setMe(me);
+      await service.init();
+    };
+    const source = () => document.createElement('div');
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    for (const name of ['gameOpened', 'acceptedNotice'] as const) {
+      it(`${name}: plays the design effect registered for the moment`, async () => {
+        const effect = vi.fn<ThemeEffect>(async () => {});
+        await start({ [name]: signatureEffect(async () => effect) });
+        const el = source();
+        await service.playEffect(name, el);
+        expect(effect).toHaveBeenCalledTimes(1);
+        expect(effect.mock.calls[0]![0]).toBe(el);
+      });
+
+      it(`${name}: the shared «Фірмові анімації дизайну» preference off → no effect`, async () => {
+        const effect = vi.fn<ThemeEffect>(async () => {});
+        const load = vi.fn(async () => effect);
+        await start(
+          { [name]: signatureEffect(load) },
+          {
+            ...user,
+            uiPrefs: { tearAnimation: true, sendAnimation: false },
+          },
+        );
+        service.preloadEffect(name);
+        await service.playEffect(name, source());
+        expect(load).not.toHaveBeenCalled();
+        expect(effect).not.toHaveBeenCalled();
+      });
+
+      it(`${name}: prefers-reduced-motion → no effect`, async () => {
+        const effect = vi.fn<ThemeEffect>(async () => {});
+        vi.stubGlobal(
+          'matchMedia',
+          vi.fn((q: string) => ({ matches: q === '(prefers-reduced-motion: reduce)' })),
+        );
+        await start({ [name]: signatureEffect(async () => effect) });
+        await service.playEffect(name, source());
+        expect(effect).not.toHaveBeenCalled();
+      });
+    }
+
+    it('a design with an effect for another moment is a no-op for this one', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      const load = vi.fn(async () => effect);
+      await start({ applicationSent: signatureEffect(load) });
+      service.preloadEffect('gameOpened');
+      const onStart = vi.fn();
+      await service.playEffect('gameOpened', source(), onStart);
+      await service.playEffect('acceptedNotice', source(), onStart);
+      expect(load).not.toHaveBeenCalled();
+      expect(onStart).not.toHaveBeenCalled();
     });
   });
 });

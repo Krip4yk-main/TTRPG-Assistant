@@ -8,6 +8,8 @@ import { NOTIFICATION_NEW_EVENT, type MeDto, type NotificationDto } from '@nri/s
 import uk from '../../../../assets/i18n/uk.json';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import { ThemeService } from '../../../theming/theme.service';
+import { ACCEPTED_NOTICE_STORAGE_KEY } from '../../../theming/moments/accepted-notice';
 import { NotificationBell } from './notification-bell';
 
 const testMe: MeDto = {
@@ -375,5 +377,73 @@ describe('NotificationBell', () => {
     expect(panel()).toBeNull();
     expect(button().getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(button());
+  });
+
+  describe('signature moment acceptedNotice', () => {
+    let play: ReturnType<typeof vi.fn>;
+    const accepted = (id: number, extra: Partial<NotificationDto> = {}) =>
+      notification(id, {
+        type: 'application.approved',
+        category: 'applications',
+        params: { gameId: 7, gameTitle: 'Морія' },
+        ...extra,
+      });
+    const reopen = async (items: NotificationDto[]) => {
+      button().click(); // закрити
+      await settle();
+      await open(items);
+    };
+
+    beforeEach(() => {
+      localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY);
+      play = vi
+        .spyOn(TestBed.inject(ThemeService), 'playEffect')
+        .mockResolvedValue() as unknown as ReturnType<typeof vi.fn>;
+    });
+    afterEach(() => localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY));
+
+    it('first shown unread «вас прийнято» plays once, on its row', async () => {
+      await start(2);
+      await open([accepted(2), notification(1)]);
+      expect(play).toHaveBeenCalledTimes(1);
+      const [name, source] = play.mock.calls[0]!;
+      expect(name).toBe('acceptedNotice');
+      expect(source).toBe(panel()!.querySelector('li[data-notification-id="2"]'));
+      expect((source as HTMLElement).textContent).toContain('Морія');
+
+      await reopen([accepted(2), notification(1)]);
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it('a newly arrived one (merged into the open panel) plays', async () => {
+      await start(1);
+      await open([notification(1)]);
+      expect(play).not.toHaveBeenCalled();
+      events.get(NOTIFICATION_NEW_EVENT)!.next({ id: 3 });
+      http.expectOne('/api/me/notifications/unread-count').flush({ count: 2 });
+      http
+        .expectOne((r) => r.url === '/api/me/notifications')
+        .flush({ items: [accepted(3), notification(1)], nextCursor: null });
+      await flushAsync();
+      await settle();
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(play.mock.calls[0]![1]).toBe(panel()!.querySelector('li[data-notification-id="3"]'));
+    });
+
+    it('read or other notifications — no effect', async () => {
+      await start(0);
+      await open([
+        accepted(2, { readAt: '2026-11-25T11:00:00.000Z' }),
+        notification(1, { type: 'application.rejected', category: 'applications' }),
+      ]);
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it('already played before a reload (remembered) — no effect', async () => {
+      localStorage.setItem(ACCEPTED_NOTICE_STORAGE_KEY, JSON.stringify([2]));
+      await start(1);
+      await open([accepted(2)]);
+      expect(play).not.toHaveBeenCalled();
+    });
   });
 });

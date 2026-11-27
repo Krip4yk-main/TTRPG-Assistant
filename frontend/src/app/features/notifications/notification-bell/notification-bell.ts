@@ -47,6 +47,8 @@ import {
   type ConfirmDialogData,
 } from '../../../shared/confirm-dialog/confirm-dialog';
 import { NotificationsStore } from '../../../core/notifications/notifications.store';
+import { AcceptedNoticeMoment } from '../../../theming/moments/accepted-notice';
+import { ThemeService } from '../../../theming/theme.service';
 
 /** Найбільше число на бейджі; більше — «99+». */
 export const BADGE_MAX = 99;
@@ -87,6 +89,8 @@ export class NotificationBell {
   private readonly dialog = inject(MatDialog);
   private readonly injector = inject(Injector);
   private readonly document = inject(DOCUMENT);
+  private readonly themes = inject(ThemeService);
+  private readonly acceptedNotice = inject(AcceptedNoticeMoment);
   private readonly trigger = viewChild.required('trigger', {
     read: ElementRef<HTMLButtonElement>,
   });
@@ -131,10 +135,33 @@ export class NotificationBell {
         if (known) previous = c;
       });
     });
+    // Фірмова анімація `acceptedNotice`: уперше показане непрочитане «вас прийнято» (при
+    // відкритті панелі чи щойно підмішане згори) — один раз на сповіщення, на найновішому.
+    effect(() => {
+      if (!this.open() || !this.store.loaded()) return;
+      const items = this.store.items();
+      untracked(() => {
+        const [fresh] = this.acceptedNotice.claim(items);
+        if (fresh) this.playAccepted(fresh.id);
+      });
+    });
     // Стор закрив панель (вихід/зміна користувача) — закриваємо й тут.
     effect(() => {
       if (!this.store.panelOpen()) untracked(() => this.open.set(false));
     });
+  }
+
+  private playAccepted(id: number): void {
+    this.themes.preloadEffect('acceptedNotice');
+    afterNextRender(
+      () => {
+        const row = this.document.querySelector<HTMLElement>(
+          `#notifications-panel [data-notification-id="${id}"]`,
+        );
+        if (row) void this.themes.playEffect('acceptedNotice', row);
+      },
+      { injector: this.injector },
+    );
   }
 
   protected toggle(): void {

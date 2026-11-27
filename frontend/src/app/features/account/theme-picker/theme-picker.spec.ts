@@ -131,10 +131,11 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(el.querySelector('[role="alert"]')?.textContent?.trim()).toBe(uk.errors.FORBIDDEN);
   });
 
-  it('«Магіпанк»: перемикач анімації конверта, зберігає лише sendAnimation', async () => {
+  it('«Магіпанк»: перемикач «Фірмові анімації дизайну», зберігає лише sendAnimation', async () => {
     const themes = fakeThemes(['quest-board', 'magicpunk'], 'magicpunk');
     const fixture = await render(themes);
     const el: HTMLElement = fixture.nativeElement;
+    expect(uk.account.theme.sendAnimation).toBe('Фірмові анімації дизайну');
     expect(el.textContent).toContain(uk.account.theme.sendAnimation);
     expect(el.textContent).toContain(uk.account.theme.sendAnimationHint);
     expect(el.textContent).not.toContain(uk.account.theme.tearAnimation);

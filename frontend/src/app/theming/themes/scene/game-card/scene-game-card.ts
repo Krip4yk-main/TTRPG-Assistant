@@ -18,6 +18,7 @@ import { SceneGmSignature } from '../gm-signature/scene-gm-signature';
 import { SceneAttachment } from '../attachment/scene-attachment';
 import { neonOf } from '../neon';
 import { isCardOpenClick } from '../../../shared/card-click';
+import { GameOpenedMoment } from '../../../moments/game-opened';
 
 /** Скільки міток видно в рядку системи (решта — «+N»): рядок не переноситься. */
 const MAX_MARKS = 2;
@@ -78,6 +79,7 @@ export class SceneGameCard implements GameCardSlot {
 
   private readonly router = inject(Router);
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
+  private readonly gameOpened = inject(GameOpenedMoment);
   /** Перехід триває — повторний (подвійний) клік нічого не робить. */
   private navigating = false;
 
@@ -89,6 +91,7 @@ export class SceneGameCard implements GameCardSlot {
     // Перехід завершився (успішно, скасовано guard-ом чи впав) — наступний клік пробує знову:
     // картка може пережити перехід (повторне використання маршруту, та сама адреса).
     const done = () => (this.navigating = false);
+    this.gameOpened.fromCard(this.game().id);
     this.router.navigateByUrl(this.gameUrl()).then(done, done);
   }
 

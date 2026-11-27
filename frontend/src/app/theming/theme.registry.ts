@@ -12,8 +12,34 @@ import type { ThemeSlots } from './slots';
  */
 export type ThemeEffect = (source: HTMLElement, signal: AbortSignal) => Promise<void>;
 
-/** Події, на які дизайн може відповісти ефектом. */
-export type ThemeEffectName = 'applicationSent';
+/**
+ * Моменти, на які дизайн може відповісти фірмовою анімацією (кожен дизайн — однією):
+ * - `applicationSent` — заявку надіслано (діалог заявки; `source` — поверхня діалогу);
+ * - `gameOpened` — гру відкрито з картки пошуку чи профілю (`source` — обкладинка й шапка на
+ *   сторінці гри; лише перехід з картки, не пряма адреса й не оновлення сторінки —
+ *   `GameOpenedMoment`);
+ * - `acceptedNotice` — у списку сповіщень уперше показано непрочитане «вас прийнято»
+ *   (`application.approved`; `source` — рядок сповіщення; один раз на сповіщення —
+ *   `AcceptedNoticeMoment`).
+ *
+ * Як дизайн реєструє ефект: в описі дизайну (`THEMES` нижче) — `effects: { <момент>:
+ * signatureEffect(() => import('./themes/<дизайн>/…').then((m) => m.<ефект>)) }`. Ефект —
+ * функція `ThemeEffect`: малює власні елементи (`aria-hidden`, лише CSS/WAAPI, ≤ 1,6 с) поверх
+ * чи довкола `source`, прибирає їх по завершенні або за `signal`. Чанк ефекту лінивий;
+ * перемикач «Фірмові анімації дизайну» (`sendAnimation`) з'являється у «Вигляді» сам.
+ * Як ефект програється: місце моменту викликає `ThemeService.preloadEffect(момент)` заздалегідь
+ * і `ThemeService.playEffect(момент, source)` у мить події; дизайн без ефекту для моменту,
+ * вимкнене налаштування чи `prefers-reduced-motion` — нічого не відбувається (no-op). Ефект
+ * лише декор: оголошення LiveAnnouncer про результат дії робить викликач, однаково з ним і без.
+ */
+export type ThemeEffectName = 'applicationSent' | 'gameOpened' | 'acceptedNotice';
+
+/** Усі моменти (для тестів і перевірок). */
+export const THEME_EFFECT_NAMES: readonly ThemeEffectName[] = [
+  'applicationSent',
+  'gameOpened',
+  'acceptedNotice',
+];
 
 /** Ефект дизайну в реєстрі. */
 export interface ThemeEffectDef {
@@ -48,6 +74,14 @@ export interface ThemeDefinition {
 }
 
 /**
+ * Фірмова анімація дизайну: вмикається спільним налаштуванням вигляду `sendAnimation` (у UI —
+ * «Фірмові анімації дизайну»; назва поля в БД історична).
+ */
+export function signatureEffect(load: ThemeEffectDef['load']): ThemeEffectDef {
+  return { pref: 'sendAnimation', load };
+}
+
+/**
  * Адреса бандла стилів (angular.json, `inject: false`). Ім'я бандла Angular не хешує, тож
  * старий кеш після релізу скидає `?v=` — хеш вихідних стилів дизайнів
  * (`scripts/gen-runtime-config.mjs`). Інлайн-скрипт index.html будує ту саму адресу.
@@ -58,7 +92,8 @@ export function themeStyleHref(bundle: string): string {
 
 /**
  * Опис дизайну за угодою: назва `theme.names.<id>`, мініатюра `themes/<id>.png`, бандл
- * стилів `theme-<id>`.
+ * стилів `theme-<id>`. Налаштування, що вмикають ефекти дизайну, додаються до його власних
+ * налаштувань (`options`) самі — перемикач з'являється разом з ефектом.
  */
 function theme(
   id: ThemeId,
@@ -76,9 +111,14 @@ function theme(
     headingFont,
     styleHref: themeStyleHref(id),
     loadSlots,
-    options,
+    options: [...new Set([...options, ...effectPrefs(effects)])],
     effects,
   };
+}
+
+/** Налаштування, що вмикають ефекти (повтори прибирає `theme`). */
+function effectPrefs(effects: ThemeDefinition['effects']): (keyof UiPrefsDto)[] {
+  return Object.values(effects ?? {}).flatMap((def) => (def?.pref ? [def.pref] : []));
 }
 
 /** Слоти родини сцени (спільний лінивий чанк усіх дизайнів сцени). */
@@ -108,22 +148,13 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
   dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots),
   'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots),
-  // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (власне
-  // налаштування — анімація надсилання; ефект — окремий лінивий чанк).
-  magicpunk: theme(
-    'magicpunk',
-    'dark',
-    '700 1em "Cormorant Unicase"',
-    loadSceneSlots,
-    ['sendAnimation'],
-    {
-      applicationSent: {
-        pref: 'sendAnimation',
-        load: () =>
-          import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
-      },
-    },
-  ),
+  // «Магіпанк»: надіслана заявка складається в конверт під сургучем і відлітає (фірмова
+  // анімація; ефект — окремий лінивий чанк).
+  magicpunk: theme('magicpunk', 'dark', '700 1em "Cormorant Unicase"', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
+    ),
+  }),
   'brass-steam': theme('brass-steam', 'dark', '900 1em "Playfair Display SC"', loadSceneSlots),
   // «Сонячний сад» — світлий дизайн сцени: світла сторінка, поля й оверлеї Material.
   'solar-garden': theme('solar-garden', 'light', '400 1em Alice', loadSceneSlots),

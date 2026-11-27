@@ -7,6 +7,7 @@ import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 import type { RestrictedGameDto, SearchGameCardDto } from '@nri/shared';
 import { SceneGameCard } from './scene-game-card';
+import { GameOpenedMoment } from '../../../moments/game-opened';
 import { browserZone } from '../../../../core/i18n/dates';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import {
@@ -312,6 +313,25 @@ describe('SceneGameCard (slot «game-card»)', () => {
       click(el.querySelector('.desc')!);
       expect(navigate).toHaveBeenCalledTimes(1);
       expect(navigate).toHaveBeenCalledWith('/games/5');
+    });
+
+    it('opening from the card marks the gameOpened moment right before navigating', async () => {
+      await render(game);
+      const moment = TestBed.inject(GameOpenedMoment);
+      const fromCard = vi.spyOn(moment, 'fromCard');
+      navigate.mockImplementation(async () => {
+        expect(fromCard).toHaveBeenCalledExactlyOnceWith(5);
+        return true;
+      });
+      click(el.querySelector('.facts')!);
+      expect(navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it('modifier clicks (new tab) do not mark the gameOpened moment', async () => {
+      await render(game);
+      const fromCard = vi.spyOn(TestBed.inject(GameOpenedMoment), 'fromCard');
+      click(el.querySelector('.facts')!, { ctrlKey: true });
+      expect(fromCard).not.toHaveBeenCalled();
     });
 
     it('a click on the title link navigates once (link and card do not both navigate)', async () => {
