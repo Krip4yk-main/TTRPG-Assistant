@@ -68,8 +68,10 @@ export class StartTimeField {
       const window = this.window();
       const sync = () => {
         // Приблизний час: «з» лише на сітці 30 хв — інакше в списку його не видно, а
-        // надіслалося б приховане значення (напр. 19:15 з точного режиму чи з сервера).
-        const snapped = window.value !== null ? snapToWindowStep(time.value) : null;
+        // надіслалося б приховане значення (напр. 19:15 з точного режиму чи з сервера). Порожнє «з»
+        // (нова гра, чернетка без дати, відновлена чернетка) — типові 18:00.
+        const snapped =
+          window.value === null ? null : (snapToWindowStep(time.value) ?? DEFAULT_WINDOW_START);
         if (snapped !== null && snapped !== time.value) time.setValue(snapped);
         this.state.set({ time: time.value, window: window.value, disabled: window.disabled });
       };
@@ -87,9 +89,7 @@ export class StartTimeField {
   protected setMode(approx: boolean): void {
     const window = this.window();
     if (approx === (window.value !== null)) return;
-    // «З» округлюється вниз до 30 хв у `sync`; без часу — типовий вечір, щоб «з» і «до» були
-    // справжніми годинами, а не порожнім полем із підписом «через N год».
-    if (approx && !this.time().value) this.time().setValue(DEFAULT_WINDOW_START);
+    // «З» округлюється вниз до 30 хв (або стає типовим) у `sync`.
     window.setValue(approx ? DEFAULT_WINDOW_MINUTES : null);
     window.markAsDirty();
   }

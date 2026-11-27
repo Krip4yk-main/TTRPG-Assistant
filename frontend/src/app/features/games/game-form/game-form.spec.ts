@@ -608,6 +608,23 @@ describe('GameForm', () => {
       expect(to.selectedOptions[0].textContent).not.toContain('sessions.window.length');
     });
 
+    it('a new game: «approximately» shows «from» 18:00 and «to» as clock times', async () => {
+      await setup();
+      q<HTMLElement>('.mode-approx button').click();
+      await settle();
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
+      const text = q<HTMLSelectElement>('select.window-to').selectedOptions[0].textContent;
+      expect(text).toContain('sessions.window.end');
+    });
+
+    it('a dateless draft with a window but no time (restored draft) gets «from» 18:00', async () => {
+      await setup(5, game({ status: 'draft', startsAt: null, startWindowMinutes: 60 }));
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
+      expect(q<HTMLSelectElement>('select.window-to').selectedOptions[0].textContent).toContain(
+        'sessions.window.end',
+      );
+    });
+
     it('switching to «approximately» snaps an off-grid start down to 30 minutes', async () => {
       await setup(5, game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z' }));
       q<HTMLElement>('.mode-approx button').click();
