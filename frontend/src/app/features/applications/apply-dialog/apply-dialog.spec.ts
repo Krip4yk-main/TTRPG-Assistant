@@ -7,7 +7,7 @@ import { provideRouter } from '@angular/router';
 import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import type { ApplicationDto } from '@nri/shared';
 import { ThemeService } from '../../../theming/theme.service';
-import { browserTimeZone, formatTime } from '../../../core/i18n/dates';
+import { browserTimeZone, formatDateTime, formatTime } from '../../../core/i18n/dates';
 import { ApplyDialog, type ApplyDialogData } from './apply-dialog';
 
 const data: ApplyDialogData = {
@@ -247,28 +247,50 @@ describe('ApplyDialog', () => {
     expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
   });
 
-  it('409 APPLICATION_COOLDOWN says when to retry (HH:mm in the viewer zone)', async () => {
-    await create();
-    const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('uk', {
-      errors: { APPLICATION_COOLDOWN: 'Спробуйте після {{time}}.' },
+  describe('409 APPLICATION_COOLDOWN', () => {
+    // Лише `Date` — таймери Angular лишаються справжніми.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-11-27T10:00:00.000Z'));
     });
-    translate.use('uk');
-    await accept();
-    await type('textarea.answer', 'Багато');
-    await submit();
-    const retryAt = '2026-11-27T17:05:00.000Z';
-    http
-      .expectOne('/api/games/7/applications')
-      .flush(
-        { error: { code: 'APPLICATION_COOLDOWN', details: { retryAt } } },
-        { status: 409, statusText: 'Conflict' },
-      );
-    await settle();
-    const time = formatTime(retryAt, browserTimeZone());
-    expect(time).toMatch(/^\d\d:\d\d$/);
-    expect(el.querySelector('[role="alert"]')!.textContent).toContain(`Спробуйте після ${time}.`);
-    expect(close).not.toHaveBeenCalled();
+    afterEach(() => vi.useRealTimers());
+
+    async function cooldown(retryAt: string): Promise<string> {
+      await create();
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('uk', {
+        errors: { APPLICATION_COOLDOWN: 'Спробуйте після {{time}}.' },
+      });
+      translate.use('uk');
+      await accept();
+      await type('textarea.answer', 'Багато');
+      await submit();
+      http
+        .expectOne('/api/games/7/applications')
+        .flush(
+          { error: { code: 'APPLICATION_COOLDOWN', details: { retryAt } } },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await settle();
+      expect(close).not.toHaveBeenCalled();
+      return el.querySelector('[role="alert"]')!.textContent!;
+    }
+
+    it('same day: only HH:mm in the viewer zone', async () => {
+      const retryAt = '2026-11-27T10:10:00.000Z';
+      const text = await cooldown(retryAt);
+      const time = formatTime(retryAt, browserTimeZone());
+      expect(time).toMatch(/^\d\d:\d\d$/);
+      expect(text).toContain(`Спробуйте після ${time}.`);
+    });
+
+    it('another day (after a rejection): date and time', async () => {
+      const retryAt = '2026-11-28T09:30:00.000Z';
+      const text = await cooldown(retryAt);
+      const when = formatDateTime(retryAt, browserTimeZone());
+      expect(when).not.toBe(formatTime(retryAt, browserTimeZone()));
+      expect(text).toContain(`Спробуйте після ${when}.`);
+    });
   });
 
   it('409 APPLICATION_COOLDOWN without a valid retryAt falls back to «a bit later»', async () => {

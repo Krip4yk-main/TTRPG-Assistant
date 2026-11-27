@@ -335,48 +335,61 @@ export async function withdrawApplication(
   if (!row) throw new AppError(404, 'NOT_FOUND');
   const now = new Date();
   const quick = now.getTime() - row.app.createdAt.getTime() < APPLICATION_QUICK_WITHDRAW_MS;
-  const removed = await db.transaction(async (tx) => {
-    const [res] = await tx
-      .update(gameApplications)
-      .set({ status: 'withdrawn', decidedAt: now })
-      .where(and(eq(gameApplications.id, id), eq(gameApplications.status, 'pending')));
-    if (res.affectedRows === 0) throw new AppError(409, 'APPLICATION_CLOSED');
-    if (!quick) return [];
-    // Спершу подія: якщо диспетчер саме її обробляє, UPDATE чекає на його коміт — тоді
-    // сповіщення вже є й видаляється нижче (блокувальне читання бачить закомічене).
-    await tx
-      .update(events)
-      .set({ dispatchedAt: now })
-      .where(
-        and(
-          eq(events.type, 'application.created'),
-          eq(events.entityType, 'application'),
-          eq(events.entityId, id),
-          isNull(events.dispatchedAt),
-        ),
+  // READ COMMITTED (як у диспетчера): без gap-блокувань, блокувальні читання бачать закомічене.
+  const removed = await db.transaction(
+    async (tx) => {
+      const [res] = await tx
+        .update(gameApplications)
+        .set({ status: 'withdrawn', decidedAt: now })
+        .where(and(eq(gameApplications.id, id), eq(gameApplications.status, 'pending')));
+      if (res.affectedRows === 0) throw new AppError(409, 'APPLICATION_CLOSED');
+      if (!quick) return [];
+      // Спершу подія — за PK, без сканування діапазону черги (вставки `logEvent` не чекають).
+      // Диспетчер саме її обробляє (FOR UPDATE SKIP LOCKED) → UPDATE чекає на його коміт і
+      // не змінює рядок (`dispatched_at` уже є), а створене ним сповіщення видаляється нижче.
+      // Ще не взяв → рядок заблоковано нами, диспетчер його пропустить, а після коміту він уже
+      // оброблений. Уже обробив → події тут немає, сповіщення видаляється нижче.
+      const pendingEvents = await tx
+        .select({ id: events.id })
+        .from(events)
+        .where(
+          and(
+            eq(events.type, 'application.created'),
+            eq(events.entityType, 'application'),
+            eq(events.entityId, id),
+            isNull(events.dispatchedAt),
+          ),
+        );
+      for (const ev of pendingEvents) {
+        await tx
+          .update(events)
+          .set({ dispatchedAt: now })
+          .where(and(eq(events.id, ev.id), isNull(events.dispatchedAt)));
+      }
+      const unread = and(
+        eq(notifications.userId, row.gmUserId),
+        eq(notifications.type, 'application.created'),
+        eq(notifications.entityType, 'application'),
+        eq(notifications.entityId, id),
+        isNull(notifications.readAt),
       );
-    const unread = and(
-      eq(notifications.userId, row.gmUserId),
-      eq(notifications.type, 'application.created'),
-      eq(notifications.entityType, 'application'),
-      eq(notifications.entityId, id),
-      isNull(notifications.readAt),
-    );
-    const found = await tx
-      .select({ id: notifications.id, userId: notifications.userId })
-      .from(notifications)
-      .where(unread)
-      .for('update');
-    if (found.length) {
-      await tx.delete(notifications).where(
-        inArray(
-          notifications.id,
-          found.map((n) => n.id),
-        ),
-      );
-    }
-    return found;
-  });
+      const found = await tx
+        .select({ id: notifications.id, userId: notifications.userId })
+        .from(notifications)
+        .where(unread)
+        .for('update');
+      if (found.length) {
+        await tx.delete(notifications).where(
+          inArray(
+            notifications.id,
+            found.map((n) => n.id),
+          ),
+        );
+      }
+      return found;
+    },
+    { isolationLevel: 'read committed' },
+  );
   await logEvent(db, {
     type: 'application.withdrawn',
     userId,

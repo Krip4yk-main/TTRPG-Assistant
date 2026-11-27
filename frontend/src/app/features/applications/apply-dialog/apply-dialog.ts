@@ -32,11 +32,12 @@ import {
   type ApplicationDto,
   type ErrorCode,
   type SanctionActiveDetails,
+  toZoned,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError, type ApiError } from '../../../core/api/api-error';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { formatTime, viewerTimeZone } from '../../../core/i18n/dates';
+import { formatDateTime, formatTime, viewerTimeZone } from '../../../core/i18n/dates';
 import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { WarningChip } from '../../../shared/warning-chip/warning-chip';
 import { sanctionActiveDetails } from '../../../core/moderation/sanction-active';
@@ -63,6 +64,19 @@ function cooldownRetryAt(err: ApiError): string | null {
   if (err.code !== 'APPLICATION_COOLDOWN') return null;
   const at = (err.details as Partial<ApplicationCooldownDetails> | null | undefined)?.retryAt;
   return typeof at === 'string' && !Number.isNaN(Date.parse(at)) ? at : null;
+}
+
+/** Чи моменти `a` і `b` припадають на один календарний день у поясі `tz`. */
+function sameDay(a: string, b: string, tz: string): boolean {
+  const day = (iso: string) => {
+    const z = toZoned(new Date(iso), tz);
+    return `${z.year}-${z.month}-${z.day}`;
+  };
+  try {
+    return day(a) === day(b);
+  } catch {
+    return false;
+  }
 }
 
 export type ApplyDialogResult =
@@ -237,10 +251,15 @@ export class ApplyDialog {
       }
       const sanction = sanctionActiveDetails(apiError);
       if (code === 'APPLICATION_COOLDOWN') {
-        // Час — у поясі глядача, без позначки поясу; без коректного `retryAt` — «трохи згодом».
+        // Час — у поясі глядача, без позначки поясу: сьогодні — «HH:mm», інший день (після
+        // відхилення — майже завжди завтра) — з датою; без коректного `retryAt` — «трохи згодом».
         const retryAt = cooldownRetryAt(apiError);
         if (retryAt) {
-          this.errorParams.set({ time: formatTime(retryAt, viewerTimeZone(this.auth.me())) });
+          const tz = viewerTimeZone(this.auth.me());
+          const time = sameDay(retryAt, new Date().toISOString(), tz)
+            ? formatTime(retryAt, tz)
+            : formatDateTime(retryAt, tz);
+          this.errorParams.set({ time });
           this.error.set('errors.APPLICATION_COOLDOWN');
         } else {
           this.error.set('games.applications.apply.cooldownSoon');
