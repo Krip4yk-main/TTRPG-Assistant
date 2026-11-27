@@ -97,16 +97,16 @@ describe('application cooldown', () => {
     expect((await apply(gameId, p.cookie)).status).toBe(201);
   });
 
-  it('24 h after rejection by the GM', async () => {
+  it('1 h after rejection by the GM', async () => {
     const { gm, gameId, p } = await setup();
     const id = await applyOk(gameId, p.cookie);
     expect((await call('post', `/api/applications/${id}/reject`, gm.cookie)).status).toBe(200);
-    await decidedAgo(id, 23 * HOUR);
+    await decidedAgo(id, 50 * MIN);
     const r = await apply(gameId, p.cookie);
     expect(r.status).toBe(409);
     expect(r.body.error.code).toBe('APPLICATION_COOLDOWN');
     expect(typeof r.body.error.details.retryAt).toBe('string');
-    await decidedAgo(id, 25 * HOUR);
+    await decidedAgo(id, 70 * MIN);
     expect((await apply(gameId, p.cookie)).status).toBe(201);
   });
 

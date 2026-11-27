@@ -33,11 +33,12 @@ export const APPLICATION_CONSTRAINT_MAX = 200;
 export const CONSTRAINT_COMMENT_MAX = 500;
 
 const MIN = 60_000;
-const DAY = 24 * 60 * MIN;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
 /** Повторна заявка на ту саму гру після власного відкликання — не раніше ніж через 10 хв. */
 export const APPLICATION_WITHDRAW_COOLDOWN_MS = 10 * MIN;
-/** Повторна заявка на ту саму гру після відхилення майстром — не раніше ніж через 24 год. */
-export const APPLICATION_REJECT_COOLDOWN_MS = DAY;
+/** Повторна заявка на ту саму гру після відхилення майстром — не раніше ніж через 1 год. */
+export const APPLICATION_REJECT_COOLDOWN_MS = HOUR;
 /** Відкликання заявки, поданої менш ніж 2 хв тому, майстра не турбує (див. сервіс). */
 export const APPLICATION_QUICK_WITHDRAW_MS = 2 * MIN;
 /** `pending` старше 3 днів — одне нагадування майстру. */

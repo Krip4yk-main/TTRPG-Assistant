@@ -26,7 +26,7 @@ describe('application statuses and timings', () => {
   });
   it('cooldowns, quick withdrawal, reminder and expiry', () => {
     expect(APPLICATION_WITHDRAW_COOLDOWN_MS).toBe(10 * 60_000);
-    expect(APPLICATION_REJECT_COOLDOWN_MS).toBe(24 * 3_600_000);
+    expect(APPLICATION_REJECT_COOLDOWN_MS).toBe(3_600_000);
     expect(APPLICATION_QUICK_WITHDRAW_MS).toBe(2 * 60_000);
     expect(APPLICATION_PENDING_REMINDER_MS).toBe(3 * 86_400_000);
     expect(APPLICATION_EXPIRE_MS).toBe(14 * 86_400_000);
