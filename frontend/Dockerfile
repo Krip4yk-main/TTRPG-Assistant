@@ -17,7 +17,8 @@ ARG NG_APP_DEPLOY_ENV="prod"
 ENV NG_APP_TELEGRAM_BOT_USERNAME=${NG_APP_TELEGRAM_BOT_USERNAME} \
     NG_APP_GOOGLE_LOGIN=${NG_APP_GOOGLE_LOGIN} \
     NG_APP_DISCORD_LOGIN=${NG_APP_DISCORD_LOGIN} \
-    NG_APP_DEV_LOGIN=${NG_APP_DEV_LOGIN} \n    NG_APP_DEPLOY_ENV=${NG_APP_DEPLOY_ENV}
+    NG_APP_DEV_LOGIN=${NG_APP_DEV_LOGIN} \
+    NG_APP_DEPLOY_ENV=${NG_APP_DEPLOY_ENV}
 RUN npm run build -w shared && npm run build -w frontend
 
 # Статика за nginx; /api і /socket.io проксіює зовнішній reverse proxy на бекенд.
