@@ -358,6 +358,11 @@ describe('approximate start time: reschedule and notifications', () => {
     const p = await userWithAge(25, 'p');
     await join(gm, gameId, p);
     const [s1] = await rows(gameId);
+    const myRsvp = async () =>
+      (await ok<SessionDto[]>(call('get', `/api/games/${gameId}/sessions`, p.cookie))).find(
+        (x) => x.id === s1!.id,
+      )!.myRsvp;
+    await ok(call('put', `/api/sessions/${s1!.id}/rsvp`, p.cookie, { status: 'going' }));
     const exact = new Date(s1!.startsAt.getTime() + HOUR);
     await ok(
       call('post', `/api/sessions/${s1!.id}/reschedule`, gm.cookie, {
@@ -365,6 +370,8 @@ describe('approximate start time: reschedule and notifications', () => {
         startWindowMinutes: null,
       }),
     );
+    // Уточнення всередині вікна лише звужує погоджене — RSVP лишається.
+    expect(await myRsvp()).toBe('going');
     await runDispatch(deps);
     const [pinnedNote] = await notesOf(p.id, 'session.rescheduled');
     expect(pinnedNote!.payload).toMatchObject({
@@ -382,6 +389,8 @@ describe('approximate start time: reschedule and notifications', () => {
         startWindowMinutes: 90,
       }),
     );
+    // Звичайне перенесення (і зміна вікна) — RSVP скидається, як і раніше.
+    expect(await myRsvp()).toBeNull();
     await runDispatch(deps);
     const notes = await notesOf(p.id, 'session.rescheduled');
     expect(notes[1]!.payload).toMatchObject({
@@ -397,6 +406,15 @@ describe('approximate start time: reschedule and notifications', () => {
       }),
     );
     expect(again.startWindowMinutes).toBe(90);
+    // Уточнення поза вікном (на інший день) — теж звичайне перенесення: RSVP скидається.
+    await ok(call('put', `/api/sessions/${s1!.id}/rsvp`, p.cookie, { status: 'going' }));
+    await ok(
+      call('post', `/api/sessions/${s1!.id}/reschedule`, gm.cookie, {
+        startsAt: new Date(later.getTime() + DAY).toISOString(),
+        startWindowMinutes: null,
+      }),
+    );
+    expect(await myRsvp()).toBeNull();
   });
 
   it('member reminders count from the window start and carry the window', async () => {
