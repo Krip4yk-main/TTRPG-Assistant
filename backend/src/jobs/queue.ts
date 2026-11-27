@@ -41,6 +41,8 @@ export async function enqueue(
   }
 }
 
+const PURGE_FINISHED_BATCH = 5000;
+
 /** Видаляє завершені задачі, що востаннє змінювалися раніше за поріг (за `updated_at`). */
 export async function purgeFinishedJobs(
   deps: { db: Pick<Db, 'delete'> },
@@ -50,16 +52,21 @@ export async function purgeFinishedJobs(
     failedOlderThanMs = 30 * 86_400_000,
   }: { doneOlderThanMs?: number; failedOlderThanMs?: number } = {},
 ): Promise<number> {
-  const [res] = await deps.db
-    .delete(jobs)
-    .where(
-      or(
-        and(eq(jobs.status, 'done'), lt(jobs.updatedAt, new Date(now.getTime() - doneOlderThanMs))),
-        and(
-          eq(jobs.status, 'failed'),
-          lt(jobs.updatedAt, new Date(now.getTime() - failedOlderThanMs)),
+  const doneCutoff = new Date(now.getTime() - doneOlderThanMs);
+  const failedCutoff = new Date(now.getTime() - failedOlderThanMs);
+  let total = 0;
+  // Пачками (короткі блокування таблиці), доки пачка повна.
+  for (;;) {
+    const [res] = await deps.db
+      .delete(jobs)
+      .where(
+        or(
+          and(eq(jobs.status, 'done'), lt(jobs.updatedAt, doneCutoff)),
+          and(eq(jobs.status, 'failed'), lt(jobs.updatedAt, failedCutoff)),
         ),
-      ),
-    );
-  return res.affectedRows;
+      )
+      .limit(PURGE_FINISHED_BATCH);
+    total += res.affectedRows;
+    if (res.affectedRows < PURGE_FINISHED_BATCH) return total;
+  }
 }

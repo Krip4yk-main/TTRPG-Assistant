@@ -8,14 +8,12 @@ import {
   games,
   gameSystems,
   genres,
-  jobs,
   notifications,
   reminderLog,
   users,
 } from '../../src/db/schema/index.js';
 import {
   materializeAll,
-  purgeDoneJobs,
   purgePendingUsers,
   purgeReadNotifications,
   purgeReminderLog,
@@ -185,27 +183,6 @@ describe('purges', () => {
     expect(await purgeReminderLog(deps, NOW)).toBe(1);
     const rest = await db.select().from(reminderLog);
     expect(rest.map((r) => r.offsetMin)).toEqual([15]);
-  });
-
-  it('done jobs older than 3 days are purged; fresh done and old failed/pending stay', async () => {
-    const row = (status: 'done' | 'failed' | 'pending', updatedAt: Date) => ({
-      type: 'test.noop',
-      runAt: updatedAt,
-      status,
-      updatedAt,
-    });
-    await db
-      .insert(jobs)
-      .values([
-        row('done', daysAgo(4)),
-        row('done', daysAgo(2)),
-        row('failed', daysAgo(10)),
-        row('pending', daysAgo(10)),
-      ]);
-    expect(await purgeDoneJobs(deps, NOW)).toBe(1);
-    const rest = await db.select().from(jobs);
-    expect(rest.map((j) => j.status).sort()).toEqual(['done', 'failed', 'pending']);
-    expect(rest.find((j) => j.status === 'done')!.updatedAt.getTime()).toBe(daysAgo(2).getTime());
   });
 
   it('runDaily isolates steps: a failing step does not skip the others', async () => {

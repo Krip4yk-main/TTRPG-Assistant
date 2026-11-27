@@ -208,7 +208,7 @@ async function assertApplySanctions(tx: Tx, userId: number, g: GameRow, now: Dat
 
 /**
  * Кулдаун повторної заявки на ту саму гру: після власного відкликання — 10 хв, після
- * відхилення майстром — 24 год (від `decided_at`). Прострочені й скасовані системою заявки
+ * відхилення майстром — 1 год (від `decided_at`). Прострочені й скасовані системою заявки
  * кулдауну не дають; інші ігри — теж. Інакше 409 `APPLICATION_COOLDOWN` з `retryAt`.
  */
 async function assertNoCooldown(tx: Tx, userId: number, gameId: number, now: Date): Promise<void> {

@@ -6,12 +6,12 @@ import {
   gameApplications,
   gameMembers,
   games,
-  jobs,
   notifications,
   reminderLog,
   sessions,
   users,
 } from '../db/schema/index.js';
+import { purgeFinishedJobs } from './queue.js';
 import { purgeTelegramOutbox } from '../notifications/telegram-outbox.js';
 import { purgeRsvpDeclineNotices } from '../scheduling/reschedule.service.js';
 import { materializeSessions } from '../sessions/materialize.js';
@@ -26,7 +26,6 @@ export const READ_NOTIFICATION_TTL_DAYS = 90;
 export const REMINDER_LOG_TTL_DAYS = 30;
 export const DONE_JOB_TTL_DAYS = 3;
 const PURGE_BATCH = 1000;
-const DONE_JOB_PURGE_BATCH = 5000;
 
 /**
  * Зсуває 28-денне вікно сесій для всіх ігор, що набирають або йдуть (ідемпотентно —
@@ -162,23 +161,6 @@ export async function purgeReminderLog(
 }
 
 /**
- * Виконані джоби (`done`), старші 3 діб, пачками по 5000 (таблиця росте тисячами рядків на
- * добу). `failed`/`pending`/`running` не чіпаються — їх розбирає людина або черга.
- */
-export async function purgeDoneJobs(deps: Pick<AppDeps, 'db'>, now = new Date()): Promise<number> {
-  const cutoff = new Date(now.getTime() - DONE_JOB_TTL_DAYS * DAY_MS);
-  let total = 0;
-  for (;;) {
-    const [res] = await deps.db
-      .delete(jobs)
-      .where(and(eq(jobs.status, 'done'), lt(jobs.updatedAt, cutoff)))
-      .limit(DONE_JOB_PURGE_BATCH);
-    total += res.affectedRows;
-    if (res.affectedRows < DONE_JOB_PURGE_BATCH) return total;
-  }
-}
-
-/**
  * Щоденне обслуговування (03:00 UTC). Кроки ізольовані: збій одного логується й не
  * скасовує інші. Якщо був тимчасовий збій БД — помилка в кінці (задача повторить; усі кроки
  * ідемпотентні); нетимчасові помилки лише логуються (повтор їх не виправить).
@@ -191,7 +173,10 @@ export async function runDaily(deps: AppDeps, now = new Date()): Promise<void> {
     ['purgeReminderLog', () => purgeReminderLog(deps, now)],
     ['purgeTelegramOutbox', () => purgeTelegramOutbox(deps, now)],
     ['purgeRsvpDeclineNotices', () => purgeRsvpDeclineNotices(deps, now)],
-    ['purgeDoneJobs', () => purgeDoneJobs(deps, now)],
+    [
+      'purgeFinishedJobs',
+      () => purgeFinishedJobs(deps, now, { doneOlderThanMs: DONE_JOB_TTL_DAYS * DAY_MS }),
+    ],
   ];
   let failure: unknown;
   for (const [name, step] of steps) {

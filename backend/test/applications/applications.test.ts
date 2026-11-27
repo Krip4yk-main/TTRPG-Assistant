@@ -169,7 +169,7 @@ describe('POST /api/games/:id/applications', () => {
   it('can reapply after rejection and after withdrawal once the cooldown has passed', async () => {
     const { gm, gameId } = await setup();
     const p = await userWithAge(25);
-    // Кулдаун (24 год / 10 хв) — від `decided_at`; тут зсуваємо його в минуле.
+    // Кулдаун (1 год / 10 хв) — від `decided_at`; тут зсуваємо його в минуле.
     const past = (id: number) =>
       db
         .update(gameApplications)
