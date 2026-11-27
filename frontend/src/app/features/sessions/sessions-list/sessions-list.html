@@ -80,9 +80,60 @@
       </p>
     }
     @if (s.summary) {
-      <p class="summary">
-        <span class="label">{{ 'sessions.summary' | translate }}:</span> {{ s.summary }}
-      </p>
+      @let fullSummary = openSummaryTexts().has(s.id);
+      @let longSummary = isLongSummary(s);
+      <div class="summary">
+        <span class="label">{{ 'sessions.summary' | translate }}:</span>
+        <p
+          class="summary-text"
+          [id]="'session-summary-' + s.id"
+          [class.clamped]="longSummary && !fullSummary"
+        >
+          {{ s.summary }}
+        </p>
+        @if (longSummary) {
+          <button
+            mat-button
+            type="button"
+            class="summary-more"
+            [attr.aria-expanded]="fullSummary"
+            [attr.aria-controls]="'session-summary-' + s.id"
+            (click)="toggleSummaryText(s)"
+          >
+            <mat-icon aria-hidden="true">{{
+              fullSummary ? 'expand_less' : 'expand_more'
+            }}</mat-icon>
+            {{ (fullSummary ? 'sessions.summaryLess' : 'sessions.summaryMore') | translate }}
+          </button>
+        }
+      </div>
+    }
+    @let summaryActs = summaryActions(s);
+    @if (summaryActs.length) {
+      <div class="summary-actions">
+        @for (a of summaryActs; track a) {
+          @let labelKey = a === 'send' ? 'send' : s.summary ? 'edit' : 'add';
+          <button
+            mat-stroked-button
+            type="button"
+            [attr.data-summary-action]="a"
+            [disabled]="busy()"
+            [attr.aria-label]="
+              'sessions.summaryActionsAria.' + labelKey | translate: { when: when(s) }
+            "
+            (click)="runSummary(s, a)"
+          >
+            <mat-icon aria-hidden="true">{{ a === 'send' ? 'send' : 'edit' }}</mat-icon>
+            {{ 'sessions.summaryActions.' + labelKey | translate }}
+          </button>
+        }
+        @if (sentWhen(s); as sent) {
+          <span class="summary-sent nri-muted">
+            <mat-icon aria-hidden="true">done_all</mat-icon>
+            {{ 'sessions.summarySent' | translate: { date: sent } }}
+          </span>
+        }
+      </div>
     }
     @if (canRsvp(s)) {
       <div

@@ -302,6 +302,13 @@
       "when": 1795738120101,
       "tag": "0042_quiet_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1795741755402,
+      "tag": "0043_plan13_session_summary_sent",
+      "breakpoints": true
     }
   ]
 }

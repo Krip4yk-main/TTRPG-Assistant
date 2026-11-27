@@ -281,6 +281,20 @@ describe('renderNotification', () => {
     expect(e.text).toContain('Детальніше: https://nri.example/my-applications');
   });
 
+  it('session summary: game, session date, excerpt as its own paragraph, game link', () => {
+    const r = render('session.summary', { ...base, excerpt: 'Герої дісталися замку…' });
+    expect(r.text.split('\n')).toEqual([
+      '📜 Майстер поділився підсумком сесії гри «Прокляття Страда» (пт, 27 листопада о 19:00):',
+      '',
+      'Герої дісталися замку…',
+      '',
+      'Детальніше: https://nri.example/games/12',
+    ]);
+    expect(r.keyboard).toBeUndefined();
+    // Без уривка — лише заголовок і посилання.
+    expect(render('session.summary', base).text.split('\n')).toHaveLength(3);
+  });
+
   it('withdrawn / left without an actor use the _noactor variants', () => {
     const w = render('application.withdrawn', { gameId: 1, gameTitle: 'Гра' });
     expect(w.text.split('\n')[0]).toBe('↩️ Заявку на гру «Гра» відкликано.');

@@ -1,8 +1,10 @@
-import { and, asc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import {
   cancelSessionInputSchema,
   finishSessionInputSchema,
   rescheduleSessionInputSchema,
+  sessionSummaryInputSchema,
+  summaryExcerpt,
   type SeenState,
   type SessionDto,
 } from '@nri/shared';
@@ -20,6 +22,12 @@ import { logEvent } from '../events/events.service.js';
 import { keepUpdatedAt } from '../games/dead-games/rules.js';
 import { isHiddenFromNonGm } from '../games/games.visibility.js';
 import { AppError } from '../http/errors.js';
+import {
+  createNotification,
+  dropSiteMuted,
+  emitNotificationsNew,
+  type NotificationRow,
+} from '../notifications/notifications.service.js';
 import { materializeSessions, sessionsWindow } from './materialize.js';
 import { sessionsChanged } from '../realtime/game-rooms.js';
 import { markGameSessionsViewed, markOwnChange, seenFor } from '../views/views.service.js';
@@ -44,6 +52,7 @@ export function toSessionDto(s: SessionRow, seen: SeenState, rsvp: RsvpView = NO
     rescheduled: s.rescheduled,
     cancelReason: s.cancelReason,
     summary: s.summary,
+    summarySentAt: iso(s.summarySentAt),
     doneAt: iso(s.doneAt),
     myRsvp: rsvp.myRsvp,
     rsvpSummary: rsvp.rsvpSummary,
@@ -289,8 +298,9 @@ export async function cancelSession(
 
 /**
  * Завершення сесії, що вже почалась: присутність активних учасників + необов'язковий
- * підсумок (бачать лише майстер і активні учасники). Невідомий чи колишній учасник у
- * присутності → 400. Після завершення вікно матеріалізації зсувається.
+ * підсумок (бачать лише майстер і активні учасники); `sendSummary` — одразу надіслати його
+ * учасникам (як `sendSessionSummary`; без підсумку → 422 `SUMMARY_EMPTY`). Невідомий чи
+ * колишній учасник у присутності → 400. Після завершення вікно матеріалізації зсувається.
  */
 export async function finishSession(
   deps: AppDeps,
@@ -300,7 +310,9 @@ export async function finishSession(
 ): Promise<SessionDto> {
   const input = finishSessionInputSchema.parse(body);
   const g = await loadForGm(deps, userId, sessionId);
+  if (input.sendSummary && !input.summary) throw new AppError(422, 'SUMMARY_EMPTY');
   const now = new Date();
+  let sent: NotificationRow[] = [];
   const attendance = await deps.db.transaction(async (tx) => {
     const { session } = await lockScheduled(tx, g.id, sessionId);
     if (session.startsAt > now) throw new AppError(409, 'SESSION_INVALID_STATE');
@@ -333,8 +345,16 @@ export async function finishSession(
     if (rows.length) await tx.insert(sessionAttendance).values(rows);
     await tx
       .update(gameSessions)
-      .set({ status: 'done', summary: input.summary, doneAt: now })
+      .set({
+        status: 'done',
+        summary: input.summary,
+        doneAt: now,
+        ...(input.sendSummary ? { summarySentAt: now } : {}),
+      })
       .where(eq(gameSessions.id, sessionId));
+    if (input.sendSummary) {
+      sent = await notifySummary(deps, tx, g, { ...session, summary: input.summary });
+    }
     // Проведена сесія одразу знімає «мертвість» і адмінське звільнення (до наступної сесії).
     await tx
       .update(games)
@@ -363,5 +383,123 @@ export async function finishSession(
     await markGameSessionsViewed(deps, userId, g.id);
   }
   await afterGmSessionChange(deps, userId, g.id, sessionId);
+  emitNotificationsNew(deps, sent);
+  return reload(deps, userId, sessionId);
+}
+
+// ---------- підсумок проведеної сесії ----------
+
+/**
+ * Блокування гра (FOR SHARE) → сесія (FOR UPDATE), як у `lockScheduled`, але сесія має бути
+ * проведеною (`done`); стан гри не важливий — підсумок можна дописати й після її завершення.
+ */
+async function lockDone(tx: Tx, gameId: number, sessionId: number): Promise<SessionRow> {
+  const [game] = await tx
+    .select({ id: games.id })
+    .from(games)
+    .where(eq(games.id, gameId))
+    .for('share');
+  if (!game) throw new AppError(404, 'NOT_FOUND');
+  const [session] = await tx
+    .select()
+    .from(gameSessions)
+    .where(eq(gameSessions.id, sessionId))
+    .for('update');
+  if (!session) throw new AppError(404, 'NOT_FOUND');
+  if (session.status !== 'done') throw new AppError(409, 'SESSION_INVALID_STATE');
+  return session;
+}
+
+/**
+ * Сповіщення `session.summary` (категорія «Розклад», сайт + Telegram) усім, хто був активним
+ * учасником гри на час сесії (вступив не пізніше початку й не вийшов до нього), крім майстра;
+ * лише активним акаунтам, без тих, хто вимкнув «Розклад» на сайті. Викликати в транзакції, що
+ * тримає сесію FOR UPDATE і ставить `summary_sent_at`; `emitNotificationsNew` — після коміту.
+ */
+async function notifySummary(
+  deps: AppDeps,
+  tx: Tx,
+  game: Pick<GameRow, 'id' | 'title' | 'gmUserId'>,
+  session: Pick<SessionRow, 'id' | 'startsAt' | 'summary'>,
+): Promise<NotificationRow[]> {
+  const members = await tx
+    .select({ userId: gameMembers.userId })
+    .from(gameMembers)
+    .innerJoin(users, eq(users.id, gameMembers.userId))
+    .where(
+      and(
+        eq(gameMembers.gameId, game.id),
+        lte(gameMembers.joinedAt, session.startsAt),
+        or(isNull(gameMembers.leftAt), gt(gameMembers.leftAt, session.startsAt)),
+        ne(gameMembers.userId, game.gmUserId),
+        eq(users.status, 'active'),
+      ),
+    );
+  const params = {
+    gameId: game.id,
+    gameTitle: game.title,
+    sessionId: session.id,
+    startsAt: session.startsAt.toISOString(),
+    excerpt: summaryExcerpt(session.summary ?? ''),
+  };
+  const planned = [...new Set(members.map((m) => m.userId))].map((userId) => ({
+    userId,
+    type: 'session.summary' as const,
+    category: 'schedule' as const,
+    params,
+    entityType: 'session',
+    entityId: session.id,
+  }));
+  const kept = await dropSiteMuted(tx, planned);
+  const rows: NotificationRow[] = [];
+  for (const n of kept) rows.push(await createNotification(deps, tx, n));
+  return rows;
+}
+
+/**
+ * Майстер задає чи змінює підсумок проведеної сесії (порожній — прибрати). Уже надісланий
+ * підсумок після редагування повторно не розсилається.
+ */
+export async function setSessionSummary(
+  deps: AppDeps,
+  userId: number,
+  sessionId: number,
+  body: unknown,
+): Promise<SessionDto> {
+  const input = sessionSummaryInputSchema.parse(body);
+  const g = await loadForGm(deps, userId, sessionId);
+  await deps.db.transaction(async (tx) => {
+    await lockDone(tx, g.id, sessionId);
+    await tx
+      .update(gameSessions)
+      .set({ summary: input.summary })
+      .where(eq(gameSessions.id, sessionId));
+  });
+  await afterGmSessionChange(deps, userId, g.id, sessionId);
+  return reload(deps, userId, sessionId);
+}
+
+/**
+ * «Надіслати учасникам»: один раз на сесію (`summary_sent_at`; повторно → 409
+ * `SUMMARY_ALREADY_SENT`), порожній підсумок → 422 `SUMMARY_EMPTY`.
+ */
+export async function sendSessionSummary(
+  deps: AppDeps,
+  userId: number,
+  sessionId: number,
+): Promise<SessionDto> {
+  const g = await loadForGm(deps, userId, sessionId);
+  const sent = await deps.db.transaction(async (tx) => {
+    const session = await lockDone(tx, g.id, sessionId);
+    if (session.summarySentAt) throw new AppError(409, 'SUMMARY_ALREADY_SENT');
+    if (!session.summary?.trim()) throw new AppError(422, 'SUMMARY_EMPTY');
+    await tx
+      .update(gameSessions)
+      .set({ summarySentAt: new Date() })
+      .where(eq(gameSessions.id, sessionId));
+    return notifySummary(deps, tx, g, session);
+  });
+  await afterGmSessionChange(deps, userId, g.id, sessionId);
+  emitNotificationsNew(deps, sent);
   return reload(deps, userId, sessionId);
 }

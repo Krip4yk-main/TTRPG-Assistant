@@ -7,6 +7,7 @@ import type {
   RescheduleSessionInput,
   RsvpStatus,
   SessionDto,
+  SessionSummaryInput,
 } from '@nri/shared';
 
 /** Тонкий шар над HTTP API сесій гри. */
@@ -35,5 +36,15 @@ export class SessionsApi {
   /** Завершити сесію, що вже почалась: присутність кожного учасника + підсумок. */
   finish(id: number, input: FinishSessionInput): Observable<SessionDto> {
     return this.http.post<SessionDto>(`/api/sessions/${id}/finish`, input);
+  }
+
+  /** Задати чи змінити підсумок проведеної сесії (лише майстер); порожній — прибрати. */
+  setSummary(id: number, input: SessionSummaryInput): Observable<SessionDto> {
+    return this.http.put<SessionDto>(`/api/sessions/${id}/summary`, input);
+  }
+
+  /** Один раз надіслати підсумок учасникам, що були в грі на час сесії. */
+  sendSummary(id: number): Observable<SessionDto> {
+    return this.http.post<SessionDto>(`/api/sessions/${id}/summary/send`, {});
   }
 }

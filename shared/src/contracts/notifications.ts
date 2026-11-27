@@ -49,7 +49,9 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * автооновлення зупинилось після кількох невдач поспіль (без параметрів). Строк заявок (не з
  * подій, `applications`, джоб `applications.housekeeping`): `application.pending_reminder` —
  * майстру, один раз, коли заявка 3 дні без рішення (`applicationId`, `actor` — заявник);
- * `application.expired` — заявнику, коли заявку 14 днів не розглянули. Текст —
+ * `application.expired` — заявнику, коли заявку 14 днів не розглянули. Підсумок сесії (не з
+ * подій, `schedule`): `session.summary` — учасникам гри на час сесії, один раз (`sessionId`,
+ * `startsAt`, `excerpt` — початок підсумку). Текст —
  * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
@@ -68,6 +70,7 @@ export const NOTIFICATION_TYPES = [
   'session.cancelled',
   'session.created',
   'session.reminder',
+  'session.summary',
   'game.started',
   'game.finished',
   'game.cancelled',
@@ -161,6 +164,8 @@ export interface NotificationParams {
   pollOptions?: NotificationPollOption[];
   /** Хто з учасників не зможе прийти (`session.rsvp_declined`), у порядку відповіді. */
   absentees?: NotificationActor[];
+  /** Початок підсумку сесії з «…», якщо обрізано (`session.summary`). */
+  excerpt?: string;
   /** Чому закрилось голосування (`poll.closed`). */
   closeReason?: PollCloseReason;
   actor?: NotificationActor | null;

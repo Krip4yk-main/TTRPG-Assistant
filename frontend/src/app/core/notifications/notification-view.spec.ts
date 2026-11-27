@@ -83,6 +83,22 @@ describe('notificationView', () => {
     }
   });
 
+  it('session.summary: the excerpt as an extra line; without one — none', () => {
+    const v = notificationView(
+      dto('session.summary', {
+        sessionId: 3,
+        startsAt: '2026-11-25T17:00:00.000Z',
+        excerpt: 'Герої…',
+      }),
+      'Europe/Kyiv',
+    );
+    expect(v.key).toBe('notifications.session.summary');
+    expect(v.excerpt).toBe('Герої…');
+    expect(v.when).not.toBeNull();
+    expect(notificationView(dto('session.summary'), 'Europe/Kyiv').excerpt).toBeNull();
+    expect(notificationView(dto('session.created'), 'Europe/Kyiv').excerpt).toBeNull();
+  });
+
   it('game.finished: genre thank-you with default fallback', () => {
     expect(notificationView(dto('game.finished', { genreSlug: 'noir' }), 'UTC').thanksKey).toBe(
       'notifications.thanks.noir',

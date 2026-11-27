@@ -41,6 +41,8 @@ export const gameSessions = mysqlTable(
     rescheduled: boolean('rescheduled').notNull().default(false),
     cancelReason: varchar('cancel_reason', { length: 300 }),
     summary: text('summary'),
+    /** Коли підсумок надіслано учасникам (`session.summary`, один раз); `NULL` — ще ні. */
+    summarySentAt: datetime('summary_sent_at', { fsp: 3 }),
     doneAt: datetime('done_at', { fsp: 3 }),
     createdAt: datetime('created_at')
       .notNull()

@@ -153,6 +153,8 @@ export function renderNotification(
       const closes = formatWhen(params.closesAt, tz);
       if (closes) parts.push('', t('notify.poll.until', { closes }));
     }
+    // Підсумок сесії: початок тексту майстра — окремим абзацом (як є, без розмітки).
+    if (kind === 'session.summary' && params.excerpt) parts.push('', params.excerpt);
     // Запрошення/нагадування оцінити: строк — окремим рядком (без дедлайну — без рядка).
     const closes = kind.startsWith('rating.') ? formatWhen(params.closesAt, tz) : null;
     if (closes) parts.push(t('notify.rating.until', { closes }));

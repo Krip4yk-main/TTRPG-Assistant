@@ -13,6 +13,7 @@ import { formatDateTime } from '../../../core/i18n/dates';
 import { FinishSessionDialog } from '../finish-session-dialog/finish-session-dialog';
 import { RescheduleDialog } from '../session-actions/reschedule-dialog';
 import { CancelSessionDialog } from '../session-actions/cancel-session-dialog';
+import { SessionSummaryDialog } from '../session-actions/session-summary-dialog';
 
 const me = {
   id: 1,
@@ -40,6 +41,7 @@ const base: SessionDto = {
   rescheduled: false,
   cancelReason: null,
   summary: null,
+  summarySentAt: null,
   doneAt: null,
   myRsvp: null,
   rsvpSummary: null,
@@ -452,6 +454,92 @@ describe('SessionsList', () => {
       await settle();
       expect(row(3)!.classList).toContain('nri-flash');
       expect(row(4)!.classList).not.toContain('nri-flash');
+    });
+  });
+
+  describe('summary', () => {
+    const LONG = 'Довгий підсумок пригоди. '.repeat(20);
+    const long: SessionDto = { ...done, id: 9, summary: LONG };
+    const summaryButtons = (id: number) =>
+      [...row(id)!.querySelectorAll<HTMLButtonElement>('button[data-summary-action]')].map(
+        (b) => b.dataset['summaryAction'],
+      );
+
+    it('a long summary is clamped to 3 lines with «show in full»; a short one is not', async () => {
+      await create(false, true, [done, long]);
+      const text = row(9)!.querySelector<HTMLElement>('.summary-text')!;
+      expect(text.classList).toContain('clamped');
+      const toggle = row(9)!.querySelector<HTMLButtonElement>('.summary-more')!;
+      expect(toggle.textContent).toContain('sessions.summaryMore');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-controls')).toBe(text.id);
+      toggle.click();
+      await settle();
+      expect(text.classList).not.toContain('clamped');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(toggle.textContent).toContain('sessions.summaryLess');
+      expect(row(1)!.querySelector('.summary-more')).toBeNull();
+      expect(row(1)!.querySelector('.summary-text')!.classList).not.toContain('clamped');
+    });
+
+    it('members get no summary buttons', async () => {
+      await create(false, true, [done]);
+      expect(summaryButtons(1)).toEqual([]);
+    });
+
+    it('the GM edits and sends; a sent summary shows the date instead of the button', async () => {
+      await create(true, true, [done, { ...done, id: 5, summary: null }]);
+      expect(summaryButtons(1)).toEqual(['edit', 'send']);
+      // Без підсумку — лише «Додати підсумок».
+      expect(summaryButtons(5)).toEqual(['edit']);
+      expect(row(5)!.querySelector('[data-summary-action="edit"]')!.textContent).toContain(
+        'sessions.summaryActions.add',
+      );
+
+      const edited = { ...done, summary: 'Знайшли дві карти' };
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(edited) });
+      row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="edit"]')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        SessionSummaryDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ sessionId: 1, summary: 'Знайшли карту', sent: false }),
+        }),
+      );
+      expect(row(1)!.textContent).toContain('Знайшли дві карти');
+      expect(el.textContent).toContain('sessions.done.summary');
+
+      row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
+      await settle();
+      const sentAt = '2026-11-02T10:00:00.000Z';
+      const req = http.expectOne('/api/sessions/1/summary/send');
+      expect(req.request.method).toBe('POST');
+      req.flush({ ...edited, summarySentAt: sentAt });
+      await settle();
+      expect(summaryButtons(1)).toEqual(['edit']);
+      expect(row(1)!.querySelector('.summary-sent')!.textContent).toContain('sessions.summarySent');
+      expect(el.textContent).toContain('sessions.done.summarySent');
+    });
+
+    it('a failed send shows the translated error and keeps the button', async () => {
+      await create(true, true, [done]);
+      row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
+      await settle();
+      http
+        .expectOne('/api/sessions/1/summary/send')
+        .flush(
+          { error: { code: 'SUMMARY_ALREADY_SENT', message: 'x' } },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await settle();
+      expect(el.textContent).toContain('errors.SUMMARY_ALREADY_SENT');
+      expect(summaryButtons(1)).toEqual(['edit', 'send']);
+    });
+
+    it('a sent summary: no send button, «sent on» label', async () => {
+      await create(true, true, [{ ...done, summarySentAt: '2026-11-02T10:00:00.000Z' }]);
+      expect(summaryButtons(1)).toEqual(['edit']);
+      expect(row(1)!.querySelector('.summary-sent')).not.toBeNull();
     });
   });
 });

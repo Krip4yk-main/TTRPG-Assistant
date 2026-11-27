@@ -147,6 +147,9 @@
                             }
                     }}</span>
                   }
+                  @if (row.view.excerpt; as excerpt) {
+                    <span class="extra excerpt">{{ excerpt }}</span>
+                  }
                   @if (row.view.closes; as closes) {
                     <span class="extra">{{
                       'notifications.rating.until' | translate: { closes }

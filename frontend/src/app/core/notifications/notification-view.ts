@@ -95,6 +95,8 @@ export interface NotificationView {
   sanction: string | null;
   /** Кінець санкції (`sanction.imposed`); безстрокова — окремий текст `_permanent`. */
   until: string | null;
+  /** Початок підсумку сесії (`session.summary`) — окремим рядком, як є. */
+  excerpt: string | null;
   /**
    * Швидкі дії під сповіщенням — посилання на сторінку гри з `?action=…` (нагадування про
    * довгу паузу: відновити, оголосити донабір, завершити); інакше порожньо.
@@ -134,6 +136,7 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     count: p.count ?? 0,
     sanction: null,
     until: null,
+    excerpt: null,
     actions: [],
     icon: CATEGORY_ICONS[n.category] ?? 'notifications',
   };
@@ -184,6 +187,11 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.icon = n.type === 'calendar.empty' ? 'edit_calendar' : 'sync_problem';
   } else if (n.type === 'session.rsvp_declined') {
     view.icon = 'event_busy';
+  }
+  // Підсумок сесії: початок тексту майстра (його бачать учасники гри) — окремим рядком.
+  if (n.type === 'session.summary') {
+    view.excerpt = p.excerpt || null;
+    view.icon = 'history_edu';
   }
   // Відновлення з донабором — окремий текст (як у боті).
   if (n.type === 'game.resumed' && p.recruit === true) {

@@ -45,6 +45,14 @@
       }
     </mat-form-field>
 
+    <mat-checkbox
+      class="send-summary"
+      [checked]="sendSummary() && hasSummary()"
+      [disabled]="!hasSummary()"
+      (change)="sendSummary.set($event.checked)"
+      >{{ 'sessions.finish.sendSummary' | translate }}</mat-checkbox
+    >
+
     <div aria-live="assertive">
       @if (error(); as key) {
         <p class="nri-alert" role="alert">{{ key | translate }}</p>

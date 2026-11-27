@@ -3,7 +3,10 @@ import {
   cancelSessionInputSchema,
   finishSessionInputSchema,
   rescheduleSessionInputSchema,
+  SESSION_SUMMARY_MAX,
   SESSION_WINDOW_DAYS,
+  sessionSummaryInputSchema,
+  summaryExcerpt,
 } from './sessions.js';
 
 describe('session contracts', () => {
@@ -41,5 +44,36 @@ describe('session contracts', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+
+  it('summary input: trimmed, empty → null, limit stays 10 000; finish accepts sendSummary', () => {
+    expect(SESSION_SUMMARY_MAX).toBe(10_000);
+    expect(sessionSummaryInputSchema.parse({ summary: '  Підсумок ' })).toEqual({
+      summary: 'Підсумок',
+    });
+    expect(sessionSummaryInputSchema.parse({ summary: '   ' })).toEqual({ summary: null });
+    expect(sessionSummaryInputSchema.parse({ summary: null })).toEqual({ summary: null });
+    expect(sessionSummaryInputSchema.safeParse({ summary: 'x'.repeat(10_001) }).success).toBe(
+      false,
+    );
+    expect(sessionSummaryInputSchema.safeParse({ summary: 'x', extra: 1 }).success).toBe(false);
+    expect(
+      finishSessionInputSchema.parse({ attendance: [], summary: 'Так', sendSummary: true }),
+    ).toEqual({ attendance: [], summary: 'Так', sendSummary: true });
+    expect(finishSessionInputSchema.safeParse({ attendance: [], sendSummary: 'yes' }).success).toBe(
+      false,
+    );
+  });
+
+  it('summaryExcerpt: short whole, long cut at a word with «…», emoji not split', () => {
+    expect(summaryExcerpt('  Коротко  ')).toBe('Коротко');
+    expect(summaryExcerpt('x'.repeat(300))).toBe('x'.repeat(300));
+    const long = 'слово '.repeat(100);
+    const e = summaryExcerpt(long);
+    expect(e.endsWith('слово…')).toBe(true);
+    expect([...e].length).toBeLessThanOrEqual(301);
+    expect(summaryExcerpt('x'.repeat(400))).toBe(`${'x'.repeat(300)}…`);
+    const emoji = summaryExcerpt('🐉'.repeat(301));
+    expect(emoji).toBe(`${'🐉'.repeat(300)}…`);
   });
 });

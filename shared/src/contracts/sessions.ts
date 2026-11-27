@@ -28,6 +28,29 @@ export interface SessionRsvpSummary {
 
 export const SESSION_CANCEL_REASON_MAX = 300;
 export const SESSION_SUMMARY_MAX = 10_000;
+/** Скільки символів підсумку йде в сповіщення `session.summary` (далі — «…»). */
+export const SESSION_SUMMARY_EXCERPT = 300;
+
+/**
+ * Початок підсумку для сповіщення: до `SESSION_SUMMARY_EXCERPT` символів (кодових точок — емодзі
+ * не розрізаються), довший — обрізаний по межі слова, якщо вона недалеко, і з «…».
+ */
+export function summaryExcerpt(summary: string, max = SESSION_SUMMARY_EXCERPT): string {
+  const text = summary.trim();
+  const chars = [...text];
+  if (chars.length <= max) return text;
+  let cut = chars.slice(0, max).join('');
+  const space = cut.search(/\s\S*$/);
+  if (space > max * 0.7) cut = cut.slice(0, space);
+  return `${cut.trimEnd()}…`;
+}
+
+const summaryText = z
+  .string()
+  .trim()
+  .max(SESSION_SUMMARY_MAX)
+  .nullish()
+  .transform((s) => (s ? s : null));
 
 const MINUTE_MS = 60_000;
 
@@ -57,15 +80,16 @@ export const finishSessionInputSchema = z
       .array(z.object({ publicId: z.string().min(1).max(10), present: z.boolean() }).strict())
       .max(50)
       .refine((a) => new Set(a.map((x) => x.publicId)).size === a.length, 'duplicate publicId'),
-    summary: z
-      .string()
-      .trim()
-      .max(SESSION_SUMMARY_MAX)
-      .nullish()
-      .transform((s) => (s ? s : null)),
+    summary: summaryText,
+    /** Одразу надіслати підсумок учасникам (як `POST /api/sessions/:id/summary/send`). */
+    sendSummary: z.boolean().optional(),
   })
   .strict();
 export type FinishSessionInput = z.input<typeof finishSessionInputSchema>;
+
+/** Тіло `PUT /api/sessions/:id/summary` — підсумок проведеної сесії; порожній — прибрати. */
+export const sessionSummaryInputSchema = z.object({ summary: summaryText }).strict();
+export type SessionSummaryInput = z.input<typeof sessionSummaryInputSchema>;
 
 export interface SessionDto {
   id: number;
@@ -78,6 +102,8 @@ export interface SessionDto {
   cancelReason: string | null;
   /** Лише для майстра й активних учасників. */
   summary: string | null;
+  /** Коли підсумок надіслано учасникам (один раз); `null` — ще ні. */
+  summarySentAt: string | null;
   doneAt: string | null;
   /** Моя відповідь (активний учасник); для майстра й без відповіді — `null`. */
   myRsvp: RsvpStatus | null;

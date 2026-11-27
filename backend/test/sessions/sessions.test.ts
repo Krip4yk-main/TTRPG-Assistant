@@ -103,6 +103,7 @@ describe('materialization on publish', () => {
       rescheduled: false,
       cancelReason: null,
       summary: null,
+      summarySentAt: null,
       doneAt: null,
       myRsvp: null,
       rsvpSummary: { going: 0, notGoing: 0, members: [] },

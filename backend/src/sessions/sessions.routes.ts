@@ -8,6 +8,8 @@ import {
   listGameSessions,
   reload,
   rescheduleSession,
+  sendSessionSummary,
+  setSessionSummary,
 } from './sessions.service.js';
 import { setRsvp } from './rsvp.js';
 import { getSessionAlternatives } from '../scheduling/reschedule.service.js';
@@ -37,6 +39,13 @@ export function sessionsRouter(deps: AppDeps): Router {
       res.json(await run(deps, req.user!.userId, numericId(req.params.id), req.body));
     });
   }
+  // Підсумок проведеної сесії: змінити й один раз надіслати учасникам (лише майстер).
+  router.put('/:id/summary', auth, requireActive, async (req, res) => {
+    res.json(await setSessionSummary(deps, req.user!.userId, numericId(req.params.id), req.body));
+  });
+  router.post('/:id/summary/send', auth, requireActive, async (req, res) => {
+    res.json(await sendSessionSummary(deps, req.user!.userId, numericId(req.params.id)));
+  });
   // Розумне перенесення: альтернативи на тижні сесії (лише майстер).
   router.get('/:id/alternatives', auth, requireActive, async (req, res) => {
     res.json(await getSessionAlternatives(deps, req.user!.userId, numericId(req.params.id)));

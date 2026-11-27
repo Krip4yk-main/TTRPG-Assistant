@@ -38,10 +38,21 @@ import {
   type CancelSessionDialogData,
 } from '../session-actions/cancel-session-dialog';
 import { RescheduleDialog, type RescheduleDialogData } from '../session-actions/reschedule-dialog';
+import {
+  SessionSummaryDialog,
+  type SessionSummaryDialogData,
+} from '../session-actions/session-summary-dialog';
 import { openSessionAlternatives } from '../../scheduling/session-alternatives-dialog/open-session-alternatives';
 
 /** Дія майстра над сесією. */
 export type SessionAction = 'alternatives' | 'reschedule' | 'cancel' | 'finish';
+
+/** Дія майстра над підсумком проведеної сесії. */
+export type SummaryAction = 'edit' | 'send';
+
+/** Підсумок, довший за це (символів чи рядків), згортається до 3 рядків. */
+const SUMMARY_CLAMP_CHARS = 240;
+const SUMMARY_CLAMP_LINES = 3;
 
 interface Message {
   kind: 'error' | 'info';
@@ -70,7 +81,8 @@ const DIALOG_OPTIONS = {
 
 /**
  * Сесії гри (сторінка гри — майстру й активним учасникам): майбутні й минулі, статус,
- * позначка «перенесено», причина скасування, підсумок. Час — у поясі глядача з назвою поясу,
+ * позначка «перенесено», причина скасування, підсумок (довгий — згорнутий до 3 рядків; майстер
+ * може його змінити й один раз надіслати учасникам). Час — у поясі глядача з назвою поясу,
  * якщо він відрізняється від поясу гри. Майстер (поки гра набирає чи йде) може перенести чи
  * скасувати заплановану сесію, а завершити — лише ту, що вже почалась.
  */
@@ -129,6 +141,8 @@ export class SessionsList {
   /** Розгорнуті списки учасників у зведенні RSVP (майстер). */
   protected readonly openSummaries = signal<ReadonlySet<number>>(new Set());
   protected readonly rsvpStatuses: readonly RsvpStatus[] = ['going', 'not_going'];
+  /** Розгорнуті довгі підсумки. */
+  protected readonly openSummaryTexts = signal<ReadonlySet<number>>(new Set());
 
   private readonly viewerZone = computed(() => viewerTimeZone(this.auth.me()));
 
@@ -179,6 +193,76 @@ export class SessionsList {
       if (!next.delete(s.id)) next.add(s.id);
       return next;
     });
+  }
+
+  /** Довгий підсумок показуємо згорнутим до 3 рядків із «Показати повністю». */
+  protected isLongSummary(s: SessionDto): boolean {
+    const text = s.summary ?? '';
+    return text.length > SUMMARY_CLAMP_CHARS || text.split('\n').length > SUMMARY_CLAMP_LINES;
+  }
+
+  protected toggleSummaryText(s: SessionDto): void {
+    this.openSummaryTexts.update((open) => {
+      const next = new Set(open);
+      if (!next.delete(s.id)) next.add(s.id);
+      return next;
+    });
+  }
+
+  /**
+   * Підсумок проведеної сесії майстру: змінити (чи додати) — завжди, навіть після завершення
+   * гри; надіслати учасникам — один раз і лише непорожній.
+   */
+  protected summaryActions(s: SessionDto): SummaryAction[] {
+    if (!this.isGm() || s.status !== 'done') return [];
+    return s.summary && !s.summarySentAt ? ['edit', 'send'] : ['edit'];
+  }
+
+  /** «Надіслано <дата>» — майстру, після надсилання підсумку. */
+  protected sentWhen(s: SessionDto): string | null {
+    return this.isGm() && s.summarySentAt
+      ? formatDateTime(s.summarySentAt, this.viewerZone())
+      : null;
+  }
+
+  protected async runSummary(s: SessionDto, action: SummaryAction): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.message.set(null);
+    try {
+      const dto =
+        action === 'edit'
+          ? await firstValueFrom(
+              this.dialog
+                .open<SessionSummaryDialog, SessionSummaryDialogData, SessionDto>(
+                  SessionSummaryDialog,
+                  {
+                    ...DIALOG_OPTIONS,
+                    data: {
+                      sessionId: s.id,
+                      when: this.when(s),
+                      summary: s.summary,
+                      sent: s.summarySentAt !== null,
+                    },
+                  },
+                )
+                .afterClosed(),
+            )
+          : await firstValueFrom(this.api.sendSummary(s.id));
+      if (!dto) return;
+      // Власна зміна: пінг сесій від неї не має піднімати банер оновлень.
+      this.mutated.emit();
+      this.patch(s.id, dto);
+      this.message.set({
+        kind: 'info',
+        key: action === 'edit' ? 'sessions.done.summary' : 'sessions.done.summarySent',
+      });
+    } catch (err) {
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') this.message.set({ kind: 'error', key: `errors.${code}` });
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Оптимістично: показуємо вибір одразу, при помилці — повертаємо попередній. */

@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -21,8 +22,8 @@ export interface FinishSessionDialogData {
 
 /**
  * «Завершити сесію»: присутність кожного активного учасника (типово — присутній) і
- * необов'язковий підсумок, який бачать лише майстер і учасники. Присутність надсилається для
- * всіх учасників. Закривається з оновленою `SessionDto`.
+ * необов'язковий підсумок, який бачать лише майстер і учасники; за бажанням — одразу надіслати
+ * його учасникам (один раз). Присутність надсилається для всіх учасників. Закривається з оновленою `SessionDto`.
  */
 @Component({
   selector: 'nri-finish-session-dialog',
@@ -57,6 +58,12 @@ export class FinishSessionDialog {
   });
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
+  private readonly summaryValue = toSignal(this.form.controls.summary.valueChanges, {
+    initialValue: '',
+  });
+  /** «Надіслати підсумок учасникам» — доступно, лише коли підсумок не порожній. */
+  protected readonly hasSummary = computed(() => this.summaryValue().trim().length > 0);
+  protected readonly sendSummary = signal(false);
 
   constructor() {
     void this.load();
@@ -90,6 +97,7 @@ export class FinishSessionDialog {
         this.api.finish(this.data.sessionId, {
           attendance: members.map((m, i) => ({ publicId: m.publicId, present: v.present[i]! })),
           summary: v.summary.trim() || null,
+          ...(this.sendSummary() && v.summary.trim() ? { sendSummary: true } : {}),
         }),
       );
       this.ref.close(dto);

@@ -97,4 +97,52 @@ describe('FinishSessionDialog', () => {
     req.flush({ id: 41, status: 'done' });
     await settle();
   });
+
+  describe('send summary to members', () => {
+    const sendBox = () =>
+      el.querySelector<HTMLInputElement>('.send-summary input[type="checkbox"]')!;
+    const type = async (text: string) => {
+      const area = el.querySelector<HTMLTextAreaElement>('textarea.summary')!;
+      area.value = text;
+      area.dispatchEvent(new Event('input'));
+      await settle();
+    };
+
+    it('is unchecked and disabled until there is a summary', async () => {
+      expect(el.querySelector('.send-summary')!.textContent).toContain(
+        'sessions.finish.sendSummary',
+      );
+      expect(sendBox().checked).toBe(false);
+      expect(sendBox().disabled).toBe(true);
+      await type('   ');
+      expect(sendBox().disabled).toBe(true);
+      await type('Знайшли карту');
+      expect(sendBox().disabled).toBe(false);
+    });
+
+    it('checked with a summary → sendSummary: true', async () => {
+      await type('Знайшли карту');
+      sendBox().click();
+      await settle();
+      el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+      await settle();
+      const req = http.expectOne('/api/sessions/41/finish');
+      expect(req.request.body).toMatchObject({ summary: 'Знайшли карту', sendSummary: true });
+      req.flush({ id: 41, status: 'done' });
+      await settle();
+    });
+
+    it('checked, then the summary cleared → nothing is sent to members', async () => {
+      await type('Знайшли карту');
+      sendBox().click();
+      await settle();
+      await type('');
+      el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+      await settle();
+      const req = http.expectOne('/api/sessions/41/finish');
+      expect(req.request.body.sendSummary).toBeUndefined();
+      req.flush({ id: 41, status: 'done' });
+      await settle();
+    });
+  });
 });

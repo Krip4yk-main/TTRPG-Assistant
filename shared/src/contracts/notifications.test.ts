@@ -24,6 +24,7 @@ describe('notification contracts', () => {
   it('every type except session.reminder, rating.* and moderation is a domain event', () => {
     const notFromEvents = [
       'session.reminder',
+      'session.summary',
       'complaint.resolved',
       'moderation.digest',
       'sanction.imposed',
@@ -161,6 +162,7 @@ describe('notificationLink', () => {
     );
     expect(notificationLink('application.expired', { gameId: 5 })).toBe('/my-applications');
     expect(notificationLink('session.cancelled', { gameId: 5, sessionId: 2 })).toBe('/games/5');
+    expect(notificationLink('session.summary', { gameId: 5, sessionId: 2 })).toBe('/games/5');
     expect(notificationLink('game.finished', {})).toBe('/');
     const deadGameTypes = ['game.stale_reminder', 'game.dead', 'game.suspicious'] as const;
     for (const t of deadGameTypes) expect(notificationLink(t, { gameId: 5 })).toBe('/my-games');

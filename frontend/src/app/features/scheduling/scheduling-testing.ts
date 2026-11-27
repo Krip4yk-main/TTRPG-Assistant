@@ -103,6 +103,7 @@ export function session(patch: Partial<SessionDto> = {}): SessionDto {
     rescheduled: false,
     cancelReason: null,
     summary: null,
+    summarySentAt: null,
     doneAt: null,
     myRsvp: null,
     rsvpSummary: null,

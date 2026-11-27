@@ -104,6 +104,46 @@ h3 {
   }
 }
 
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nri-space-xs);
+}
+
+.summary-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+
+  // Довгий підсумок — перші 3 рядки, решта за «Показати повністю».
+  &.clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+}
+
+.summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-xs) var(--nri-space-sm);
+}
+
+.summary-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

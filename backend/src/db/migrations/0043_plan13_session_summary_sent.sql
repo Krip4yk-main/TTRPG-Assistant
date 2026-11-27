@@ -1,0 +1,1 @@
+ALTER TABLE `game_sessions` ADD `summary_sent_at` datetime(3);
