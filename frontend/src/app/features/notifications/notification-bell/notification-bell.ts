@@ -54,6 +54,9 @@ import { ThemeService } from '../../../theming/theme.service';
 /** Найбільше число на бейджі; більше — «99+». */
 export const BADGE_MAX = 99;
 
+/** Відступ панелі сповіщень від країв вікна, px (і ширина панелі — `100vw − 2 × відступ`). */
+export const PANEL_VIEWPORT_MARGIN = 8;
+
 interface Row {
   n: NotificationDto;
   view: NotificationView;
@@ -122,6 +125,11 @@ export class NotificationBell {
     }));
   });
 
+  /**
+   * Відступ панелі від країв вікна. Разом із `push` тримає панель у вікні на вузьких екранах:
+   * правим краєм до дзвоника вона виходила за лівий край (на 375 px — на ≈60 px).
+   */
+  readonly viewportMargin = PANEL_VIEWPORT_MARGIN;
   protected readonly positions: ConnectedPosition[] = [
     { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top', offsetY: 4 },
     { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom', offsetY: -4 },

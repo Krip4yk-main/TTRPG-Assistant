@@ -10,7 +10,9 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { ThemeService } from '../../../theming/theme.service';
 import { ACCEPTED_NOTICE_STORAGE_KEY } from '../../../theming/moments/accepted-notice';
-import { NotificationBell } from './notification-bell';
+import { By } from '@angular/platform-browser';
+import { CdkConnectedOverlay } from '@angular/cdk/overlay';
+import { NotificationBell, PANEL_VIEWPORT_MARGIN } from './notification-bell';
 
 const testMe: MeDto = {
   id: 1,
@@ -114,6 +116,16 @@ describe('NotificationBell', () => {
   afterEach(() => {
     fixture?.destroy();
     http.verify();
+  });
+
+  it('panel overlay is pushed into the viewport with a margin (narrow screens)', async () => {
+    await start(0);
+    await open([]);
+    const node = fixture.debugElement.queryAllNodes(By.directive(CdkConnectedOverlay))[0];
+    const overlay = node.injector.get(CdkConnectedOverlay);
+    expect(overlay.push).toBe(true);
+    expect(overlay.viewportMargin).toBe(PANEL_VIEWPORT_MARGIN);
+    expect(PANEL_VIEWPORT_MARGIN).toBe(8);
   });
 
   it('badge: hidden at 0, aria-label without count', async () => {
