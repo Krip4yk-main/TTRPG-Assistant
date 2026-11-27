@@ -863,6 +863,24 @@ describe('GameForm', () => {
       expect(stored(NEW_KEY)!.values).toMatchObject({ title: 'Чернетка', system: 7, genreId: 4 });
     });
 
+    it('an existing game without safety data stays clean: no autosave, PATCH sends empty lists', async () => {
+      await setup(5, game({ status: 'draft' }));
+      await debounce();
+      expect(localStorage.getItem('nri.gameDraft.1.5')).toBeNull();
+      expect(el.querySelector('.restored-notice')).toBeNull();
+      await type('input[formcontrolname="title"]', 'Нова назва');
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toMatchObject({
+        safetyTools: [],
+        lines: { warningIds: [], custom: [] },
+        veils: { warningIds: [], custom: [] },
+      });
+      req.flush(game({ status: 'draft' }));
+      await settle();
+    });
+
     it('restores a new game draft on reload and shows a notice', async () => {
       seedDraft(NEW_KEY, {
         title: 'Збережена назва',
