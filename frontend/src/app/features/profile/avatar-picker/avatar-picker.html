@@ -1,0 +1,71 @@
+<section class="avatar-picker" aria-labelledby="avatar-picker-title">
+  <h2 id="avatar-picker-title">{{ 'avatarPicker.title' | translate }}</h2>
+  <p class="nri-muted hint">{{ 'avatarPicker.hint' | translate }}</p>
+
+  <div class="choices" role="radiogroup" aria-labelledby="avatar-picker-title">
+    @for (c of choices(); track c.source) {
+      <label class="choice" [class.selected]="selected() === c.source">
+        <input
+          type="radio"
+          name="avatarSource"
+          [value]="c.source"
+          [checked]="selected() === c.source"
+          (change)="select(c.source)"
+        />
+        @if (showPreview(c); as url) {
+          <img
+            class="preview"
+            [src]="url"
+            alt=""
+            width="48"
+            height="48"
+            referrerpolicy="no-referrer"
+            (error)="markBroken(url)"
+          />
+        } @else {
+          <span class="preview placeholder" aria-hidden="true">
+            <mat-icon>{{ c.icon }}</mat-icon>
+          </span>
+        }
+        <span class="label">{{ labelKey(c.source) | translate }}</span>
+      </label>
+    }
+  </div>
+
+  @if (selected() === 'custom') {
+    <mat-form-field appearance="outline" class="url">
+      <mat-label>{{ 'avatarPicker.urlLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="url"
+        name="customAvatarUrl"
+        [formControl]="customUrl"
+        maxlength="512"
+        inputmode="url"
+        autocomplete="off"
+        [attr.aria-invalid]="urlError() ? 'true' : null"
+      />
+      <mat-hint>{{ 'avatarPicker.urlHint' | translate }}</mat-hint>
+    </mat-form-field>
+  }
+  @if (urlError(); as key) {
+    <p class="nri-alert url-error" role="alert">{{ key | translate }}</p>
+  }
+
+  <div class="actions">
+    <button mat-flat-button type="button" [disabled]="saving()" (click)="save()">
+      {{ (saving() ? 'common.saving' : 'common.save') | translate }}
+    </button>
+  </div>
+  <div aria-live="polite">
+    @if (message(); as m) {
+      <p
+        [class.nri-alert]="m.kind === 'error'"
+        [class.nri-notice]="m.kind === 'info'"
+        [attr.role]="m.kind === 'error' ? 'alert' : null"
+      >
+        {{ m.key | translate }}
+      </p>
+    }
+  </div>
+</section>

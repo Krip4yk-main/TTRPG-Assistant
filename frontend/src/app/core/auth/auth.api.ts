@@ -7,6 +7,7 @@ import type {
   IdentityDto,
   IdentityProvider,
   MeDto,
+  UpdateAvatarInput,
 } from '@nri/shared';
 
 /** Дані Telegram Login Widget (передаються бекенду як є для перевірки підпису). */
@@ -54,6 +55,11 @@ export class AuthApi {
   /** Пояс акаунта; слоти календаря лишаються тим самим «настінним» часом (R5). */
   changeTimezone(timezone: string): Observable<MeDto> {
     return this.http.patch<MeDto>('/api/me/timezone', { timezone });
+  }
+
+  /** Джерело аватара; `customUrl` — лише для `custom`. */
+  changeAvatar(input: UpdateAvatarInput): Observable<MeDto> {
+    return this.http.put<MeDto>('/api/me/avatar', input);
   }
 
   unlinkIdentity(provider: IdentityProvider): Observable<{ identities: IdentityDto[] }> {
