@@ -61,4 +61,17 @@ describe('tester report contracts', () => {
     );
     expect(stripReportUrlSecrets('not a url')).toBe('not a url');
   });
+
+  it('url: drops OAuth tokens/state, keys, secrets, passwords and hashes too', () => {
+    expect(
+      stripReportUrlSecrets(
+        'https://dev.nri.example/cb?access_token=a&ID_TOKEN=b&refresh_token=c&state=s&page=2' +
+          '&key=k&secret=x&password=p&hash=h&tab=info',
+      ),
+    ).toBe('https://dev.nri.example/cb?page=2&tab=info');
+    // Схожі, але інші назви лишаються.
+    expect(stripReportUrlSecrets('https://dev.nri.example/x?keyword=a&statement=b')).toBe(
+      'https://dev.nri.example/x?keyword=a&statement=b',
+    );
+  });
 });

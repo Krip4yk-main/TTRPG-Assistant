@@ -20,12 +20,27 @@ export const TESTER_REPORT_THEME_MAX = 64;
 export const TESTER_REPORT_UA_MAX = 512;
 const VIEWPORT_MAX = 100_000;
 
-/** Параметри запиту, що можуть бути секретами (токени входу, коди OAuth) — не потрапляють у звіт. */
-export const TESTER_REPORT_SECRET_PARAMS = ['token', 'code'] as const;
+/**
+ * Параметри запиту, що можуть бути секретами (токени входу, коди й стан OAuth, ключі, паролі) —
+ * не потрапляють у звіт. Порівняння без урахування регістру.
+ */
+export const TESTER_REPORT_SECRET_PARAMS = [
+  'token',
+  'code',
+  'access_token',
+  'id_token',
+  'refresh_token',
+  'state',
+  'key',
+  'secret',
+  'password',
+  'hash',
+] as const;
 
 /**
- * Адреса сторінки для звіту: шлях і query без секретних параметрів (`token`, `code`) і без
- * фрагмента (`#…` теж буває носієм токена). Без `URL` — shared не залежить від DOM/Node-типів.
+ * Адреса сторінки для звіту: шлях і query без секретних параметрів
+ * (`TESTER_REPORT_SECRET_PARAMS`) і без фрагмента (`#…` теж буває носієм токена). Без `URL` —
+ * shared не залежить від DOM/Node-типів.
  */
 export function stripReportUrlSecrets(href: string): string {
   const noHash = href.split('#', 1)[0]!;

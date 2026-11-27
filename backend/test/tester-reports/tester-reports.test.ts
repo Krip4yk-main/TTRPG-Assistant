@@ -59,6 +59,10 @@ describe('tester reports: only on DEPLOY_ENV=dev', () => {
     expect((await h.call('get', '/api/admin/tester-reports', owner.cookie)).status).toBe(404);
     const mark = await h.call('post', '/api/admin/tester-reports/1/processed', owner.cookie);
     expect(mark.status).toBe(404);
+    // Гість поза dev теж бачить 404 (не 401): ендпоінтів «немає».
+    expect((await h.call('get', '/api/admin/tester-reports', undefined)).status).toBe(404);
+    const guestMark = await h.call('post', '/api/admin/tester-reports/1/processed', undefined);
+    expect(guestMark.status).toBe(404);
     expect(await db.select().from(testerReports)).toHaveLength(0);
   });
 });
