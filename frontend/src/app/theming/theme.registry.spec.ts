@@ -16,10 +16,9 @@ describe('THEMES: фірмові анімації', () => {
     }
   });
 
-  it('перемикач sendAnimation — рівно в дизайнів з ефектами', () => {
+  it('усі десять дизайнів — під одним перемикачем sendAnimation (відривання «Дошки» теж)', () => {
     for (const id of THEME_IDS) {
-      const hasEffects = Object.keys(THEMES[id].effects ?? {}).length > 0;
-      expect(THEMES[id].options?.includes('sendAnimation') ?? false).toBe(hasEffects);
+      expect(THEMES[id].options).toEqual(['sendAnimation']);
     }
   });
 

@@ -86,7 +86,7 @@ export class QuestBoardGameCard implements GameCardSlot {
   private readonly themes = inject(ThemeService);
   protected readonly gameUrl = computed(() => `/games/${this.game().id}`);
   /** Анімацію ввімкнено в профілі (гість — так): тоді й текст оголошення не виділяється. */
-  protected readonly tearEnabled = computed(() => this.themes.uiPrefs().tearAnimation);
+  protected readonly tearEnabled = computed(() => this.themes.uiPrefs().sendAnimation);
   protected readonly tearing = signal(false);
   /** Перехід уже почався — повторний клік (подвійний) нічого не робить. */
   private leaving = false;

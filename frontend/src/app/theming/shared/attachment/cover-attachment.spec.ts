@@ -83,7 +83,7 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
         {
           provide: ThemeService,
           useValue: {
-            uiPrefs: signal({ tearAnimation: false, sendAnimation: true }),
+            uiPrefs: signal({ tearAnimation: true, sendAnimation: false }),
             preloadEffect: () => undefined,
             effectEnabled: () => false,
           },

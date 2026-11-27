@@ -58,8 +58,13 @@ async function render(
 const optionButtons = (el: HTMLElement) => [
   ...el.querySelectorAll<HTMLButtonElement>('button.option'),
 ];
+/** Перемикач «Фірмові анімації дизайну» (у «Дошці» — це й відривання оголошення). */
 const tearSwitch = (el: HTMLElement) =>
-  el.querySelector<HTMLButtonElement>('mat-slide-toggle button[role="switch"]');
+  el.querySelector<HTMLButtonElement>(
+    'mat-slide-toggle[data-option="sendAnimation"] button[role="switch"]',
+  );
+/** Колишній окремий перемикач «Дошки» — більше ніде не показується. */
+const OLD_TEAR = 'Анімація відривання листка';
 const byName = (el: HTMLElement, name: string) =>
   optionButtons(el).find((b) => b.textContent?.includes(name))!;
 
@@ -76,7 +81,8 @@ describe('ThemePicker («Вигляд»)', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('h2')?.textContent).toContain('Вигляд');
     expect(optionButtons(el)).toHaveLength(0);
-    expect(el.textContent).toContain(uk.account.theme.tearAnimation);
+    expect(el.textContent).toContain(uk.account.theme.sendAnimation);
+    expect(el.textContent).not.toContain(OLD_TEAR);
     expect(tearSwitch(el)?.getAttribute('aria-checked')).toBe('true');
   });
 
@@ -86,7 +92,7 @@ describe('ThemePicker («Вигляд»)', () => {
     tearSwitch(fixture.nativeElement)!.click();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(themes.saveUiPrefs).toHaveBeenCalledWith({ tearAnimation: false });
+    expect(themes.saveUiPrefs).toHaveBeenCalledWith({ sendAnimation: false });
     expect(tearSwitch(fixture.nativeElement)?.getAttribute('aria-checked')).toBe('false');
   });
 
@@ -138,7 +144,7 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(uk.account.theme.sendAnimation).toBe('Фірмові анімації дизайну');
     expect(el.textContent).toContain(uk.account.theme.sendAnimation);
     expect(el.textContent).toContain(uk.account.theme.sendAnimationHint);
-    expect(el.textContent).not.toContain(uk.account.theme.tearAnimation);
+    expect(el.textContent).not.toContain(OLD_TEAR);
     const sw = el.querySelector<HTMLButtonElement>(
       'mat-slide-toggle[data-option="sendAnimation"] button[role="switch"]',
     )!;
@@ -154,7 +160,7 @@ describe('ThemePicker («Вигляд»)', () => {
     const fixture = await render(fakeThemes(['quest-board', 'night-city'], 'night-city'));
     const el: HTMLElement = fixture.nativeElement;
     expect(optionButtons(el)).toHaveLength(2);
-    expect(el.textContent).not.toContain(uk.account.theme.tearAnimation);
+    expect(el.textContent).not.toContain(OLD_TEAR);
     expect(
       [...el.querySelectorAll('mat-slide-toggle')].map((t) => t.getAttribute('data-option')),
     ).toEqual(['sendAnimation']);

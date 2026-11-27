@@ -136,13 +136,14 @@ const loadSceneSlots = () => import('./themes/scene/slots').then((m) => m.SCENE_
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
   // «Дошка оголошень»: дерев'яна стіна, але текст і поля — на пергаменті (чорнило на світлому),
   // тож нативні контроли (select, скролбари панелей, календарі) — світлі.
-  // Власне налаштування — анімація відривання оголошення.
+  // Фірмова анімація — відривання оголошення при відкритті гри (у картці, не `effects`);
+  // вмикається спільним «Фірмові анімації дизайну» (`sendAnimation`), як у всіх дизайнах.
   'quest-board': theme(
     'quest-board',
     'light',
     '400 1em Kurale',
     () => import('./themes/quest-board/slots').then((m) => m.QUEST_BOARD_SLOTS),
-    ['tearAnimation'],
+    ['sendAnimation'],
   ),
   // Родина сцени (themes/scene): окремі дизайни з одним лінивим чанком слотів (той самий
   // import — вантажиться один раз) і власним бандлом стилів кожен. Кібер-дизайни — текст
