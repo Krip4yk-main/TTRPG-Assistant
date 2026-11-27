@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
@@ -81,6 +81,20 @@ function hasImageUrl(body: unknown): boolean {
   return typeof v === 'string' && v.length > 0;
 }
 
+/**
+ * Публічний ICS-фід (`/api/cal/<token>.ics`): ≤ 60 завантажень на годину на посилання й
+ * ≤ 600 на годину з однієї IP (сервери Google/Apple/Outlook спільні для багатьох підписок).
+ */
+export const CAL_FEED_TOKEN_MAX = 60;
+export const CAL_FEED_IP_MAX = 600;
+export const CAL_FEED_WINDOW_SEC = 3600;
+
+/** Ключ ліміту на посилання — хеш (у Redis не потрапляє сам токен). */
+function calFeedKey(req: Request): string {
+  const file = String(req.params.file ?? '');
+  return `t:${createHash('sha256').update(file).digest('hex').slice(0, 32)}`;
+}
+
 export function rateLimiters(env: Env, redis: Redis) {
   return {
     // Бот із дійсним ключем не обмежується; запити з хибним ключем лишаються під лімітом.
@@ -104,6 +118,15 @@ export function rateLimiters(env: Env, redis: Redis) {
       IMAGE_CHECK_MAX,
       (req) => !req.user || !hasImageUrl(req.body),
       (req) => `u:${req.user!.userId}`,
+    ),
+    calFeedIp: limiter(redis, 'calip', CAL_FEED_WINDOW_SEC, CAL_FEED_IP_MAX),
+    calFeedToken: limiter(
+      redis,
+      'caltok',
+      CAL_FEED_WINDOW_SEC,
+      CAL_FEED_TOKEN_MAX,
+      undefined,
+      calFeedKey,
     ),
   };
 }

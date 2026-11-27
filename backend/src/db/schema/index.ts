@@ -3,6 +3,7 @@ import * as availability from './availability.js';
 import * as auth from './auth.js';
 import * as calendar from './calendar.js';
 import * as calendarImport from './calendar-import.js';
+import * as calendarFeed from './calendar-feed.js';
 import * as demo from './demo.js';
 import * as catalog from './catalog.js';
 import * as events from './events.js';
@@ -24,6 +25,7 @@ export * from './auth.js';
 export * from './availability.js';
 export * from './calendar.js';
 export * from './calendar-import.js';
+export * from './calendar-feed.js';
 export * from './demo.js';
 export * from './catalog.js';
 export * from './events.js';
@@ -61,4 +63,5 @@ export const schema = {
   ...polls,
   ...scheduling,
   ...calendarImport,
+  ...calendarFeed,
 };

@@ -1,0 +1,80 @@
+:host {
+  display: block;
+}
+
+.calendar-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+
+  h2,
+  p {
+    margin: 0;
+  }
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nri-space-sm);
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+}
+
+.url-label,
+.instructions-title {
+  font-weight: 600;
+}
+
+.url-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}
+
+.feed-url {
+  flex: 1 1 16rem;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 var(--nri-space-sm);
+  border: 1px solid var(--nri-border);
+  border-radius: var(--nri-radius-sm);
+  background: var(--nri-surface);
+  color: var(--nri-text);
+  font: inherit;
+}
+
+.instructions ul {
+  margin: var(--nri-space-xs) 0;
+  padding-left: var(--nri-space-lg);
+}
+
+.connected-since {
+  display: flex;
+  align-items: center;
+  gap: var(--nri-space-xs);
+  font-weight: 600;
+
+  mat-icon {
+    flex: none;
+    color: var(--nri-success-text);
+  }
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+  margin-top: var(--nri-space-xs);
+}
+
+.danger {
+  --mat-button-outlined-label-text-color: var(--nri-danger-text);
+}

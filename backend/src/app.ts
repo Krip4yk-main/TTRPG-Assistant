@@ -17,6 +17,7 @@ import { adminCatalogRouter } from './catalog/catalog.admin.routes.js';
 import { profileRouter, publicUsersRouter } from './profiles/profiles.routes.js';
 import { availabilityRouter } from './availability/availability.routes.js';
 import { calendarRouter } from './calendar/calendar.routes.js';
+import { calendarFeedPublicRouter, calendarFeedRouter } from './calendar/calendar-feed.routes.js';
 import { gamesRouter } from './games/games.routes.js';
 import {
   applicationsRouter,
@@ -79,6 +80,8 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(healthRouter(deps));
   // Поза /api: без сесії, CSRF-cookie та загального rate limiter (лише GET — тіло не потрібне).
   app.use(seoRootRouter(deps));
+  // Публічний ICS-фід: без cookie/CSRF/сесії (секрет — у посиланні), під власними лімітами.
+  app.use(calendarFeedPublicRouter(deps, { ip: limits.calFeedIp, token: limits.calFeedToken }));
   // Rate limiter — ДО парсерів тіла: клієнт поза лімітом не змусить розбирати 1 МБ.
   app.use(['/api/auth', '/api/appeals'], limits.auth);
   app.use('/api', limits.general);
@@ -107,6 +110,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/me/sanctions', mySanctionAppealsRouter(deps));
   app.use('/api/me/dead-games', myDeadGamesRouter(deps));
   app.use('/api/me/calendar-import', calendarImportRouter(deps));
+  app.use('/api/me/calendar-feed', calendarFeedRouter(deps));
   app.use('/api/me', calendarRouter(deps));
   app.use('/api/me', usersRouter(deps));
   app.use('/api/users', publicUsersRouter(deps));

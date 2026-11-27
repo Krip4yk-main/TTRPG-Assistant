@@ -1,0 +1,111 @@
+<section class="calendar-feed" aria-labelledby="calendar-feed-title">
+  <h2 id="calendar-feed-title">{{ 'calendar.feed.title' | translate }}</h2>
+  <p class="nri-muted">{{ 'calendar.feed.lead' | translate }}</p>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="nri-muted" role="status">{{ 'common.loading' | translate }}</p>
+    }
+    @case ('error') {
+      <div class="nri-alert load-error" role="alert">
+        <span>{{ 'calendar.feed.loadError' | translate }}</span>
+        <button mat-stroked-button type="button" (click)="load()">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    }
+    @case ('ready') {
+      @if (status()?.enabled) {
+        @if (url(); as link) {
+          <div class="link">
+            <label class="url-label" for="calendar-feed-url">{{
+              'calendar.feed.urlLabel' | translate
+            }}</label>
+            <div class="url-row">
+              <input
+                id="calendar-feed-url"
+                class="feed-url"
+                type="text"
+                readonly
+                spellcheck="false"
+                aria-describedby="calendar-feed-secret"
+                #feedUrl
+                [value]="link"
+                (focus)="feedUrl.select()"
+              />
+              <button mat-flat-button type="button" class="copy" (click)="copy()">
+                <mat-icon aria-hidden="true">content_copy</mat-icon>
+                {{ 'calendar.feed.copy' | translate }}
+              </button>
+            </div>
+            <p class="nri-muted" id="calendar-feed-secret">
+              {{ 'calendar.feed.secret' | translate }}
+            </p>
+            <div class="instructions">
+              <p class="instructions-title">{{ 'calendar.feed.help.title' | translate }}</p>
+              <ul>
+                <li>{{ 'calendar.feed.help.google' | translate }}</li>
+                <li>{{ 'calendar.feed.help.apple' | translate }}</li>
+                <li>{{ 'calendar.feed.help.outlook' | translate }}</li>
+              </ul>
+              <p class="nri-muted">{{ 'calendar.feed.help.googleDelay' | translate }}</p>
+            </div>
+          </div>
+        } @else {
+          <p class="connected-since">
+            <mat-icon aria-hidden="true">event_available</mat-icon>
+            <span>{{ 'calendar.feed.since' | translate: { when: since() ?? '' } }}</span>
+          </p>
+          <p class="nri-muted">{{ 'calendar.feed.hiddenLink' | translate }}</p>
+        }
+        <div class="buttons">
+          <button
+            mat-stroked-button
+            type="button"
+            class="reissue"
+            [disabled]="busy() !== null"
+            (click)="issue(true)"
+          >
+            <mat-icon aria-hidden="true">autorenew</mat-icon>
+            {{ 'calendar.feed.reissue' | translate }}
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            class="disable danger"
+            [disabled]="busy() !== null"
+            (click)="disable()"
+          >
+            <mat-icon aria-hidden="true">link_off</mat-icon>
+            {{ 'calendar.feed.disable' | translate }}
+          </button>
+        </div>
+      } @else {
+        <div class="buttons">
+          <button
+            mat-flat-button
+            type="button"
+            class="enable"
+            [disabled]="busy() !== null"
+            (click)="issue(false)"
+          >
+            <mat-icon aria-hidden="true">event</mat-icon>
+            {{ 'calendar.feed.enable' | translate }}
+          </button>
+        </div>
+      }
+    }
+  }
+
+  <div aria-live="polite">
+    @if (message(); as m) {
+      <p
+        [class.nri-alert]="m.kind === 'error'"
+        [class.nri-notice]="m.kind === 'info'"
+        [attr.role]="m.kind === 'error' ? 'alert' : null"
+      >
+        {{ m.key | translate }}
+      </p>
+    }
+  </div>
+</section>

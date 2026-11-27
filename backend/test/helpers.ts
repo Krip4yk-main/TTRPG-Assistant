@@ -42,6 +42,7 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
 }
 
 const TABLES = [
+  'calendar_feeds',
   'calendar_import_busy',
   'calendar_imports',
   'rsvp_decline_notices',
