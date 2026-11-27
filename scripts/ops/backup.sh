@@ -2,7 +2,8 @@
 # Зашифрований бекап БД: mysqldump | gzip | openssl enc → $BACKUP_DIR/nri-YYYY-MM-DDTHHMMZ.sql.gz.enc
 # Незашифрований дамп не торкається диска: усе йде одним пайпом.
 # Ротація: 30 щоденних у $BACKUP_DIR + 12 місячних у $BACKUP_DIR/monthly (перша копія місяця —
-# зазвичай 1-го числа; повторний запуск копію не дублює). Каталог weekly/ зі старої схеми не чіпаємо й не наповнюємо.
+# зазвичай 1-го числа; повторний запуск копію не дублює). Каталог weekly/ зі старої схеми
+# не чіпаємо й не наповнюємо.
 # Копія поза сервером — rclone (S3: Cloudflare R2 / Backblaze B2): daily/ 30 днів, monthly/ 365 днів.
 # Документація: docs/ops/backups.md. `set -x` тут заборонено — він би показав секрети.
 set -euo pipefail
@@ -44,6 +45,7 @@ mysqldump --defaults-extra-file="$MYSQL_CNF" \
 
 # Швидка перевірка цілісності: файл розшифровується, gzip-потік цілий.
 openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in "$PARTIAL" | gzip -t \
+ \
   || die "integrity check of the new backup failed"
 
 mv -- "$PARTIAL" "$TARGET"
@@ -86,7 +88,8 @@ export RCLONE_CONFIG_OFFSITE_REGION="${BACKUP_S3_REGION:-}"
 export RCLONE_CONFIG_OFFSITE_NO_CHECK_BUCKET=true
 
 REMOTE="offsite:$BACKUP_S3_BUCKET/nri"
-rclone copyto --stats 0 "$TARGET" "$REMOTE/daily/$NAME"   || die "off-site upload failed (local backup is kept)"
+rclone copyto --stats 0 "$TARGET" "$REMOTE/daily/$NAME" \
+  || die "off-site upload failed (local backup is kept)"
 log "off-site copy uploaded: daily/$NAME"
 
 # Місячна копія: лише якщо за цей місяць у monthly/ ще нічого немає (див. monthly_copy_needed).
@@ -94,7 +97,8 @@ log "off-site copy uploaded: daily/$NAME"
 # Код 3 rclone — «каталог не знайдено» (monthly/ ще порожній) — це «копії немає».
 MONTH="$(backup_month "$NAME")"
 remote_rc=0
-remote_list="$(rclone lsf --stats 0 --files-only --include "nri-${MONTH}-*.sql.gz.enc" "$REMOTE/monthly")"   || remote_rc=$?
+remote_list="$(rclone lsf --stats 0 --files-only --include "nri-${MONTH}-*.sql.gz.enc" "$REMOTE/monthly")" \
+  || remote_rc=$?
 if [ "$remote_rc" -eq 3 ]; then
   remote_list=""
   remote_rc=0
@@ -107,14 +111,18 @@ else
     remote_have=yes
   fi
   if monthly_copy_needed "$NAME" "$remote_have"; then
-    rclone copyto --stats 0 "$TARGET" "$REMOTE/monthly/$NAME"       || die "off-site monthly upload failed (local backup is kept)"
+    rclone copyto --stats 0 "$TARGET" "$REMOTE/monthly/$NAME" \
+      || die "off-site monthly upload failed (local backup is kept)"
     log "off-site monthly copy uploaded: monthly/$NAME"
   fi
 fi
 
-rclone delete --stats 0 --min-age "$REMOTE_DAILY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE/daily"   || die "off-site rotation (daily) failed"
-rclone delete --stats 0 --min-age "$REMOTE_MONTHLY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE/monthly"   || die "off-site rotation (monthly) failed"
+rclone delete --stats 0 --min-age "$REMOTE_DAILY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE/daily" \
+  || die "off-site rotation (daily) failed"
+rclone delete --stats 0 --min-age "$REMOTE_MONTHLY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE/monthly" \
+  || die "off-site rotation (monthly) failed"
 # Файли в корені з попередньої схеми (План 13): лише корінь, без підкаталогів.
-rclone delete --stats 0 --max-depth 1 --min-age "$REMOTE_DAILY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE"   || die "off-site rotation (legacy root) failed"
+rclone delete --stats 0 --max-depth 1 --min-age "$REMOTE_DAILY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE" \
+  || die "off-site rotation (legacy root) failed"
 log "off-site rotation done (daily >$REMOTE_DAILY_MAX_AGE, monthly >$REMOTE_MONTHLY_MAX_AGE removed)"
 log "backup finished"
