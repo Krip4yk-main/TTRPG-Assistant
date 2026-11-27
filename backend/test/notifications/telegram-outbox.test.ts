@@ -639,24 +639,33 @@ describe('quiet hours (Task 5)', () => {
     expect(r.silent).toBe(false);
   });
 
-  it('X-Card is always urgent: at 01:00 goes at once (silently), even without startsAt', async () => {
+  it('X-Card is always urgent: at 01:00 goes at once with sound, even without startsAt', async () => {
     const u = await recipient();
     const now = at('2026-12-01T23:00:00Z'); // 01:00 Київ
     expectImmediate(
       await enqueueAt(u, now, 'session.x_card', { gameId: 1, sessionId: 1, gameTitle: 'Гра' }),
       now,
-      true,
     );
     // Ще одна через 5 хв — окремий рядок, теж одразу (без групування й дедуплікації).
     const later = new Date(now.getTime() + 5 * MIN);
     expectImmediate(
       await enqueueAt(u, later, 'session.x_card', { gameId: 1, sessionId: 1, gameTitle: 'Гра' }),
       later,
-      true,
     );
     // Удень — одразу, зі звуком.
     const noon = at('2026-12-02T10:00:00Z');
     expectImmediate(await enqueueAt(u, noon, 'session.x_card', { gameId: 1, sessionId: 1 }), noon);
+  });
+
+  it('session.reminder within 2h in quiet hours is still silent', async () => {
+    const u = await recipient();
+    const now = at('2026-12-01T23:00:00Z');
+    const soon = new Date(now.getTime() + 60 * MIN).toISOString();
+    expectImmediate(
+      await enqueueAt(u, now, 'session.reminder', { gameId: 1, sessionId: 2, startsAt: soon }),
+      now,
+      true,
+    );
   });
 
   it('urgent at 23:10: a session before the quiet end is not held past itself', async () => {

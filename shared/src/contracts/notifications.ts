@@ -56,7 +56,7 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). X-Card (не з подій,
  * `sessions`): `session.x_card` — майстру, коли хтось із гравців підняв X-Card (`sessionId`,
  * `startsAt`, назва гри); анонімно — без `actor` і без жодних даних про того, хто натиснув;
- * термінове (тихі години не затримують). Відгуки про сайт (не з
+ * термінове: тихі години не затримують і звук не вимикають. Відгуки про сайт (не з
  * подій, `moderation`; на dev — звіти тестерів, на prod — відгуки користувачів): `tester.report` — власнику платформи на кожен новий звіт
  * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Текст — `notifications.<type>`.
  */

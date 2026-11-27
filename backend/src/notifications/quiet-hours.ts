@@ -8,6 +8,9 @@ const URGENT_TYPES = new Set(['session.reminder', 'session.rescheduled', 'sessio
 /** Завжди термінові (незалежно від часу сесії): X-Card — сигнал майстру під час гри. */
 const ALWAYS_URGENT_TYPES = new Set(['session.x_card']);
 
+/** Типи, що йдуть завжди й зі звуком навіть у тихі години (X-Card — сигнал безпеки). */
+export const isAlwaysUrgent = (type: string): boolean => ALWAYS_URGENT_TYPES.has(type);
+
 const DEFAULT_ZONE = 'Europe/Kyiv';
 
 function isKnownZone(tz: string): boolean {
@@ -51,7 +54,7 @@ export function quietHoursEnd(now: Date, quiet: QuietHours, zone: string): Date 
  * Термінове: нагадування / перенесення / скасування сесії, що починається (стара `from` або
  * нова `startsAt` дата) не далі ніж за 2 год від `now` (або почалась щойно, ≤ 2 год тому) —
  * чи ще до кінця тихих годин `quietEnd`: відкладене до ранку прийшло б уже після сесії.
- * X-Card (`session.x_card`) — термінова завжди.
+ * X-Card (`session.x_card`) — термінова завжди, і зі звуком навіть у тихі години.
  */
 export function isUrgent(
   type: string,
@@ -59,7 +62,7 @@ export function isUrgent(
   now: Date,
   quietEnd: Date | null = null,
 ): boolean {
-  if (ALWAYS_URGENT_TYPES.has(type)) return true;
+  if (isAlwaysUrgent(type)) return true;
   if (!URGENT_TYPES.has(type)) return false;
   const nowMs = now.getTime();
   const horizon = Math.max(nowMs + URGENT_WITHIN_MS, quietEnd?.getTime() ?? 0);

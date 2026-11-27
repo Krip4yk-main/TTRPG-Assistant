@@ -20,7 +20,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { isUrgent, quietHoursEnd } from './quiet-hours.js';
+import { isAlwaysUrgent, isUrgent, quietHoursEnd } from './quiet-hours.js';
 
 type DbLike = Db | Tx;
 
@@ -92,7 +92,7 @@ export function buttonsFor(
  *
  * Тихі години одержувача (`prefs.quietHours`, пояс `users.timezone`): поставлене в них
  * отримує `next_try_at` = їхній кінець (бот забере зранку); термінове (`isUrgent`: сесія
- * ≤ 2 год або ще до кінця тихих годин) — одразу, але `silent` (без звуку). Поза тихими годинами / вимкнено — одразу, зі звуком.
+ * ≤ 2 год або ще до кінця тихих годин) — одразу, але `silent` (без звуку; X-Card — завжди зі звуком). Поза тихими годинами / вимкнено — одразу, зі звуком.
  */
 export async function enqueueTelegram(
   tx: DbLike,
@@ -181,7 +181,7 @@ export async function enqueueTelegram(
         ),
         timeZone: zoneOf.get(r.userId) ?? null,
         nextTryAt: quietEnd !== null && !urgent ? quietEnd : now,
-        silent: urgent,
+        silent: urgent && !isAlwaysUrgent(r.type),
       },
     ];
   });
