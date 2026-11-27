@@ -10,7 +10,11 @@ import {
   emitNotificationsNew,
 } from '../notifications/notifications.service.js';
 
-/** Чи доступна X-Card на сесіях гри глядачу: увімкнена майстром і глядач — не майстер. */
+/**
+ * Чи доступна X-Card на сесіях гри глядачу: увімкнена майстром і глядач — не майстер.
+ * Передумова: членство глядача (активний учасник) перевіряє виклик — сервіс сесій віддає DTO
+ * лише майстру й учасникам, `raiseXCard` — окремою перевіркою; сама функція членства не знає.
+ */
 export const xCardFor = (
   game: { gmUserId: number; safetyTools: readonly string[] },
   viewerId: number,
