@@ -191,6 +191,11 @@ export class GameDetails {
   protected readonly canComplain = computed(
     () => this.auth.isActive() && !!this.view() && !this.isGm(),
   );
+  /** Копію можна зробити з будь-якої власної гри, крім закритої адміністрацією. */
+  protected readonly canClone = computed(() => {
+    const g = this.game();
+    return this.isGm() && !!g && !g.closedByAdmin;
+  });
   protected readonly canEdit = computed(() => {
     const g = this.game();
     return this.isGm() && !!g && EDITABLE.has(g.status);
@@ -238,7 +243,7 @@ export class GameDetails {
   /** «Створити копію»: нова чернетка майстра → одразу її форма редагування. */
   protected async clone(): Promise<void> {
     const g = this.game();
-    if (!g || this.busy() || !this.canEdit()) return;
+    if (!g || this.busy() || !this.canClone()) return;
     this.busy.set(true);
     this.notice.set(null);
     try {

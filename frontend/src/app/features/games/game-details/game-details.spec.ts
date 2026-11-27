@@ -647,7 +647,7 @@ describe('GameDetails', () => {
     };
     const cloneButton = () => el().querySelector<HTMLButtonElement>('button.clone');
 
-    it('only the GM of an editable game sees «Create a copy»', async () => {
+    it('only the GM sees (finished/cancelled too, not admin-closed) «Create a copy»', async () => {
       await open(me, (r) => r.flush(game));
       http.match('/api/games/7/members').forEach((r) => r.flush([]));
       http.match('/api/games/7/sessions').forEach((r) => r.flush([]));
@@ -657,7 +657,13 @@ describe('GameDetails', () => {
       await settle();
       expect(cloneButton()).toBeNull();
       TestBed.resetTestingModule();
-      await open(me, (r) => r.flush({ ...own, status: 'finished', nextSessionAt: null }));
+      for (const status of ['finished', 'cancelled'] as const) {
+        await open(me, (r) => r.flush({ ...own, status, nextSessionAt: null }));
+        await flushGmExtras();
+        expect(cloneButton()).not.toBeNull();
+        TestBed.resetTestingModule();
+      }
+      await open(me, (r) => r.flush({ ...own, status: 'cancelled', closedByAdmin: true }));
       await flushGmExtras();
       expect(cloneButton()).toBeNull();
       TestBed.resetTestingModule();

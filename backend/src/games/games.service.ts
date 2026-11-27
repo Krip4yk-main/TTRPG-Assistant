@@ -467,7 +467,14 @@ const COPY_SUFFIX = ' (копія)';
  * після `now`. Колонка `starts_at` обов'язкова, а правило розкладу має містити день тижня
  * першої сесії, тож порожньої дати в чернетці бути не може; майстер уточнює дату у формі.
  */
-function copyStartsAt(source: Date, tz: string, now: Date): Date {
+/** «<назва> (копія)» не довше 120 символів; ріжемо по кодових точках (без обірваних сурогатів). */
+export function copyTitle(title: string): string {
+  const chars = Array.from(title);
+  while (chars.length && (chars.join('') + COPY_SUFFIX).length > 120) chars.pop();
+  return `${chars.join('').trimEnd()}${COPY_SUFFIX}`;
+}
+
+export function copyStartsAt(source: Date, tz: string, now: Date): Date {
   const z = toZoned(source, tz);
   let n = dayNumber(z.year, z.month, z.day);
   let at = source;
@@ -483,18 +490,19 @@ function copyStartsAt(source: Date, tz: string, now: Date): Date {
 export async function cloneGame(deps: AppDeps, userId: number, id: number): Promise<GameDto> {
   const { db } = deps;
   const { row: source } = await loadOwned(deps, userId, id);
-  if (source.status === 'finished' || source.status === 'cancelled') {
-    throw new AppError(409, 'GAME_INVALID_TRANSITION');
-  }
+  // Закриту адміністрацією гру копією не воскресити; завершену чи скасовану — можна (джерело не змінюється).
+  if (source.closedByAdmin) throw new AppError(403, 'FORBIDDEN');
   const gm = await loadGm(deps, userId);
   const deadGameIds = await deadGameIdsOf(db, userId);
   if (deadGameIds.length) throw new AppError(409, 'GAME_CREATION_BLOCKED', { deadGameIds });
   const now = new Date();
   const prev = toInput(source, await warningIdsOf(deps, id));
-  const input = gameInputSchema(gm.timezone).parse({
+  // Пояс копії — пояс джерела: дні тижня правила перевірені саме в ньому.
+  const tz = source.timezone;
+  const input = gameInputSchema(tz).parse({
     ...prev,
-    title: `${source.title.slice(0, 120 - COPY_SUFFIX.length).trimEnd()}${COPY_SUFFIX}`,
-    startsAt: copyStartsAt(source.startsAt, gm.timezone, now).toISOString(),
+    title: copyTitle(source.title),
+    startsAt: copyStartsAt(source.startsAt, tz, now).toISOString(),
   });
   assertGmAge(gm, input, now);
   await assertCatalogRefs(deps, input, prev);
@@ -503,7 +511,7 @@ export async function cloneGame(deps: AppDeps, userId: number, id: number): Prom
   const copyId = await db.transaction(async (tx) => {
     const [res] = await tx
       .insert(games)
-      .values({ ...columns(input), gmUserId: userId, timezone: gm.timezone, status: 'draft' })
+      .values({ ...columns(input), gmUserId: userId, timezone: tz, status: 'draft' })
       .$returningId();
     const gameId = res!.id;
     if (input.contentWarningIds.length) {

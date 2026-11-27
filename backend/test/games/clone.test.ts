@@ -1,7 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
-import { gameApplications, gameMembers, gameSessions, games } from '../../src/db/schema/index.js';
+import { toZoned } from '@nri/shared';
+import { copyStartsAt, copyTitle } from '../../src/games/games.service.js';
+import {
+  gameApplications,
+  gameMembers,
+  gameSessions,
+  games,
+  users,
+} from '../../src/db/schema/index.js';
 import { closeDeps, resetDb, testDeps } from '../helpers.js';
 import { harness } from './fixtures.js';
 
@@ -131,13 +139,78 @@ describe('POST /api/games/:id/clone', () => {
     expect(await db.select().from(games)).toHaveLength(2);
   });
 
-  it('finished and cancelled games cannot be cloned (409)', async () => {
+  it('finished and cancelled games can be cloned; the source is unchanged', async () => {
     const gm = await userWithAge(30);
     const a = await createGame(gm.cookie, {}, true);
     await call('post', `/api/games/${a}/cancel`, gm.cookie);
-    const res = await call('post', `/api/games/${a}/clone`, gm.cookie);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('GAME_INVALID_TRANSITION');
+    const b = await createGame(gm.cookie, {}, true);
+    await call('post', `/api/games/${b}/start`, gm.cookie);
+    await call('post', `/api/games/${b}/finish`, gm.cookie);
+    for (const id of [a, b]) {
+      const [before] = await db.select().from(games).where(eq(games.id, id));
+      const res = await call('post', `/api/games/${id}/clone`, gm.cookie);
+      expect(res.status).toBe(201);
+      const [copy] = await db.select().from(games).where(eq(games.id, res.body.id));
+      expect(copy!.status).toBe('draft');
+      expect(copy!.finishedAt).toBeNull();
+      expect(copy!.cancelledAt).toBeNull();
+      const [after] = await db.select().from(games).where(eq(games.id, id));
+      expect(after).toEqual(before);
+    }
+  });
+
+  it('a game closed by the administration cannot be cloned (403), nothing created', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {}, true);
+    await call('post', `/api/games/${id}/cancel`, gm.cookie);
+    await db.update(games).set({ closedByAdmin: true }).where(eq(games.id, id));
+    const res = await call('post', `/api/games/${id}/clone`, gm.cookie);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+    expect(await db.select().from(games)).toHaveLength(1);
+  });
+
+  it('the copy keeps the source timezone even if the GM changed theirs', async () => {
+    const gm = await userWithAge(30);
+    const id = await createGame(gm.cookie, {});
+    await db.update(users).set({ timezone: 'Pacific/Auckland' }).where(eq(users.id, gm.id));
+    const res = await call('post', `/api/games/${id}/clone`, gm.cookie);
+    expect(res.status).toBe(201);
+    const [copy] = await db.select().from(games).where(eq(games.id, res.body.id));
+    expect(copy!.timezone).toBe('Europe/Kyiv');
+    expect(copy!.weekdays).toEqual([0]);
+    expect(toZoned(copy!.startsAt, 'Europe/Kyiv').weekday).toBe(0);
+  });
+
+  it('title cut counts code points (no lone surrogate)', () => {
+    const t = copyTitle('😀'.repeat(119) + 'ab');
+    expect(t.endsWith(' (копія)')).toBe(true);
+    expect(t.length).toBeLessThanOrEqual(120);
+    expect(
+      Array.from(t).every(
+        (c) => c.length === 2 || c.charCodeAt(0) < 0xd800 || c.charCodeAt(0) > 0xdfff,
+      ),
+    ).toBe(true);
+  });
+
+  it('copyStartsAt: weekly far in the past keeps the local slot; DST crossing', () => {
+    const tz = 'Europe/Kyiv';
+    const now = new Date('2026-11-27T10:00:00Z');
+    const winter = copyStartsAt(new Date('2024-01-08T17:00:00Z'), tz, now);
+    const z = toZoned(winter, tz);
+    expect([z.weekday, z.hour, z.minute]).toEqual([0, 19, 0]);
+    expect(winter.getTime()).toBeGreaterThan(now.getTime());
+    expect(winter.getTime() - now.getTime()).toBeLessThanOrEqual(7 * 86_400_000);
+    // Літній слот (UTC+3, 19:00) -> зимовий час із тими ж 19:00 локально.
+    const summer = copyStartsAt(new Date('2026-07-06T16:00:00Z'), tz, now);
+    expect(summer.toISOString()).toBe('2026-11-30T17:00:00.000Z');
+    // Зимовий слот -> після переходу на літній час (29.03.2027): 19:00 локально = 16:00 UTC.
+    const march = copyStartsAt(
+      new Date('2027-03-01T17:00:00Z'),
+      tz,
+      new Date('2027-03-28T00:00:00Z'),
+    );
+    expect(march.toISOString()).toBe('2027-03-29T16:00:00.000Z');
   });
 
   it('creation limits apply: a dead game blocks the clone', async () => {
