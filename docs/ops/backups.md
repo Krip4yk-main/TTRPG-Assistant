@@ -6,8 +6,9 @@
 
 - **Щодня о 03:30 UTC** — дамп БД `nri` (`mysqldump --single-transaction --routines --triggers`) → `gzip` → `openssl enc -aes-256-cbc -pbkdf2` одним пайпом. Незашифрований дамп на диск не пишеться ніколи. Файл `nri-YYYY-MM-DDTHHMMZ.sql.gz.enc` у volume `backups`.
 - Якщо контейнер стартував після 03:30, а сьогоднішнього бекапу ще немає, бекап робиться одразу. Якщо бекап не вдався, наступна спроба буде наступного дня (у лозі `ERROR`).
-- **Локальна ротація:** 7 останніх щоденних у корені volume + 4 щотижневих (недільних) у `weekly/`.
-- **Копія поза сервером:** Cloudflare R2 або Backblaze B2 (S3-API) через `rclone`, префікс `<bucket>/nri/`. Віддалено файли старші за 30 днів видаляються. Якщо `BACKUP_S3_*` не задано, бекап лишається тільки локально, а в лозі буде `WARN: off-site copy disabled`. Якщо задано лише частину змінних, це `ERROR` і ненульовий код (локальний бекап при цьому зберігається).
+- **Локальна ротація:** 30 останніх щоденних у корені volume + 12 місячних у `monthly/` (копія бекапу 1-го числа або, якщо за поточний місяць у `monthly/` ще нічого немає, першого наявного). Стара папка `weekly/` зі схеми 7+4 скриптом більше не наповнюється й не чиститься; якщо вона є, її можна видалити вручну.
+- **Копія поза сервером:** Cloudflare R2 або Backblaze B2 (S3-API) через `rclone`, префікс `<bucket>/nri/`: `daily/` (файли старші за 30 днів видаляються) і `monthly/` (та сама логіка «перша копія місяця», видаляються старші за 365 днів). Старі файли в корені `nri/` (План 13) видаляються за правилом 30 днів. Якщо `BACKUP_S3_*` не задано, бекап лишається тільки локально, а в лозі буде `WARN: off-site copy disabled`. Якщо задано лише частину змінних, це `ERROR` і ненульовий код (локальний бекап при цьому зберігається).
+- **Обсяг:** дамп ≈3,8 МБ, після gzip ≈0,4 МБ. Повний набір (30 щоденних + 12 місячних) ≈17 МБ локально й стільки ж віддалено, тобто безкоштовних 10 ГБ вистачає з величезним запасом.
 - **Щонеділі о 04:30 UTC** — перевірка відновлення (див. нижче).
 - Без `BACKUP_PASSPHRASE` сервіс не робить нічого: помилка в лозі й ненульовий код (fail closed).
 
@@ -58,12 +59,12 @@ docker compose -f docker-compose.prod.yml run --rm backup backup
 # перевірка відновлення зараз
 docker compose -f docker-compose.prod.yml run --rm backup restore-check
 # список локальних бекапів
-docker compose -f docker-compose.prod.yml run --rm --entrypoint ls backup -l /backups /backups/weekly
+docker compose -f docker-compose.prod.yml run --rm --entrypoint ls backup -l /backups /backups/monthly
 ```
 
 ## Перевірка відновлення
 
-`restore-check` бере останній локальний бекап, розшифровує його й розгортає в тимчасову БД `nri_restore_check` на тому ж MySQL. Потім порівнює кількість рядків у `users`, `games`, `game_members`, `game_sessions`, `notifications` з живою БД (допуск ±1 %, але не менше ±5 рядків), друкує `OK`/`FAIL` по кожній таблиці й підсумок `restore-check OK|FAIL`. Тимчасова БД видаляється на виході за будь-якого результату. Якщо результат `FAIL`, код виходу ненульовий.
+`restore-check` бере найсвіжіший щоденний бекап (з кореня volume, `monthly/` не чіпає), розшифровує його й розгортає в тимчасову БД `nri_restore_check` на тому ж MySQL. Потім порівнює кількість рядків у `users`, `games`, `game_members`, `game_sessions`, `notifications` з живою БД (допуск ±1 %, але не менше ±5 рядків), друкує `OK`/`FAIL` по кожній таблиці й підсумок `restore-check OK|FAIL`. Тимчасова БД видаляється на виході за будь-якого результату. Якщо результат `FAIL`, код виходу ненульовий.
 
 ## Відновлення вручну
 
@@ -76,7 +77,7 @@ docker compose -f docker-compose.prod.yml stop backend bot
 З локального volume. Розшифрований потік іде пайпом прямо в `mysql` і на диск не потрапляє:
 
 ```sh
-F=nri-2026-01-01T0330Z.sql.gz.enc   # потрібний файл (або weekly/<файл>)
+F=nri-2026-01-01T0330Z.sql.gz.enc   # потрібний файл (або monthly/<файл>)
 docker compose -f docker-compose.prod.yml run --rm -T --entrypoint sh backup -c \
   "openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in /backups/$F | gzip -dc" \
   | docker compose -f docker-compose.prod.yml exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot nri'

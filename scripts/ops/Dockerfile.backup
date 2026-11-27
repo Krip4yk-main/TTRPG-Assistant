@@ -11,7 +11,7 @@ COPY scripts/ops/backup-lib.sh scripts/ops/backup.sh scripts/ops/restore-check.s
 # Знімаємо можливі CRLF (checkout на Windows) і робимо скрипти виконуваними.
 RUN sed -i 's/\r$//' /opt/backup/*.sh \
   && chmod 0755 /opt/backup/*.sh \
-  && mkdir -p /backups/weekly \
+  && mkdir -p /backups/monthly \
   && chown -R mysql:mysql /backups \
   && chmod 0700 /backups
 USER mysql

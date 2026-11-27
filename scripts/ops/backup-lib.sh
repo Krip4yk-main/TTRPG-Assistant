@@ -49,3 +49,37 @@ cleanup_work_dir() {
 latest_backup() {
   find "$BACKUP_DIR" -maxdepth 1 -type f -name 'nri-*.sql.gz.enc' | sort | tail -n 1
 }
+
+# Ім'я бекапу nri-YYYY-MM-DDTHHMMZ.sql.gz.enc → місяць (YYYY-MM) і день (DD).
+backup_month() { local n="${1#nri-}"; printf '%s' "${n:0:7}"; }
+backup_day() { local n="${1#nri-}"; printf '%s' "${n:8:2}"; }
+
+# Чи потрібна місячна копія: бекап 1-го числа АБО за цей місяць копії ще немає.
+# $1 — ім'я файлу, $2 — чи існує вже копія за місяць цього файлу (yes|no).
+monthly_copy_needed() {
+  [ "$(backup_day "$1")" = "01" ] || [ "$2" = "no" ]
+}
+
+# Локальна ротація: лишаємо найновіші N файлів у каталозі (імена сортуються за датою).
+rotate_dir() {
+  local dir="$1" keep="$2" old
+  find "$dir" -maxdepth 1 -type f -name 'nri-*.sql.gz.enc' | sort -r | tail -n +"$((keep + 1))" \
+    | while IFS= read -r old; do
+      rm -f -- "$old"
+      log "rotated: ${old#"$BACKUP_DIR"/}"
+    done
+}
+
+# Локальна місячна копія у $BACKUP_DIR/monthly. $1 — ім'я файлу (він уже в $BACKUP_DIR).
+local_monthly_copy() {
+  local name="$1" month have=no
+  month="$(backup_month "$name")"
+  mkdir -p "$BACKUP_DIR/monthly"
+  if find "$BACKUP_DIR/monthly" -maxdepth 1 -type f -name "nri-${month}-*.sql.gz.enc" | grep -q .; then
+    have=yes
+  fi
+  if monthly_copy_needed "$name" "$have"; then
+    cp -p -- "$BACKUP_DIR/$name" "$BACKUP_DIR/monthly/$name"
+    log "monthly copy: monthly/$name"
+  fi
+}
