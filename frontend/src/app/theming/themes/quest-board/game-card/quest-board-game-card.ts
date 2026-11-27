@@ -133,9 +133,9 @@ export class QuestBoardGameCard implements GameCardSlot {
 
   private navigate(): void {
     this.timer = null;
+    this.gameOpened.fromCard(this.game().id);
     // Перехід скасовано (guard) чи впав — оголошення повертається на місце, а не лишається
     // «відірваним».
-    this.gameOpened.fromCard(this.game().id);
     this.router.navigateByUrl(this.gameUrl()).then(
       (ok) => {
         if (!ok) this.reset();

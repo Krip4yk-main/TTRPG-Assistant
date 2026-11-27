@@ -238,6 +238,15 @@ export class ThemeService {
     }
   }
 
+  /**
+   * Чи програє `playEffect(name, …)` щось зараз: у чинного дизайну є ефект для моменту, його
+   * налаштування ввімкнене й немає `prefers-reduced-motion`. Реактивне щодо дизайну й
+   * налаштувань (не щодо медіазапиту).
+   */
+  effectEnabled(name: ThemeEffectName): boolean {
+    return this.activeEffect(name) !== null;
+  }
+
   /** Ефект чинного дизайну, якщо він увімкнений (налаштування вигляду, зменшений рух). */
   private activeEffect(name: ThemeEffectName): ThemeEffectDef | null {
     const def = this.registry[this.current()].effects?.[name];

@@ -1131,6 +1131,21 @@ describe('GameDetails', () => {
       expect(effects.play).not.toHaveBeenCalled();
     });
 
+    it('a failed first load clears the mark: a manual retry does not play', async () => {
+      await open(
+        null,
+        (r) => r.flush(null, { status: 500, statusText: 'Server Error' }),
+        '/games/7',
+        7,
+      );
+      el().querySelector<HTMLButtonElement>('.load-error button')!.click();
+      await settle();
+      expectGame().flush(game);
+      await settle();
+      expect(el().querySelector('article.game')).not.toBeNull();
+      expect(effects.play).not.toHaveBeenCalled();
+    });
+
     it('a silent refresh after the first show does not replay', async () => {
       await open(me, (r) => r.flush(game), '/games/7', 7);
       expect(effects.play).toHaveBeenCalledTimes(1);

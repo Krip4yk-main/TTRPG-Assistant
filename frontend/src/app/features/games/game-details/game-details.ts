@@ -827,6 +827,10 @@ export class GameDetails {
   /** `silent` — оновити дані без стану «завантаження» (після дії на сторінці). */
   private async load(id: number, silent = false): Promise<boolean> {
     const seq = ++this.seq;
+    // Позначку картки знімає перше ж завантаження, хоч би чим воно скінчилось: «Повторити»
+    // після збою вже не перехід з картки.
+    const fromCard = this.openedFromCard === id;
+    this.openedFromCard = null;
     if (!silent) {
       this.state.set('loading');
       this.view.set(null);
@@ -842,7 +846,7 @@ export class GameDetails {
       this.view.set(g);
       this.state.set('ready');
       this.updateSeo(g);
-      this.playGameOpened(id);
+      if (fromCard) this.playGameOpened();
       return true;
     } catch (err) {
       if (seq !== this.seq) return true;
@@ -853,11 +857,8 @@ export class GameDetails {
     }
   }
 
-  /** Перший показ гри, відкритої з картки, — фірмова анімація (один раз, без затримки сторінки). */
-  private playGameOpened(id: number): void {
-    const fromCard = this.openedFromCard;
-    this.openedFromCard = null;
-    if (fromCard !== id) return;
+  /** Перший показ гри, відкритої з картки, — фірмова анімація (без затримки сторінки). */
+  private playGameOpened(): void {
     afterNextRender(
       () => {
         const target = this.host.nativeElement.querySelector<HTMLElement>(

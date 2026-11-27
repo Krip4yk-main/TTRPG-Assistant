@@ -1018,6 +1018,20 @@ describe('ThemeService', () => {
       });
     }
 
+    it('effectEnabled: only for a registered moment with the pref on and no reduced motion', async () => {
+      await start({ acceptedNotice: signatureEffect(async () => async () => {}) });
+      expect(service.effectEnabled('acceptedNotice')).toBe(true);
+      expect(service.effectEnabled('gameOpened')).toBe(false);
+      auth.setMe({ ...user, uiPrefs: { tearAnimation: true, sendAnimation: false } });
+      expect(service.effectEnabled('acceptedNotice')).toBe(false);
+      auth.setMe(user);
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((q: string) => ({ matches: q === '(prefers-reduced-motion: reduce)' })),
+      );
+      expect(service.effectEnabled('acceptedNotice')).toBe(false);
+    });
+
     it('a design with an effect for another moment is a no-op for this one', async () => {
       const effect = vi.fn<ThemeEffect>(async () => {});
       const load = vi.fn(async () => effect);

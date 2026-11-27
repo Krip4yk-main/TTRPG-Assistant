@@ -381,6 +381,7 @@ describe('NotificationBell', () => {
 
   describe('signature moment acceptedNotice', () => {
     let play: ReturnType<typeof vi.fn>;
+    let enabled: ReturnType<typeof vi.fn>;
     const accepted = (id: number, extra: Partial<NotificationDto> = {}) =>
       notification(id, {
         type: 'application.approved',
@@ -396,9 +397,14 @@ describe('NotificationBell', () => {
 
     beforeEach(() => {
       localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY);
-      play = vi
-        .spyOn(TestBed.inject(ThemeService), 'playEffect')
-        .mockResolvedValue() as unknown as ReturnType<typeof vi.fn>;
+      const themes = TestBed.inject(ThemeService);
+      play = vi.spyOn(themes, 'playEffect').mockResolvedValue() as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      // Чинний дизайн анімує момент (тест нижче — коли ні).
+      enabled = vi.spyOn(themes, 'effectEnabled').mockReturnValue(true) as unknown as ReturnType<
+        typeof vi.fn
+      >;
     });
     afterEach(() => localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY));
 
@@ -437,6 +443,20 @@ describe('NotificationBell', () => {
         notification(1, { type: 'application.rejected', category: 'applications' }),
       ]);
       expect(play).not.toHaveBeenCalled();
+    });
+
+    it('design without an enabled effect: not claimed, plays later under one that animates', async () => {
+      enabled.mockReturnValue(false);
+      await start(1);
+      await open([accepted(2)]);
+      expect(enabled).toHaveBeenCalledWith('acceptedNotice');
+      expect(play).not.toHaveBeenCalled();
+      expect(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)).toBeNull();
+
+      enabled.mockReturnValue(true);
+      await reopen([accepted(2)]);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(play.mock.calls[0]![0]).toBe('acceptedNotice');
     });
 
     it('already played before a reload (remembered) — no effect', async () => {

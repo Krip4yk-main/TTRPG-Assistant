@@ -137,8 +137,11 @@ export class NotificationBell {
     });
     // Фірмова анімація `acceptedNotice`: уперше показане непрочитане «вас прийнято» (при
     // відкритті панелі чи щойно підмішане згори) — один раз на сповіщення, на найновішому.
+    // Поки чинний дизайн його не анімує (немає ефекту, вимкнено, зменшений рух), сповіщення
+    // не вважається зіграним — програється пізніше під дизайном, що анімує.
     effect(() => {
       if (!this.open() || !this.store.loaded()) return;
+      if (!this.themes.effectEnabled('acceptedNotice')) return;
       const items = this.store.items();
       untracked(() => {
         const [fresh] = this.acceptedNotice.claim(items);
