@@ -1,4 +1,6 @@
+import type { Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { TranslateService } from '@ngx-translate/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
@@ -130,10 +132,11 @@ describe('ThemeService', () => {
   let auth: AuthStore;
   let meChanged: Subject<unknown>;
 
-  const setup = (reg = registry()) => {
+  const setup = (reg = registry(), extra: Provider[] = []) => {
     meChanged = new Subject();
     TestBed.configureTestingModule({
       providers: [
+        ...extra,
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: THEME_REGISTRY, useValue: reg },
@@ -814,8 +817,12 @@ describe('ThemeService', () => {
       };
       return { reg, load };
     };
-    const start = async (reg: Record<ThemeId, ThemeDefinition>, me: MeDto = user) => {
-      setup(reg);
+    const start = async (
+      reg: Record<ThemeId, ThemeDefinition>,
+      me: MeDto = user,
+      extra: Provider[] = [],
+    ) => {
+      setup(reg, extra);
       bootFromCache('night-city', 'theme-night-city.css?v=1');
       auth.setMe(me);
       await service.init();
@@ -859,6 +866,30 @@ describe('ThemeService', () => {
       await service.playEffect('applicationSent', source());
       expect(load).toHaveBeenCalledTimes(1);
       expect(effect).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the effect a translator for its own captions (uk.json)', async () => {
+      const texts: string[] = [];
+      const effect = vi.fn<ThemeEffect>(async (_el, _signal, text) => {
+        texts.push(text('theme.effects.x'), text('missing.key'));
+      });
+      const { reg } = withEffect(effect);
+      const translate = {
+        instant: (key: string) => (key === 'theme.effects.x' ? 'Заявку подано' : key),
+      };
+      await start(reg, user, [{ provide: TranslateService, useValue: translate }]);
+      await service.playEffect('applicationSent', source());
+      expect(texts).toEqual(['Заявку подано', 'missing.key']);
+    });
+
+    it('without translations the effect gets the key itself', async () => {
+      let caption = '';
+      const { reg } = withEffect(async (_el, _signal, text) => {
+        caption = text('theme.effects.x');
+      });
+      await start(reg);
+      await service.playEffect('applicationSent', source());
+      expect(caption).toBe('theme.effects.x');
     });
 
     it('a design without the effect resolves at once', async () => {

@@ -50,7 +50,7 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
   it('builds a decorative overlay, hides the source, resolves, then removes the overlay', async () => {
     vi.useFakeTimers();
     Element.prototype.animate = fakeAnimate(true).animate;
-    await sendInEnvelope(source, new AbortController().signal);
+    await sendInEnvelope(source, new AbortController().signal, String);
     const overlay = document.querySelector('.mp-send')!;
     expect(overlay.getAttribute('aria-hidden')).toBe('true');
     expect(overlay.querySelectorAll('.mp-send-panel')).toHaveLength(3);
@@ -76,7 +76,7 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
     source.cloneNode = () => {
       throw new Error('boom');
     };
-    await sendInEnvelope(source, new AbortController().signal);
+    await sendInEnvelope(source, new AbortController().signal, String);
     expect(document.querySelector('.mp-send')).toBeNull();
     expect(source.style.visibility).toBe('visible');
   });
@@ -85,7 +85,7 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const abort = new AbortController();
-    const done = sendInEnvelope(source, abort.signal);
+    const done = sendInEnvelope(source, abort.signal, String);
     expect(document.querySelector('.mp-send')).not.toBeNull();
     abort.abort();
     await done;
@@ -95,13 +95,13 @@ describe('sendInEnvelope («Магіпанк»: конверт заявки)', (
 
   it('without Web Animations (or a zero-sized source) does nothing', async () => {
     (Element.prototype as { animate?: unknown }).animate = undefined;
-    await sendInEnvelope(source, new AbortController().signal);
+    await sendInEnvelope(source, new AbortController().signal, String);
     expect(document.querySelector('.mp-send')).toBeNull();
     expect(source.style.visibility).toBe('');
 
     Element.prototype.animate = fakeAnimate(true).animate;
     source.getBoundingClientRect = () => ({ width: 0, height: 0 }) as DOMRect;
-    await sendInEnvelope(source, new AbortController().signal);
+    await sendInEnvelope(source, new AbortController().signal, String);
     expect(document.querySelector('.mp-send')).toBeNull();
   });
 });

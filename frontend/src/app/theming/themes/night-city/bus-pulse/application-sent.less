@@ -1,0 +1,92 @@
+// «Нічне місто»: вигляд ефекту «Імпульс по шині» (рух — bus-pulse/application-sent.ts, Web
+// Animations API; оверлей і його розміщення — theming/effect-stage.ts). Шина й затискачі — як
+// sc-d1 / sc-d2 карток (night-city.less), діоди — окремі елементи (їх анімує ефект). Імпульс —
+// рожева комета; рамка «готово» — лаймова лінія зі світінням по краю діалогу; табличка статусу —
+// лаймова плашка на склі. Без текстур — лише градієнти.
+
+.nc-send-bus {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 12px;
+}
+
+.nc-send-rail {
+  position: absolute;
+  inset: 0 calc(-1 * var(--sc-rail-reach, 14px));
+  background: linear-gradient(#4a4f5c, #2a2d36 45%, #181a20);
+  box-shadow:
+    0 5px 10px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.nc-send-clamp {
+  position: absolute;
+  top: -5px;
+  width: 26px;
+  height: 22px;
+  margin-left: -13px;
+  border-radius: 4px;
+  background: linear-gradient(#5a5f6c, #2a2d35);
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.nc-send-diode {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #3a3e4c;
+}
+
+// Комета: яскрава голова праворуч, хвіст ліворуч.
+.nc-send-pulse {
+  position: absolute;
+  top: 3px;
+  left: -72px;
+  width: 72px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255, 61, 139, 0.75) 60%, #ffd3e5);
+  box-shadow:
+    0 0 10px #ff3d8b,
+    0 0 22px rgba(255, 61, 139, 0.6);
+  transform-origin: 100% 50%;
+}
+
+.nc-send-frame {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #9dff4d;
+  box-shadow:
+    0 0 14px rgba(157, 255, 77, 0.45),
+    inset 0 0 14px rgba(157, 255, 77, 0.18);
+}
+
+.nc-send-status {
+  position: absolute;
+  bottom: 18px;
+  left: 20px;
+  max-width: calc(100% - 40px);
+  padding: 6px 12px;
+  border: 1px solid rgba(157, 255, 77, 0.55);
+  border-radius: 6px;
+  background: #1d2029;
+  box-shadow: 0 0 12px rgba(157, 255, 77, 0.25);
+  font-family: var(--sc-font-display);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #e2ffc9;
+
+  &::before {
+    content: '●';
+    margin-right: 0.5em;
+    color: #9dff4d;
+    text-shadow: 0 0 6px #9dff4d;
+  }
+}

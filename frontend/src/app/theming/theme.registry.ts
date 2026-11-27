@@ -8,9 +8,14 @@ import type { ThemeSlots } from './slots';
  * `source` — елемент, з якого ефект починається (його можна сховати: після ефекту викликач
  * його прибирає). Проміс завершується, коли ефект скінчився і викликач може йти далі (хвіст
  * ефекту — напр. пил, що осідає, — може догорати й після). `signal` спрацьовує, якщо
- * викликач більше не чекає (тайм-аут): ефект має одразу прибрати все своє.
+ * викликач більше не чекає (тайм-аут): ефект має одразу прибрати все своє. `text` — переклад
+ * ключа `uk.json` (написи самого ефекту, напр. «Заявку подано» на вивісці).
  */
-export type ThemeEffect = (source: HTMLElement, signal: AbortSignal) => Promise<void>;
+export type ThemeEffect = (
+  source: HTMLElement,
+  signal: AbortSignal,
+  text: (key: string) => string,
+) => Promise<void>;
 
 /**
  * Моменти, на які дизайн може відповісти фірмовою анімацією (кожен дизайн — однією):
@@ -142,9 +147,19 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   // Родина сцени (themes/scene): окремі дизайни з одним лінивим чанком слотів (той самий
   // import — вантажиться один раз) і власним бандлом стилів кожен. Кібер-дизайни — текст
   // світлий на темному склі.
-  'neon-signs': theme('neon-signs', 'dark', '700 1em "M PLUS Rounded 1c"', loadSceneSlots),
+  // Фірмова анімація «заявку подано»: вивіска запалюється по літерах.
+  'neon-signs': theme('neon-signs', 'dark', '700 1em "M PLUS Rounded 1c"', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/neon-signs/sign/application-sent').then((m) => m.lightNeonSign),
+    ),
+  }),
   'holo-market': theme('holo-market', 'dark', '700 1em Jura', loadSceneSlots),
-  'night-city': theme('night-city', 'dark', '500 1em Unbounded', loadSceneSlots),
+  // Фірмова анімація «заявку подано»: рожевий імпульс біжить силовою шиною.
+  'night-city': theme('night-city', 'dark', '500 1em Unbounded', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/night-city/bus-pulse/application-sent').then((m) => m.pulseAlongBus),
+    ),
+  }),
   // Інші дизайни сцени (План 10): той самий чанк слотів, свій бандл стилів.
   dungeon: theme('dungeon', 'dark', '400 1em "Ruslan Display"', loadSceneSlots),
   'gothic-gloom': theme('gothic-gloom', 'dark', '600 1em "Cormorant SC"', loadSceneSlots),
@@ -155,7 +170,12 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
       import('./themes/magicpunk/envelope/application-sent').then((m) => m.sendInEnvelope),
     ),
   }),
-  'brass-steam': theme('brass-steam', 'dark', '900 1em "Playfair Display SC"', loadSceneSlots),
+  // Фірмова анімація «заявку подано»: телеграфна стрічка, штамп і манометр.
+  'brass-steam': theme('brass-steam', 'dark', '900 1em "Playfair Display SC"', loadSceneSlots, [], {
+    applicationSent: signatureEffect(() =>
+      import('./themes/brass-steam/telegraph/application-sent').then((m) => m.printTelegraphTape),
+    ),
+  }),
   // «Сонячний сад» — світлий дизайн сцени: світла сторінка, поля й оверлеї Material.
   'solar-garden': theme('solar-garden', 'light', '400 1em Alice', loadSceneSlots),
   // «Мальоване місто» — темний дизайн сцени (світла лише смуга верхнього міста в заголовку).

@@ -150,11 +150,14 @@ describe('ThemePicker («Вигляд»)', () => {
     expect(sw.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('у «Нічного міста» власних налаштувань немає — лише картки', async () => {
+  it('у «Нічного міста» з власних налаштувань — лише «Фірмові анімації дизайну»', async () => {
     const fixture = await render(fakeThemes(['quest-board', 'night-city'], 'night-city'));
     const el: HTMLElement = fixture.nativeElement;
     expect(optionButtons(el)).toHaveLength(2);
-    expect(tearSwitch(el)).toBeNull();
+    expect(el.textContent).not.toContain(uk.account.theme.tearAnimation);
+    expect(
+      [...el.querySelectorAll('mat-slide-toggle')].map((t) => t.getAttribute('data-option')),
+    ).toEqual(['sendAnimation']);
   });
 
   it('чотири дизайни: картки з мініатюрою й назвою, чинний позначений', async () => {

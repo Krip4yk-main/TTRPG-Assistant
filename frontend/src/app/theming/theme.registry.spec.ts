@@ -28,4 +28,18 @@ describe('THEMES: фірмові анімації', () => {
     expect(def?.pref).toBe('sendAnimation');
     await expect(def!.load()).resolves.toBeTypeOf('function');
   });
+
+  it.each([
+    ['neon-signs', 'lightNeonSign'],
+    ['night-city', 'pulseAlongBus'],
+    ['brass-steam', 'printTelegraphTape'],
+  ] as const)('%s — лише «заявку подано»: %s (лінивий чанк)', async (id, effect) => {
+    const effects = THEMES[id].effects ?? {};
+    expect(Object.keys(effects)).toEqual(['applicationSent']);
+    expect(effects.applicationSent?.pref).toBe('sendAnimation');
+    expect(THEMES[id].options).toContain('sendAnimation');
+    const loaded = await effects.applicationSent!.load();
+    expect(loaded).toBeTypeOf('function');
+    expect(loaded.name).toBe(effect);
+  });
 });

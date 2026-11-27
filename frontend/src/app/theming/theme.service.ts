@@ -2,6 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { TranslateService } from '@ngx-translate/core';
 import {
   DEFAULT_THEME,
   DEFAULT_UI_PREFS,
@@ -93,6 +94,8 @@ export class ThemeService {
   private readonly auth = inject(AuthStore);
   private readonly http = inject(HttpClient);
   private readonly doc = inject(DOCUMENT);
+  /** Переклади написів ефектів (у тестах без перекладів — сам ключ). */
+  private readonly translate = inject(TranslateService, { optional: true });
 
   private readonly current = signal<ThemeId>(DEFAULT_THEME);
   private readonly guestChoice = signal<GuestThemeId>(readGuestTheme());
@@ -229,7 +232,7 @@ export class ThemeService {
       onStart?.();
       const abort = new AbortController();
       const done = await withTimeout(
-        effect(source, abort.signal).then(() => true),
+        effect(source, abort.signal, (key) => this.effectText(key)).then(() => true),
         EFFECT_TIMEOUT_MS,
       );
       if (!done) abort.abort();
@@ -245,6 +248,11 @@ export class ThemeService {
    */
   effectEnabled(name: ThemeEffectName): boolean {
     return this.activeEffect(name) !== null;
+  }
+
+  private effectText(key: string): string {
+    const text: unknown = this.translate?.instant(key);
+    return typeof text === 'string' ? text : key;
   }
 
   /** Ефект чинного дизайну, якщо він увімкнений (налаштування вигляду, зменшений рух). */

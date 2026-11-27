@@ -1,0 +1,152 @@
+// «Латунь і пара»: вигляд ефекту «Телеграфна стрічка» (рух — telegraph/application-sent.ts, Web
+// Animations API; оверлей і його розміщення — theming/effect-stage.ts). На діалозі: латунна
+// щілина телеграфа вгорі праворуч, з неї — сепієва стрічка з текстом PT Mono (вертикально);
+// штамп «ВІДПРАВЛЕНО» — червоне чорнило з подвійною рамкою на сепієвому клаптику бланка;
+// манометр внизу праворуч — латунний обідок і циферблат з червоним сектором (як `.pips`
+// карток); пара — м'які білі клуби. Без текстур — лише градієнти (жодних швів).
+// Змінна @bs-brass-v — з brass-steam.less (цей файл імпортується в його кінці).
+
+.bs-send-brass {
+  position: absolute;
+  inset: 0;
+}
+
+.bs-send-slot {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  z-index: 2;
+  width: 88px;
+  height: 14px;
+  border-radius: 3px;
+  background: @bs-brass-v;
+  box-shadow:
+    0 2px 4px rgba(4, 12, 28, 0.6),
+    inset 0 0 0 1px #5a4013;
+
+  // Щілина.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    left: 10px;
+    height: 2px;
+    border-radius: 1px;
+    background: #2a1b0a;
+  }
+}
+
+// Стрічка виходить зі щілини: обрізано лише згори (падіння відірваної стрічки видно).
+.bs-send-well {
+  position: absolute;
+  top: 20px;
+  right: 45px;
+  z-index: 1;
+  width: 34px;
+  height: calc(100% - 40px);
+  clip-path: inset(0 -60px -200px -60px);
+}
+
+.bs-send-tape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-height: 100%;
+  padding: 10px 6px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #efe2c2, #fbf4e1 30%, #f6ebd0 75%, #e5cfa2);
+  box-shadow: 0 3px 6px rgba(4, 12, 28, 0.45);
+  font-family: var(--sc-font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 22px;
+  letter-spacing: 0.06em;
+  color: #24170c;
+  text-transform: uppercase;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+}
+
+.bs-send-stamp {
+  position: absolute;
+  top: 52%;
+  left: 46%;
+  z-index: 3;
+  padding: 6px 12px;
+  border: 3px double #8e2a18;
+  border-radius: 4px;
+  background: rgba(246, 235, 208, 0.92);
+  box-shadow: 0 6px 14px rgba(4, 12, 28, 0.5);
+  font-family: var(--sc-font-display);
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #8e2a18;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bs-send-gauge {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #f7eed6 0 23px,
+    #6b4f1c 23px 24px,
+    #c9a04f 24px 26px,
+    #4c3711 26px 28px
+  );
+  box-shadow: 0 3px 8px rgba(4, 12, 28, 0.55);
+
+  // Червоний сектор шкали (дуга біля краю циферблата).
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: conic-gradient(from 45deg, rgba(142, 42, 24, 0.85) 0 60deg, transparent 0);
+    mask-image: radial-gradient(circle, transparent 0 13px, #000 13.5px);
+  }
+
+  // Вісь стрілки.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    border-radius: 50%;
+    background: #3b2a0d;
+  }
+}
+
+.bs-send-needle {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #8e2a18;
+  transform-origin: 50% 100%;
+}
+
+.bs-send-steam {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}

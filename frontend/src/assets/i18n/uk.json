@@ -101,6 +101,18 @@
       "brass-steam": "Латунь і пара",
       "solar-garden": "Сонячний сад",
       "painted-city": "Мальоване місто"
+    },
+    "effects": {
+      "neonSigns": {
+        "sign": "Заявку подано"
+      },
+      "nightCity": {
+        "status": "Заявку передано"
+      },
+      "brassSteam": {
+        "tape": "Заявку подано STOP",
+        "stamp": "Відправлено"
+      }
     }
   },
   "scene": {

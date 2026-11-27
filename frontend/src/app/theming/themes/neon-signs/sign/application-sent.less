@@ -1,0 +1,94 @@
+// «Неонові вивіски»: вигляд ефекту «Вивіска запалюється» (рух — sign/application-sent.ts, Web
+// Animations API; оверлей і його розміщення — theming/effect-stage.ts). Вивіска — над місцем
+// діалогу, по центру: пляма рожевого світла на стіні, дві стійки-дроти вгору, холодні скляні
+// літери (контур без світла), ціанова трубка внизу, відблиск на мокрому асфальті й зелена
+// галочка. Без текстур і зображень — лише градієнти (жодних швів).
+
+.ns-send-sign {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-family: var(--sc-font-display);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  transform: translate(-50%, -62%);
+}
+
+// Світло вивіски на стіні.
+.ns-send-glow {
+  position: absolute;
+  inset: -40% -20% -10%;
+  background: radial-gradient(
+    ellipse 50% 45% at 50% 45%,
+    rgba(255, 63, 164, 0.3),
+    rgba(255, 63, 164, 0.08) 60%,
+    transparent 75%
+  );
+  pointer-events: none;
+}
+
+.ns-send-wire {
+  position: absolute;
+  bottom: 100%;
+  width: 2px;
+  height: 100vh;
+  background: linear-gradient(180deg, transparent, rgba(214, 207, 227, 0.32) 85%);
+}
+
+.ns-send-wire-l {
+  left: 22%;
+}
+
+.ns-send-wire-r {
+  right: 22%;
+}
+
+.ns-send-lines {
+  position: relative;
+}
+
+.ns-send-line {
+  display: block;
+  white-space: nowrap;
+}
+
+// Холодна трубка: прозоре скло з сірим контуром.
+.ns-send-letter {
+  color: rgba(255, 227, 243, 0.06);
+  -webkit-text-stroke: 1px rgba(171, 161, 192, 0.5);
+}
+
+.ns-send-tube {
+  position: relative;
+  width: 78%;
+  height: 4px;
+  margin: 0.32em auto 0;
+  border-radius: 2px;
+  background: #d6f9ff;
+}
+
+// Мокрий асфальт: дзеркальна розмита копія напису, що згасає донизу.
+.ns-send-reflection {
+  position: relative;
+  margin-top: 0.3em;
+  color: #ff3fa4;
+  filter: blur(3px);
+  transform: scaleY(-1);
+  mask-image: linear-gradient(0deg, #000, transparent 70%);
+  pointer-events: none;
+}
+
+.ns-send-check {
+  position: absolute;
+  right: 4%;
+  bottom: 38%;
+  font-family: var(--sc-font-body, sans-serif);
+  font-size: 0.5em;
+  color: #ebffdf;
+  text-shadow:
+    0 0 6px #7dff5c,
+    0 0 14px #7dff5c;
+}
