@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { Pool } from 'mysql2/promise';
 import { loadEnv } from '../src/config/env.js';
 import type { AppDeps } from '../src/app.js';
 import { createDb } from '../src/db/client.js';
@@ -36,9 +37,31 @@ export async function testDeps(extraEnv: Record<string, string> = {}): Promise<A
     ...extraEnv,
   });
   const { db, pool } = createDb(dbUrl);
+  syncDbClock(pool);
   pools.set(db, pool);
   const redis = createRedis(redisUrl);
   return { env, db, redis };
+}
+
+/**
+ * Час MySQL = час JS у тестах. `CURRENT_TIMESTAMP`/`NOW()` у SQL і дефолтах колонок бачать
+ * сесійний `TIMESTAMP`, тож щоразу, коли пул видає з'єднання (запит, `execute`, транзакція,
+ * зокрема з'єднання з черги очікування), спершу ставимо `SET TIMESTAMP` = поточний `Date.now()`
+ * тестового годинника — константного `TEST_NOW`, підміненого тестом (`vi.setSystemTime`) чи
+ * реального (`vi.useRealTimers()`). Команди одного з'єднання виконуються по черзі, тож `SET`
+ * завжди йде перед запитом. У межах транзакції час БД фіксується на її початку.
+ */
+export function syncDbClock(pool: Pool): void {
+  const core = pool.pool;
+  const getConnection = core.getConnection.bind(core);
+  core.getConnection = (cb) =>
+    getConnection((err, conn) => {
+      if (err) return cb(err, conn);
+      conn.query(`SET TIMESTAMP = ${(Date.now() / 1000).toFixed(3)}`, (setErr) => {
+        if (setErr) console.error('syncDbClock: SET TIMESTAMP failed', setErr);
+      });
+      cb(null, conn);
+    });
 }
 
 const TABLES = [

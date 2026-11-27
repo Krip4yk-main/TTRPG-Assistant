@@ -28,6 +28,12 @@ npm run dev -w bot
 
 Тести бекенду йдуть паралельно (4 воркери): кожен воркер створює й мігрує власну БД `nri_test_<N>`, тож тестовому користувачу MySQL потрібні права на `nri\_test\_%` (див. `docker/mysql-init.sql`). Якщо том MySQL створено раніше, виконайте один раз від root: ``GRANT ALL PRIVILEGES ON `nri\_test\_%`.* TO 'nri'@'%';``
 
+**Час у тестах константний.** У всіх воркспейсах тести бачать один «зараз» — `TEST_NOW` = пн 23.11.2026 10:00 UTC (`shared/test/test-now.ts`, `bot/test/test-now.ts`, `backend/test/test-now.ts`, `frontend/src/testing/test-now.ts`; значення однакове). Глобальний setup-файл (vitest `setupFiles`; у фронтенді — `setupFiles` білдера `@angular/build:unit-test` в `angular.json`) підмінює лише `Date`: годинник стартує з `TEST_NOW` на початку кожного файлу й іде вперед у реальному темпі, таймери справжні; перед і після кожного тесту годинник відновлюється. У бекенді час MySQL іде за тим самим годинником: тестовий пул (`syncDbClock` у `backend/test/helpers.ts`) перед кожним запитом/транзакцією ставить `SET TIMESTAMP`, тож `NOW()`/`CURRENT_TIMESTAMP` збігаються з `Date.now()` (і з `vi.setSystemTime` тесту). Правила:
+
+- Дати у фікстурах — відносно `TEST_NOW` або явно задані тестом (`vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime(...)`), ніколи відносно реальної дати.
+- Якщо тест підмінює таймери (`toFake: ['setTimeout', …]`), додавайте й `'Date'`, інакше в цьому тесті `Date` стане реальним.
+- Реальний час — лише в окремих тестах годинника (`*/test/clock.test.ts`, `frontend/src/testing/clock.spec.ts`): вони вмикають `vi.useRealTimers()` і перевіряють, що код без явного `now` бере справжній `Date.now()`.
+
 Нотатки для розробки:
 
 - Після змін у `@nri/shared` перезберіть його (`npm run build -w shared`) і перезапустіть `ng serve`, видаливши `frontend/.angular/cache` (Vite попередньо збирає лінкований пакет).

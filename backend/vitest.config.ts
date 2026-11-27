@@ -6,7 +6,8 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts'],
     globalSetup: ['test/setup/global-setup.ts'],
-    setupFiles: ['test/setup/env.ts'],
+    // clock.ts — константний «зараз» у всіх тестах (test/test-now.ts); БД синхронізує helpers.ts.
+    setupFiles: ['test/setup/env.ts', 'test/setup/clock.ts'],
     // Файли паралельно: кожен воркер має власну БД/Redis-базу/канал Socket.IO (test/setup/workers.ts).
     maxWorkers: TEST_WORKERS,
     // Інтеграційні тести (HTTP + MySQL з fsync на кожен коміт). Окремо найдовші — ~1 с, але при
