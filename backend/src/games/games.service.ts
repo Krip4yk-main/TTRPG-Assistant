@@ -832,22 +832,37 @@ async function activeCount(tx: Tx, gameId: number): Promise<number> {
 /**
  * «Завершити гру» для ваншота завершує й його єдину сесію (`scheduled` → `done`). Сесію,
  * якої ще немає (гру опубліковано до матеріалізації), спершу створюємо з правила. Сесія з
- * приблизним часом → 409 `SESSION_TIME_APPROXIMATE` (спершу уточнити час).
+ * приблизним часом: на явне «Завершити гру» майстра (`strictWindow`) → 409
+ * `SESSION_TIME_APPROXIMATE` (спершу уточнити час); інакше (закриття «мертвої» гри) вікно, що
+ * вже почалося, → `done` (`startsAt` лишається початком вікна), а вікно цілком у майбутньому
+ * лишається `scheduled` — його скасує `cancelFutureSessions` з причиною завершення гри.
  */
-async function finishOneshotSession(tx: Tx, row: GameRow, now: Date): Promise<number[]> {
+async function finishOneshotSession(
+  tx: Tx,
+  row: GameRow,
+  now: Date,
+  strictWindow: boolean,
+): Promise<number[]> {
   await materializeForRow(tx, row, now, row.startsAt ?? undefined);
   const open = await tx
-    .select({ id: gameSessions.id, startWindowMinutes: gameSessions.startWindowMinutes })
+    .select({
+      id: gameSessions.id,
+      startsAt: gameSessions.startsAt,
+      startWindowMinutes: gameSessions.startWindowMinutes,
+    })
     .from(gameSessions)
     .where(and(eq(gameSessions.gameId, row.id), eq(gameSessions.status, 'scheduled')))
     .for('update');
   if (open.length === 0) return [];
-  // Сесію з приблизним часом не завершити, доки майстер не уточнить час (як `finishSession`).
-  const approximate = open.find((s) => s.startWindowMinutes !== null);
-  if (approximate) {
-    throw new AppError(409, 'SESSION_TIME_APPROXIMATE', { sessionId: approximate.id });
+  const approximate = open.filter((s) => s.startWindowMinutes !== null);
+  // Явне завершення майстром: сесію з приблизним часом спершу уточнити (як `finishSession`).
+  if (strictWindow && approximate[0]) {
+    throw new AppError(409, 'SESSION_TIME_APPROXIMATE', { sessionId: approximate[0].id });
   }
-  const ids = open.map((s) => s.id);
+  const ids = open
+    .filter((s) => s.startWindowMinutes === null || s.startsAt <= now)
+    .map((s) => s.id);
+  if (ids.length === 0) return [];
   await tx
     .update(gameSessions)
     .set({ status: 'done', doneAt: now })
@@ -871,7 +886,7 @@ export async function transitionGame(
   const { row } = await loadOwned(deps, userId, id);
   if (action === 'pause') return pauseGame(deps, userId, row, body);
   if (action === 'resume') return resumeGame(deps, userId, row, body);
-  return applyTransition(deps, userId, row, action);
+  return applyTransition(deps, userId, row, action, { strictWindow: true });
 }
 
 // ---------- пауза кампейну ----------
@@ -1015,6 +1030,17 @@ export interface AdminClose {
   inTx: (tx: Tx, now: Date) => Promise<void>;
 }
 
+/** Додаткові умови переходу. */
+export interface TransitionOptions {
+  /** Закриття адміністрацією (див. `AdminClose`). */
+  admin?: AdminClose;
+  /**
+   * Явне «Завершити гру» майстра: ваншот із сесією з приблизним часом → 409
+   * `SESSION_TIME_APPROXIMATE`. Без нього (закриття «мертвої» гри) вікно розв'язується саме.
+   */
+  strictWindow?: boolean;
+}
+
 /**
  * Перехід статусу гри від імені майстра (`actorId`) або адміністрації (`admin`: подія — без
  * автора й з `closedByAdmin`, гра — з позначкою `closed_by_admin`). Завершення й скасування
@@ -1025,7 +1051,7 @@ export async function applyTransition(
   actorId: number,
   row: GameRow,
   action: PlainAction,
-  admin?: AdminClose,
+  { admin, strictWindow = false }: TransitionOptions = {},
 ): Promise<GameTransitionDto> {
   const { db } = deps;
   const id = row.id;
@@ -1066,7 +1092,7 @@ export async function applyTransition(
       if (action === 'start') await assertNearestSessionPinned(tx, id, now);
       const doneSessionIds =
         action === 'finish' && row.kind === 'oneshot'
-          ? await finishOneshotSession(tx, row, now)
+          ? await finishOneshotSession(tx, row, now, strictWindow)
           : [];
       const belowMin = action === 'start' && (await activeCount(tx, id)) < row.minPlayers;
       const cancelled: CancelledApplication[] = endReason

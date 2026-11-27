@@ -13,13 +13,13 @@ import { runDispatch } from '../../src/notifications/dispatcher.js';
 import { sendReminders, sendUnpinnedReminders } from '../../src/notifications/reminders.js';
 import { getSessionWindowSlots } from '../../src/sessions/start-window.js';
 import { gameBusyIntervals } from '../../src/calendar/game-busy.service.js';
-import { closeDeps, resetDb, testDeps } from '../helpers.js';
+import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 import { harness } from '../games/fixtures.js';
 
 const deps = await testDeps();
 const { db, redis } = deps;
 const app = createApp(deps);
-const { userWithAge, call, createGame } = harness(deps, app);
+const { login, userWithAge, call, createGame } = harness(deps, app);
 
 beforeEach(async () => {
   await redis.flushdb();
@@ -389,6 +389,59 @@ describe('approximate start time: start / finish guards', () => {
     );
     await ok(call('post', `/api/games/${gameId}/finish`, gm.cookie));
     expect((await rows(gameId))[0]!.status).toBe('done');
+  });
+
+  /** Ваншот, що «йде», з вікном 19:00–20:00; сесія зсунута напряму в БД на `startsAt`. */
+  async function startedWindowedOneshot(startsAt: Date) {
+    const gm = await userWithAge(30, 'gm');
+    const gameId = await createGame(
+      gm.cookie,
+      {
+        kind: 'oneshot',
+        recurrence: 'none',
+        weekdays: [],
+        startsAt: kyivAt(3).startsAt,
+        startWindowMinutes: 60,
+      },
+      true,
+    );
+    const [s] = await rows(gameId);
+    await db.update(gameSessions).set({ startsAt }).where(eq(gameSessions.id, s!.id));
+    await db
+      .update(games)
+      .set({ status: 'started', startsAt, deadAt: new Date() })
+      .where(eq(games.id, gameId));
+    return { gm, gameId, sessionId: s!.id };
+  }
+
+  async function moderator() {
+    const u = await createUser(db, { nickname: 'mod', role: 'moderator' });
+    return { ...u, cookie: await login(u.id) };
+  }
+
+  it('admin close of a started oneshot: a started window → done (start kept), GM finish still 409', async () => {
+    const windowStart = new Date(Math.floor((Date.now() - 30 * MIN) / MIN) * MIN);
+    const { gm, gameId, sessionId } = await startedWindowedOneshot(windowStart);
+    const res = await call('post', `/api/games/${gameId}/finish`, gm.cookie);
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: { code: 'SESSION_TIME_APPROXIMATE', details: { sessionId } },
+    });
+    const mod = await moderator();
+    await ok(call('post', `/api/admin/dead-games/${gameId}/close`, mod.cookie, {}));
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.status).toBe('finished');
+    const [s] = await rows(gameId);
+    expect(s).toMatchObject({ status: 'done', startsAt: windowStart, startWindowMinutes: 60 });
+  });
+
+  it('GM dead-game close of a oneshot whose window is in the future → session cancelled', async () => {
+    const { gm, gameId } = await startedWindowedOneshot(new Date(Date.now() + 2 * DAY));
+    await ok(call('post', `/api/games/${gameId}/close-dead`, gm.cookie));
+    const [g] = await db.select().from(games).where(eq(games.id, gameId));
+    expect(g!.status).toBe('finished');
+    const [s] = await rows(gameId);
+    expect(s).toMatchObject({ status: 'cancelled', cancelReason: 'game_finished' });
   });
 });
 
