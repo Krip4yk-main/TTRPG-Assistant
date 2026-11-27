@@ -91,6 +91,25 @@ describe('GET /api/games/:id/members', () => {
   });
 });
 
+describe('«Мої межі» — приватність', () => {
+  it('the limits marker never appears in the members list or in search results', async () => {
+    const { gm, gameId } = await setup();
+    const p = await userWithAge(25, 'Alpha');
+    await join(gm, gameId, p);
+    const marker = 'унікальний-маркер-меж-7731';
+    expect((await call('put', '/api/me/limits', p.cookie, { limits: [marker] })).status).toBe(200);
+    const roster = await call('get', `/api/games/${gameId}/members`, gm.cookie);
+    expect(roster.status).toBe(200);
+    expect(JSON.stringify(roster.body)).not.toContain(marker);
+    const asMember = await call('get', `/api/games/${gameId}/members`, p.cookie);
+    expect(JSON.stringify(asMember.body)).not.toContain(marker);
+    const found = await call('post', '/api/games/search', gm.cookie, {});
+    expect(found.status).toBe(200);
+    expect(found.body.items.map((i: { id: number }) => i.id)).toContain(gameId);
+    expect(JSON.stringify(found.body)).not.toContain(marker);
+  });
+});
+
 describe('POST /api/games/:id/leave', () => {
   it('without noteForGm (or shorter than 10) → 400', async () => {
     const { gm, gameId } = await setup();
