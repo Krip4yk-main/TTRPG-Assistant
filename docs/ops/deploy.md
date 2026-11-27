@@ -9,7 +9,7 @@
 2. У кореневому `.env` задайте `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD` (пароль без символів, що ламають URL: `@ : / ? #`).
 3. `DATABASE_URL`, `REDIS_URL` і `BACKEND_INTERNAL_URL` у compose перевизначаються на адреси сервісів — у `.env` їх можна не задавати.
 4. Налаштування фронтенду (`NG_APP_*`) — build-аргументи, див. `frontend/Dockerfile`.
-5. Бекапи: створіть MySQL-користувача `backup` і задайте `BACKUP_*` у кореневому `.env` — див. [backups.md](backups.md). Без `MYSQL_*`, `BACKUP_DB_PASSWORD` і `BACKUP_PASSPHRASE` compose відмовляється запускати стек (fail closed).
+5. Бекапи: створіть MySQL-користувача `backup` і задайте `BACKUP_*` у кореневому `.env` — див. [backups.md](backups.md). Без `MYSQL_*` compose відмовляється запускати стек. Без `BACKUP_PASSPHRASE` чи `BACKUP_DB_PASSWORD` застосунок стартує, а сервіс `backup` пише помилку в лог і не робить бекапів (fail closed): без парольної фрази він завершується й перезапускається, доки її не задано; без пароля БД щоденний бекап падає й повторюється наступної доби.
 6. Reverse proxy: вимкніть або редагуйте access-логи для `/api/cal/` — у шляху ICS-фіду секретний токен.
 
 ## Збірка і запуск

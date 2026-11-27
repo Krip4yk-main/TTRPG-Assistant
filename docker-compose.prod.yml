@@ -1,8 +1,8 @@
 # Продакшн-стек. Збірка/запуск: див. docs/ops/deploy.md
 # Змінні для ${...} беруться з кореневого .env (поруч із цим файлом) або з оточення.
 # Секрети лише в .env-файлах (backend/.env, bot/.env, корінь) — не в цьому файлі.
-# Обов'язкові (${VAR:?…}): MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD, BACKUP_DB_PASSWORD,
-# BACKUP_PASSPHRASE — без них compose не запуститься.
+# Обов'язкові (${VAR:?…}): MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD — без них compose
+# не запуститься. BACKUP_* необов'язкові для старту: без них сервіс backup відмовляється працювати.
 # /api і /socket.io на backend:3000 та статику з frontend:8080 віддає зовнішній reverse proxy.
 
 x-restart: &restart
@@ -119,8 +119,8 @@ services:
     environment:
       BACKUP_DB_HOST: mysql
       BACKUP_DB_USER: ${BACKUP_DB_USER:-backup}
-      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:?set BACKUP_DB_PASSWORD in the root .env (docs/ops/backups.md)}
-      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE in the root .env (docs/ops/backups.md)}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
       BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
       BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
       BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
