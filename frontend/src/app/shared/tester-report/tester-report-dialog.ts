@@ -38,6 +38,8 @@ import { TesterReportsApi } from '../../core/tester-reports/tester-reports.api';
 export interface TesterReportDialogData {
   context: TesterReportContext;
   publicId: string | null;
+  /** Поза dev: нейтральні тексти («Відгук») і повідомлення про ліміт 2 на добу. */
+  feedback: boolean;
 }
 
 function trimmedRequired(control: AbstractControl<string>): ValidationErrors | null {
@@ -85,6 +87,8 @@ export class TesterReportDialog {
   protected readonly submitting = signal(false);
   protected readonly sent = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Префікс текстів: на dev — «Повідомити», поза dev — «Відгук». */
+  protected readonly ns = this.data.feedback ? 'testerReport.feedback' : 'testerReport';
 
   protected async submit(): Promise<void> {
     if (this.submitting() || this.sent()) return;
@@ -108,7 +112,12 @@ export class TesterReportDialog {
         injector: this.injector,
       });
     } catch (err) {
-      this.error.set(`errors.${toApiError(err).code}`);
+      const code = toApiError(err).code;
+      this.error.set(
+        this.data.feedback && code === 'RATE_LIMITED'
+          ? 'testerReport.feedback.rateLimited'
+          : `errors.${code}`,
+      );
     } finally {
       this.submitting.set(false);
     }

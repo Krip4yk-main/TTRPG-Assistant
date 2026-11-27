@@ -3,7 +3,7 @@ import type { Request, RequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import type { Redis } from 'ioredis';
-import { TESTER_REPORTS_PER_HOUR } from '@nri/shared';
+import { TESTER_REPORTS_PER_DAY, TESTER_REPORTS_PER_HOUR } from '@nri/shared';
 import type { Env } from '../config/env.js';
 import { oauthNavErrorBase } from '../auth/oauth-nav.js';
 import { AppError } from './errors.js';
@@ -121,8 +121,20 @@ export function rateLimiters(env: Env, redis: Redis) {
       (req) => `u:${req.user!.userId}`,
     ),
     calFeedIp: limiter(redis, 'calip', CAL_FEED_WINDOW_SEC, CAL_FEED_IP_MAX),
-    /** Звіти тестувальників (лише dev): ≤ 10 на годину з однієї IP (гості теж надсилають). */
+    /** Звіти на dev: ≤ 10 на годину з однієї IP (гості теж надсилають). */
     testerReport: limiter(redis, 'tester', 3600, TESTER_REPORTS_PER_HOUR),
+    /**
+     * Відгуки поза dev (prod і local): ≤ 2 на добу на користувача. Монтується після сесії;
+     * без сесії — пропуск (такий запит відхилить `requireAuth` з 401).
+     */
+    feedback: limiter(
+      redis,
+      'feedback',
+      24 * 3600,
+      TESTER_REPORTS_PER_DAY,
+      (req) => !req.user,
+      (req) => `u:${req.user!.userId}`,
+    ),
     calFeedToken: limiter(
       redis,
       'caltok',

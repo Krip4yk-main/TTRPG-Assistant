@@ -3,7 +3,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import {
   type CanActivateFn,
-  type CanMatchFn,
   Router,
   UrlTree,
   provideRouter,
@@ -14,7 +13,7 @@ import { Subject } from 'rxjs';
 import type { MeDto, UserRole } from '@nri/shared';
 import { AuthStore } from '../../core/auth/auth.store';
 import { SocketService } from '../../core/realtime/socket.service';
-import { devEnvMatch, staffGuard } from './admin.guards';
+import { staffGuard } from './admin.guards';
 import { ADMIN_ROUTES } from './admin.routes';
 
 const me = (role: UserRole): MeDto => ({
@@ -105,16 +104,5 @@ describe('staffGuard', () => {
     expect(path(await check())).toBe('/admin');
     TestBed.inject(AuthStore).setMe(me('admin'));
     expect(await check()).toBe(true);
-  });
-
-  it('tester reports match only on the dev server; elsewhere the URL is not found', () => {
-    const child = ADMIN_ROUTES[0]!.children!.find((r) => r.path === 'tester-reports')!;
-    expect(child.canMatch).toHaveLength(1);
-    // Тести бачать згенерований конфіг (`local`) — маршрут не збігається.
-    const match = (guard: CanMatchFn) =>
-      TestBed.runInInjectionContext(() => guard({} as never, [], {} as never));
-    expect(match(child.canMatch![0] as CanMatchFn)).toBe(false);
-    expect(match(devEnvMatch('dev'))).toBe(true);
-    for (const env of ['prod', 'local', '']) expect(match(devEnvMatch(env))).toBe(false);
   });
 });

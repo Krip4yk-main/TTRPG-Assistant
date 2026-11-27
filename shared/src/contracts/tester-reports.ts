@@ -14,6 +14,8 @@ export type TesterReportStatus = (typeof TESTER_REPORT_STATUSES)[number];
 export const TESTER_REPORT_TEXT_MAX = 4000;
 /** Ліміт `POST /api/tester-reports`: звітів на годину з однієї IP. */
 export const TESTER_REPORTS_PER_HOUR = 10;
+/** Поза dev (prod і local): ≤ 2 відгуки на добу на користувача. */
+export const TESTER_REPORTS_PER_DAY = 2;
 
 export const TESTER_REPORT_URL_MAX = 2048;
 export const TESTER_REPORT_THEME_MAX = 64;

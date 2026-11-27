@@ -1,13 +1,14 @@
-@if (deployEnv() === 'dev') {
+@if (visible()) {
+  @let ns = dev() ? 'testerReport' : 'testerReport.feedback';
   <button
     type="button"
     class="tester-report"
-    [attr.aria-label]="'testerReport.buttonLabel' | translate"
-    [title]="'testerReport.buttonLabel' | translate"
+    [attr.aria-label]="ns + '.buttonLabel' | translate"
+    [title]="ns + '.buttonLabel' | translate"
     aria-haspopup="dialog"
     (click)="open()"
   >
     <mat-icon aria-hidden="true">bug_report</mat-icon>
-    <span class="label">{{ 'testerReport.button' | translate }}</span>
+    <span class="label">{{ ns + '.button' | translate }}</span>
   </button>
 }

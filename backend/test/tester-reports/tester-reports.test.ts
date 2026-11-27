@@ -50,20 +50,40 @@ const submit = (cookie: string | undefined, b: object = body()) =>
   call('post', '/api/tester-reports', cookie, b);
 const ids = (res: { body: { items: { id: number }[] } }) => res.body.items.map((r) => r.id);
 
-describe('tester reports: only on DEPLOY_ENV=dev', () => {
-  it.each(['local', 'prod'] as const)('%s: submit and admin endpoints → 404', async (env) => {
-    const app = createApp({ ...deps, env: { ...deps.env, DEPLOY_ENV: env } });
-    const h = harness(deps, app);
-    const owner = await user('Власник', 'owner');
-    expect((await h.call('post', '/api/tester-reports', undefined, body())).status).toBe(404);
-    expect((await h.call('get', '/api/admin/tester-reports', owner.cookie)).status).toBe(404);
-    const mark = await h.call('post', '/api/admin/tester-reports/1/processed', owner.cookie);
-    expect(mark.status).toBe(404);
-    // Гість поза dev теж бачить 404 (не 401): ендпоінтів «немає».
-    expect((await h.call('get', '/api/admin/tester-reports', undefined)).status).toBe(404);
-    const guestMark = await h.call('post', '/api/admin/tester-reports/1/processed', undefined);
-    expect(guestMark.status).toBe(404);
+describe.each(['local', 'prod'] as const)('feedback outside dev (DEPLOY_ENV=%s)', (env) => {
+  const app = createApp({ ...deps, env: { ...deps.env, DEPLOY_ENV: env } });
+  const h = harness(deps, app);
+
+  it('guest → 401 UNAUTHENTICATED, nothing stored', async () => {
+    const res = await h.call('post', '/api/tester-reports', undefined, body());
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHENTICATED');
     expect(await db.select().from(testerReports)).toHaveLength(0);
+  });
+
+  it('user: 2 per day, the 3rd → 429 RATE_LIMITED; another user is not affected', async () => {
+    const u = await user('Гравець');
+    const other = await user('Інший');
+    for (let i = 0; i < 2; i++) {
+      expect((await h.call('post', '/api/tester-reports', u.cookie, body())).status).toBe(201);
+    }
+    const res = await h.call('post', '/api/tester-reports', u.cookie, body());
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('RATE_LIMITED');
+    expect((await h.call('post', '/api/tester-reports', other.cookie, body())).status).toBe(201);
+    const rows = await db.select().from(testerReports);
+    expect(rows).toHaveLength(3);
+    expect(rows.filter((r) => r.reporterId === u.id)).toHaveLength(2);
+  });
+
+  it('admin list is available (owner sees the feedback); guest → 401', async () => {
+    const owner = await user('Власник', 'owner');
+    const u = await user('Гравець');
+    expect((await h.call('post', '/api/tester-reports', u.cookie, body())).status).toBe(201);
+    const list = await h.call('get', '/api/admin/tester-reports', owner.cookie);
+    expect(list.status).toBe(200);
+    expect(list.body.items).toHaveLength(1);
+    expect((await h.call('get', '/api/admin/tester-reports', undefined)).status).toBe(401);
   });
 });
 

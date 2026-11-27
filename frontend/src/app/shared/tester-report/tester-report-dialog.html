@@ -1,7 +1,7 @@
-<h2 mat-dialog-title>{{ 'testerReport.title' | translate }}</h2>
+<h2 mat-dialog-title>{{ ns + '.title' | translate }}</h2>
 @if (sent()) {
   <mat-dialog-content>
-    <p class="sent" role="status">{{ 'testerReport.sent' | translate }}</p>
+    <p class="sent" role="status">{{ ns + '.sent' | translate }}</p>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
     <button #done mat-flat-button type="button" class="done" (click)="close()">
@@ -74,7 +74,7 @@
         {{ 'common.cancel' | translate }}
       </button>
       <button mat-flat-button type="submit" class="submit" [disabled]="submitting()">
-        {{ 'testerReport.submit' | translate }}
+        {{ ns + '.submit' | translate }}
       </button>
     </mat-dialog-actions>
   </form>

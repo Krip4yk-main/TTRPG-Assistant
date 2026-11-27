@@ -76,9 +76,36 @@ describe('TesterReport', () => {
     overlay()?.replaceChildren();
   });
 
-  it.each(['local', 'prod'])('renders nothing on %s', async (env) => {
+  it.each(['local', 'prod'])('%s: renders nothing for a guest', async (env) => {
     const el = (await create(env)).nativeElement as HTMLElement;
     expect(el.querySelector('button')).toBeNull();
+  });
+
+  it.each(['local', 'prod'])('%s: logged in — neutral «Відгук» button and dialog', async (env) => {
+    const fixture = await create(env, me);
+    const button = (fixture.nativeElement as HTMLElement).querySelector(
+      'button.tester-report',
+    ) as HTMLButtonElement;
+    expect(button.textContent).toContain('Відгук');
+    expect(button.textContent).not.toContain('Повідомити');
+    expect(button.getAttribute('aria-label')).toBe('Надіслати відгук');
+    button.click();
+    await settle(fixture);
+    const dialog = overlay()!.querySelector('nri-tester-report-dialog') as HTMLElement;
+    expect(dialog.querySelector('h2')!.textContent).toContain('Надіслати відгук');
+    expect(dialog.querySelector('button.submit')!.textContent).toContain('Надіслати відгук');
+    const textarea = dialog.querySelector<HTMLTextAreaElement>('textarea')!;
+    textarea.value = 'Відгук';
+    textarea.dispatchEvent(new Event('input'));
+    dialog.querySelector<HTMLButtonElement>('button.submit')!.click();
+    await settle(fixture);
+    http
+      .expectOne('/api/tester-reports')
+      .flush({ error: { code: 'RATE_LIMITED' } }, { status: 429, statusText: 'Too Many' });
+    await settle(fixture);
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toContain(
+      'Можна надіслати 2 відгуки на добу.',
+    );
   });
 
   it('dev: a labelled button opens the dialog with the context shown', async () => {

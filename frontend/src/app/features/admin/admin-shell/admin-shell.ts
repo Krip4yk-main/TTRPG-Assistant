@@ -1,9 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { UserRole } from '@nri/shared';
-import { runtimeConfig } from '../../../../environments/runtime-config';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { roleAtLeast } from '../../../core/auth/roles';
 
@@ -11,8 +10,6 @@ interface AdminTab {
   path: string;
   label: string;
   min: UserRole;
-  /** Лише на dev-сервері (`deployEnv === 'dev'`). */
-  devOnly?: boolean;
 }
 
 const TABS: readonly AdminTab[] = [
@@ -24,7 +21,7 @@ const TABS: readonly AdminTab[] = [
   { path: 'roles', label: 'admin.tabs.roles', min: 'admin' },
   { path: 'catalog', label: 'admin.tabs.catalog', min: 'admin' },
   { path: 'log', label: 'admin.tabs.log', min: 'admin' },
-  { path: 'tester-reports', label: 'admin.tabs.testerReports', min: 'admin', devOnly: true },
+  { path: 'tester-reports', label: 'admin.tabs.testerReports', min: 'admin' },
 ];
 
 /** Каркас розділу «Адмінка»: заголовок і вкладки за роллю (навігація маршрутами). */
@@ -37,12 +34,8 @@ const TABS: readonly AdminTab[] = [
 })
 export class AdminShell {
   private readonly auth = inject(AuthStore);
-  /** Середовище розгортання (за замовчуванням — з конфігу збірки). */
-  readonly deployEnv = input<string>(runtimeConfig.deployEnv);
-
   protected readonly tabs = computed(() => {
     const role = this.auth.me()?.role;
-    const dev = this.deployEnv() === 'dev';
-    return TABS.filter((t) => roleAtLeast(role, t.min) && (dev || !t.devOnly));
+    return TABS.filter((t) => roleAtLeast(role, t.min));
   });
 }

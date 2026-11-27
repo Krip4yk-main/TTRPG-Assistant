@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -16,9 +16,9 @@ import { ThemeService } from '../../theming/theme.service';
 import { TesterReportDialog, type TesterReportDialogData } from './tester-report-dialog';
 
 /**
- * Плаваюча кнопка «Повідомити» внизу справа (лише на dev-сервері): відкриває діалог звіту
- * тестувальника. Банер «Тестове середовище» — у лівому нижньому куті, тож не перекриваються.
- * Поза dev нічого не рендерить.
+ * Плаваюча кнопка внизу справа: відкриває діалог звіту. На dev («Повідомити») — для всіх,
+ * гостей теж; поза dev («Відгук») — лише для того, хто ввійшов (сервер: 2 на добу).
+ * Банер «Тестове середовище» — у лівому нижньому куті, тож не перекриваються.
  */
 @Component({
   selector: 'nri-tester-report',
@@ -48,11 +48,19 @@ export class TesterReport {
     };
   }
 
+  /** Dev — тестувальницький режим («Повідомити»); інакше — нейтральний «Відгук». */
+  protected readonly dev = computed(() => this.deployEnv() === 'dev');
+  protected readonly visible = computed(() => this.dev() || this.auth.me() !== null);
+
   protected open(): void {
     if (this.dialog.getDialogById(DIALOG_ID)) return;
     this.dialog.open<TesterReportDialog, TesterReportDialogData, boolean>(TesterReportDialog, {
       id: DIALOG_ID,
-      data: { context: this.context(), publicId: this.auth.me()?.publicId ?? null },
+      data: {
+        context: this.context(),
+        publicId: this.auth.me()?.publicId ?? null,
+        feedback: !this.dev(),
+      },
       width: '480px',
       maxWidth: 'calc(100vw - 32px)',
       autoFocus: 'first-tabbable',

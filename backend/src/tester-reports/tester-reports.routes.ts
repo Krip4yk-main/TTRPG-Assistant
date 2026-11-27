@@ -10,18 +10,20 @@ import {
 } from './tester-reports.service.js';
 
 /**
- * Монтується на `/api/tester-reports` лише при `DEPLOY_ENV=dev` (інакше — 404): подання звіту.
- * Гості теж можуть (сесія необов'язкова); ліміт — `rateLimiters().testerReport`.
+ * Монтується на `/api/tester-reports` у всіх середовищах: подання відгуку. На dev гості теж
+ * можуть (ліміт — `rateLimiters().testerReport`, з IP); поза dev (prod, local) — лише авторизовані
+ * (гість → 401), ліміт `rateLimiters().feedback` — 2 на добу на користувача.
  */
 export function testerReportsRouter(deps: AppDeps): Router {
   const router = Router();
+  if (deps.env.DEPLOY_ENV !== 'dev') router.use(requireAuth(deps));
   router.post('/', async (req, res) => {
     res.status(201).json(await submitTesterReport(deps, req.user?.userId ?? null, req.body));
   });
   return router;
 }
 
-/** Монтується на `/api/admin/tester-reports` лише при `DEPLOY_ENV=dev`: адмін і власник. */
+/** Монтується на `/api/admin/tester-reports` у всіх середовищах: адмін і власник. */
 export function adminTesterReportsRouter(deps: AppDeps): Router {
   const router = Router();
   router.use(requireAuth(deps), requireStaff('admin'));
