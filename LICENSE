@@ -1,0 +1,31 @@
+НРІ Асистент (TTRPG-Assistant)
+Copyright (c) 2026 Viacheslav Mykhalchenko (Krip4yk-main). All rights reserved
+except as expressly granted below.
+
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+This software is licensed under the PolyForm Noncommercial License 1.0.0.
+Full license text: https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Required Notice: Copyright (c) 2026 Viacheslav Mykhalchenko (Krip4yk-main)
+(https://github.com/Krip4yk-main/TTRPG-Assistant)
+
+In short (this summary is not a substitute for the license text):
+- You may read, study and use this software for noncommercial purposes only.
+- Any commercial use — including running it as a service, selling it, or
+  building a competing product from it — is NOT permitted without a separate
+  written license from the copyright holder.
+- Using this repository's code, texts, designs or assets to train, fine-tune
+  or evaluate machine-learning models is not a permitted noncommercial use
+  and is not allowed without written permission. See AI_POLICY.md.
+
+Коротко українською (не замінює текст ліцензії):
+- Код можна переглядати, вивчати й використовувати лише некомерційно.
+- Комерційне використання — зокрема запуск як сервісу, продаж або створення
+  конкурентного продукту на його основі — заборонене без окремої письмової
+  ліцензії від власника прав.
+- Використання коду, текстів, дизайнів чи ресурсів цього репозиторію для
+  навчання, донавчання чи оцінювання моделей ШІ без письмового дозволу
+  заборонене. Див. AI_POLICY.md.
+
+Commercial licensing / комерційна ліцензія: krip4yk.main@gmail.com

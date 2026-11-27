@@ -15,6 +15,7 @@
     "typecheck": "npm run config && tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit"
   },
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@angular/cdk": "~22.3.0",
     "@angular/common": "^22.3.0",

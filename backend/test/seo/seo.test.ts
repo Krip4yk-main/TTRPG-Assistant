@@ -96,6 +96,15 @@ describe('sitemap.xml / robots.txt', () => {
     expect(res.text).toContain('Disallow: /account');
     expect(res.text).toContain('Allow: /');
   });
+
+  it('robots.txt blocks AI training crawlers but not regular search engines', async () => {
+    const res = await request(app).get('/robots.txt');
+    expect(res.text).toContain('User-agent: GPTBot\nDisallow: /');
+    expect(res.text).toContain('User-agent: ClaudeBot\nDisallow: /');
+    expect(res.text).toContain('User-agent: Google-Extended\nDisallow: /');
+    expect(res.text).not.toContain('User-agent: Googlebot');
+    expect(res.text).toContain('User-agent: *\nAllow: /');
+  });
 });
 
 describe('dev environment indexing', () => {

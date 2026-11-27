@@ -72,6 +72,29 @@ function neutral(url: string): string {
   return renderOg({ title: NEUTRAL_TITLE, url, type: 'website', noindex: true });
 }
 
+/**
+ * Краулери для навчання ШІ — заборонено (див. AI_POLICY.md); звичайні пошуковики індексують як раніше.
+ * Це прохання, яке шанують сумлінні боти; юридично захищає ліцензія (LICENSE).
+ */
+export const AI_CRAWLERS = [
+  'GPTBot',
+  'ClaudeBot',
+  'anthropic-ai',
+  'CCBot',
+  'Google-Extended',
+  'Applebot-Extended',
+  'PerplexityBot',
+  'Bytespider',
+  'meta-externalagent',
+  'cohere-ai',
+  'cohere-training-data-crawler',
+  'Diffbot',
+  'omgili',
+  'Timpibot',
+  'ImagesiftBot',
+] as const;
+const AI_CRAWLERS_BLOCK = AI_CRAWLERS.map((ua) => `User-agent: ${ua}\nDisallow: /\n\n`).join('');
+
 /** Маршрути поза `/api`: `/sitemap.xml`, `/robots.txt` (без сесії, CSRF і rate limiter). */
 export function seoRootRouter(deps: AppDeps): Router {
   const { db, env } = deps;
@@ -87,7 +110,8 @@ export function seoRootRouter(deps: AppDeps): Router {
       .set('Cache-Control', CACHE)
       .type('text/plain')
       .send(
-        `User-agent: *\nAllow: /\nDisallow: /account\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`,
+        AI_CRAWLERS_BLOCK +
+          `User-agent: *\nAllow: /\nDisallow: /account\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`,
       );
   });
 
