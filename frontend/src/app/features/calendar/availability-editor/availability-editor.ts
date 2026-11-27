@@ -11,9 +11,11 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule, type MatDatepickerInputEvent } from '@angular/material/datepicker';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -29,13 +31,21 @@ import {
   CELLS_PER_DAY,
   CELL_MINUTES,
   DAYS,
+  WEEKDAY_EVENINGS,
+  WEEKENDS,
   cellIndex,
   cellsToSlots,
   formatMinutes,
   gameBusyCells,
   gameBusyWindow,
   slotsToCells,
+  withTemplate,
+  type WeekTemplate,
 } from './availability-grid';
+import {
+  ConfirmDialog,
+  type ConfirmDialogData,
+} from '../../../shared/confirm-dialog/confirm-dialog';
 
 /** Як часто оновлювати зайнятість від ігор, мс. */
 const GAME_BUSY_REFRESH_MS = 5 * 60_000;
@@ -45,6 +55,17 @@ const MAX_BUSY_DATES = 366;
 const PAGE_STEP = 8;
 /** Клітинка, з якої починається клавіатурна навігація (Пн 18:00). */
 const DEFAULT_FOCUS = cellIndex(0, 36);
+/** Нижче цієї ширини режим «Фарбувати» ввімкнений одразу (телефони). */
+const NARROW_QUERY = '(max-width: 767.98px)';
+
+/** Шаблони тижня: кнопка → проміжки й повідомлення для читача екрана. */
+const TEMPLATES = {
+  weekdayEvenings: {
+    template: WEEKDAY_EVENINGS,
+    announce: 'calendar.templates.weekdayEveningsAdded',
+  },
+  weekends: { template: WEEKENDS, announce: 'calendar.templates.weekendsAdded' },
+} satisfies Record<string, { template: WeekTemplate; announce: string }>;
 
 interface Point {
   day: number;
@@ -74,7 +95,12 @@ function inRect(d: Drag, day: number, cell: number): boolean {
  *
  * - Миша/перо: протягування виділяє прямокутник; почавши з вибраної клітинки — знімає виділення.
  *   Дотик: торкання перемикає клітинку (протягування пальцем лишається прокруткою).
- * - Клавіатура: стрілки, Home/End, PageUp/PageDown — рух; пробіл/Enter — перемкнути;
+ * - Режим «Фарбувати» (на телефоні — одразу): тап (клік) по клітинці; перший тап визначає дію
+ *   («додавати» з вільної клітинки, «стирати» — з позначеної) для наступних, доки режим не
+ *   вимкнуто або не натиснуто «Готово». Жодного `preventDefault` — сторінка прокручується.
+ * - Шаблони «Будні вечори», «Вихідні» додаються до наявних слотів; «Очистити» — з підтвердженням.
+ * - Клавіатура (клітинки — кнопки з `aria-pressed`): стрілки, Home/End, PageUp/PageDown — рух;
+ *   пробіл/Enter — перемкнути;
  *   Shift+стрілка — протягнути те саме значення далі.
  * - `save`: кнопка «Зберегти» → `PUT /api/me/availability`. Сітка — у поясі акаунта (R5),
  *   змінити його можна лише в налаштуваннях акаунта; календар пояс не змінює.
@@ -106,6 +132,8 @@ export class AvailabilityEditor {
   private readonly auth = inject(AuthStore);
   private readonly translate = inject(TranslateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly dialog = inject(MatDialog);
+  private readonly announcer = inject(LiveAnnouncer);
 
   /** `save` — сторінка «Мій календар»; `custom` — календар лише для поточного пошуку. */
   readonly mode = input<'save' | 'custom'>('save');
@@ -133,6 +161,12 @@ export class AvailabilityEditor {
   protected readonly message = signal<{ kind: 'error' | 'info'; key: string } | null>(null);
   /** Знімок останнього збереженого/завантаженого стану — для «є незбережені зміни». */
   private readonly snapshot = signal('');
+  /** Режим «Фарбувати»: тапи замість протягування. */
+  protected readonly paintMode = signal(
+    typeof matchMedia === 'function' && !!matchMedia(NARROW_QUERY)?.matches,
+  );
+  /** Дія режиму «Фарбувати», визначена першим тапом: `true` — додавати, `false` — стирати. */
+  protected readonly paintAction = signal<boolean | null>(null);
   /** Значення, яке Shift+стрілка «протягує» далі. */
   private paintValue = true;
   /**
@@ -250,7 +284,8 @@ export class AvailabilityEditor {
   // ---- Миша / перо / дотик ----
 
   protected onPointerDown(event: PointerEvent, day: number, cell: number): void {
-    if (event.button !== 0) return;
+    // У режимі «Фарбувати» — лише тапи (click): без протягування й без блокування прокрутки.
+    if (event.button !== 0 || this.paintMode()) return;
     // Для миші — без виділення тексту; дотик лишаємо браузеру (прокрутка).
     if (event.pointerType !== 'touch') event.preventDefault();
     this.focusCell(cellIndex(day, cell));
@@ -274,6 +309,31 @@ export class AvailabilityEditor {
       ),
     );
     this.message.set(null);
+  }
+
+  // ---- Режим «Фарбувати» ----
+
+  protected togglePaintMode(): void {
+    this.paintMode.update((on) => !on);
+    this.paintAction.set(null);
+  }
+
+  /** «Готово»: наступний тап знову визначить дію. */
+  protected paintDone(): void {
+    this.paintAction.set(null);
+  }
+
+  protected onCellClick(event: MouseEvent, index: number): void {
+    // `detail === 0` — клік від Enter/пробілу; клавіатуру вже обробив `onKeydown`.
+    if (!this.paintMode() || event.detail === 0) return;
+    let value = this.paintAction();
+    if (value === null) {
+      value = !this.cells()[index];
+      this.paintAction.set(value);
+    }
+    this.paintValue = value;
+    this.focused.set(index);
+    this.setCell(index, value);
   }
 
   // ---- Клавіатура ----
@@ -336,7 +396,7 @@ export class AvailabilityEditor {
     const day = Math.floor(index / CELLS_PER_DAY);
     const cell = index % CELLS_PER_DAY;
     this.host.nativeElement
-      .querySelector<HTMLElement>(`[role=gridcell][data-day="${day}"][data-cell="${cell}"]`)
+      .querySelector<HTMLElement>(`button.cell[data-day="${day}"][data-cell="${cell}"]`)
       ?.focus();
   }
 
@@ -369,9 +429,29 @@ export class AvailabilityEditor {
 
   // ---- Дії ----
 
-  protected clearWeek(): void {
-    this.cells.set(slotsToCells([]));
+  protected applyTemplate(name: keyof typeof TEMPLATES): void {
+    const { template, announce } = TEMPLATES[name];
+    this.cells.update((cells) => withTemplate(cells, template));
     this.message.set(null);
+    void this.announcer.announce(this.translate.instant(announce), 'polite');
+  }
+
+  protected async clearWeek(): Promise<void> {
+    const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
+      data: {
+        title: 'calendar.clearConfirm.title',
+        text: 'calendar.clearConfirm.text',
+        confirm: 'calendar.clearConfirm.confirm',
+        danger: true,
+      },
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+    if (!(await firstValueFrom(ref.afterClosed()))) return;
+    this.cells.set(slotsToCells([]));
+    this.paintAction.set(null);
+    this.message.set(null);
+    void this.announcer.announce(this.translate.instant('calendar.cleared'), 'polite');
   }
 
   protected applyCustom(): void {

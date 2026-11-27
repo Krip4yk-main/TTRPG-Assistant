@@ -252,7 +252,7 @@ describe('SearchPage', () => {
     const editor = el().querySelector('nri-availability-editor')!;
     expect(editor).not.toBeNull();
     expect(
-      editor.querySelector('[data-day="1"][data-cell="38"]')!.getAttribute('aria-selected'),
+      editor.querySelector('[data-day="1"][data-cell="38"]')!.getAttribute('aria-pressed'),
     ).toBe('true');
     let req = expectSearch();
     expect(body(req).calendar).toEqual({

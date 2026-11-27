@@ -45,6 +45,43 @@ h2 {
   }
 }
 
+// Режим «Фарбувати» й шаблони — над сіткою.
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-sm);
+  margin-bottom: var(--nri-space-sm);
+
+  .paint-hint {
+    margin: 0;
+  }
+}
+
+.paint-row,
+.templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nri-space-sm);
+}
+
+.paint-toggle.active {
+  --mat-button-outlined-label-text-color: var(--nri-on-primary);
+  --mat-button-outlined-outline-color: var(--nri-primary);
+
+  background: var(--nri-primary);
+}
+
+.paint-live {
+  display: contents;
+}
+
+.paint-status {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nri-primary-text);
+}
+
 // Сітка прокручується всередині себе (вертикально), сторінка — без горизонтального скролу.
 .grid-scroll {
   max-height: min(60vh, 560px);
@@ -109,12 +146,28 @@ h2 {
   }
 }
 
+.slot {
+  display: block;
+  min-width: 0;
+}
+
 .cell {
+  display: block;
+  width: 100%;
   height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   border-top: 1px dashed transparent;
   border-left: 1px solid var(--nri-border);
   background: var(--nri-surface);
   cursor: pointer;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  // Прокрутка й масштаб лишаються браузеру; без затримки подвійного тапу.
+  touch-action: manipulation;
   transition: background var(--nri-transition);
 
   &:hover {
@@ -215,5 +268,27 @@ h2 {
 @media (pointer: coarse) {
   .cell {
     height: 1.75rem;
+  }
+}
+
+// Телефон: кнопки — щонайменше 44 px заввишки.
+@media (max-width: 767.98px), (pointer: coarse) {
+  .tools,
+  .actions {
+    .mat-mdc-button-base {
+      min-height: 44px;
+    }
+  }
+
+  .templates .mat-mdc-button-base {
+    flex: 1 1 auto;
+  }
+
+  .busy-list .mat-mdc-icon-button {
+    --mat-icon-button-state-layer-size: 44px;
+
+    width: 44px;
+    height: 44px;
+    padding: 10px;
   }
 }

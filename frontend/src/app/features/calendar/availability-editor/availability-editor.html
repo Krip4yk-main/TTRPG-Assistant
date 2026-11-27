@@ -39,11 +39,74 @@
         </p>
       }
 
-      <div class="grid-scroll">
+      <div class="tools">
+        <div class="paint-row">
+          <button
+            mat-stroked-button
+            type="button"
+            class="paint-toggle"
+            [class.active]="paintMode()"
+            [attr.aria-pressed]="paintMode()"
+            (click)="togglePaintMode()"
+          >
+            <mat-icon aria-hidden="true">brush</mat-icon>
+            {{ 'calendar.paint.toggle' | translate }}
+          </button>
+          <div class="paint-live" aria-live="polite">
+            @if (paintMode() && paintAction() !== null) {
+              <p class="paint-status">
+                {{
+                  (paintAction() ? 'calendar.paint.adding' : 'calendar.paint.erasing') | translate
+                }}
+              </p>
+            }
+          </div>
+          @if (paintMode() && paintAction() !== null) {
+            <button mat-flat-button type="button" class="paint-done" (click)="paintDone()">
+              {{ 'calendar.paint.done' | translate }}
+            </button>
+          }
+        </div>
+        @if (paintMode()) {
+          <p class="nri-muted hint paint-hint">{{ 'calendar.paint.hint' | translate }}</p>
+        }
+        <div
+          class="templates"
+          role="group"
+          [attr.aria-label]="'calendar.templates.label' | translate"
+        >
+          <button
+            mat-stroked-button
+            type="button"
+            class="tpl-weekday-evenings"
+            (click)="applyTemplate('weekdayEvenings')"
+          >
+            {{ 'calendar.templates.weekdayEvenings' | translate }}
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            class="tpl-weekends"
+            (click)="applyTemplate('weekends')"
+          >
+            {{ 'calendar.templates.weekends' | translate }}
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            class="clear"
+            [disabled]="selectedCount() === 0"
+            (click)="clearWeek()"
+          >
+            {{ 'calendar.clear' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-scroll" [class.painting]="paintMode()">
         <div
           role="grid"
           class="grid"
-          aria-multiselectable="true"
           [attr.aria-labelledby]="uid + '-week'"
           [attr.aria-describedby]="uid + '-help'"
           [attr.aria-rowcount]="rows.length + 1"
@@ -68,22 +131,25 @@
               </span>
               @for (d of days; track d) {
                 @let i = d * rows.length + c;
-                <div
-                  role="gridcell"
-                  class="cell"
-                  [class.on]="display()[i]"
-                  [class.game-busy]="gameBusy()[i].length > 0"
-                  [attr.title]="busyTitles()[i]"
-                  [attr.data-day]="d"
-                  [attr.data-cell]="c"
-                  [attr.aria-selected]="display()[i]"
-                  [attr.aria-label]="labels()[d][c]"
-                  [attr.tabindex]="focused() === i ? 0 : -1"
-                  (pointerdown)="onPointerDown($event, d, c)"
-                  (pointerenter)="onPointerEnter(d, c)"
-                  (focus)="focused.set(i)"
-                  (keydown)="onKeydown($event)"
-                ></div>
+                <div role="gridcell" class="slot">
+                  <button
+                    type="button"
+                    class="cell"
+                    [class.on]="display()[i]"
+                    [class.game-busy]="gameBusy()[i].length > 0"
+                    [attr.title]="busyTitles()[i]"
+                    [attr.data-day]="d"
+                    [attr.data-cell]="c"
+                    [attr.aria-pressed]="display()[i]"
+                    [attr.aria-label]="labels()[d][c]"
+                    [attr.tabindex]="focused() === i ? 0 : -1"
+                    (pointerdown)="onPointerDown($event, d, c)"
+                    (pointerenter)="onPointerEnter(d, c)"
+                    (click)="onCellClick($event, i)"
+                    (focus)="focused.set(i)"
+                    (keydown)="onKeydown($event)"
+                  ></button>
+                </div>
               }
             </div>
           }
@@ -165,15 +231,6 @@
           {{ (saving() ? 'common.saving' : 'common.save') | translate }}
         </button>
       }
-      <button
-        mat-stroked-button
-        type="button"
-        class="clear"
-        [disabled]="selectedCount() === 0"
-        (click)="clearWeek()"
-      >
-        {{ 'calendar.clear' | translate }}
-      </button>
     </div>
     <div aria-live="polite">
       @if (message(); as m) {

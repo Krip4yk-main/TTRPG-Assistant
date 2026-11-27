@@ -105,3 +105,27 @@ export function gameBusyCells(
   }
   return out;
 }
+
+/** Шаблон тижня: дні (0 = пн) і проміжок у хвилинах доби — у поясі сітки. */
+export interface WeekTemplate {
+  days: readonly number[];
+  startMin: number;
+  endMin: number;
+}
+
+/** «Будні вечори 18–22»: пн–пт 18:00–22:00. */
+export const WEEKDAY_EVENINGS: WeekTemplate = {
+  days: [0, 1, 2, 3, 4],
+  startMin: 1080,
+  endMin: 1320,
+};
+/** «Вихідні 12–22»: сб–нд 12:00–22:00. */
+export const WEEKENDS: WeekTemplate = { days: [5, 6], startMin: 720, endMin: 1320 };
+
+/** Об'єднання клітинок із шаблоном: позначене лишається позначеним, шаблон додається. */
+export function withTemplate(cells: readonly boolean[], t: WeekTemplate): boolean[] {
+  const add = slotsToCells(
+    t.days.map((d) => ({ weekday: d as Weekday, startMin: t.startMin, endMin: t.endMin })),
+  );
+  return cells.map((on, i) => on || add[i]!);
+}
