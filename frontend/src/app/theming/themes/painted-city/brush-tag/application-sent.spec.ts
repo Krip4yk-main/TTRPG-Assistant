@@ -21,7 +21,7 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     document.querySelectorAll('.pc-send').forEach((o) => o.remove());
   });
 
-  it('the brush paints the uk.json tag stroke by stroke, drips and underline within 1.6 s', async () => {
+  it('the brush paints the uk.json tag stroke by stroke, drips and underline within 1.5 s (+ ≤0.1 s font wait)', async () => {
     const { animate, anims } = fakeAnimate(false);
     Element.prototype.animate = animate;
     const done = paintBrushTag(source, new AbortController().signal, text);
@@ -50,7 +50,8 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
     expect(overlay.querySelector('.pc-send-brush')).not.toBeNull();
     // Сам діалог ефект не чіпає.
     expect(anims.some((a) => a.target === source)).toBe(false);
-    expect(lastEnd(anims)).toBeLessThanOrEqual(1600);
+    // 1.5 с сцени + до 0.1 с чекання шрифту — разом ≤ 1.6 с від успіху.
+    expect(lastEnd(anims)).toBeLessThanOrEqual(1500);
     anims.forEach((a) => a.resolve());
     await done;
     expect(document.querySelector('.pc-send')).toBeNull();
@@ -83,13 +84,13 @@ describe('paintBrushTag («Мальоване місто»: тег пензле�
       expect(animate).toHaveBeenCalled();
     });
 
-    it('does not wait for the font longer than 300 ms', async () => {
+    it('does not wait for the font longer than 100 ms', async () => {
       vi.useFakeTimers();
       fakeFonts(() => new Promise(() => undefined));
       const { animate } = fakeAnimate(true);
       Element.prototype.animate = animate;
       const done = paintBrushTag(source, new AbortController().signal, text);
-      await vi.advanceTimersByTimeAsync(299);
+      await vi.advanceTimersByTimeAsync(99);
       expect(animate).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
       await done;
