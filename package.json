@@ -1,6 +1,7 @@
 {
   "name": "nri-assistant",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "version": "0.1.0",
   "description": "НРІ Асистент — пошук ігор для настільних рольових ігор",
   "engines": {

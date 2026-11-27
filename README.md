@@ -175,6 +175,10 @@ docker run --rm --env-file backend/.env nri-backend node --import tsx src/cli/se
 
 - Шрифти підвантажуються з Google CDN.
 
+## Ліцензія
+
+Проєкт **не є open-source**: [PolyForm Noncommercial 1.0.0](LICENSE) — код можна переглядати й використовувати лише некомерційно; комерційне використання (зокрема запуск як сервісу чи конкурентного продукту) — лише за окремою письмовою ліцензією. Використання репозиторію для навчання моделей ШІ заборонене — див. [AI_POLICY.md](AI_POLICY.md).
+
 ## Автор
 
 - GitHub: [Krip4yk-main](https://github.com/Krip4yk-main)
