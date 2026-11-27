@@ -11,13 +11,30 @@ export interface IdentityDto {
   displayName: string | null;
 }
 
+/** Обране джерело аватара. `auto` — аватар провайдера, з яким створено акаунт (інакше будь-якого прив'язаного). */
+export const AVATAR_SOURCES = ['auto', 'google', 'discord', 'telegram', 'custom', 'none'] as const;
+export type AvatarSource = (typeof AVATAR_SOURCES)[number];
+/** Провайдери, що дають аватар. */
+export type AvatarProvider = 'google' | 'discord' | 'telegram';
+
+/** Доступне джерело аватара (прив'язаний провайдер з аватаром) з URL для прев'ю. */
+export interface AvatarOptionDto {
+  source: AvatarProvider;
+  previewUrl: string;
+}
+
 /** Відповідь `GET /api/me`. */
 export interface MeDto {
   id: number;
   /** Незмінний публічний ідентифікатор (`/users/<publicId>`). */
   publicId: string;
   nickname: string | null;
+  /** Ефективний аватар (за `avatarSource`). */
   avatarUrl: string | null;
+  avatarSource: AvatarSource;
+  customAvatarUrl: string | null;
+  /** Прив'язані провайдери з аватаром — що можна обрати. */
+  avatarOptions: AvatarOptionDto[];
   birthDate: string | null;
   role: UserRole;
   status: UserStatus;
@@ -38,3 +55,19 @@ export interface MeDto {
  */
 export const changeTimezoneSchema = z.object({ timezone: ianaTimezone }).strict();
 export type ChangeTimezoneInput = z.infer<typeof changeTimezoneSchema>;
+
+/** `PUT /api/me/avatar` → `MeDto`. `customUrl` обов'язковий (https) лише для `custom`. */
+export const updateAvatarSchema = z
+  .object({
+    source: z.enum(AVATAR_SOURCES),
+    customUrl: z
+      .url({ protocol: /^https$/ })
+      .max(512)
+      .optional(),
+  })
+  .strict()
+  .refine((v) => (v.source === 'custom') === (v.customUrl !== undefined), {
+    message: 'customUrl is required for custom source only',
+    path: ['customUrl'],
+  });
+export type UpdateAvatarInput = z.infer<typeof updateAvatarSchema>;

@@ -8,6 +8,7 @@ import type { Tx } from '../applications/applications.rules.js';
 import { isDuplicateKey } from '../db/errors.js';
 import { AppError } from '../http/errors.js';
 import { generatePublicId, PUBLIC_ID_ATTEMPTS } from '../users/nickname.js';
+import { recomputeAvatar } from '../users/avatar.js';
 import type { Provider, VerifiedIdentity } from './providers/provider.js';
 
 type Deps = Pick<AppDeps, 'env' | 'db'>;
@@ -93,8 +94,19 @@ async function assertNotBanned({ env, db }: Deps, identity: VerifiedIdentity): P
 }
 
 async function findOwner(db: Deps['db'], identity: VerifiedIdentity): Promise<number | null> {
+  return (await findIdentity(db, identity))?.userId ?? null;
+}
+
+async function findIdentity(
+  db: Deps['db'],
+  identity: VerifiedIdentity,
+): Promise<{ id: number; userId: number; avatarUrl: string | null } | null> {
   const [row] = await db
-    .select({ userId: authIdentities.userId })
+    .select({
+      id: authIdentities.id,
+      userId: authIdentities.userId,
+      avatarUrl: authIdentities.avatarUrl,
+    })
     .from(authIdentities)
     .where(
       and(
@@ -102,7 +114,24 @@ async function findOwner(db: Deps['db'], identity: VerifiedIdentity): Promise<nu
         eq(authIdentities.subject, identity.subject),
       ),
     );
-  return row?.userId ?? null;
+  return row ?? null;
+}
+
+/**
+ * Оновлює аватар ідентичності значенням від провайдера (відсутнє — `NULL`) й, якщо він змінився,
+ * перераховує ефективний `users.avatar_url`.
+ */
+async function refreshIdentityAvatar(
+  db: Deps['db'],
+  row: { id: number; userId: number; avatarUrl: string | null },
+  identity: VerifiedIdentity,
+): Promise<void> {
+  const next = identity.avatarUrl ?? null;
+  if (next === row.avatarUrl) return;
+  await db.transaction(async (tx) => {
+    await tx.update(authIdentities).set({ avatarUrl: next }).where(eq(authIdentities.id, row.id));
+    await recomputeAvatar(tx, row.userId);
+  });
 }
 
 export async function resolveLogin(
@@ -110,8 +139,11 @@ export async function resolveLogin(
   identity: VerifiedIdentity,
 ): Promise<{ userId: number; isNew: boolean }> {
   const { db } = deps;
-  const existing = await findOwner(db, identity);
-  if (existing !== null) return { userId: existing, isNew: false };
+  const existing = await findIdentity(db, identity);
+  if (existing !== null) {
+    await refreshIdentityAvatar(db, existing, identity);
+    return { userId: existing.userId, isNew: false };
+  }
   await assertNotBanned(deps, identity);
 
   let userId: number;
@@ -123,6 +155,7 @@ export async function resolveLogin(
         provider: identity.provider,
         subject: identity.subject,
         displayName: identity.displayName ?? null,
+        avatarUrl: identity.avatarUrl ?? null,
       });
       return u!.id;
     });
@@ -153,11 +186,14 @@ export async function linkIdentity(
     .from(users)
     .where(eq(users.id, userId));
   if (!target || target.status === 'deleted') throw new AppError(404, 'NOT_FOUND');
-  // true — ідентичність уже моя; кидає 409, якщо чужа.
+  // true — ідентичність уже моя (аватар оновлюємо); кидає 409, якщо чужа.
   const alreadyMine = async (): Promise<boolean> => {
-    const owner = await findOwner(db, identity);
-    if (owner === userId) return true;
-    if (owner !== null) throw new AppError(409, 'IDENTITY_TAKEN');
+    const row = await findIdentity(db, identity);
+    if (row?.userId === userId) {
+      await refreshIdentityAvatar(db, row, identity);
+      return true;
+    }
+    if (row) throw new AppError(409, 'IDENTITY_TAKEN');
     return false;
   };
   if (await alreadyMine()) return;
@@ -174,7 +210,9 @@ export async function linkIdentity(
         provider: identity.provider,
         subject: identity.subject,
         displayName: identity.displayName ?? null,
+        avatarUrl: identity.avatarUrl ?? null,
       });
+      await recomputeAvatar(tx, userId);
     });
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;

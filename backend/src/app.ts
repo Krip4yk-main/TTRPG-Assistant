@@ -101,6 +101,7 @@ export function createApp(deps: AppDeps): express.Express {
   // Кожна перевірка обкладинки — зовнішній запит: ≤ 20 на годину на користувача.
   app.post('/api/games', limits.imageCheck);
   app.patch('/api/games/:id', limits.imageCheck);
+  app.put('/api/me/avatar', limits.imageCheck);
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));

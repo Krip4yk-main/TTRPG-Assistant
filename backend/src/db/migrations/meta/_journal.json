@@ -330,6 +330,13 @@
       "when": 1795771643011,
       "tag": "0046_plan15_start_window",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1795775602483,
+      "tag": "0047_plan15_avatars",
+      "breakpoints": true
     }
   ]
 }

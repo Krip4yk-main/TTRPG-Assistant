@@ -11,6 +11,7 @@ import {
   type MeChangedPing,
   type MeDto,
   type ThemeId,
+  type UpdateAvatarInput,
   type UpdateUiPrefsInput,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
@@ -32,6 +33,7 @@ import {
 } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import { AppError } from '../http/errors.js';
+import { assertImageUrl } from '../http/image-url.js';
 import { cancelPendingOutbox } from '../notifications/telegram-outbox.js';
 import {
   leaveCandidates,
@@ -40,9 +42,11 @@ import {
   pingLeaveCascade,
   runLeaveCascade,
 } from './leave-cascade.js';
+import { avatarOptions, recomputeAvatar } from './avatar.js';
 import { deleteCalendarImportTx } from '../scheduling/ical/calendar-import.service.js';
 
 type Provider = typeof authIdentities.$inferSelect.provider;
+type AvatarSourceValue = typeof users.$inferSelect.avatarSource;
 
 const DAY_MS = 86_400_000;
 export type Clock = () => Date;
@@ -69,7 +73,11 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
   const [u] = await db.select().from(users).where(eq(users.id, userId));
   if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
   const identities = await db
-    .select({ provider: authIdentities.provider, displayName: authIdentities.displayName })
+    .select({
+      provider: authIdentities.provider,
+      displayName: authIdentities.displayName,
+      avatarUrl: authIdentities.avatarUrl,
+    })
     .from(authIdentities)
     .where(eq(authIdentities.userId, userId))
     .orderBy(authIdentities.id);
@@ -78,16 +86,51 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     publicId: u.publicId,
     nickname: u.nickname,
     avatarUrl: u.avatarUrl,
+    avatarSource: u.avatarSource,
+    customAvatarUrl: u.customAvatarUrl,
+    avatarOptions: avatarOptions(identities),
     birthDate: u.birthDate,
     role: u.role,
     status: u.status,
     timezone: u.timezone,
     locale: u.locale,
-    identities,
+    identities: identities.map(({ provider, displayName }) => ({ provider, displayName })),
     uiTheme: resolveTheme(u.uiTheme, u.role),
     availableThemes: availableThemes(u.role),
     uiPrefs: { tearAnimation: u.qbTearAnimation, sendAnimation: u.uiSendAnimation },
   };
+}
+
+/**
+ * Зміна джерела аватара. Провайдер має бути прив'язаний і мати аватар (інакше 422
+ * `AVATAR_SOURCE_UNAVAILABLE`); `custom` — посилання перевіряється (`assertImageUrl`, поза транзакцією).
+ */
+export async function changeAvatar(
+  deps: Pick<AppDeps, 'db' | 'imageUrlChecker'>,
+  userId: number,
+  input: UpdateAvatarInput,
+): Promise<MeDto> {
+  const { db } = deps;
+  const { source, customUrl } = input;
+  if (source !== 'auto' && source !== 'none' && source !== 'custom') {
+    const [row] = await db
+      .select({ avatarUrl: authIdentities.avatarUrl })
+      .from(authIdentities)
+      .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, source)));
+    if (!row?.avatarUrl) throw new AppError(422, 'AVATAR_SOURCE_UNAVAILABLE');
+  }
+  if (source === 'custom') await assertImageUrl(deps, 'customUrl', customUrl!);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        avatarSource: source,
+        ...(source === 'custom' ? { customAvatarUrl: customUrl! } : {}),
+      })
+      .where(eq(users.id, userId));
+    await recomputeAvatar(tx, userId);
+  });
+  return getMe(deps, userId);
 }
 
 export type CompleteResult = { ok: true } | { ok: false; rejected: 'AGE_TOO_LOW' };
@@ -291,6 +334,12 @@ export async function unlinkIdentity(
     // повторну реєстрацію й прив'язку (ухилення від бану).
     await upsertTombstone(tx, deps.env.IDENTITY_PEPPER, userId, u?.isBanned ?? false, target);
     await tx.delete(authIdentities).where(eq(authIdentities.id, target.id));
+    // Обране джерело зникло разом з ідентичністю → повертаємось до `auto`.
+    await tx
+      .update(users)
+      .set({ avatarSource: 'auto' })
+      .where(and(eq(users.id, userId), eq(users.avatarSource, provider as AvatarSourceValue)));
+    await recomputeAvatar(tx, userId);
     // Ще не надіслане в цей чат більше не доставляємо.
     if (provider === 'telegram') await cancelPendingOutbox(tx, userId, 'unlinked');
   });
@@ -338,6 +387,8 @@ export async function deleteAccount(deps: AppDeps, userId: number): Promise<void
         role: 'user',
         nickname: null,
         avatarUrl: null,
+        avatarSource: 'auto',
+        customAvatarUrl: null,
         birthDate: null,
         birthDateChangedAt: null,
         deletedAt: now,

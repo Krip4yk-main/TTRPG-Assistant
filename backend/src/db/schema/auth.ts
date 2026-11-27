@@ -26,6 +26,8 @@ export const authIdentities = mysqlTable(
     provider: mysqlEnum('provider', providers).notNull(),
     subject: varchar('subject', { length: 191 }).notNull(),
     displayName: varchar('display_name', { length: 191 }),
+    /** Аватар від провайдера; оновлюється при кожному вході/прив'язці (NULL — немає). */
+    avatarUrl: varchar('avatar_url', { length: 512 }),
     createdAt: datetime('created_at')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),

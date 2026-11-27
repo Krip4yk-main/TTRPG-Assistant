@@ -30,6 +30,9 @@ const base = {
   status: 'active' as const,
   timezone: 'Europe/Kyiv',
   locale: 'uk',
+  avatarSource: 'auto',
+  customAvatarUrl: null,
+  avatarOptions: [],
   identities: [] as MeDto['identities'],
 } satisfies Partial<MeDto>;
 

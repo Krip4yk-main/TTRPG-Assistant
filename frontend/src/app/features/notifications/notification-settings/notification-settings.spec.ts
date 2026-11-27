@@ -30,6 +30,9 @@ const me = (telegram: boolean): MeDto => ({
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
+  avatarSource: 'auto',
+  customAvatarUrl: null,
+  avatarOptions: [],
   identities: telegram
     ? [{ provider: 'telegram', displayName: '@gandalf' }]
     : [{ provider: 'dev', displayName: 'G' }],

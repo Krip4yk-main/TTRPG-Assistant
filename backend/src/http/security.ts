@@ -77,8 +77,8 @@ export const IMAGE_CHECK_WINDOW_SEC = 3600;
 
 function hasImageUrl(body: unknown): boolean {
   if (!body || typeof body !== 'object') return false;
-  const v = (body as Record<string, unknown>).coverUrl;
-  return typeof v === 'string' && v.length > 0;
+  const { coverUrl, customUrl } = body as Record<string, unknown>;
+  return [coverUrl, customUrl].some((v) => typeof v === 'string' && v.length > 0);
 }
 
 /**
@@ -108,7 +108,7 @@ export function rateLimiters(env: Env, redis: Redis) {
     auth: limiter(redis, 'auth', env.RATE_LIMIT_WINDOW_SEC, env.RATE_LIMIT_AUTH_MAX),
     /**
      * Перевірки посилань на картинки (кожна — зовнішній запит): ≤ 20 на годину на користувача.
-     * Монтується після сесії й розбору тіла; рахуються лише запити з непорожнім `coverUrl`
+     * Монтується після сесії й розбору тіла; рахуються лише запити з непорожнім `coverUrl` (обкладинка гри) чи `customUrl` (аватар)
      * (без сесії — пропуск: такий запит однаково відхилить `requireAuth`).
      */
     imageCheck: limiter(

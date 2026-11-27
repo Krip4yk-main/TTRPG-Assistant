@@ -23,6 +23,9 @@ const me = {
   uiTheme: 'quest-board',
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
+  avatarSource: 'auto',
+  customAvatarUrl: null,
+  avatarOptions: [],
   identities: [],
 } satisfies MeDto;
 

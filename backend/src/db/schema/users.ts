@@ -17,7 +17,21 @@ export const users = mysqlTable('users', {
   /** Незмінний публічний ідентифікатор (URL профілю `/users/<publicId>`). */
   publicId: char('public_id', { length: 10 }).notNull().unique(),
   nickname: varchar('nickname', { length: 32 }).unique(),
+  /** Ефективний аватар (обчислюється з `avatarSource`, див. `users/avatar.ts`); його читають усі споживачі. */
   avatarUrl: varchar('avatar_url', { length: 512 }),
+  /** Обране джерело аватара; `auto` — аватар провайдера, з яким створено акаунт. */
+  avatarSource: mysqlEnum('avatar_source', [
+    'auto',
+    'google',
+    'discord',
+    'telegram',
+    'custom',
+    'none',
+  ])
+    .notNull()
+    .default('auto'),
+  /** Власне посилання на аватар (використовується за `avatarSource = custom`). */
+  customAvatarUrl: varchar('custom_avatar_url', { length: 512 }),
   birthDate: date('birth_date', { mode: 'string' }),
   birthDateChangedAt: datetime('birth_date_changed_at'),
   role: mysqlEnum('role', ['owner', 'admin', 'moderator', 'user']).notNull().default('user'),
