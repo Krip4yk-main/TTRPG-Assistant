@@ -1,8 +1,8 @@
 #!/bin/bash
 # Зашифрований бекап БД: mysqldump | gzip | openssl enc → $BACKUP_DIR/nri-YYYY-MM-DDTHHMMZ.sql.gz.enc
 # Незашифрований дамп не торкається диска: усе йде одним пайпом.
-# Ротація: 30 щоденних у $BACKUP_DIR + 12 місячних у $BACKUP_DIR/monthly (копія 1-го числа
-# або перша за місяць). Каталог weekly/ зі старої схеми не чіпаємо й не наповнюємо.
+# Ротація: 30 щоденних у $BACKUP_DIR + 12 місячних у $BACKUP_DIR/monthly (перша копія місяця —
+# зазвичай 1-го числа; повторний запуск копію не дублює). Каталог weekly/ зі старої схеми не чіпаємо й не наповнюємо.
 # Копія поза сервером — rclone (S3: Cloudflare R2 / Backblaze B2): daily/ 30 днів, monthly/ 365 днів.
 # Документація: docs/ops/backups.md. `set -x` тут заборонено — він би показав секрети.
 set -euo pipefail
@@ -89,15 +89,27 @@ REMOTE="offsite:$BACKUP_S3_BUCKET/nri"
 rclone copyto --stats 0 "$TARGET" "$REMOTE/daily/$NAME"   || die "off-site upload failed (local backup is kept)"
 log "off-site copy uploaded: daily/$NAME"
 
-# Місячна копія: бекап 1-го числа або за цей місяць у monthly/ ще нічого немає.
+# Місячна копія: лише якщо за цей місяць у monthly/ ще нічого немає (див. monthly_copy_needed).
+# Помилку переліку не ховаємо: WARN і пропуск місячної копії цього разу (без дубля навмання).
+# Код 3 rclone — «каталог не знайдено» (monthly/ ще порожній) — це «копії немає».
 MONTH="$(backup_month "$NAME")"
-remote_have=no
-if [ -n "$(rclone lsf --stats 0 --files-only --include "nri-${MONTH}-*.sql.gz.enc" "$REMOTE/monthly" 2>/dev/null)" ]; then
-  remote_have=yes
+remote_rc=0
+remote_list="$(rclone lsf --stats 0 --files-only --include "nri-${MONTH}-*.sql.gz.enc" "$REMOTE/monthly")"   || remote_rc=$?
+if [ "$remote_rc" -eq 3 ]; then
+  remote_list=""
+  remote_rc=0
 fi
-if monthly_copy_needed "$NAME" "$remote_have"; then
-  rclone copyto --stats 0 "$TARGET" "$REMOTE/monthly/$NAME"     || die "off-site monthly upload failed (local backup is kept)"
-  log "off-site monthly copy uploaded: monthly/$NAME"
+if [ "$remote_rc" -ne 0 ]; then
+  log "WARN: off-site monthly listing failed (rclone exit $remote_rc) — monthly upload skipped this run"
+else
+  remote_have=no
+  if [ -n "$remote_list" ]; then
+    remote_have=yes
+  fi
+  if monthly_copy_needed "$NAME" "$remote_have"; then
+    rclone copyto --stats 0 "$TARGET" "$REMOTE/monthly/$NAME"       || die "off-site monthly upload failed (local backup is kept)"
+    log "off-site monthly copy uploaded: monthly/$NAME"
+  fi
 fi
 
 rclone delete --stats 0 --min-age "$REMOTE_DAILY_MAX_AGE" --include 'nri-*.sql.gz.enc' "$REMOTE/daily"   || die "off-site rotation (daily) failed"
