@@ -127,6 +127,9 @@
               <mat-error>{{ key | translate: { max: 512 } }}</mat-error>
             }
           </mat-form-field>
+          @if (apiError('coverUrl'); as key) {
+            <p class="field-error" role="alert">{{ key | translate }}</p>
+          }
         </div>
       </fieldset>
 

@@ -61,6 +61,7 @@ import {
 } from '../sessions/materialize.js';
 import { assertNoSanction, isPaid } from '../moderation/sanctions.enforce.js';
 import { AppError } from '../http/errors.js';
+import { assertImageUrl } from '../http/image-url.js';
 import { toCardView, toGameView, viewerAge, type Viewer } from './games.visibility.js';
 import { deadGameIdsOf, sessionAnchors, stalenessOf } from './dead-games/rules.js';
 import {
@@ -436,6 +437,8 @@ export async function createGame(deps: AppDeps, userId: number, body: unknown): 
   await assertCatalogRefs(deps, input);
   // `no_paid_create`: нову платну гру не створити (безплатну — можна).
   if (isPaid(input.priceUah)) await assertNoSanction(db, userId, 'no_paid_create', now);
+  // Мережевий запит — до транзакції (не тримаємо її відкритою під час завантаження).
+  if (input.coverUrl !== null) await assertImageUrl(deps, 'coverUrl', input.coverUrl);
   const id = await db.transaction(async (tx) => {
     const [res] = await tx
       .insert(games)
@@ -470,6 +473,10 @@ export async function updateGame(
   const { row: seen } = await loadOwned(deps, userId, id);
   if (seen.status === 'finished' || seen.status === 'cancelled') {
     throw new AppError(409, 'GAME_INVALID_TRANSITION');
+  }
+  // Нове посилання на обкладинку перевіряється до транзакції; незмінене — ні (уже перевірене).
+  if (patch.coverUrl != null && patch.coverUrl !== seen.coverUrl) {
+    await assertImageUrl(deps, 'coverUrl', patch.coverUrl);
   }
   await patchHooks.beforeWrite?.(id);
   const gm = await loadGm(deps, userId);

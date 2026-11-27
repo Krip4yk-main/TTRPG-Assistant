@@ -7,7 +7,7 @@
   [attr.aria-labelledby]="ids.name"
 >
   <header class="head">
-    @if (t.avatarUrl) {
+    @if (t.avatarUrl && brokenAvatar() !== t.avatarUrl) {
       <img
         class="avatar"
         [src]="t.avatarUrl"
@@ -15,6 +15,7 @@
         width="40"
         height="40"
         referrerpolicy="no-referrer"
+        (error)="brokenAvatar.set(t.avatarUrl)"
       />
     } @else {
       <span class="avatar placeholder" aria-hidden="true"><mat-icon>person</mat-icon></span>

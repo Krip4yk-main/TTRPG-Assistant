@@ -421,6 +421,41 @@ describe('GameForm', () => {
     await settle();
   });
 
+  it.each(['unreachable', 'not_image', 'too_large', 'forbidden_address', 'timeout'])(
+    'IMAGE_URL_INVALID %s: reason text next to the cover field',
+    async (reason) => {
+      await setup(5, game({ status: 'draft' }));
+      await type('input[formcontrolname="coverUrl"]', 'https://img.example.com/x.png');
+      await submit();
+      http
+        .expectOne('/api/games/5')
+        .flush(
+          { error: { code: 'IMAGE_URL_INVALID', details: { field: 'coverUrl', reason } } },
+          { status: 422, statusText: 'Unprocessable' },
+        );
+      await settle();
+      const coverField = q<HTMLInputElement>('input[formcontrolname="coverUrl"]').closest(
+        '.field',
+      )!;
+      expect(coverField.textContent).toContain(`errors.imageUrl.${reason}`);
+      expect(fixture.nativeElement.querySelector('.nri-alert')).toBeNull();
+      await type('input[formcontrolname="coverUrl"]', 'https://img.example.com/y.png');
+      expect(coverField.textContent).not.toContain('errors.imageUrl');
+    },
+  );
+
+  it('an unchanged cover URL is not sent again in the PATCH; a new one is', async () => {
+    const cover = 'https://img.example.com/cover.png';
+    await setup(5, game({ status: 'draft', coverUrl: cover }));
+    await type('input[formcontrolname="title"]', 'Нова назва');
+    await submit();
+    const req = http.expectOne('/api/games/5');
+    expect(req.request.body).toMatchObject({ title: 'Нова назва' });
+    expect(req.request.body).not.toHaveProperty('coverUrl');
+    req.flush(game({ status: 'draft', title: 'Нова назва', coverUrl: cover }));
+    await settle();
+  });
+
   it('a server field error clears once the user edits that field', async () => {
     await setup(5, game({ status: 'draft' }));
     await submit();

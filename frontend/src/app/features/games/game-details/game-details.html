@@ -63,12 +63,13 @@
         </article>
       } @else if (game(); as g) {
         <article class="game">
-          @if (g.coverUrl) {
+          @if (g.coverUrl && brokenCover() !== g.coverUrl) {
             <img
               class="cover"
               [src]="g.coverUrl"
               [alt]="'games.details.coverAlt' | translate: { title: g.title }"
               referrerpolicy="no-referrer"
+              (error)="brokenCover.set(g.coverUrl)"
             />
           }
 

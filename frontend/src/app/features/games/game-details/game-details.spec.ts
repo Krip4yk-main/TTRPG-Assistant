@@ -211,6 +211,14 @@ describe('GameDetails', () => {
     expect(el().querySelector('a[href="/games/7/edit"]')).toBeNull();
   });
 
+  it('a broken cover URL hides the image instead of leaving a broken one', async () => {
+    await open(me, (r) => r.flush(game));
+    el().querySelector('img.cover')!.dispatchEvent(new Event('error'));
+    await settle();
+    expect(el().querySelector('img.cover')).toBeNull();
+    expect(el().textContent).toContain('Туман над Дніпром');
+  });
+
   it('a game closed by the administration carries the label; others do not', async () => {
     expect(game.closedByAdmin).toBe(false);
     await open(null, (r) =>

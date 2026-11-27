@@ -159,6 +159,8 @@ export class GameDetails {
   readonly session = input<string | undefined>();
 
   protected readonly view = signal<GameViewDto | null>(null);
+  /** Обкладинка, що не завантажилась (битий URL): ховаємо, як гру без обкладинки. */
+  protected readonly brokenCover = signal<string | null>(null);
   protected readonly state = signal<'loading' | 'ready' | 'notFound' | 'error'>('loading');
   protected readonly notice = signal<Notice | null>(null);
   /** Іде подання/відкликання заявки — захист від подвійного кліку. */

@@ -30,6 +30,7 @@ import { gameSchedulingRouter, pollsRouter } from './scheduling/scheduling.route
 import { calendarImportRouter } from './scheduling/ical/calendar-import.routes.js';
 import type { IcsFetcher } from './scheduling/ical/fetch.js';
 import type { IcsParser } from './scheduling/ical/parse-runner.js';
+import type { ImageUrlChecker } from './http/image-url.js';
 import { gameNotesRouter, sessionNotesRouter } from './notes/notes.routes.js';
 import { notificationsRouter } from './notifications/notifications.routes.js';
 import { notificationPrefsRouter } from './notifications/prefs.routes.js';
@@ -60,6 +61,8 @@ export type AppDeps = {
   /** DI для тестів імпорту iCal: завантаження й розбір (за замовчуванням — безпечні реальні). */
   icsFetcher?: IcsFetcher;
   icsParser?: IcsParser;
+  /** DI для тестів: перевірка посилань на картинки (за замовчуванням — безпечна реальна). */
+  imageUrlChecker?: ImageUrlChecker;
 };
 
 export function createApp(deps: AppDeps): express.Express {
@@ -85,6 +88,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(express.json({ limit: '100kb' }));
   app.use(csrfProtection(env));
   app.use(loadSession(deps));
+  // Кожна перевірка обкладинки — зовнішній запит: ≤ 20 на годину на користувача.
+  app.post('/api/games', limits.imageCheck);
+  app.patch('/api/games/:id', limits.imageCheck);
 
   const auth = requireAuth(deps);
   app.use('/api/auth', authRouter(deps));

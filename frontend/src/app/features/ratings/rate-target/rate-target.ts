@@ -93,6 +93,8 @@ export class RateTarget {
   })();
   protected readonly commentMax = RATING_COMMENT_MAX;
 
+  /** Аватар, що не завантажився (битий URL) — замість нього плейсхолдер. */
+  protected readonly brokenAvatar = signal<string | null>(null);
   protected readonly overall = signal<number | null>(null);
   protected readonly scores = signal<Partial<Record<RatingCriterion, number>>>({});
   protected readonly comment = signal('');

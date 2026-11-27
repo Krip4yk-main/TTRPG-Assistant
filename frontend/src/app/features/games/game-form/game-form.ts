@@ -40,6 +40,7 @@ import {
   GAME_EXPERIENCE,
   GAME_LANGUAGES,
   GAME_LOCKED_AFTER_PUBLISH,
+  IMAGE_URL_INVALID_REASONS,
   type GameDto,
   type GameExperience,
   type GameFormat,
@@ -569,12 +570,20 @@ export class GameForm {
     }
   }
 
-  /** Після публікації заблоковані поля не надсилаються; для гри, що йде, — і правило розкладу. */
+  /**
+   * Після публікації заблоковані поля не надсилаються; для гри, що йде, — і правило розкладу.
+   * Незмінене посилання на обкладинку теж не надсилається: сервер перевіряє (і обмежує за
+   * частотою) лише нові посилання.
+   */
   private patchFor(input: GameInput): GamePatch {
-    if (!this.locked()) return input;
     const patch: Record<string, unknown> = { ...input };
-    for (const field of GAME_LOCKED_AFTER_PUBLISH) delete patch[field];
-    if (this.scheduleLocked()) for (const field of RULE_FIELDS) delete patch[field];
+    if (input.coverUrl !== null && input.coverUrl === this.game()?.coverUrl) {
+      delete patch['coverUrl'];
+    }
+    if (this.locked()) {
+      for (const field of GAME_LOCKED_AFTER_PUBLISH) delete patch[field];
+      if (this.scheduleLocked()) for (const field of RULE_FIELDS) delete patch[field];
+    }
     return patch as GamePatch;
   }
 
@@ -604,6 +613,12 @@ export class GameForm {
       fieldErrors['ageRating'] = 'errors.AGE_RESTRICTED_CREATE';
     } else if (code === 'GAME_IN_PAST') {
       fieldErrors['startDate'] = 'errors.GAME_IN_PAST';
+    } else if (code === 'IMAGE_URL_INVALID') {
+      // Посилання на обкладинку не пройшло перевірку сервера: причина — біля поля.
+      const reason = (IMAGE_URL_INVALID_REASONS as readonly unknown[]).includes(d.reason)
+        ? (d.reason as string)
+        : 'unreachable';
+      fieldErrors['coverUrl'] = `errors.imageUrl.${reason}`;
     } else if (code === 'VALIDATION') {
       if (Array.isArray(details)) {
         for (const issue of details as ZodLikeIssue[]) {

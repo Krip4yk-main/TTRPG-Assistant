@@ -27,7 +27,7 @@
           </div>
         } @else {
           <header class="nri-card head">
-            @if (p.avatarUrl) {
+            @if (p.avatarUrl && brokenAvatar() !== p.avatarUrl) {
               <img
                 class="avatar"
                 [src]="p.avatarUrl"
@@ -35,6 +35,7 @@
                 width="96"
                 height="96"
                 referrerpolicy="no-referrer"
+                (error)="brokenAvatar.set(p.avatarUrl)"
               />
             } @else {
               <span class="avatar placeholder" aria-hidden="true">

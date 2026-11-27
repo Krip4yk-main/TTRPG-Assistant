@@ -61,6 +61,8 @@ export class ProfilePage {
   readonly publicId = input.required<string>();
 
   protected readonly profile = signal<PublicProfileDto | null>(null);
+  /** Аватар, що не завантажився (битий URL) — замість нього плейсхолдер. */
+  protected readonly brokenAvatar = signal<string | null>(null);
   protected readonly state = signal<'loading' | 'ready' | 'notFound' | 'error'>('loading');
   private seq = 0;
 

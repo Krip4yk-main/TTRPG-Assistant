@@ -108,6 +108,25 @@ describe('ProfilePage', () => {
 
   afterEach(() => http.verify());
 
+  it('a broken avatar URL falls back to the placeholder', async () => {
+    await open(me, 'zzzzzzzzzz', {
+      publicId: 'zzzzzzzzzz',
+      status: 'active',
+      nickname: 'Gandalf',
+      avatarUrl: 'https://example.com/broken.png',
+      gamesAsGm: [],
+      gamesAsPlayer: [],
+      ratings: { gm: null, playerFromGm: null, playerFromPlayer: null },
+    });
+    const img = el().querySelector<HTMLImageElement>('img.avatar')!;
+    expect(img.getAttribute('src')).toBe('https://example.com/broken.png');
+    expect(el().querySelector('.avatar.placeholder')).toBeNull();
+    img.dispatchEvent(new Event('error'));
+    await settle();
+    expect(el().querySelector('img.avatar')).toBeNull();
+    expect(el().querySelector('.avatar.placeholder')).not.toBeNull();
+  });
+
   it("does not render hidden fields on someone else's profile", async () => {
     await open(me, 'zzzzzzzzzz', {
       publicId: 'zzzzzzzzzz',

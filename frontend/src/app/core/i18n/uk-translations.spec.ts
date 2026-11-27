@@ -3,15 +3,21 @@ import {
   APPLICATION_STATUSES,
   CONSTRAINT_RESPONSES,
   ERROR_CODES,
+  IMAGE_URL_INVALID_REASONS,
   SESSION_STATUSES,
 } from '@nri/shared';
 import uk from '../../../assets/i18n/uk.json';
 
 describe('uk.json', () => {
   it('має переклад для кожного коду помилки API', () => {
-    const errors = uk.errors as Record<string, string>;
+    const errors = uk.errors as unknown as Record<string, unknown>;
     const missing = ERROR_CODES.filter((code) => !errors[code]);
     expect(missing).toEqual([]);
+  });
+
+  it('має текст для кожної причини IMAGE_URL_INVALID', () => {
+    const texts = (uk.errors as unknown as Record<string, Record<string, string>>)['imageUrl']!;
+    expect(IMAGE_URL_INVALID_REASONS.filter((r) => !texts[r])).toEqual([]);
   });
 
   it('має ключ «Видалений користувач»', () => {

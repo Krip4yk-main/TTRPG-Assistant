@@ -46,11 +46,13 @@ function limiter(
   windowSec: number,
   limit: number,
   skip?: (req: Request) => boolean,
+  keyGenerator?: (req: Request) => string,
 ): RequestHandler {
   return rateLimit({
     windowMs: windowSec * 1000,
     limit,
     skip,
+    ...(keyGenerator ? { keyGenerator } : {}),
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     store: new RedisStore({
@@ -70,6 +72,15 @@ function limiter(
   });
 }
 
+export const IMAGE_CHECK_MAX = 20;
+export const IMAGE_CHECK_WINDOW_SEC = 3600;
+
+function hasImageUrl(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false;
+  const v = (body as Record<string, unknown>).coverUrl;
+  return typeof v === 'string' && v.length > 0;
+}
+
 export function rateLimiters(env: Env, redis: Redis) {
   return {
     // Бот із дійсним ключем не обмежується; запити з хибним ключем лишаються під лімітом.
@@ -81,5 +92,18 @@ export function rateLimiters(env: Env, redis: Redis) {
       (req) => req.path.startsWith('/internal/') && hasValidInternalKey(req, env.INTERNAL_API_KEY),
     ),
     auth: limiter(redis, 'auth', env.RATE_LIMIT_WINDOW_SEC, env.RATE_LIMIT_AUTH_MAX),
+    /**
+     * Перевірки посилань на картинки (кожна — зовнішній запит): ≤ 20 на годину на користувача.
+     * Монтується після сесії й розбору тіла; рахуються лише запити з непорожнім `coverUrl`
+     * (без сесії — пропуск: такий запит однаково відхилить `requireAuth`).
+     */
+    imageCheck: limiter(
+      redis,
+      'image',
+      IMAGE_CHECK_WINDOW_SEC,
+      IMAGE_CHECK_MAX,
+      (req) => !req.user || !hasImageUrl(req.body),
+      (req) => `u:${req.user!.userId}`,
+    ),
   };
 }
