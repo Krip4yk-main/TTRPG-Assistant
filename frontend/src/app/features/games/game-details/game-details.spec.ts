@@ -1120,6 +1120,15 @@ describe('GameDetails', () => {
       expect(source).toBe(el().querySelector('article.game'));
     });
 
+    it('leaving the page aborts the running effect', async () => {
+      await open(null, (r) => r.flush(game), '/games/7', 7);
+      const cancel = effects.play.mock.calls[0]![3] as AbortSignal;
+      expect(cancel).toBeInstanceOf(AbortSignal);
+      expect(cancel.aborted).toBe(false);
+      await harness.navigateByUrl('/elsewhere');
+      expect(cancel.aborted).toBe(true);
+    });
+
     it('direct URL / refresh (no card mark) — no effect', async () => {
       await open(null, (r) => r.flush(game));
       expect(effects.preload).not.toHaveBeenCalledWith('gameOpened');

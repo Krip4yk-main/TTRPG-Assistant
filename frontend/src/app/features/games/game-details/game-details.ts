@@ -166,6 +166,8 @@ export class GameDetails {
   /** Підсвітити шапку гри після оновлення деталей. */
   protected readonly flashDetails = signal(false);
   private flashTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Перериває фірмову анімацію `gameOpened`, коли сторінку знищено. */
+  private readonly effectCancel = new AbortController();
 
   /** `:id` з маршруту. */
   readonly id = input.required<string>();
@@ -418,6 +420,8 @@ export class GameDetails {
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.flashTimer) clearTimeout(this.flashTimer);
+      // Пішли зі сторінки — фірмова анімація відкриття гри більше не потрібна.
+      this.effectCancel.abort();
     });
     effect(() => {
       const g = this.game();
@@ -864,7 +868,9 @@ export class GameDetails {
         const target = this.host.nativeElement.querySelector<HTMLElement>(
           'article.game, article.restricted',
         );
-        if (target) void this.themes.playEffect('gameOpened', target);
+        if (target) {
+          void this.themes.playEffect('gameOpened', target, undefined, this.effectCancel.signal);
+        }
       },
       { injector: this.injector },
     );

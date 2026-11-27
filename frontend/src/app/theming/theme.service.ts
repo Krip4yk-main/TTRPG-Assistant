@@ -218,24 +218,35 @@ export class ThemeService {
    * `EFFECT_LOAD_TIMEOUT_MS` — завершується одразу, `onStart` не викликається. Ніколи не
    * відхиляється: збій ефекту — тихо, довше за `EFFECT_TIMEOUT_MS` — ефект переривається, і
    * викликач іде далі. `onStart` — саме перед стартом ефекту (напр. заборонити закриття).
+   * `cancel` — викликач більше не потребує ефекту (компонент знищено, панель закрито): ефект
+   * переривається й прибирає себе, проміс завершується одразу; уже скасовано до старту —
+   * ефект не стартує (`onStart` не викликається).
    */
   async playEffect(
     name: ThemeEffectName,
     source: HTMLElement,
     onStart?: () => void,
+    cancel?: AbortSignal,
   ): Promise<void> {
     const def = this.activeEffect(name);
-    if (!def) return;
+    if (!def || cancel?.aborted) return;
     try {
       const effect = await withTimeout(this.loadEffect(def), EFFECT_LOAD_TIMEOUT_MS);
-      if (!effect) return;
+      if (!effect || cancel?.aborted) return;
       onStart?.();
       const abort = new AbortController();
-      const done = await withTimeout(
-        effect(source, abort.signal, (key) => this.effectText(key)).then(() => true),
-        EFFECT_TIMEOUT_MS,
+      const stop = () => abort.abort();
+      const timer = setTimeout(stop, EFFECT_TIMEOUT_MS);
+      cancel?.addEventListener('abort', stop, { once: true });
+      const aborted = new Promise<void>((resolve) =>
+        abort.signal.addEventListener('abort', () => resolve(), { once: true }),
       );
-      if (!done) abort.abort();
+      try {
+        await Promise.race([effect(source, abort.signal, (key) => this.effectText(key)), aborted]);
+      } finally {
+        clearTimeout(timer);
+        cancel?.removeEventListener('abort', stop);
+      }
     } catch {
       // Ефект декоративний: його збій не заважає основній дії.
     }

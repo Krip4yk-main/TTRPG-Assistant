@@ -970,6 +970,61 @@ describe('ThemeService', () => {
       expect(signal?.aborted).toBe(true);
     });
 
+    it('cancel aborts a running effect and resolves at once', async () => {
+      let signal: AbortSignal | undefined;
+      const { reg } = withEffect((_el, s) => {
+        signal = s;
+        return new Promise<void>(() => {});
+      });
+      await start(reg);
+      const cancel = new AbortController();
+      let done = false;
+      const played = service
+        .playEffect('applicationSent', source(), undefined, cancel.signal)
+        .then(() => (done = true));
+      await vi.waitFor(() => expect(signal).toBeDefined());
+      expect(signal!.aborted).toBe(false);
+      expect(done).toBe(false);
+      cancel.abort();
+      await played;
+      expect(done).toBe(true);
+      expect(signal!.aborted).toBe(true);
+    });
+
+    it('already cancelled → the effect never starts (no onStart)', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      const { reg } = withEffect(effect);
+      await start(reg);
+      const cancel = new AbortController();
+      cancel.abort();
+      const onStart = vi.fn();
+      await service.playEffect('applicationSent', source(), onStart, cancel.signal);
+      expect(onStart).not.toHaveBeenCalled();
+      expect(effect).not.toHaveBeenCalled();
+    });
+
+    it('cancelled while the chunk loads → the effect never starts', async () => {
+      const effect = vi.fn<ThemeEffect>(async () => {});
+      let release!: (e: ThemeEffect) => void;
+      const { reg } = withEffect(
+        effect,
+        () =>
+          new Promise<ThemeEffect>((resolve) => {
+            release = resolve;
+          }),
+      );
+      await start(reg);
+      const cancel = new AbortController();
+      const onStart = vi.fn();
+      const played = service.playEffect('applicationSent', source(), onStart, cancel.signal);
+      await vi.waitFor(() => expect(release).toBeDefined());
+      cancel.abort();
+      release(effect);
+      await played;
+      expect(onStart).not.toHaveBeenCalled();
+      expect(effect).not.toHaveBeenCalled();
+    });
+
     it('a chunk slower than EFFECT_LOAD_TIMEOUT_MS skips the effect (no onStart)', async () => {
       const effect = vi.fn<ThemeEffect>(async () => {});
       let release!: (e: ThemeEffect) => void;
