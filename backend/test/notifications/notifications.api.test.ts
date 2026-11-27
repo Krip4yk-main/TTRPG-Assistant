@@ -148,6 +148,7 @@ describe('/api/me/notification-prefs', () => {
       },
       site: { schedule: true },
       reminderOffsets: [1440, 60],
+      quietHours: { enabled: true, start: '23:00', end: '08:00' },
     });
     const put = await call('put', '/api/me/notification-prefs', u.cookie, {
       telegram,
@@ -159,6 +160,7 @@ describe('/api/me/notification-prefs', () => {
       telegram: { ...telegram, schedule: true },
       site: { schedule: true },
       reminderOffsets: [2880, 15],
+      quietHours: { enabled: true, start: '23:00', end: '08:00' },
     });
     expect((await call('get', '/api/me/notification-prefs', u.cookie)).body).toEqual(put.body);
     const off = await call('put', '/api/me/notification-prefs', u.cookie, {
@@ -185,7 +187,44 @@ describe('/api/me/notification-prefs', () => {
       telegram: { ...legacy, ratings: true, moderation: true, schedule: true },
       site: { schedule: true },
       reminderOffsets: [60],
+      quietHours: { enabled: true, start: '23:00', end: '08:00' },
     });
+  });
+
+  it('quiet hours: saved and read back; omitted keeps the saved value; validated', async () => {
+    const u = await userWithAge(25);
+    const quietHours = { enabled: false, start: '22:30', end: '07:00' };
+    const put = await call('put', '/api/me/notification-prefs', u.cookie, {
+      telegram,
+      reminderOffsets: [60],
+      quietHours,
+    });
+    expect(put.status).toBe(200);
+    expect(put.body.quietHours).toEqual(quietHours);
+    const [row] = await db.select().from(notificationPrefs);
+    expect(row).toMatchObject({
+      quietHoursEnabled: false,
+      quietHoursStart: '22:30',
+      quietHoursEnd: '07:00',
+    });
+    const legacy = await call('put', '/api/me/notification-prefs', u.cookie, {
+      telegram,
+      reminderOffsets: [60],
+    });
+    expect(legacy.body.quietHours).toEqual(quietHours);
+    for (const bad of [
+      { ...quietHours, start: '22:15' },
+      { ...quietHours, end: '22:30' },
+      { ...quietHours, end: '8:00' },
+      { start: '22:30', end: '07:00' },
+    ]) {
+      const res = await call('put', '/api/me/notification-prefs', u.cookie, {
+        telegram,
+        reminderOffsets: [60],
+        quietHours: bad,
+      });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
   });
 
   it('«Розклад»: toggled for Telegram and the site; omitted keys keep the saved value', async () => {

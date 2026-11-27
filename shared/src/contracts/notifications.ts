@@ -222,15 +222,43 @@ const sitePrefsShape = Object.fromEntries(
   SITE_OPTIONAL_CATEGORIES.map((c) => [c, z.boolean()]),
 ) as Record<SiteOptionalCategory, z.ZodBoolean>;
 
+/** Час тихих годин — `HH:mm` з кроком 30 хв: 00:00, 00:30 … 23:30. */
+export const QUIET_HOURS_TIMES: readonly string[] = Array.from(
+  { length: 48 },
+  (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
+);
+
 /**
- * Тіло `PUT /api/me/notification-prefs` — повна заміна налаштувань. `site` (і ключ `schedule`
- * у `telegram`) можна не передавати — тоді лишається збережене значення (сумісність зі
+ * Тихі години Telegram у поясі користувача (`users.timezone`): повідомлення, поставлене в цей
+ * час, надходить у кінці інтервалу; термінові (сесія ≤ 2 год) — одразу, але без звуку.
+ * `start > end` — інтервал через північ (23:00–08:00). Сповіщень на сайті не стосується.
+ */
+export const quietHoursSchema = z
+  .object({
+    enabled: z.boolean(),
+    start: z.string().refine((t) => QUIET_HOURS_TIMES.includes(t)),
+    end: z.string().refine((t) => QUIET_HOURS_TIMES.includes(t)),
+  })
+  .strict()
+  .refine((q) => q.start !== q.end, { path: ['end'] });
+export type QuietHours = z.infer<typeof quietHoursSchema>;
+
+export const defaultQuietHours = (): QuietHours => ({
+  enabled: true,
+  start: '23:00',
+  end: '08:00',
+});
+
+/**
+ * Тіло `PUT /api/me/notification-prefs` — повна заміна налаштувань. `site`, `quietHours` (і ключ
+ * `schedule` у `telegram`) можна не передавати — тоді лишається збережене значення (сумісність зі
  * старими клієнтами).
  */
 export const notificationPrefsInputSchema = z
   .object({
     telegram: z.object({ ...telegramPrefsShape, schedule: z.boolean().optional() }).strict(),
     site: z.object(sitePrefsShape).strict().optional(),
+    quietHours: quietHoursSchema.optional(),
     /** Порожній список — нагадування вимкнено; дублікати прибираються. */
     reminderOffsets: z
       .array(z.union(REMINDER_OFFSETS.map((o) => z.literal(o))))
@@ -247,6 +275,8 @@ export interface NotificationPrefsDto {
   site: Record<SiteOptionalCategory, boolean>;
   /** За спаданням (раніше нагадування — першим). */
   reminderOffsets: ReminderOffset[];
+  /** Тихі години Telegram (див. `quietHoursSchema`). */
+  quietHours: QuietHours;
 }
 
 export const defaultNotificationPrefs = (): NotificationPrefsDto => ({
@@ -259,6 +289,7 @@ export const defaultNotificationPrefs = (): NotificationPrefsDto => ({
     boolean
   >,
   reminderOffsets: [...DEFAULT_REMINDER_OFFSETS],
+  quietHours: defaultQuietHours(),
 });
 
 /** Подія сокета: нове сповіщення (лише id — дані беруться через API). */

@@ -25,6 +25,11 @@ export interface TelegramOutboxItem {
   attempts: number;
   /** IANA-пояс одержувача для дат у тексті; `null` — типовий (Europe/Kyiv). */
   timeZone: string | null;
+  /**
+   * Надіслати беззвучно (`disable_notification`): термінове повідомлення, поставлене в тихі
+   * години одержувача.
+   */
+  silent: boolean;
 }
 
 export interface TelegramOutboxClaimResult {

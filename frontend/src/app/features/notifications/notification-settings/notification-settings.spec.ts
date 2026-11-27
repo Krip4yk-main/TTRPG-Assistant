@@ -134,6 +134,7 @@ describe('NotificationSettings', () => {
       telegram: { ...defaultNotificationPrefs().telegram, applications: false },
       site: { schedule: true },
       reminderOffsets: [60, 15],
+      quietHours: { enabled: true, start: '23:00', end: '08:00' },
     });
     req.flush({ ...req.request.body });
     await flushAsync();
@@ -236,6 +237,86 @@ describe('NotificationSettings', () => {
     await flushAsync();
     await settle();
     expect(toggleInput('games')).not.toBeNull();
+  });
+
+  describe('quiet hours', () => {
+    afterEach(() => {
+      document.querySelectorAll('.cdk-overlay-container').forEach((c) => (c.innerHTML = ''));
+    });
+
+    const quietToggle = () =>
+      el.querySelector<HTMLButtonElement>('mat-slide-toggle.quiet-toggle button')!;
+    const select = (cls: string) => el.querySelector<HTMLElement>(`mat-select.${cls}`)!;
+    const pick = async (cls: string, value: string) => {
+      const s = select(cls);
+      s.querySelector<HTMLElement>('.mat-mdc-select-trigger')!.click();
+      await settle();
+      const panel = document.getElementById(s.getAttribute('aria-controls')!)!;
+      const options = [...panel.querySelectorAll<HTMLElement>('mat-option')];
+      expect(options).toHaveLength(48);
+      options.find((o) => o.textContent!.trim() === value)!.click();
+      await settle();
+    };
+
+    it('shows the default 23:00–08:00 with the explanation', async () => {
+      await start(true);
+      const block = el.querySelector('.quiet-hours')!;
+      expect(block.textContent).toContain(uk.notifications.settings.quietHours.title);
+      expect(block.textContent).toContain(
+        'Telegram-сповіщення в цей час приходитимуть зранку; термінові — без звуку',
+      );
+      expect(quietToggle().getAttribute('aria-checked')).toBe('true');
+      expect(select('quiet-start').textContent).toContain('23:00');
+      expect(select('quiet-end').textContent).toContain('08:00');
+    });
+
+    it('edits times on a 30-minute step and saves quietHours', async () => {
+      await start(true);
+      await pick('quiet-start', '22:30');
+      await pick('quiet-end', '07:00');
+      el.querySelector<HTMLButtonElement>('button.save')!.click();
+      const req = http.expectOne('/api/me/notification-prefs');
+      expect(req.request.body.quietHours).toEqual({
+        enabled: true,
+        start: '22:30',
+        end: '07:00',
+      });
+      req.flush({ ...defaultNotificationPrefs(), quietHours: req.request.body.quietHours });
+      await flushAsync();
+      await settle();
+      expect(el.querySelector<HTMLButtonElement>('button.save')!.disabled).toBe(true);
+    });
+
+    it('switched off: times disabled, saved as enabled: false', async () => {
+      await start(true);
+      quietToggle().click();
+      await settle();
+      expect(select('quiet-start').getAttribute('aria-disabled')).toBe('true');
+      el.querySelector<HTMLButtonElement>('button.save')!.click();
+      const req = http.expectOne('/api/me/notification-prefs');
+      expect(req.request.body.quietHours).toEqual({
+        enabled: false,
+        start: '23:00',
+        end: '08:00',
+      });
+      req.flush({ ...req.request.body, site: { schedule: true } });
+      await flushAsync();
+    });
+
+    it('same start and end: error shown, Save disabled', async () => {
+      await start(true);
+      await pick('quiet-end', '23:00');
+      expect(el.querySelector('.quiet-error')!.textContent).toContain(
+        uk.notifications.settings.quietHours.sameTime,
+      );
+      expect(el.querySelector<HTMLButtonElement>('button.save')!.disabled).toBe(true);
+    });
+
+    it('no Telegram linked: quiet hours are disabled', async () => {
+      await start(false);
+      expect(quietToggle().disabled).toBe(true);
+      expect(select('quiet-start').getAttribute('aria-disabled')).toBe('true');
+    });
   });
 
   it('route /settings/notifications is guarded like other auth pages', () => {

@@ -14,6 +14,7 @@ export type SendApi = {
     other: {
       reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] };
       link_preview_options?: { is_disabled: boolean };
+      disable_notification?: boolean;
     },
   ): Promise<unknown>;
 };
@@ -80,7 +81,8 @@ function isStale(item: TelegramOutboxItem, now: Date): boolean {
 
 /**
  * Один цикл: спершу повторити незвітовані `sent`, потім забрати пачку й надіслати кожне
- * повідомлення простим текстом (без `parse_mode`), звітуючи `sent` / `failed`.
+ * повідомлення простим текстом (без `parse_mode`), звітуючи `sent` / `failed`; `silent` —
+ * беззвучно (`disable_notification`).
  * - Помилка рендеру — остаточна (`retryable: false`), без спроби надіслати.
  * - Нагадування про сесію, що вже почалась, — `failed 'stale'` без надсилання.
  * - Telegram 429 — пачка зупиняється: це й решта повідомлень звітуються як `rateLimited`
@@ -149,6 +151,8 @@ export async function deliverOnce(
       await deps.api.sendMessage(item.chatId, r.text, {
         ...(r.keyboard ? { reply_markup: { inline_keyboard: r.keyboard } } : {}),
         link_preview_options: { is_disabled: true },
+        // Термінове в тихі години одержувача — без звуку.
+        ...(item.silent ? { disable_notification: true } : {}),
       });
     } catch (err) {
       const failure = classifySendError(err);

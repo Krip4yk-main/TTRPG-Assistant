@@ -74,6 +74,64 @@
         </ul>
       </section>
 
+      <!-- Тихі години (лише Telegram) -->
+      @if (quietHours(); as quiet) {
+        <section class="nri-card quiet-hours" aria-labelledby="quiet-title">
+          <h2 id="quiet-title">{{ 'notifications.settings.quietHours.title' | translate }}</h2>
+          <p class="nri-muted" id="quiet-hint">
+            {{ 'notifications.settings.quietHours.hint' | translate }}
+          </p>
+          <mat-slide-toggle
+            class="quiet-toggle"
+            [checked]="quiet.enabled"
+            [disabled]="!hasTelegram() || saving()"
+            aria-describedby="quiet-hint"
+            (change)="setQuiet({ enabled: $event.checked })"
+            >{{ 'notifications.settings.quietHours.toggle' | translate }}</mat-slide-toggle
+          >
+          <div class="quiet-times">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>{{ 'notifications.settings.quietHours.start' | translate }}</mat-label>
+              <mat-select
+                class="quiet-start"
+                [value]="quiet.start"
+                [disabled]="!hasTelegram() || !quiet.enabled || saving()"
+                (selectionChange)="setQuiet({ start: $event.value })"
+              >
+                @for (t of quietTimes; track t) {
+                  <mat-option [value]="t">{{ t }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <span class="dash" aria-hidden="true">–</span>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>{{ 'notifications.settings.quietHours.end' | translate }}</mat-label>
+              <mat-select
+                class="quiet-end"
+                [value]="quiet.end"
+                [disabled]="!hasTelegram() || !quiet.enabled || saving()"
+                (selectionChange)="setQuiet({ end: $event.value })"
+              >
+                @for (t of quietTimes; track t) {
+                  <mat-option [value]="t">{{ t }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <p class="nri-muted hint">
+            {{ 'notifications.settings.quietHours.zone' | translate: { zone: timeZone() } }}
+            {{ 'notifications.settings.quietHours.urgent' | translate }}
+          </p>
+          <div aria-live="polite">
+            @if (quietInvalid()) {
+              <p class="nri-alert quiet-error" role="alert">
+                {{ 'notifications.settings.quietHours.sameTime' | translate }}
+              </p>
+            }
+          </div>
+        </section>
+      }
+
       <!-- Нагадування -->
       <section class="nri-card" aria-labelledby="reminders-title">
         <h2 id="reminders-title">{{ 'notifications.settings.reminders.title' | translate }}</h2>
@@ -113,7 +171,7 @@
           mat-flat-button
           type="button"
           class="save"
-          [disabled]="saving() || !dirty()"
+          [disabled]="saving() || !dirty() || quietInvalid()"
           (click)="save()"
         >
           {{ (saving() ? 'common.saving' : 'common.save') | translate }}

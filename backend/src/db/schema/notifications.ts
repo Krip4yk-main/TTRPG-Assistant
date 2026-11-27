@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
+  char,
   datetime,
   index,
   int,
@@ -84,6 +86,10 @@ export const notificationPrefs = mysqlTable('notification_prefs', {
   reminderOffsets: json('reminder_offsets').$type<number[]>().notNull(),
   /** Сповіщення на сайті для категорій, що вимикаються (`SITE_OPTIONAL_CATEGORIES`); NULL — усі ввімкнено. */
   site: json('site').$type<Partial<Record<SiteOptionalCategory, boolean>>>(),
+  /** Тихі години Telegram (`QuietHours` у `@nri/shared`): `HH:mm` у поясі `users.timezone`. */
+  quietHoursEnabled: boolean('quiet_hours_enabled').notNull().default(true),
+  quietHoursStart: char('quiet_hours_start', { length: 5 }).notNull().default('23:00'),
+  quietHoursEnd: char('quiet_hours_end', { length: 5 }).notNull().default('08:00'),
   updatedAt: datetime('updated_at')
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`)
@@ -153,6 +159,8 @@ export const telegramOutbox = mysqlTable(
     lastError: varchar('last_error', { length: 255 }),
     /** IANA-пояс одержувача на момент постановки (`users.timezone`) — для дат у тексті. */
     timeZone: varchar('time_zone', { length: 64 }),
+    /** Беззвучно (`disable_notification`): термінове, поставлене в тихі години одержувача. */
+    silent: boolean('silent').notNull().default(false),
     createdAt: datetime('created_at', { fsp: 3 })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP(3)`),

@@ -126,6 +126,7 @@ describe('createBackendClient outbox', () => {
         buttons: null,
         attempts: 0,
         timeZone: null,
+        silent: false,
       },
     ];
     const { f, client } = make(new Response(JSON.stringify({ items }), { status: 200 }));

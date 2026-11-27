@@ -29,6 +29,7 @@ const item = (id: number, extra: Partial<TelegramOutboxItem> = {}): TelegramOutb
   ],
   attempts: 0,
   timeZone: null,
+  silent: false,
   ...extra,
 });
 
@@ -77,6 +78,14 @@ describe('deliverOnce', () => {
     const { sendMessage, deps } = setup([item(1, { buttons: null })], async () => ({}));
     await deliverOnce(deps);
     expect((sendMessage.mock.calls[0] as unknown[])[2]).not.toHaveProperty('reply_markup');
+  });
+
+  it('silent → sent with disable_notification; otherwise with sound', async () => {
+    const { sendMessage, deps } = setup([item(1, { silent: true }), item(2)], async () => ({}));
+    await deliverOnce(deps);
+    const opts = sendMessage.mock.calls.map((c) => (c as unknown[])[2] as Record<string, unknown>);
+    expect(opts[0]).toMatchObject({ disable_notification: true });
+    expect(opts[1]).not.toHaveProperty('disable_notification');
   });
 
   it('403 blocked → failed, not retryable, chat unreachable', async () => {

@@ -2,17 +2,21 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { type MatChipListboxChange, MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 import {
   NOTIFICATION_CATEGORIES,
+  QUIET_HOURS_TIMES,
   REMINDER_OFFSETS,
   SITE_OPTIONAL_CATEGORIES,
   type NotificationCategory,
   type NotificationPrefsDto,
+  type QuietHours,
   type ReminderOffset,
   type SiteOptionalCategory,
 } from '@nri/shared';
@@ -24,8 +28,8 @@ type TelegramPrefs = Record<NotificationCategory, boolean>;
 type SitePrefs = Record<SiteOptionalCategory, boolean>;
 
 /**
- * `/settings/notifications`: що вимкнути на сайті («Розклад»), Telegram за категоріями й
- * моменти нагадувань про сесії.
+ * `/settings/notifications`: що вимкнути на сайті («Розклад»), Telegram за категоріями, тихі
+ * години Telegram і моменти нагадувань про сесії.
  */
 @Component({
   selector: 'nri-notification-settings',
@@ -33,7 +37,9 @@ type SitePrefs = Record<SiteOptionalCategory, boolean>;
     RouterLink,
     MatButtonModule,
     MatChipsModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatSelectModule,
     MatSlideToggleModule,
     TranslatePipe,
   ],
@@ -52,6 +58,9 @@ export class NotificationSettings {
   protected readonly siteCategories = SITE_OPTIONAL_CATEGORIES;
   /** Від найближчого до найдальшого (15 хв … 48 год). */
   protected readonly offsets = REMINDER_OFFSETS;
+  /** Варіанти часу тихих годин: 00:00 … 23:30 з кроком 30 хв. */
+  protected readonly quietTimes = QUIET_HOURS_TIMES;
+  protected readonly timeZone = computed(() => this.auth.me()?.timezone ?? 'Europe/Kyiv');
 
   protected readonly hasTelegram = computed(
     () => this.auth.me()?.identities.some((i) => i.provider === 'telegram') ?? false,
@@ -65,18 +74,28 @@ export class NotificationSettings {
   protected readonly site = signal<SitePrefs | null>(null);
   protected readonly reminderOffsets = signal<ReminderOffset[]>([]);
   protected readonly remindersOff = computed(() => this.reminderOffsets().length === 0);
+  protected readonly quietHours = signal<QuietHours | null>(null);
+  /** Початок і кінець збігаються — інтервал порожній, бекенд відхилить. */
+  protected readonly quietInvalid = computed(() => {
+    const q = this.quietHours();
+    return q !== null && q.start === q.end;
+  });
   /** Останній збережений (завантажений) стан — для «є незбережені зміни». */
   private readonly saved = signal<NotificationPrefsDto | null>(null);
   protected readonly dirty = computed(() => {
     const saved = this.saved();
     const telegram = this.telegram();
     const site = this.site();
-    if (!saved || !telegram || !site) return false;
+    const quiet = this.quietHours();
+    if (!saved || !telegram || !site || !quiet) return false;
     const offsets = (a: readonly number[]) => [...a].sort((x, y) => y - x).join(',');
     return (
       this.categories.some((c) => telegram[c] !== saved.telegram[c]) ||
       this.siteCategories.some((c) => site[c] !== saved.site[c]) ||
-      offsets(this.reminderOffsets()) !== offsets(saved.reminderOffsets)
+      offsets(this.reminderOffsets()) !== offsets(saved.reminderOffsets) ||
+      quiet.enabled !== saved.quietHours.enabled ||
+      quiet.start !== saved.quietHours.start ||
+      quiet.end !== saved.quietHours.end
     );
   });
 
@@ -105,6 +124,10 @@ export class NotificationSettings {
     this.site.update((s) => (s ? { ...s, [category]: value } : s));
   }
 
+  protected setQuiet(patch: Partial<QuietHours>): void {
+    this.quietHours.update((q) => (q ? { ...q, ...patch } : q));
+  }
+
   protected setOffsets(event: MatChipListboxChange): void {
     const value = (event.value ?? []) as ReminderOffset[];
     this.reminderOffsets.set([...value]);
@@ -117,7 +140,9 @@ export class NotificationSettings {
   protected async save(): Promise<void> {
     const telegram = this.telegram();
     const site = this.site();
-    if (!telegram || !site || this.saving() || !this.dirty()) return;
+    const quietHours = this.quietHours();
+    if (!telegram || !site || !quietHours || this.saving() || !this.dirty()) return;
+    if (this.quietInvalid()) return;
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -126,6 +151,7 @@ export class NotificationSettings {
           telegram,
           site,
           reminderOffsets: [...this.reminderOffsets()].sort((a, b) => b - a),
+          quietHours,
         }),
       );
       this.apply(saved);
@@ -146,5 +172,6 @@ export class NotificationSettings {
     this.telegram.set({ ...prefs.telegram });
     this.site.set({ ...prefs.site });
     this.reminderOffsets.set([...prefs.reminderOffsets]);
+    this.quietHours.set({ ...prefs.quietHours });
   }
 }

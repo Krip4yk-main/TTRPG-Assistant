@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import {
   defaultNotificationPrefs,
+  defaultQuietHours,
   POLL_VOTE_VALUES,
   telegramOutboxClaimSchema,
   telegramOutboxFailedSchema,
@@ -18,6 +19,7 @@ import {
   users,
 } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
+import { isUrgent, quietHoursEnd } from './quiet-hours.js';
 
 type DbLike = Db | Tx;
 
@@ -85,8 +87,16 @@ export function buttonsFor(
  * та ввімкненою категорією (`prefs.telegram[category] !== false`). Два пакетні запити (ідентичності
  * з поясом користувача, налаштування), одна вставка; повтор того самого сповіщення — no-op
  * (UNIQUE notification_id). Лише записи через `tx`, без мережі.
+ *
+ * Тихі години одержувача (`prefs.quietHours`, пояс `users.timezone`): поставлене в них
+ * отримує `next_try_at` = їхній кінець (бот забере зранку); термінове (`isUrgent`: сесія
+ * ≤ 2 год) — одразу, але `silent` (без звуку). Поза тихими годинами / вимкнено — одразу, зі звуком.
  */
-export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise<number> {
+export async function enqueueTelegram(
+  tx: DbLike,
+  rows: OutboxSource[],
+  now: Date = new Date(),
+): Promise<number> {
   if (rows.length === 0) return 0;
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const idents = await tx
@@ -102,11 +112,34 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
   const chatOf = new Map(idents.map((i) => [i.userId, i.subject]));
   const zoneOf = new Map(idents.map((i) => [i.userId, i.timeZone]));
   const prefRows = await tx
-    .select({ userId: notificationPrefs.userId, telegram: notificationPrefs.telegram })
+    .select({
+      userId: notificationPrefs.userId,
+      telegram: notificationPrefs.telegram,
+      quietEnabled: notificationPrefs.quietHoursEnabled,
+      quietStart: notificationPrefs.quietHoursStart,
+      quietEnd: notificationPrefs.quietHoursEnd,
+    })
     .from(notificationPrefs)
     .where(inArray(notificationPrefs.userId, [...chatOf.keys()]));
   const defaults = defaultNotificationPrefs().telegram;
   const prefsOf = new Map(prefRows.map((p) => [p.userId, { ...defaults, ...p.telegram }]));
+  const quietOf = new Map(
+    prefRows.map((p) => [
+      p.userId,
+      { enabled: p.quietEnabled, start: p.quietStart, end: p.quietEnd },
+    ]),
+  );
+  // Кінець тихих годин на `now` для кожного одержувача (`null` — не тихо).
+  const quietEndOf = new Map(
+    [...chatOf.keys()].map((userId) => [
+      userId,
+      quietHoursEnd(
+        now,
+        quietOf.get(userId) ?? defaultQuietHours(),
+        zoneOf.get(userId) ?? 'Europe/Kyiv',
+      ),
+    ]),
+  );
   // Майстри ігор нагадувань: їм — без RSVP-кнопок.
   const reminderGameIds = [
     ...new Set(
@@ -130,6 +163,8 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
     const chatId = chatOf.get(r.userId);
     if (chatId === undefined) return [];
     if ((prefsOf.get(r.userId) ?? defaults)[r.category] === false) return [];
+    const quietEnd = quietEndOf.get(r.userId) ?? null;
+    const urgent = quietEnd !== null && isUrgent(r.type, r.payload, now);
     return [
       {
         notificationId: r.id,
@@ -142,6 +177,8 @@ export async function enqueueTelegram(tx: DbLike, rows: OutboxSource[]): Promise
           r.payload.gameId !== undefined && gmOf.get(r.payload.gameId) === r.userId,
         ),
         timeZone: zoneOf.get(r.userId) ?? null,
+        nextTryAt: quietEnd !== null && !urgent ? quietEnd : now,
+        silent: urgent,
       },
     ];
   });
@@ -161,6 +198,7 @@ const toItem = (r: typeof telegramOutbox.$inferSelect): TelegramOutboxItem => ({
   buttons: r.buttons ?? null,
   attempts: r.attempts,
   timeZone: r.timeZone ?? null,
+  silent: r.silent,
 });
 
 /**

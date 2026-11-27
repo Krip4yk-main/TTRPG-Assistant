@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EVENT_TYPES } from './events.js';
 import {
   NOTIFICATION_TYPES,
+  QUIET_HOURS_TIMES,
   defaultNotificationPrefs,
   notificationPrefsInputSchema,
+  quietHoursSchema,
   notificationLink,
   notificationsQuerySchema,
 } from './notifications.js';
@@ -80,6 +82,51 @@ describe('notification contracts', () => {
     expect(d.reminderOffsets).toEqual([1440, 60]);
     expect(d.telegram.ratings).toBe(true);
     expect(d.telegram.moderation).toBe(true);
+  });
+
+  it('defaults: quiet hours on, 23:00–08:00', () => {
+    expect(defaultNotificationPrefs().quietHours).toEqual({
+      enabled: true,
+      start: '23:00',
+      end: '08:00',
+    });
+  });
+
+  it('quiet hours: HH:mm on a 30-minute step, start ≠ end', () => {
+    expect(QUIET_HOURS_TIMES).toHaveLength(48);
+    expect(QUIET_HOURS_TIMES[0]).toBe('00:00');
+    expect(QUIET_HOURS_TIMES[47]).toBe('23:30');
+    const ok = { enabled: false, start: '22:30', end: '07:00' };
+    expect(quietHoursSchema.parse(ok)).toEqual(ok);
+    for (const bad of [
+      { ...ok, start: '7:00' },
+      { ...ok, start: '24:00' },
+      { ...ok, end: '07:15' },
+      { ...ok, end: '07:00:00' },
+      { ...ok, end: '22:30' },
+      { ...ok, enabled: 'yes' },
+      { ...ok, extra: 1 },
+      { start: '22:30', end: '07:00' },
+    ]) {
+      expect(quietHoursSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it('prefs input: quietHours is optional (old clients) and validated when given', () => {
+    expect(
+      notificationPrefsInputSchema.parse({ telegram, reminderOffsets: [] }).quietHours,
+    ).toBeUndefined();
+    const quietHours = { enabled: true, start: '00:00', end: '06:30' };
+    expect(
+      notificationPrefsInputSchema.parse({ telegram, reminderOffsets: [], quietHours }).quietHours,
+    ).toEqual(quietHours);
+    expect(
+      notificationPrefsInputSchema.safeParse({
+        telegram,
+        reminderOffsets: [],
+        quietHours: { ...quietHours, end: '00:00' },
+      }).success,
+    ).toBe(false);
   });
 
   it('query: limit default 20, max 50', () => {

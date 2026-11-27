@@ -270,6 +270,7 @@ describe('claim', () => {
       buttons: null,
       attempts: 1,
       timeZone: null,
+      silent: false,
     });
     expect((await row(id!)).lockedUntil!.getTime()).toBe(now.getTime() + 120 * SEC);
     expect((await row(id!)).attempts).toBe(1);
@@ -480,6 +481,218 @@ describe('recipient time zone', () => {
     expect(r!.timeZone).toBe('America/New_York');
     const [item] = await claimOutbox(deps, {});
     expect(item!.timeZone).toBe('America/New_York');
+  });
+});
+
+describe('quiet hours (Task 5)', () => {
+  const MIN = 60 * SEC;
+  type Quiet = { enabled: boolean; start: string; end: string };
+
+  /** Одержувач із Telegram у поясі `tz`; `quiet` — збережені тихі години (без — за замовчуванням). */
+  async function recipient(tz = 'Europe/Kyiv', quiet?: Quiet) {
+    const u = await createUser(db, { timezone: tz });
+    await linkTelegram(u.id, String(8000 + u.id));
+    if (quiet) {
+      await db.insert(notificationPrefs).values({
+        userId: u.id,
+        telegram: {},
+        reminderOffsets: [60],
+        quietHoursEnabled: quiet.enabled,
+        quietHoursStart: quiet.start,
+        quietHoursEnd: quiet.end,
+      });
+    }
+    return u.id;
+  }
+
+  /** Ставить у чергу сповіщення `type` у момент `now`; повертає рядок outbox. */
+  async function enqueueAt(
+    userId: number,
+    now: Date,
+    type = 'game.started',
+    params: Record<string, unknown> = { gameId: 1, gameTitle: 'Гра' },
+  ) {
+    const category =
+      type === 'session.reminder'
+        ? 'reminders'
+        : type.startsWith('session.')
+          ? 'sessions'
+          : 'games';
+    const [res] = await db
+      .insert(notifications)
+      .values({ userId, type, category, payload: params })
+      .$returningId();
+    expect(
+      await enqueueTelegram(db, [{ id: res!.id, userId, type, category, payload: params }], now),
+    ).toBe(1);
+    const [r] = await db
+      .select()
+      .from(telegramOutbox)
+      .where(eq(telegramOutbox.notificationId, res!.id));
+    return r!;
+  }
+
+  const at = (iso: string) => new Date(iso);
+  /** «Одразу»: `next_try_at` — сам момент постановки, не відкладено. */
+  const expectImmediate = (r: { nextTryAt: Date; silent: boolean }, now: Date, silent = false) => {
+    expect(r.nextTryAt.toISOString()).toBe(now.toISOString());
+    expect(r.silent).toBe(silent);
+  };
+
+  it('23:30 Kyiv → 08:00 Kyiv next day', async () => {
+    const u = await recipient();
+    const r = await enqueueAt(u, at('2026-12-01T21:30:00Z'));
+    expect(r.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    expect(r.silent).toBe(false);
+  });
+
+  it('07:00 Kyiv → 08:00 the same day; exactly 23:00 is quiet, exactly 08:00 is not', async () => {
+    const u = await recipient();
+    expect((await enqueueAt(u, at('2026-12-02T05:00:00Z'))).nextTryAt.toISOString()).toBe(
+      '2026-12-02T06:00:00.000Z',
+    );
+    expect((await enqueueAt(u, at('2026-12-01T21:00:00Z'))).nextTryAt.toISOString()).toBe(
+      '2026-12-02T06:00:00.000Z',
+    );
+    const eight = at('2026-12-02T06:00:00Z');
+    expectImmediate(await enqueueAt(u, eight), eight);
+  });
+
+  it('12:00 Kyiv → at once', async () => {
+    const u = await recipient();
+    const noon = at('2026-12-02T10:00:00Z');
+    expectImmediate(await enqueueAt(u, noon), noon);
+  });
+
+  it('uses the recipient zone: Warsaw vs Kyiv at the same instant', async () => {
+    const warsaw = await recipient('Europe/Warsaw');
+    const kyiv = await recipient('Europe/Kyiv');
+    const now = at('2026-12-01T22:30:00Z'); // 23:30 Варшава, 00:30 Київ
+    expect((await enqueueAt(warsaw, now)).nextTryAt.toISOString()).toBe('2026-12-02T07:00:00.000Z');
+    expect((await enqueueAt(kyiv, now)).nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    // 21:30 Варшава (22:30 Київ) — у Варшаві ще не тихо.
+    const evening = at('2026-12-01T20:30:00Z');
+    expectImmediate(await enqueueAt(warsaw, evening), evening);
+  });
+
+  it('DST nights: end is 08:00 local after the spring and autumn switch', async () => {
+    const u = await recipient();
+    // 27→28.03.2027: 23:30 EET (+2) → 08:00 EEST (+3).
+    expect((await enqueueAt(u, at('2027-03-27T21:30:00Z'))).nextTryAt.toISOString()).toBe(
+      '2027-03-28T05:00:00.000Z',
+    );
+    // 24→25.10.2026: 23:30 EEST (+3) → 08:00 EET (+2).
+    expect((await enqueueAt(u, at('2026-10-24T20:30:00Z'))).nextTryAt.toISOString()).toBe(
+      '2026-10-25T06:00:00.000Z',
+    );
+  });
+
+  it('an end inside the spring gap moves forward like zonedToUtc (03:30 → 04:30 EEST)', async () => {
+    const u = await recipient('Europe/Kyiv', { enabled: true, start: '01:00', end: '03:30' });
+    // 28.03.2027 02:30 EET = 00:30Z; 03:30 не існує → 04:30 EEST = 01:30Z.
+    expect((await enqueueAt(u, at('2027-03-28T00:30:00Z'))).nextTryAt.toISOString()).toBe(
+      '2027-03-28T01:30:00.000Z',
+    );
+  });
+
+  it('an unknown stored zone falls back to Kyiv instead of failing the notification', async () => {
+    const u = await recipient('Not/AZone');
+    expect((await enqueueAt(u, at('2026-12-01T21:30:00Z'))).nextTryAt.toISOString()).toBe(
+      '2026-12-02T06:00:00.000Z',
+    );
+  });
+
+  it('a daytime interval (13:00–15:00) and a disabled one', async () => {
+    const day = await recipient('Europe/Kyiv', { enabled: true, start: '13:00', end: '15:00' });
+    expect((await enqueueAt(day, at('2026-12-02T12:00:00Z'))).nextTryAt.toISOString()).toBe(
+      '2026-12-02T13:00:00.000Z',
+    );
+    const night = at('2026-12-01T21:30:00Z');
+    expectImmediate(await enqueueAt(day, night), night);
+    const off = await recipient('Europe/Kyiv', { enabled: false, start: '23:00', end: '08:00' });
+    expectImmediate(await enqueueAt(off, night), night);
+  });
+
+  it('urgent at 01:00: reminder for a session ≤ 2h away goes at once, silently', async () => {
+    const u = await recipient();
+    const now = at('2026-12-01T23:00:00Z'); // 01:00 Київ
+    const soon = new Date(now.getTime() + 90 * MIN).toISOString();
+    const later = new Date(now.getTime() + 3 * 60 * MIN).toISOString();
+    expectImmediate(
+      await enqueueAt(u, now, 'session.reminder', { gameId: 1, sessionId: 1, startsAt: soon }),
+      now,
+      true,
+    );
+    // За 3 год — не термінове: зранку, зі звуком.
+    const r = await enqueueAt(u, now, 'session.reminder', {
+      gameId: 1,
+      sessionId: 2,
+      startsAt: later,
+    });
+    expect(r.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    expect(r.silent).toBe(false);
+  });
+
+  it('urgent: reschedule with the old or new date ≤ 2h, cancellation ≤ 2h', async () => {
+    const u = await recipient();
+    const now = at('2026-12-01T23:00:00Z');
+    const soon = new Date(now.getTime() + 60 * MIN).toISOString();
+    const week = new Date(now.getTime() + 7 * 24 * 60 * MIN).toISOString();
+    expectImmediate(
+      await enqueueAt(u, now, 'session.rescheduled', { gameId: 1, from: soon, startsAt: week }),
+      now,
+      true,
+    );
+    expectImmediate(
+      await enqueueAt(u, now, 'session.rescheduled', { gameId: 1, from: week, startsAt: soon }),
+      now,
+      true,
+    );
+    expectImmediate(
+      await enqueueAt(u, now, 'session.cancelled', { gameId: 1, startsAt: soon }),
+      now,
+      true,
+    );
+    const far = await enqueueAt(u, now, 'session.cancelled', { gameId: 1, startsAt: week });
+    expect(far.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    // Інший тип із близьким startsAt — не термінове.
+    const other = await enqueueAt(u, now, 'session.created', { gameId: 1, startsAt: soon });
+    expect(other.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+  });
+
+  it('urgent outside quiet hours / with quiet hours off → normal sound', async () => {
+    const u = await recipient();
+    const noon = at('2026-12-02T10:00:00Z');
+    const soon = new Date(noon.getTime() + 30 * MIN).toISOString();
+    expectImmediate(
+      await enqueueAt(u, noon, 'session.reminder', { gameId: 1, startsAt: soon }),
+      noon,
+    );
+    const off = await recipient('Europe/Kyiv', { enabled: false, start: '23:00', end: '08:00' });
+    const night = at('2026-12-01T23:00:00Z');
+    const nightSoon = new Date(night.getTime() + 30 * MIN).toISOString();
+    expectImmediate(
+      await enqueueAt(off, night, 'session.reminder', { gameId: 1, startsAt: nightSoon }),
+      night,
+    );
+  });
+
+  it('claim hands silent to the bot; postponed rows are not claimed before the end', async () => {
+    const u = await recipient();
+    const now = at('2026-12-01T23:00:00Z');
+    const soon = new Date(now.getTime() + 30 * MIN).toISOString();
+    const urgent = await enqueueAt(u, now, 'session.reminder', { gameId: 1, startsAt: soon });
+    const later = await enqueueAt(u, now);
+    expect(later.nextTryAt.toISOString()).toBe('2026-12-02T06:00:00.000Z');
+    // Вік рядка (для «stale») — від моменту постановки.
+    await db.update(telegramOutbox).set({ createdAt: now });
+    const claimed = await claimOutbox(deps, {}, now);
+    expect(claimed.map((i) => [i.id, i.silent])).toEqual([[urgent.id, true]]);
+    await markOutboxSent(deps, urgent.id);
+    expect(await claimOutbox(deps, {}, new Date('2026-12-02T05:59:00Z'))).toEqual([]);
+    // Відкладений рядок видається з кінцем тихих годин.
+    const [morning] = await claimOutbox(deps, {}, new Date('2026-12-02T06:00:00Z'));
+    expect(morning).toMatchObject({ id: later.id, silent: false });
   });
 });
 

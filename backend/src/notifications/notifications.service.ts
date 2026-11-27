@@ -241,6 +241,11 @@ export async function getPrefs(
     telegram: { ...d.telegram, ...row.telegram },
     site: { ...d.site, ...(row.site ?? {}) },
     reminderOffsets: row.reminderOffsets as ReminderOffset[],
+    quietHours: {
+      enabled: row.quietHoursEnabled,
+      start: row.quietHoursStart,
+      end: row.quietHoursEnd,
+    },
   };
 }
 
@@ -250,16 +255,23 @@ export async function putPrefs(
   body: unknown,
 ): Promise<NotificationPrefsDto> {
   const input = notificationPrefsInputSchema.parse(body);
-  // Не передані `site` / `telegram.schedule` (старий клієнт) — лишаються збереженими.
+  // Не передані `site` / `quietHours` / `telegram.schedule` (старий клієнт) — лишаються збереженими.
   const current = await getPrefs(deps, userId);
   const telegram = { ...current.telegram, ...stripUndefined(input.telegram) };
   const site = input.site ?? current.site;
+  const quiet = input.quietHours ?? current.quietHours;
+  const set = {
+    telegram,
+    site,
+    reminderOffsets: input.reminderOffsets,
+    quietHoursEnabled: quiet.enabled,
+    quietHoursStart: quiet.start,
+    quietHoursEnd: quiet.end,
+  };
   await deps.db
     .insert(notificationPrefs)
-    .values({ userId, telegram, site, reminderOffsets: input.reminderOffsets })
-    .onDuplicateKeyUpdate({
-      set: { telegram, site, reminderOffsets: input.reminderOffsets },
-    });
+    .values({ userId, ...set })
+    .onDuplicateKeyUpdate({ set });
   return getPrefs(deps, userId);
 }
 
