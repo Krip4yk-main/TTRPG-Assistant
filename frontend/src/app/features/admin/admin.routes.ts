@@ -5,6 +5,7 @@ import { AdminShell } from './admin-shell/admin-shell';
 /**
  * Розділ `/admin` (окремий чанк). Вкладки «Скарги», «Користувачі», «Апеляції», «Відгуки»,
  * «Мертві ігри» — модератору й вище; «Ролі», «Каталог» і «Журнал» — адміну й власнику.
+ * «Звіти тестерів» — адміну й власнику, лише на dev-сервері (поза dev вкладка прихована).
  */
 export const ADMIN_ROUTES: Routes = [
   {
@@ -60,6 +61,13 @@ export const ADMIN_ROUTES: Routes = [
         title: 'titles.admin',
         canActivate: [staffGuard('admin')],
         loadComponent: () => import('./log/log').then((m) => m.AdminLog),
+      },
+      {
+        path: 'tester-reports',
+        title: 'titles.admin',
+        canActivate: [staffGuard('admin')],
+        loadComponent: () =>
+          import('./tester-reports/tester-reports').then((m) => m.AdminTesterReports),
       },
     ],
   },

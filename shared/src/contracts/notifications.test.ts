@@ -41,6 +41,7 @@ describe('notification contracts', () => {
       'calendar.import_broken',
       'application.pending_reminder',
       'application.expired',
+      'tester.report',
     ];
     for (const t of NOTIFICATION_TYPES) {
       if (!notFromEvents.includes(t) && !t.startsWith('rating.')) expect(EVENT_TYPES).toContain(t);
@@ -147,6 +148,7 @@ describe('notificationLink', () => {
   it('moderation: digest → complaint queue; resolved complaint → home, ignoring params', () => {
     expect(notificationLink('moderation.digest', { count: 3 })).toBe('/admin/complaints');
     expect(notificationLink('complaint.resolved', {})).toBe('/');
+    expect(notificationLink('tester.report', {})).toBe('/admin/tester-reports');
     expect(notificationLink('complaint.resolved', { gameId: 5 })).toBe('/');
     expect(notificationLink('sanction.imposed', { sanctionType: 'warning' })).toBe('/my-sanctions');
     expect(notificationLink('sanction.lifted', { sanctionType: 'global_ban' })).toBe(

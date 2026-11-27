@@ -195,6 +195,9 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.icon = n.type === 'calendar.empty' ? 'edit_calendar' : 'sync_problem';
   } else if (n.type === 'session.rsvp_declined') {
     view.icon = 'event_busy';
+  } else if (n.type === 'tester.report') {
+    // Звіт тестувальника (dev-сервер) — веде до «Звітів тестерів» в адмінці.
+    view.icon = 'bug_report';
   }
   // Підсумок сесії: початок тексту майстра (його бачать учасники гри) — окремим рядком.
   if (n.type === 'session.summary') {

@@ -27,6 +27,8 @@ describe('renderNotification', () => {
     'appeal.decided',
     // Без гри: стан імпорту календаря користувача.
     'calendar.import_broken',
+    // Лише на сайті (у Telegram не ставиться), без гри.
+    'tester.report',
   ];
   const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
 

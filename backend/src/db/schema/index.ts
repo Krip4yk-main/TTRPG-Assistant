@@ -17,6 +17,7 @@ import * as profiles from './profiles.js';
 import * as ratings from './ratings.js';
 import * as scheduling from './scheduling.js';
 import * as sessions from './sessions.js';
+import * as testerReports from './tester-reports.js';
 import * as users from './users.js';
 import * as views from './views.js';
 
@@ -39,6 +40,7 @@ export * from './profiles.js';
 export * from './ratings.js';
 export * from './scheduling.js';
 export * from './sessions.js';
+export * from './tester-reports.js';
 export * from './users.js';
 export * from './views.js';
 
@@ -64,4 +66,5 @@ export const schema = {
   ...scheduling,
   ...calendarImport,
   ...calendarFeed,
+  ...testerReports,
 };

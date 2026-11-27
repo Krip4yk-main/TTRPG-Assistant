@@ -3,6 +3,7 @@ import {
   defaultNotificationPrefs,
   defaultQuietHours,
   POLL_VOTE_VALUES,
+  SITE_ONLY_TYPES,
   telegramOutboxClaimSchema,
   telegramOutboxFailedSchema,
   type NotificationCategory,
@@ -86,7 +87,8 @@ export function buttonsFor(
  * Ставить Telegram-повідомлення для нових сповіщень: лише користувачам із Telegram-ідентичністю
  * та ввімкненою категорією (`prefs.telegram[category] !== false`). Два пакетні запити (ідентичності
  * з поясом користувача, налаштування), одна вставка; повтор того самого сповіщення — no-op
- * (UNIQUE notification_id). Лише записи через `tx`, без мережі.
+ * (UNIQUE notification_id). Лише записи через `tx`, без мережі. Типи лише для сайту
+ * (`SITE_ONLY_TYPES`, напр. `tester.report`) у чергу не потрапляють.
  *
  * Тихі години одержувача (`prefs.quietHours`, пояс `users.timezone`): поставлене в них
  * отримує `next_try_at` = їхній кінець (бот забере зранку); термінове (`isUrgent`: сесія
@@ -97,6 +99,7 @@ export async function enqueueTelegram(
   rows: OutboxSource[],
   now: Date = new Date(),
 ): Promise<number> {
+  rows = rows.filter((r) => !(SITE_ONLY_TYPES as readonly string[]).includes(r.type));
   if (rows.length === 0) return 0;
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const idents = await tx

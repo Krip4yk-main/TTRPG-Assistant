@@ -1,0 +1,13 @@
+@if (deployEnv() === 'dev') {
+  <button
+    type="button"
+    class="tester-report"
+    [attr.aria-label]="'testerReport.buttonLabel' | translate"
+    [title]="'testerReport.buttonLabel' | translate"
+    aria-haspopup="dialog"
+    (click)="open()"
+  >
+    <mat-icon aria-hidden="true">bug_report</mat-icon>
+    <span class="label">{{ 'testerReport.button' | translate }}</span>
+  </button>
+}

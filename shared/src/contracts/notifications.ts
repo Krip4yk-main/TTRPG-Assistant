@@ -53,8 +53,9 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * подій, `schedule`): `session.summary` — учасникам гри на час сесії, один раз (`sessionId`,
  * `startsAt`, `excerpt` — початок підсумку). Приблизний час (не з подій, `sessions`):
  * `session.time_unpinned` — майстру за 24 год до початку вікна, один раз на час сесії:
- * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Текст —
- * `notifications.<type>`.
+ * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Звіти тестувальників (не з
+ * подій, `moderation`, лише dev-сервер): `tester.report` — власнику платформи на кожен новий звіт
+ * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Текст — `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -100,8 +101,12 @@ export const NOTIFICATION_TYPES = [
   'session.rsvp_declined',
   'calendar.empty',
   'calendar.import_broken',
+  'tester.report',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** Типи лише для сайту: у Telegram не ставляться (службові сповіщення тестового сервера). */
+export const SITE_ONLY_TYPES: readonly NotificationType[] = ['tester.report'];
 
 /** Дозволені офсети нагадувань, хвилини до початку сесії: 15 хв, 1 год, 3 год, 24 год, 48 год. */
 export const REMINDER_OFFSETS = [15, 60, 180, 1440, 2880] as const;
@@ -315,6 +320,7 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   // Модерація — без гри: черга скарг персоналу; «скаргу розглянуто» — без подробиць.
   if (type === 'moderation.digest') return '/admin/complaints';
   if (type === 'complaint.resolved') return '/';
+  if (type === 'tester.report') return '/admin/tester-reports';
   // Санкції — сторінка «Обмеження акаунта» (фронтенд, Task 5).
   if (type === 'sanction.imposed' || type === 'sanction.lifted' || type === 'appeal.decided') {
     return '/my-sanctions';

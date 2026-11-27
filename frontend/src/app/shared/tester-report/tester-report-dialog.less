@@ -1,0 +1,35 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-md);
+}
+
+.kind {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+}
+
+.kind-label {
+  color: var(--nri-text-muted);
+  font-size: 0.85rem;
+}
+
+.kind-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nri-space-sm);
+}
+
+// Що додасться автоматично — дрібно, без переповнення довгими адресами й user agent.
+.context {
+  margin: 0;
+  color: var(--nri-text-muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.sent,
+.nri-alert {
+  margin: 0;
+}

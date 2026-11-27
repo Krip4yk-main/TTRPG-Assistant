@@ -47,6 +47,10 @@ import {
   deadGamesRouter,
   myDeadGamesRouter,
 } from './games/dead-games/dead-games.routes.js';
+import {
+  adminTesterReportsRouter,
+  testerReportsRouter,
+} from './tester-reports/tester-reports.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { healthRouter } from './http/health.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
@@ -91,6 +95,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(calendarFeedPublicRouter(deps, { ip: limits.calFeedIp, token: limits.calFeedToken }));
   // Rate limiter — ДО парсерів тіла: клієнт поза лімітом не змусить розбирати 1 МБ.
   app.use(['/api/auth', '/api/appeals'], limits.auth);
+  // Звіти тестувальників існують лише на dev-сервері (інакше маршрутів немає — 404).
+  const testerReports = env.DEPLOY_ENV === 'dev';
+  if (testerReports) app.post('/api/tester-reports', limits.testerReport);
   app.use('/api', limits.general);
   // Нотатки до 200 000 символів (кирилиця ≈ 400 КБ): окремий ліміт, змонтований ДО глобального
   // (body-parser пропускає вже розібране тіло).
@@ -140,6 +147,10 @@ export function createApp(deps: AppDeps): express.Express {
   app.use('/api/admin/log', adminLogRouter(deps));
   app.use('/api/admin/dead-games', adminDeadGamesRouter(deps));
   app.use('/api/admin/catalog', adminCatalogRouter(deps));
+  if (testerReports) {
+    app.use('/api/tester-reports', testerReportsRouter(deps));
+    app.use('/api/admin/tester-reports', adminTesterReportsRouter(deps));
+  }
   app.use('/api/admin', adminSanctionsRouter(deps));
   app.use('/api/admin', adminRouter(deps));
   app.use('/api/og', ogRouter(deps));

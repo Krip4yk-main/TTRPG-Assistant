@@ -1,0 +1,84 @@
+<div class="toolbar">
+  <mat-button-toggle-group
+    class="filter"
+    hideSingleSelectionIndicator
+    [value]="filter()"
+    (change)="setFilter($event.value)"
+    [attr.aria-label]="'admin.filter' | translate"
+  >
+    @for (f of filters; track f) {
+      <mat-button-toggle [value]="f">{{
+        'admin.testerReports.filter.' + f | translate
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+</div>
+
+<div class="notice-area" aria-live="polite">
+  @if (notice(); as key) {
+    <p class="nri-alert" role="alert">{{ key | translate }}</p>
+  }
+</div>
+
+<ul class="list">
+  @for (r of list.items(); track r.id) {
+    <li class="nri-card item report" [attr.data-report]="r.id">
+      <div class="item-head">
+        <h2>{{ 'testerReport.kinds.' + r.kind | translate }}</h2>
+        <span class="status" [attr.data-status]="r.status">{{
+          'admin.testerReports.status.' + r.status | translate
+        }}</span>
+        <span class="nri-muted">{{ r.createdAt | adminDate }}</span>
+      </div>
+      <p class="text">{{ r.text }}</p>
+      <dl class="meta">
+        <div>
+          <dt>{{ 'admin.testerReports.reporter' | translate }}</dt>
+          <dd class="reporter">
+            <nri-admin-user-ref [user]="r.reporter" emptyKey="admin.testerReports.guest" />
+          </dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.testerReports.page' | translate }}</dt>
+          <dd class="page">{{ r.context.url }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.testerReports.theme' | translate }}</dt>
+          <dd>{{ r.context.theme }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'admin.testerReports.viewport' | translate }}</dt>
+          <dd>{{ r.context.viewportWidth }}×{{ r.context.viewportHeight }}</dd>
+        </div>
+        <div class="wide">
+          <dt>{{ 'admin.testerReports.userAgent' | translate }}</dt>
+          <dd class="ua">{{ r.context.userAgent }}</dd>
+        </div>
+        @if (r.status === 'processed') {
+          <div>
+            <dt>{{ 'admin.testerReports.processed' | translate }}</dt>
+            <dd>
+              <nri-admin-user-ref [user]="r.processedBy" />
+              <span class="nri-muted">{{ r.processedAt | adminDate }}</span>
+            </dd>
+          </div>
+        }
+      </dl>
+      @if (r.status === 'new') {
+        <div class="actions">
+          <button
+            mat-flat-button
+            type="button"
+            class="mark-processed"
+            [disabled]="busy() === r.id"
+            (click)="markProcessed(r)"
+          >
+            <mat-icon aria-hidden="true">done</mat-icon>
+            {{ 'admin.testerReports.markProcessed' | translate }}
+          </button>
+        </div>
+      }
+    </li>
+  }
+</ul>
+<nri-admin-pager [list]="list" />

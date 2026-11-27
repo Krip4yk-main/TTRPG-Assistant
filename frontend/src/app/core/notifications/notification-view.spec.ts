@@ -193,6 +193,13 @@ describe('notificationView', () => {
     }
   });
 
+  it('tester report: own icon and text (link to the admin page comes from the server)', () => {
+    const v = notificationView({ ...dto('tester.report'), category: 'moderation' }, 'UTC');
+    expect(v.key).toBe('notifications.tester.report');
+    expect(v.icon).toBe('bug_report');
+    expect(String(lookup(v.key))).toContain('звіт тестувальника');
+  });
+
   it('long pause reminder: text names the three choices; quick actions link to the game page', () => {
     const v = notificationView(dto('game.long_pause'), 'UTC');
     expect(v.key).toBe('notifications.game.long_pause');

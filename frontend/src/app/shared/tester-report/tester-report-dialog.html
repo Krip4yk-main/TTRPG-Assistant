@@ -1,0 +1,81 @@
+<h2 mat-dialog-title>{{ 'testerReport.title' | translate }}</h2>
+@if (sent()) {
+  <mat-dialog-content>
+    <p class="sent" role="status">{{ 'testerReport.sent' | translate }}</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button #done mat-flat-button type="button" class="done" (click)="close()">
+      {{ 'common.close' | translate }}
+    </button>
+  </mat-dialog-actions>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <mat-dialog-content class="content">
+      <div class="kind">
+        <span id="tester-report-kind" class="kind-label">{{
+          'testerReport.kind' | translate
+        }}</span>
+        <mat-radio-group
+          class="kind-list"
+          formControlName="kind"
+          aria-labelledby="tester-report-kind"
+        >
+          @for (k of kinds; track k) {
+            <mat-radio-button [value]="k" [attr.data-kind]="k">{{
+              'testerReport.kinds.' + k | translate
+            }}</mat-radio-button>
+          }
+        </mat-radio-group>
+      </div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ 'testerReport.text' | translate }}</mat-label>
+        <textarea
+          matInput
+          class="text"
+          rows="5"
+          required
+          formControlName="text"
+          cdkFocusInitial
+          [attr.maxlength]="max"
+          aria-describedby="tester-report-context"
+        ></textarea>
+        <mat-hint align="end">{{
+          'moderation.counter' | translate: { count: length(), max: max }
+        }}</mat-hint>
+        @if (text.hasError('required')) {
+          <mat-error>{{ 'testerReport.textRequired' | translate }}</mat-error>
+        } @else if (text.hasError('maxlength')) {
+          <mat-error>{{ 'moderation.tooLong' | translate: { max: max } }}</mat-error>
+        }
+      </mat-form-field>
+      <p id="tester-report-context" class="context">
+        {{
+          'testerReport.context'
+            | translate
+              : {
+                  url: data.context.url,
+                  theme: 'theme.names.' + data.context.theme | translate,
+                  viewport: viewport,
+                  userAgent: data.context.userAgent,
+                  user: data.publicId
+                    ? ('testerReport.contextUser' | translate: { publicId: data.publicId })
+                    : '',
+                }
+        }}
+      </p>
+      <div aria-live="assertive">
+        @if (error(); as key) {
+          <p class="nri-alert submit-error" role="alert">{{ key | translate }}</p>
+        }
+      </div>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" (click)="close()">
+        {{ 'common.cancel' | translate }}
+      </button>
+      <button mat-flat-button type="submit" class="submit" [disabled]="submitting()">
+        {{ 'testerReport.submit' | translate }}
+      </button>
+    </mat-dialog-actions>
+  </form>
+}

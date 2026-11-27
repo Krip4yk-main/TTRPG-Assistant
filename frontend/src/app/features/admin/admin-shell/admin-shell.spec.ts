@@ -29,7 +29,7 @@ const me = (role: UserRole): MeDto => ({
 });
 
 describe('AdminShell', () => {
-  async function tabsFor(role: UserRole): Promise<string[]> {
+  async function tabsFor(role: UserRole, deployEnv = 'local'): Promise<string[]> {
     await TestBed.configureTestingModule({
       imports: [AdminShell],
       providers: [
@@ -51,6 +51,7 @@ describe('AdminShell', () => {
     }).compileComponents();
     TestBed.inject(AuthStore).setMe(me(role));
     const fixture = TestBed.createComponent(AdminShell);
+    fixture.componentRef.setInput('deployEnv', deployEnv);
     fixture.detectChanges();
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
@@ -82,4 +83,14 @@ describe('AdminShell', () => {
       ]);
     },
   );
+
+  it('tester reports tab: admin and owner on dev only', async () => {
+    expect(await tabsFor('admin', 'dev')).toContain('tester-reports');
+    TestBed.resetTestingModule();
+    expect(await tabsFor('owner', 'dev')).toContain('tester-reports');
+    TestBed.resetTestingModule();
+    expect(await tabsFor('moderator', 'dev')).not.toContain('tester-reports');
+    TestBed.resetTestingModule();
+    expect(await tabsFor('owner', 'prod')).not.toContain('tester-reports');
+  });
 });
