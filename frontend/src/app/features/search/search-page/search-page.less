@@ -72,6 +72,15 @@
   }
 }
 
+// Планшет / вузький ноутбук (≈1024 px): вужча панель фільтрів і менший проміжок — щоб поряд
+// уміщалося щонайменше дві колонки карток (у всіх дизайнах), а не одна з порожньою половиною.
+@media (min-width: 900px) and (max-width: 1199.98px) {
+  .layout {
+    grid-template-columns: 272px minmax(0, 1fr);
+    gap: var(--nri-space-lg);
+  }
+}
+
 @media (max-width: 899.98px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);

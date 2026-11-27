@@ -39,10 +39,11 @@
   padding: 0;
   border: 0;
 
-  // Компактні заголовки розділів.
+  // Компактні заголовки розділів. Нижній відступ — із запасом на плаваючу мітку першого поля
+  // (вона виступає над рамкою поля й інакше впиралася в заголовок).
   legend {
     padding: 0;
-    margin-bottom: var(--nri-space-xs);
+    margin-bottom: 0.875rem;
     font-family: var(--nri-font-heading);
     font-size: 1.05rem;
     font-weight: 600;

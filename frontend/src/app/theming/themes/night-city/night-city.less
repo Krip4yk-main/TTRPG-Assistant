@@ -417,5 +417,12 @@
   }
 }
 
+// Поле «Сортування» стоїть просто на стіні: прозоре поле пропускало заклепки стіни — суцільне тло
+// поля (як заглиблення) тримає декор стіни поза елементом керування.
+@{nc} .nri-board .results-header .sort .mat-mdc-text-field-wrapper {
+  border-radius: var(--mat-form-field-outlined-container-shape, 8px);
+  background: var(--sc-field);
+}
+
 // Ефект «заявку подано»: імпульс по шині (рух — bus-pulse/application-sent.ts).
 @import './bus-pulse/application-sent.less';

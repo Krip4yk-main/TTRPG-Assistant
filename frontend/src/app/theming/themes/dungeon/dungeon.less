@@ -922,5 +922,12 @@
   }
 }
 
+// Поле «Сортування» стоїть просто на стіні: прозоре поле пропускало шви кладки — суцільне тло
+// поля (як заглиблення) тримає декор стіни поза елементом керування.
+@{dg} .nri-board .results-header .sort .mat-mdc-text-field-wrapper {
+  border-radius: var(--mat-form-field-outlined-container-shape, 8px);
+  background: var(--sc-field);
+}
+
 // Ефект «відкриття гри»: на картці піднімаються ґрати (рух — portcullis/game-opened.ts).
 @import './portcullis/game-opened.less';
