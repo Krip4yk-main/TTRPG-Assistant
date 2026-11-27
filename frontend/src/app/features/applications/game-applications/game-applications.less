@@ -26,8 +26,15 @@
 
 .full-warning {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--nri-space-sm);
+
+  // Значок не стискається, коли текст переноситься (на 375 px його обрізало), і стоїть
+  // на рівні першого рядка.
+  mat-icon {
+    flex: none;
+    margin-top: calc((1lh - 24px) / 2);
+  }
 }
 
 .load-error {

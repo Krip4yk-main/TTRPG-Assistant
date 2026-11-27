@@ -65,6 +65,15 @@ h2 {
   gap: var(--nri-space-sm);
 }
 
+// Вузький екран: шаблони й «Очистити» — стовпчиком на всю ширину, однаково в усіх дизайнах
+// (у рядку з переносом розклад залежав від ширини шрифту: то 1+2, то 2+1).
+@media (max-width: 599.98px) {
+  .templates {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .paint-toggle.active {
   --mat-button-outlined-label-text-color: var(--nri-on-primary);
   --mat-button-outlined-outline-color: var(--nri-primary);
