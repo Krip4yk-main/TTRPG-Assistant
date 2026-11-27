@@ -3,7 +3,7 @@
 // (npm pre-скрипти) цей скрипт записує типізований TS-модуль, який імпортує застосунок.
 // Згенерований файл у .gitignore; пріоритет: process.env > frontend/.env > порожньо.
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -102,5 +102,9 @@ export const runtimeConfig: RuntimeConfig = ${JSON.stringify(config, null, 2)};
 `;
 
 const prev = existsSync(out) ? readFileSync(out, 'utf8') : '';
-if (prev !== source) writeFileSync(out, source);
+if (prev !== source) {
+  // У свіжому клоні (CI) теки ще немає — файл генерований і gitignored.
+  mkdirSync(new URL('.', out), { recursive: true });
+  writeFileSync(out, source);
+}
 console.log(`runtime-config: ${fileURLToPath(out)}`);
