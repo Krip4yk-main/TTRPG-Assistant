@@ -158,6 +158,30 @@ h3 {
   gap: var(--nri-space-xs);
 }
 
+// Вузький екран: дії — рівною сіткою у дві колонки (а не по 1–2 різної ширини в ряд); непарна
+// остання — на всю ширину; довгий підпис переноситься всередині кнопки.
+@media (max-width: 599.98px) {
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > .mat-mdc-button-base {
+      height: auto;
+      min-height: 40px;
+      white-space: normal;
+    }
+
+    > .mat-mdc-button-base:last-child:nth-child(odd),
+    > .x-card-sent {
+      grid-column: 1 / -1;
+    }
+
+    > .x-card-sent:empty {
+      display: none;
+    }
+  }
+}
+
 .danger {
   --mat-button-outlined-label-text-color: var(--nri-danger-text);
 }
@@ -192,6 +216,15 @@ h3 {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+// Лічильники «Буде · Не зможуть · Без відповіді»: значок — одразу перед текстом, перенесений
+// рядок — під першим (вирівнювання за початком, не по центру кнопки).
+.summary-toggle {
+  height: auto;
+  min-height: 40px;
+  justify-content: flex-start;
+  text-align: start;
 }
 
 .rsvp-list {

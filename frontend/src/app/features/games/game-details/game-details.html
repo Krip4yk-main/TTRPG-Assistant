@@ -255,7 +255,12 @@
               }
             }
             @if (canComplain()) {
-              <button mat-button type="button" class="complain" (click)="complain(g)">
+              <button
+                mat-button
+                type="button"
+                class="complain nri-text-button-flush"
+                (click)="complain(g)"
+              >
                 <mat-icon aria-hidden="true">flag</mat-icon>
                 {{ 'moderation.complain.button' | translate }}
               </button>

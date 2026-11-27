@@ -2,8 +2,10 @@
   <h1>{{ 'admin.title' | translate }}</h1>
   <nav
     mat-tab-nav-bar
-    class="tabs"
+    class="tabs nri-wrap-tabs"
     [tabPanel]="panel"
+    [disablePagination]="true"
+    mat-stretch-tabs="false"
     [attr.aria-label]="'admin.title' | translate"
   >
     @for (t of tabs(); track t.path) {

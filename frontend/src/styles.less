@@ -139,6 +139,24 @@ a,
   margin: 0 0 var(--nri-space-md);
 }
 
+// Вкладки (mat-tab-nav-bar), що переносяться в кілька рядків замість прокрутки стрілками:
+// усі підписи видно повністю за будь-якої ширини (адмінка). Поруч — [disablePagination].
+.nri-wrap-tabs {
+  .mat-mdc-tab-links {
+    flex-wrap: wrap;
+  }
+
+  .mat-mdc-tab-link {
+    flex: 0 0 auto;
+  }
+}
+
+// Текстова кнопка Material у ряду інших кнопок: внутрішній відступ компенсовано, щоб значок
+// стояв на краю ряду (перенесена — під сусідами, у ряду — на звичайному проміжку).
+.nri-text-button-flush {
+  margin-inline-start: calc(-1 * var(--mat-button-text-with-icon-horizontal-padding, 12px));
+}
+
 .nri-notice {
   border-left: 4px solid var(--nri-new-highlight-border);
   background: var(--nri-new-highlight);
