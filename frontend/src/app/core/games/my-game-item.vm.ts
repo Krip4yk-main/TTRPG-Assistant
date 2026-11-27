@@ -1,5 +1,5 @@
 import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
-import { formatDateTime, viewerTimeZone } from '../i18n/dates';
+import { formatWindow, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
 import type { ViewMode } from '../view-mode/view-mode.store';
 import type { LinePart } from './game-card.vm';
@@ -73,6 +73,11 @@ export interface MyGameItemVm {
   systemLine: LinePart[];
   /** Найближча сесія в поясі глядача, або `null`. */
   nextSession: string | null;
+  /**
+   * Найближча сесія має приблизний час (вікно): `nextSession` — проміжок, шаблон додає
+   * «час уточнюється» (`games.approxTime`).
+   */
+  nextSessionApprox: boolean;
   /** Ключ підпису, коли найближчої сесії немає (чернетка без дати — «Дату ще не визначено»). */
   noNextKey: string;
   freeSlots: number;
@@ -160,7 +165,11 @@ export function toMyGameItemVm(
   let nextSession: string | null = null;
   if (game.nextSessionAt) {
     // У поясі глядача, без назви поясу (як на картці пошуку).
-    nextSession = formatDateTime(game.nextSessionAt, viewerTimeZone(me));
+    nextSession = formatWindow(
+      game.nextSessionAt,
+      game.nextSessionWindowMinutes,
+      viewerTimeZone(me),
+    );
   }
 
   const systemName = game.system?.name ?? game.systemOther ?? '';
@@ -190,6 +199,7 @@ export function toMyGameItemVm(
       { key: kindKey },
     ],
     nextSession,
+    nextSessionApprox: nextSession !== null && game.nextSessionWindowMinutes !== null,
     noNextKey: game.startsAt === null ? 'games.my.noStartDate' : 'games.my.noNextSession',
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,

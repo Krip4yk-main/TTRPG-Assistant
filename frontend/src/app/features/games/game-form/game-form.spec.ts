@@ -78,6 +78,7 @@ function game(overrides: Partial<GameDto> = {}): GameDto {
     timezone: 'Europe/Kyiv',
     status: 'draft',
     nextSessionAt: '2027-03-02T17:00:00.000Z',
+    nextSessionWindowMinutes: null,
     freeSlots: 5,
     publishedAt: null,
     startedAt: null,
@@ -562,6 +563,34 @@ describe('GameForm', () => {
       const req = http.expectOne('/api/games/5');
       expect(req.request.body).toMatchObject({ startWindowMinutes: null });
       req.flush(game({ status: 'draft' }));
+      await settle();
+    });
+
+    it('a dateless draft keeps its window: saved with startsAt null and the window', async () => {
+      await setup(5, game({ status: 'draft', startWindowMinutes: 60 }));
+      q<HTMLButtonElement>('button.clear-start').click();
+      await settle();
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.body).toMatchObject({ startsAt: null, startWindowMinutes: 60 });
+      req.flush(
+        game({ status: 'draft', startsAt: null, startWindowMinutes: 60, nextSessionAt: null }),
+      );
+      await settle();
+      // «До» без дати — підписи за годинником, без помилок.
+      expect(el.querySelectorAll('select.window-to option').length).toBe(24);
+    });
+
+    it('an off-grid start of a windowed game is snapped, so no hidden value is sent', async () => {
+      await setup(
+        5,
+        game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z', startWindowMinutes: 60 }),
+      );
+      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+      await submit();
+      const req = http.expectOne('/api/games/5');
+      expect(req.request.body).toMatchObject({ startsAt: '2027-03-02T17:00:00.000Z' });
+      req.flush(game({ status: 'draft', startWindowMinutes: 60 }));
       await settle();
     });
 

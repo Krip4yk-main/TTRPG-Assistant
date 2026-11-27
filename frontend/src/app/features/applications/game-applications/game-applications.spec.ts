@@ -44,6 +44,7 @@ const game: GameDto = {
   timezone: 'Europe/Kyiv',
   status: 'recruiting',
   nextSessionAt: null,
+  nextSessionWindowMinutes: null,
   freeSlots: 1,
   publishedAt: '2026-11-01T10:00:00.000Z',
   startedAt: null,

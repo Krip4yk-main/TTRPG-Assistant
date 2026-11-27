@@ -98,6 +98,8 @@ export interface Loaded {
 export interface SessionStats {
   /** Найближча `scheduled` сесія, що починається не раніше моменту завантаження. */
   nextScheduled: Date | null;
+  /** Вікно початку цієї сесії, хв; `null` — точний час (або сесії немає). */
+  nextScheduledWindow: number | null;
   /** Найпізніший матеріалізований слот правила: слоти після нього ще не створено. */
   lastRuleSlot: Date | null;
 }
@@ -185,6 +187,10 @@ async function sessionStats(
         string | null
       >`min(case when ${gameSessions.status} = 'scheduled' and ${gameSessions.startsAt} >= ${now} then ${gameSessions.startsAt} end)`,
       lastRuleSlot: sql<string | null>`max(${gameSessions.ruleStartsAt})`,
+      // Вікно саме тієї сесії, що дала `nextScheduled` (той самий фільтр, найраніша).
+      nextScheduledWindow: sql<
+        number | null
+      >`(select s2.start_window_minutes from game_sessions s2 where s2.game_id = ${gameSessions.gameId} and s2.status = 'scheduled' and s2.starts_at >= ${now} order by s2.starts_at, s2.id limit 1)`,
     })
     .from(gameSessions)
     .where(inArray(gameSessions.gameId, gameIds))
@@ -195,7 +201,11 @@ async function sessionStats(
   return new Map(
     rows.map((r) => [
       r.gameId,
-      { nextScheduled: asDate(r.nextScheduled), lastRuleSlot: asDate(r.lastRuleSlot) },
+      {
+        nextScheduled: asDate(r.nextScheduled),
+        nextScheduledWindow: r.nextScheduledWindow === null ? null : Number(r.nextScheduledWindow),
+        lastRuleSlot: asDate(r.lastRuleSlot),
+      },
     ]),
   );
 }
@@ -220,7 +230,10 @@ async function warningIdsOf(deps: AppDeps, gameId: number): Promise<number[]> {
  * `scheduled` або перший слот правила після вже матеріалізованих, якщо він раніший. Гра
  * без матеріалізованих сесій (чернетка) — з правила.
  */
-function nextSessionAt(l: Pick<Loaded, 'row' | 'sessions'>, now: Date): string | null {
+function nextSession(
+  l: Pick<Loaded, 'row' | 'sessions'>,
+  now: Date,
+): { at: string; windowMinutes: number | null } | null {
   const { row, sessions } = l;
   if (row.status === 'finished' || row.status === 'cancelled' || row.status === 'paused') {
     return null;
@@ -228,8 +241,21 @@ function nextSessionAt(l: Pick<Loaded, 'row' | 'sessions'>, now: Date): string |
   const scheduled =
     sessions?.nextScheduled && sessions.nextScheduled >= now ? sessions.nextScheduled : null;
   const fromRule = ruleNext(row, sessions?.lastRuleSlot ?? null, now);
-  if (scheduled && fromRule) return (scheduled < fromRule ? scheduled : fromRule).toISOString();
-  return (scheduled ?? fromRule)?.toISOString() ?? null;
+  // Матеріалізована сесія — зі своїм вікном (перенесена/уточнена могла змінити його);
+  // ще не матеріалізований слот правила — з вікном правила.
+  if (scheduled && (!fromRule || scheduled <= fromRule)) {
+    return { at: scheduled.toISOString(), windowMinutes: sessions?.nextScheduledWindow ?? null };
+  }
+  return fromRule ? { at: fromRule.toISOString(), windowMinutes: row.startWindowMinutes } : null;
+}
+
+/** `nextSessionAt` і `nextSessionWindowMinutes` для DTO. */
+function nextSessionFields(
+  l: Pick<Loaded, 'row' | 'sessions'>,
+  now: Date,
+): { nextSessionAt: string | null; nextSessionWindowMinutes: number | null } {
+  const next = nextSession(l, now);
+  return { nextSessionAt: next?.at ?? null, nextSessionWindowMinutes: next?.windowMinutes ?? null };
 }
 
 /** Перший слот правила ≥ `now` і пізніший за `after` (останній матеріалізований); без дати — `null`. */
@@ -309,7 +335,7 @@ function toGameDto(l: Loaded, warningIds: number[], now: Date): GameDto {
     gm: l.gm,
     timezone: l.row.timezone,
     status: l.row.status,
-    nextSessionAt: nextSessionAt(l, now),
+    ...nextSessionFields(l, now),
     freeSlots: freeSlots(l),
     publishedAt: iso(l.row.publishedAt),
     startedAt: iso(l.row.startedAt),
@@ -339,7 +365,7 @@ export function toCardDto(l: Loaded, now: Date = new Date()): GameCardDto {
     gm: l.gm,
     format: r.format,
     city: r.city,
-    nextSessionAt: nextSessionAt(l, now),
+    ...nextSessionFields(l, now),
     timezone: r.timezone,
     freeSlots: freeSlots(l),
     maxPlayers: r.maxPlayers,

@@ -173,6 +173,24 @@ describe('RescheduleDialog', () => {
       expect(close).toHaveBeenCalled();
     });
 
+    it('a window across midnight that started yesterday can be pinned to yesterday evening', async () => {
+      // Вікно 9 бер. 22:00 – 10 бер. 04:00 (Нью-Йорк); «зараз» — 10 бер. 15:10, вже минуло.
+      TestBed.resetTestingModule();
+      await create({ ...session, startsAt: '2027-03-10T03:00:00.000Z', startWindowMinutes: 360 });
+      el.querySelector<HTMLElement>('.mode-exact button')!.click();
+      await settle();
+      form().patchValue({ date: new Date(2027, 2, 9), time: '23:30' });
+      await submit();
+      const req = http.expectOne('/api/sessions/41/reschedule');
+      expect(req.request.body).toEqual({
+        startsAt: '2027-03-10T04:30:00.000Z',
+        startWindowMinutes: null,
+      });
+      req.flush({ ...session, startsAt: '2027-03-10T04:30:00.000Z' });
+      await settle();
+      expect(close).toHaveBeenCalled();
+    });
+
     it('a past moment outside the window or keeping the window is rejected', async () => {
       await submit();
       http.expectNone('/api/sessions/41/reschedule');

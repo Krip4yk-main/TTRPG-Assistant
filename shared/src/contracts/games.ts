@@ -304,6 +304,11 @@ export interface GameCardDto {
   city: string | null;
   /** Найближча сесія ≥ зараз (ISO UTC), `null` — немає. */
   nextSessionAt: string | null;
+  /**
+   * Вікно початку найближчої сесії, хв (`nextSessionAt` … + стільки): приблизний час; `null` —
+   * точний (або сесії немає). Матеріалізована сесія — її власне вікно, слот правила — вікно гри.
+   */
+  nextSessionWindowMinutes: number | null;
   /** IANA-пояс гри (у ньому задані `weekdays` і час сесій). */
   timezone: string;
   /** `maxPlayers − учасники`, не менше 0. */
@@ -378,6 +383,8 @@ export interface GameDto extends Omit<GameInput, 'systemId'> {
   timezone: string;
   status: GameStatus;
   nextSessionAt: string | null;
+  /** Див. `GameCardDto.nextSessionWindowMinutes`. */
+  nextSessionWindowMinutes: number | null;
   freeSlots: number;
   publishedAt: string | null;
   startedAt: string | null;

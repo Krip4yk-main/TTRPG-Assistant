@@ -327,8 +327,12 @@
                       </ul>
                       @if (s.time) {
                         <span class="schedule-zone">{{
-                          (s.end ? 'games.details.scheduleWindow' : 'games.details.scheduleAt')
-                            | translate: s
+                          (s.end
+                            ? s.nextDay
+                              ? 'games.details.scheduleWindowNextDay'
+                              : 'games.details.scheduleWindow'
+                            : 'games.details.scheduleAt'
+                          ) | translate: s
                         }}</span>
                       }
                     </dd>

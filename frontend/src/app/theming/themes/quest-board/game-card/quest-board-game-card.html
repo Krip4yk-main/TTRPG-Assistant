@@ -89,7 +89,12 @@
     <dl class="facts">
       @if (g.showSchedule) {
         <dt>{{ 'questBoard.card.when' | translate }}</dt>
-        @let next = g.nextSession ?? ('search.card.noNext' | translate);
+        @let next =
+          g.nextSession
+            ? g.nextSessionApprox
+              ? ('games.approxTime' | translate: { when: g.nextSession })
+              : g.nextSession
+            : ('search.card.noNext' | translate);
         <dd class="next" [nriTruncateTooltip]="next">{{ next }}</dd>
       }
       @let where = g.whereLine | nriLine;

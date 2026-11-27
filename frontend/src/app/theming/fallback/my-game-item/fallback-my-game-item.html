@@ -21,7 +21,11 @@
   </p>
   <p>
     @if (game.nextSession; as at) {
-      {{ 'games.my.nextSession' | translate: { date: at } }}
+      {{
+        'games.my.nextSession'
+          | translate
+            : { date: game.nextSessionApprox ? ('games.approxTime' | translate: { when: at }) : at }
+      }}
     } @else {
       {{ game.noNextKey | translate }}
     }

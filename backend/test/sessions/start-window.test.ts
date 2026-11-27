@@ -183,6 +183,77 @@ describe('approximate start time: game rule', () => {
   });
 });
 
+describe('approximate start time: nextSessionWindowMinutes', () => {
+  type Card = { id: number; nextSessionAt: string | null; nextSessionWindowMinutes: number | null };
+  const mine = async (gm: User, gameId: number) =>
+    (await ok<Card[]>(call('get', '/api/games/mine', gm.cookie))).find((g) => g.id === gameId)!;
+
+  it('rule window → the game, my-games card and search card carry the window minutes', async () => {
+    const { gm, gameId, first } = await windowed();
+    const game = await ok<GameDto>(call('get', `/api/games/${gameId}`, gm.cookie));
+    expect(game.nextSessionAt).toBe(first.startsAt);
+    expect(game.nextSessionWindowMinutes).toBe(120);
+    expect((await mine(gm, gameId)).nextSessionWindowMinutes).toBe(120);
+    const search = await ok<{ items: Card[] }>(call('post', '/api/games/search', undefined, {}));
+    expect(search.items.find((g) => g.id === gameId)?.nextSessionWindowMinutes).toBe(120);
+  });
+
+  it('pinned at the window start → same nextSessionAt, window null', async () => {
+    const { gm, gameId, first } = await windowed();
+    const [next] = await rows(gameId);
+    await ok(
+      call('post', `/api/sessions/${next!.id}/reschedule`, gm.cookie, {
+        startsAt: first.startsAt,
+        startWindowMinutes: null,
+      }),
+    );
+    const game = await ok<GameDto>(call('get', `/api/games/${gameId}`, gm.cookie));
+    expect(game.nextSessionAt).toBe(first.startsAt);
+    expect(game.nextSessionWindowMinutes).toBeNull();
+    expect((await mine(gm, gameId)).nextSessionWindowMinutes).toBeNull();
+  });
+
+  it('an individually windowed session of an exact rule → its own minutes', async () => {
+    const { gm, gameId } = await windowed({ startWindowMinutes: null });
+    const [next] = await rows(gameId);
+    const moved = kyivAt(1, 18);
+    await ok(
+      call('post', `/api/sessions/${next!.id}/reschedule`, gm.cookie, {
+        startsAt: moved.startsAt,
+        startWindowMinutes: 90,
+      }),
+    );
+    const game = await ok<GameDto>(call('get', `/api/games/${gameId}`, gm.cookie));
+    expect(game.startWindowMinutes).toBeNull();
+    expect(game.nextSessionAt).toBe(moved.startsAt);
+    expect(game.nextSessionWindowMinutes).toBe(90);
+  });
+
+  it('draft: rule window from the rule; without a start date — no next session, no window', async () => {
+    const gm = await userWithAge(30, 'gm');
+    const first = kyivAt(3);
+    const draft = await createGame(gm.cookie, {
+      startsAt: first.startsAt,
+      weekdays: [first.weekday],
+      startWindowMinutes: 60,
+    });
+    const g1 = await ok<GameDto>(call('get', `/api/games/${draft}`, gm.cookie));
+    expect(g1.nextSessionAt).toBe(first.startsAt);
+    expect(g1.nextSessionWindowMinutes).toBe(60);
+    const dateless = await createGame(gm.cookie, {
+      startsAt: null,
+      weekdays: [],
+      recurrence: 'none',
+      startWindowMinutes: 60,
+    });
+    const g2 = await ok<GameDto>(call('get', `/api/games/${dateless}`, gm.cookie));
+    expect(g2.startsAt).toBeNull();
+    expect(g2.startWindowMinutes).toBe(60);
+    expect(g2.nextSessionAt).toBeNull();
+    expect(g2.nextSessionWindowMinutes).toBeNull();
+  });
+});
+
 describe('approximate start time: start / finish guards', () => {
   it('start → 409 SESSION_TIME_APPROXIMATE while the nearest session has a window', async () => {
     const { gm, gameId } = await windowed();

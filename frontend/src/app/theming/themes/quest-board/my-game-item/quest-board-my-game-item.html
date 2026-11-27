@@ -22,7 +22,12 @@
   }
   <dl class="facts">
     <dt>{{ 'questBoard.card.when' | translate }}</dt>
-    @let next = game.nextSession ?? (game.noNextKey | translate);
+    @let next =
+      game.nextSession
+        ? game.nextSessionApprox
+          ? ('games.approxTime' | translate: { when: game.nextSession })
+          : game.nextSession
+        : (game.noNextKey | translate);
     <dd [nriTruncateTooltip]="next">{{ next }}</dd>
     <dt>{{ 'search.card.slots' | translate }}</dt>
     <dd>

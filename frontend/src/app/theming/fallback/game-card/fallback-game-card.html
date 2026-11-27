@@ -30,7 +30,13 @@
     @if (g.showSchedule) {
       <p>
         {{ 'search.card.next' | translate }}:
-        {{ g.nextSession ?? ('search.card.noNext' | translate) }}
+        {{
+          g.nextSession
+            ? g.nextSessionApprox
+              ? ('games.approxTime' | translate: { when: g.nextSession })
+              : g.nextSession
+            : ('search.card.noNext' | translate)
+        }}
       </p>
       <p>
         {{ 'search.card.slots' | translate }}:

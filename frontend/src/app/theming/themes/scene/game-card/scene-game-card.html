@@ -84,7 +84,12 @@
       @if (g.showSchedule) {
         <div>
           <dt>{{ 'scene.card.when' | translate }}</dt>
-          @let next = g.nextSession ?? ('search.card.noNext' | translate);
+          @let next =
+            g.nextSession
+              ? g.nextSessionApprox
+                ? ('games.approxTime' | translate: { when: g.nextSession })
+                : g.nextSession
+              : ('search.card.noNext' | translate);
           <dd [nriTruncateTooltip]="next">{{ next }}</dd>
         </div>
       }

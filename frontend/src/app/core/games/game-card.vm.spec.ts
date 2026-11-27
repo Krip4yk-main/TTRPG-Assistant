@@ -20,6 +20,7 @@ const game: SearchGameCardDto = {
   format: 'offline',
   city: 'Київ',
   nextSessionAt: '2027-03-02T17:00:00.000Z',
+  nextSessionWindowMinutes: null,
   timezone: 'Europe/Kyiv',
   freeSlots: 2,
   maxPlayers: 5,
@@ -121,6 +122,17 @@ describe('toGameCardVm', () => {
     expect(full({ ...game, status: 'finished' }).showSchedule).toBe(false);
     expect(full({ ...game, status: 'cancelled' }).showSchedule).toBe(false);
     expect(full({ ...game, nextSessionAt: null }).nextSession).toBeNull();
+  });
+
+  it('an approximate next session: range and the «TBD» flag; exact — no flag', () => {
+    vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Kyiv');
+    const v = full({ ...game, nextSessionWindowMinutes: 120 });
+    expect(v.nextSession).toContain('19:00–21:00');
+    expect(v.nextSessionApprox).toBe(true);
+    expect(full(game).nextSessionApprox).toBe(false);
+    expect(
+      full({ ...game, nextSessionAt: null, nextSessionWindowMinutes: 120 }).nextSessionApprox,
+    ).toBe(false);
   });
 
   it('next session in the viewer zone, never with a zone label', () => {

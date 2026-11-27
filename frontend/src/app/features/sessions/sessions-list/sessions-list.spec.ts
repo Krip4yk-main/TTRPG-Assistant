@@ -336,11 +336,9 @@ describe('SessionsList', () => {
 
     it('finish refused for an approximate time leads straight to «pin time»', async () => {
       await create(true, true, [approxStarted]);
-      dialogOpen
-        .mockReturnValueOnce({ afterClosed: () => of(PIN_FIRST) })
-        .mockReturnValueOnce({
-          afterClosed: () => of({ ...approxStarted, startWindowMinutes: null }),
-        });
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(PIN_FIRST) }).mockReturnValueOnce({
+        afterClosed: () => of({ ...approxStarted, startWindowMinutes: null }),
+      });
       row(9)!.querySelector<HTMLButtonElement>('button[data-action="finish"]')!.click();
       await vi.waitFor(() => expect(dialogOpen).toHaveBeenCalledTimes(2));
       expect(dialogOpen.mock.calls[0]![0]).toBe(FinishSessionDialog);
@@ -351,7 +349,7 @@ describe('SessionsList', () => {
         .flush([{ ...approxStarted, startWindowMinutes: null }]);
       await settle();
       await settle();
-      expect(el.textContent).toContain('sessions.done.pin');
+      expect(el.textContent).toContain('sessions.done.pinThenFinish');
     });
   });
 

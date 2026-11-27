@@ -62,6 +62,7 @@ function card(id: number): SearchGameCardDto {
     format: 'online',
     city: null,
     nextSessionAt: '2027-03-02T17:00:00.000Z',
+    nextSessionWindowMinutes: null,
     timezone: 'Europe/Kyiv',
     freeSlots: 3,
     maxPlayers: 5,

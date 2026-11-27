@@ -405,7 +405,8 @@ export class SessionsList {
       // «Завершити» відмовило (409 SESSION_TIME_APPROXIMATE): майстер обрав «Уточнити час».
       if (result === PIN_FIRST) {
         result = await this.pin(s.id);
-        done = 'pin';
+        // Як у «Моїх іграх»: час уточнено — тепер сесію можна завершити.
+        done = 'pinThenFinish';
       }
       if (!result) return;
       // Завершення зсуває вікно матеріалізації — беремо список із сервера.

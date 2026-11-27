@@ -48,6 +48,7 @@ const game: GameCardDto = {
   format: 'offline',
   city: 'Київ',
   nextSessionAt: null,
+  nextSessionWindowMinutes: null,
   timezone: 'Europe/Kyiv',
   freeSlots: 2,
   maxPlayers: 5,

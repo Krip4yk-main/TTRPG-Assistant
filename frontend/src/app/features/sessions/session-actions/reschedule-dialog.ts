@@ -70,7 +70,11 @@ export class RescheduleDialog {
   private readonly injector = inject(Injector);
 
   protected readonly durations = SESSION_DURATIONS;
-  protected readonly minDate = fromIsoDate(localDate(new Date(), this.data.timezone));
+  /**
+   * Мінімум datepicker-а — сьогодні в поясі гри; для сесії з вікном — не пізніше дня початку
+   * вікна: вікно через північ, що почалось учора, можна уточнити й на вчорашній вечір.
+   */
+  protected readonly minDate = fromIsoDate(this.minIsoDate());
   protected readonly zoneDiffers = differentZones(this.data.timezone, this.data.viewerTimezone);
 
   private readonly initial = utcToZonedInput(this.data.session.startsAt, this.data.timezone);
@@ -150,6 +154,13 @@ export class RescheduleDialog {
       }
       this.submitting.set(false);
     }
+  }
+
+  private minIsoDate(): string {
+    const today = localDate(new Date(), this.data.timezone);
+    if (this.data.session.startWindowMinutes === null) return today;
+    const windowDay = localDate(new Date(this.data.session.startsAt), this.data.timezone);
+    return windowDay < today ? windowDay : today;
   }
 
   /**

@@ -14,6 +14,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
     format: 'online',
     city: null,
     nextSessionAt: '2027-03-02T17:00:00.000Z',
+    nextSessionWindowMinutes: null,
     startsAt: '2027-03-02T17:00:00.000Z',
     timezone: 'Europe/Kyiv',
     freeSlots: 4,
@@ -141,6 +142,13 @@ describe('toMyGameItemVm', () => {
     });
     expect(v.nextSession).toBeTruthy();
     expect(vm({ ...card(3, 'started'), nextSessionAt: null }).nextSession).toBeNull();
+  });
+
+  it('an approximate next session: range and the «TBD» flag', () => {
+    const v = vm({ ...card(3, 'started'), nextSessionWindowMinutes: 90 });
+    expect(v.nextSession).toContain('–');
+    expect(v.nextSessionApprox).toBe(true);
+    expect(vm(card(3, 'started')).nextSessionApprox).toBe(false);
   });
 
   it('a draft without a start date reads «date not set yet» instead of «no next session»', () => {

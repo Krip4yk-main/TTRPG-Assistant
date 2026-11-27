@@ -5,7 +5,7 @@ import {
   type RestrictedGameDto,
   type SearchGameCardDto,
 } from '@nri/shared';
-import { formatDateTime, viewerTimeZone } from '../i18n/dates';
+import { formatWindow, viewerTimeZone } from '../i18n/dates';
 import type { ViewMode } from '../view-mode/view-mode.store';
 import { toSeatsVm, type SeatsVm } from './seats.vm';
 
@@ -69,6 +69,11 @@ export interface FullGameCardVm extends GameCardVmBase {
   showSchedule: boolean;
   /** Найближча сесія в поясі глядача (з назвою поясу, якщо він інший), або `null`. */
   nextSession: string | null;
+  /**
+   * Найближча сесія має приблизний час (вікно): `nextSession` — проміжок, шаблон додає
+   * «час уточнюється» (`games.approxTime`).
+   */
+  nextSessionApprox: boolean;
   freeSlots: number;
   maxPlayers: number;
   /** Місця за видом (гравцю — зайняті, майстру — вільні): текст і заповнення індикатора. */
@@ -149,7 +154,11 @@ export function toGameCardVm(
   if (game.nextSessionAt) {
     // Час — у поясі глядача (акаунта або браузера) і без назви поясу: на картці «Коли» завжди
     // «по-вашому»; пояс гри видно на сторінці гри.
-    nextSession = formatDateTime(game.nextSessionAt, viewerTimeZone(me));
+    nextSession = formatWindow(
+      game.nextSessionAt,
+      game.nextSessionWindowMinutes,
+      viewerTimeZone(me),
+    );
   }
 
   const systemName = game.system?.name ?? game.systemOther ?? '';
@@ -174,6 +183,7 @@ export function toGameCardVm(
     languageKey,
     showSchedule: game.status === 'recruiting' || game.status === 'started',
     nextSession,
+    nextSessionApprox: nextSession !== null && game.nextSessionWindowMinutes !== null,
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
     seats: toSeatsVm(game.freeSlots, game.maxPlayers, viewMode),

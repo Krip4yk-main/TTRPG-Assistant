@@ -46,6 +46,7 @@ function card(id: number, status: MyGameCardDto['status']): MyGameCardDto {
     format: 'online',
     city: null,
     nextSessionAt: '2027-03-02T17:00:00.000Z',
+    nextSessionWindowMinutes: null,
     startsAt: '2027-03-02T17:00:00.000Z',
     timezone: 'Europe/Kyiv',
     freeSlots: 4,
@@ -256,6 +257,15 @@ describe('MyGames', () => {
     await vi.waitFor(() => expect(el.textContent).toContain('games.my.pinned.start'));
     http.expectOne('/api/games/mine').flush([{ ...card(5, 'recruiting'), memberCount: 2 }]);
     await settle();
+  });
+
+  it('an approximate next session reads «… · time TBD» on the card', async () => {
+    fixture.componentInstance['games'].update((list) =>
+      list!.map((g) => (g.id === 2 ? { ...g, nextSessionWindowMinutes: 120 } : g)),
+    );
+    await settle();
+    expect(article(2).textContent).toContain('games.approxTime');
+    expect(article(5).textContent).not.toContain('games.approxTime');
   });
 
   describe('«dead» games flags', () => {

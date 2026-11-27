@@ -25,6 +25,7 @@ const game: MyGameCardDto = {
   format: 'online',
   city: null,
   nextSessionAt: null,
+  nextSessionWindowMinutes: null,
   startsAt: '2027-03-02T17:00:00.000Z',
   timezone: 'Europe/Kyiv',
   freeSlots: 4,

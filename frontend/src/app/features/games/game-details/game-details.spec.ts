@@ -76,6 +76,7 @@ const game: PublicGameDto = {
   timezone: 'Europe/Kyiv',
   status: 'recruiting',
   nextSessionAt: '2027-03-02T17:00:00.000Z',
+  nextSessionWindowMinutes: null,
   freeSlots: 2,
   publishedAt: '2026-11-01T10:00:00.000Z',
   startedAt: null,
@@ -978,7 +979,9 @@ describe('GameDetails', () => {
 
     it('a windowed rule: schedule «between … and …», next session as a range with «TBD»', async () => {
       vi.spyOn(browserZone, 'get').mockReturnValue('Europe/Warsaw');
-      await open(null, (r) => r.flush({ ...game, startWindowMinutes: 180 }));
+      await open(null, (r) =>
+        r.flush({ ...game, startWindowMinutes: 180, nextSessionWindowMinutes: 180 }),
+      );
       const tr = TestBed.inject(TranslateService);
       tr.setTranslation(
         'uk',
@@ -992,13 +995,27 @@ describe('GameDetails', () => {
       expect(nextSessionText()).toContain('sessions.window.approxBadge');
     });
 
-    it('a next session moved to another time of day is shown exactly', async () => {
-      await open(me, (r) =>
-        r.flush({ ...game, startWindowMinutes: 180, nextSessionAt: '2027-03-03T15:00:00.000Z' }),
+    it('a rule window across midnight: «… next day» in the schedule', async () => {
+      // 19:00 Київ + 6 год = 01:00 наступного дня.
+      await open(me, (r) => r.flush({ ...game, startWindowMinutes: 360 }));
+      expect(el().querySelector('.schedule-zone')!.textContent).toContain(
+        'games.details.scheduleWindowNextDay',
       );
-      expect(nextSessionText()).toContain('17:00');
+    });
+
+    it('next session pinned at the window start: exact time, no «TBD» (window from the server)', async () => {
+      await open(me, (r) =>
+        r.flush({ ...game, startWindowMinutes: 180, nextSessionWindowMinutes: null }),
+      );
+      expect(nextSessionText()).toContain('19:00');
       expect(nextSessionText()).not.toContain('–');
       expect(nextSessionText()).not.toContain('sessions.window.approxBadge');
+    });
+
+    it('an individually windowed next session of an exact rule shows its own window', async () => {
+      await open(me, (r) => r.flush({ ...game, nextSessionWindowMinutes: 60 }));
+      expect(nextSessionText()).toContain('19:00–20:00');
+      expect(nextSessionText()).toContain('sessions.window.approxBadge');
     });
 
     it('a draft without a start date: «date not set yet», weekdays without a time', async () => {

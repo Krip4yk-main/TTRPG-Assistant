@@ -65,12 +65,13 @@ export class StartTimeField {
     effect((onCleanup) => {
       const time = this.time();
       const window = this.window();
-      const sync = () =>
-        this.state.set({
-          time: time.value,
-          window: window.value,
-          disabled: window.disabled,
-        });
+      const sync = () => {
+        // Приблизний час: «з» лише на сітці 30 хв — інакше в списку його не видно, а
+        // надіслалося б приховане значення (напр. 19:15 з точного режиму чи з сервера).
+        const snapped = window.value !== null ? snapToWindowStep(time.value) : null;
+        if (snapped !== null && snapped !== time.value) time.setValue(snapped);
+        this.state.set({ time: time.value, window: window.value, disabled: window.disabled });
+      };
       sync();
       const sub = merge(time.events, window.events).subscribe(sync);
       onCleanup(() => sub.unsubscribe());
@@ -83,16 +84,10 @@ export class StartTimeField {
 
   /** Перемикач: приблизний час — вікно типової ширини з початком на сітці 30 хв. */
   protected setMode(approx: boolean): void {
-    const time = this.time();
     const window = this.window();
     if (approx === (window.value !== null)) return;
-    if (approx) {
-      const snapped = snapToWindowStep(time.value);
-      if (snapped !== null && snapped !== time.value) time.setValue(snapped);
-      window.setValue(DEFAULT_WINDOW_MINUTES);
-    } else {
-      window.setValue(null);
-    }
+    // «З» округлюється вниз до 30 хв у `sync`.
+    window.setValue(approx ? DEFAULT_WINDOW_MINUTES : null);
     window.markAsDirty();
   }
 }
