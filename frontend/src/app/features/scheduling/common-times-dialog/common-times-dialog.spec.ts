@@ -167,7 +167,10 @@ describe('CommonTimesDialog', () => {
     select.dispatchEvent(new Event('change'));
     el.querySelector<HTMLButtonElement>('button.confirm-move')!.click();
     const req = http.expectOne('/api/sessions/42/reschedule');
-    expect(req.request.body).toEqual({ startsAt: '2030-03-08T17:00:00.000Z' });
+    expect(req.request.body).toEqual({
+      startsAt: '2030-03-08T17:00:00.000Z',
+      startWindowMinutes: null,
+    });
     const moved = session({ id: 42, startsAt: '2030-03-08T17:00:00.000Z' });
     req.flush(moved);
     await settle();

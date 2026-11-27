@@ -501,6 +501,44 @@ describe('polls: apply (GM, closed only, idempotent)', () => {
     expect(sessions[0]!.startsAt.toISOString()).toBe(poll.options[1]!.startsAt);
     expect(res.body.applied).toEqual({ kind: 'session', sessionId: sessions[0]!.id });
   });
+
+  it('a windowed session gets the exact option time (window cleared): target and oneshot', async () => {
+    const { gm, a, b, gameId } = await group({ startWindowMinutes: 120 });
+    await call('get', `/api/games/${gameId}/sessions`, gm.cookie);
+    const [s] = await db
+      .select()
+      .from(gameSessions)
+      .where(eq(gameSessions.gameId, gameId))
+      .orderBy(asc(gameSessions.startsAt));
+    expect(s!.startWindowMinutes).toBe(120);
+    const re = await createPoll(gm, gameId, oneOffBody({ sessionId: s!.id }));
+    await votes(a, re, ['no', 'yes']);
+    await votes(b, re, ['no', 'yes']);
+    expect((await call('post', `/api/polls/${re.id}/apply`, gm.cookie, {})).status).toBe(200);
+    const [moved] = await db.select().from(gameSessions).where(eq(gameSessions.id, s!.id));
+    expect(moved!.startsAt.toISOString()).toBe(re.options[1]!.startsAt);
+    expect(moved!.startWindowMinutes).toBeNull();
+
+    const one = await createGame(
+      gm.cookie,
+      {
+        kind: 'oneshot',
+        recurrence: 'none',
+        weekdays: [],
+        startsAt: kyivAt(3).iso,
+        startWindowMinutes: 60,
+        title: 'Ваншот з вікном',
+      },
+      true,
+    );
+    await join(gm, one, a);
+    const poll = await createPoll(gm, one);
+    await votes(a, poll, ['yes', 'no']);
+    expect((await call('post', `/api/polls/${poll.id}/apply`, gm.cookie, {})).status).toBe(200);
+    const [single] = await db.select().from(gameSessions).where(eq(gameSessions.gameId, one));
+    expect(single!.startsAt.toISOString()).toBe(poll.options[0]!.startsAt);
+    expect(single!.startWindowMinutes).toBeNull();
+  });
 });
 
 describe('polls: Telegram buttons (RF 2)', () => {

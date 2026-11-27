@@ -69,7 +69,11 @@ export class SessionAlternativesDialog {
     try {
       this.ref.close(
         await firstValueFrom(
-          this.sessions.reschedule(this.data.sessionId, { startsAt: c.startsAt }),
+          // Кандидат — точний час: вікно (якщо було) знімаємо.
+          this.sessions.reschedule(this.data.sessionId, {
+            startsAt: c.startsAt,
+            startWindowMinutes: null,
+          }),
         ),
       );
     } catch (err) {

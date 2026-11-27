@@ -51,7 +51,10 @@ describe('SessionAlternativesDialog', () => {
     items()[0]!.querySelector<HTMLButtonElement>('button.move')!.click();
     const req = http.expectOne('/api/sessions/41/reschedule');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ startsAt: '2030-03-08T17:00:00.000Z' });
+    expect(req.request.body).toEqual({
+      startsAt: '2030-03-08T17:00:00.000Z',
+      startWindowMinutes: null,
+    });
     const moved = session({ startsAt: '2030-03-08T17:00:00.000Z', rescheduled: true });
     req.flush(moved);
     await settle();

@@ -683,7 +683,10 @@ async function runPlan(
       return null;
     }
     case 'reschedule':
-      await rescheduleSession(deps, userId, plan.sessionId, { startsAt: plan.startsAt });
+      await rescheduleSession(deps, userId, plan.sessionId, {
+        startsAt: plan.startsAt,
+        startWindowMinutes: null,
+      });
       return plan.sessionId;
     case 'oneshot': {
       // Ваншот: його єдина запланована сесія (матеріалізуємо, якщо ще немає).
@@ -695,7 +698,10 @@ async function runPlan(
         .orderBy(asc(gameSessions.startsAt))
         .limit(1);
       if (!s) throw new AppError(409, 'SESSION_INVALID_STATE');
-      await rescheduleSession(deps, userId, s.id, { startsAt: plan.startsAt });
+      await rescheduleSession(deps, userId, s.id, {
+        startsAt: plan.startsAt,
+        startWindowMinutes: null,
+      });
       return s.id;
     }
     case 'new_session':

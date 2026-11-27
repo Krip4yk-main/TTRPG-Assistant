@@ -211,7 +211,8 @@ export class CommonTimesDialog {
     this.error.set(null);
     try {
       const session = await firstValueFrom(
-        this.sessionsApi.reschedule(id, { startsAt: c.startsAt }),
+        // Кандидат — точний час: вікно (якщо було) знімаємо.
+        this.sessionsApi.reschedule(id, { startsAt: c.startsAt, startWindowMinutes: null }),
       );
       this.ref.close({ kind: 'rescheduled', session });
     } catch (err) {
