@@ -24,7 +24,8 @@ const DAY_MS = 86_400_000;
 export const PENDING_USER_TTL_DAYS = 7;
 export const READ_NOTIFICATION_TTL_DAYS = 90;
 export const REMINDER_LOG_TTL_DAYS = 30;
-export const DONE_JOB_TTL_DAYS = 3;
+/** Виконані задачі (диспетчер сповіщень — ~8.6 тис. на добу) тримаємо добу, як і раніше. */
+export const DONE_JOB_TTL_DAYS = 1;
 const PURGE_BATCH = 1000;
 
 /**
