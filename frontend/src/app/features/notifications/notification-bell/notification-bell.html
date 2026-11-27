@@ -79,7 +79,7 @@
       </a>
     </header>
 
-    <div class="panel-body" [attr.aria-busy]="store.loading()">
+    <div class="panel-body" [attr.aria-busy]="store.loading()" (scroll)="playVisibleAccepted()">
       <div class="progress">
         @if (store.loading()) {
           <mat-progress-bar

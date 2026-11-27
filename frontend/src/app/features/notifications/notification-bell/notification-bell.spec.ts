@@ -395,7 +395,32 @@ describe('NotificationBell', () => {
       await open(items);
     };
 
+    /**
+     * Розкладка (у jsdom її немає): вікно `.panel-body` — 0…300 px, кожен рядок — 60 px за
+     * порядком у списку, зсунутий на `scrolled` (наче прокрутили). Рядок поза 0…300 — не видно.
+     */
+    let scrolled = 0;
+    const rect = (top: number, height: number) =>
+      ({ top, bottom: top + height, height, left: 0, right: 320, width: 320 }) as DOMRect;
+    const body = () => panel()!.querySelector<HTMLElement>('.panel-body')!;
+    const scrollTo = async (px: number) => {
+      scrolled = px;
+      body().dispatchEvent(new Event('scroll'));
+      await settle();
+    };
+
     beforeEach(() => {
+      scrolled = 0;
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: Element,
+      ) {
+        if (this.classList.contains('panel-body')) return rect(0, 300);
+        if (this.matches('li[data-notification-id]')) {
+          const index = [...this.parentElement!.children].indexOf(this);
+          return rect(index * 60 - scrolled, 60);
+        }
+        return rect(0, 0);
+      });
       localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY);
       const themes = TestBed.inject(ThemeService);
       play = vi.spyOn(themes, 'playEffect').mockResolvedValue() as unknown as ReturnType<
@@ -406,7 +431,10 @@ describe('NotificationBell', () => {
         typeof vi.fn
       >;
     });
-    afterEach(() => localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY));
+    afterEach(() => {
+      localStorage.removeItem(ACCEPTED_NOTICE_STORAGE_KEY);
+      vi.restoreAllMocks();
+    });
 
     it('first shown unread «вас прийнято» plays once, on its row', async () => {
       await start(2);
@@ -457,6 +485,56 @@ describe('NotificationBell', () => {
       await reopen([accepted(2)]);
       expect(play).toHaveBeenCalledTimes(1);
       expect(play.mock.calls[0]![0]).toBe('acceptedNotice');
+    });
+
+    it('a row out of view is not claimed; scrolling it into view plays it', async () => {
+      const filler = Array.from({ length: 6 }, (_, i) => notification(10 - i));
+      await start(1);
+      await open([...filler, accepted(2)]); // 7-й рядок: 360…420 px — поза вікном
+      expect(play).not.toHaveBeenCalled();
+      expect(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)).toBeNull();
+
+      await scrollTo(60); // 300…360 — ще не видно
+      expect(play).not.toHaveBeenCalled();
+      await scrollTo(150); // 210…270 — видно
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(play.mock.calls[0]![1]).toBe(panel()!.querySelector('li[data-notification-id="2"]'));
+      expect(JSON.parse(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)!)).toEqual([2]);
+
+      await scrollTo(160);
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it('only the first visible one is claimed; another plays later', async () => {
+      await start(2);
+      await open([accepted(3), accepted(2)]);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(play.mock.calls[0]![1]).toBe(panel()!.querySelector('li[data-notification-id="3"]'));
+      expect(JSON.parse(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)!)).toEqual([3]);
+
+      await reopen([accepted(3), accepted(2)]);
+      expect(play).toHaveBeenCalledTimes(2);
+      expect(play.mock.calls[1]![1]).toBe(panel()!.querySelector('li[data-notification-id="2"]'));
+    });
+
+    it('closing the panel aborts the running effect', async () => {
+      play.mockImplementation(() => new Promise<void>(() => {}));
+      await start(1);
+      await open([accepted(2)]);
+      const cancel = play.mock.calls[0]![3] as AbortSignal;
+      expect(cancel.aborted).toBe(false);
+      button().click();
+      await settle();
+      expect(cancel.aborted).toBe(true);
+    });
+
+    it('destroying the bell aborts the running effect', async () => {
+      play.mockImplementation(() => new Promise<void>(() => {}));
+      await start(1);
+      await open([accepted(2)]);
+      const cancel = play.mock.calls[0]![3] as AbortSignal;
+      fixture.destroy();
+      expect(cancel.aborted).toBe(true);
     });
 
     it('already played before a reload (remembered) — no effect', async () => {

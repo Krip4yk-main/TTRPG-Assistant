@@ -16,31 +16,31 @@ export function isAcceptedNotice(n: NotificationDto): boolean {
 }
 
 /**
- * Момент `acceptedNotice`: один раз на сповіщення (у цьому браузері). Список сповіщень віддає
- * рядки, які щойно показав (`claim`), і отримує ті непрочитані «вас прийнято», для яких
- * анімація ще не грала, — вони одразу вважаються зіграними (у пам'яті й `localStorage`, щоб і
- * після перезавантаження не повторювалась). Викликати лише тоді, коли чинний дизайн справді
- * програє ефект (`ThemeService.effectEnabled`). Недоступне сховище — пам'ятаємо до
- * перезавантаження.
+ * Момент `acceptedNotice`: один раз на сповіщення (у цьому браузері). Список сповіщень питає
+ * кандидатів (`candidates`) — непрочитані «вас прийнято», для яких анімація ще не грала, — і
+ * позначає зіграним (`markPlayed`) лише те, на якому справді запустив ефект (рядок видно в
+ * панелі, чинний дизайн анімує момент). Зіграні пам'ятаються й у `localStorage`, щоб і після
+ * перезавантаження не повторювались. Недоступне сховище — пам'ятаємо до перезавантаження.
  */
 @Injectable({ providedIn: 'root' })
 export class AcceptedNoticeMoment {
   private readonly played: number[] = readPlayed();
 
-  /** Непрочитані «вас прийнято» з `shown`, ще без анімації; позначає їх зіграними. */
-  claim(shown: readonly NotificationDto[]): NotificationDto[] {
-    const fresh = shown.filter(
-      (n) => !n.readAt && isAcceptedNotice(n) && !this.played.includes(n.id),
-    );
-    if (fresh.length === 0) return [];
-    this.played.push(...fresh.map((n) => n.id));
+  /** Непрочитані «вас прийнято» з `shown`, ще без анімації (у тому ж порядку); без побічних дій. */
+  candidates(shown: readonly NotificationDto[]): NotificationDto[] {
+    return shown.filter((n) => !n.readAt && isAcceptedNotice(n) && !this.played.includes(n.id));
+  }
+
+  /** Анімація для сповіщення `id` зіграла — більше не повторювати. */
+  markPlayed(id: number): void {
+    if (this.played.includes(id)) return;
+    this.played.push(id);
     this.played.splice(0, Math.max(0, this.played.length - REMEMBER));
     try {
       localStorage.setItem(ACCEPTED_NOTICE_STORAGE_KEY, JSON.stringify(this.played));
     } catch {
       // Сховище недоступне — пам'ятаємо до перезавантаження.
     }
-    return fresh;
   }
 }
 

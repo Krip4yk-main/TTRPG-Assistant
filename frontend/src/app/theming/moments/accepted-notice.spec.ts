@@ -23,26 +23,38 @@ describe('AcceptedNoticeMoment', () => {
     return TestBed.inject(AcceptedNoticeMoment);
   };
 
-  it('лише непрочитані «вас прийнято»', () => {
+  it('кандидати — лише непрочитані «вас прийнято», у тому ж порядку', () => {
     const m = fresh();
-    const got = m.claim([
+    const got = m.candidates([
+      notice(4),
       notice(1),
       notice(2, { readAt: new Date(TEST_NOW).toISOString() }),
       notice(3, { type: 'application.rejected' }),
     ]);
-    expect(got.map((n) => n.id)).toEqual([1]);
+    expect(got.map((n) => n.id)).toEqual([4, 1]);
   });
 
-  it('один раз на сповіщення — і після перезавантаження', () => {
-    expect(fresh().claim([notice(1)])).toHaveLength(1);
+  it('candidates нічого не позначає', () => {
     const m = fresh();
-    expect(m.claim([notice(1)])).toHaveLength(0);
-    expect(m.claim([notice(2), notice(1)]).map((n) => n.id)).toEqual([2]);
-    expect(m.claim([notice(2)])).toHaveLength(0);
+    expect(m.candidates([notice(1)])).toHaveLength(1);
+    expect(m.candidates([notice(1)])).toHaveLength(1);
+    expect(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)).toBeNull();
+    expect(fresh().candidates([notice(1)])).toHaveLength(1);
+  });
+
+  it('markPlayed — один раз на сповіщення, і після перезавантаження', () => {
+    const m = fresh();
+    m.markPlayed(1);
+    expect(m.candidates([notice(2), notice(1)]).map((n) => n.id)).toEqual([2]);
+    m.markPlayed(1);
+    expect(JSON.parse(localStorage.getItem(ACCEPTED_NOTICE_STORAGE_KEY)!)).toEqual([1]);
+    const again = fresh();
+    expect(again.candidates([notice(1)])).toHaveLength(0);
+    expect(again.candidates([notice(2)]).map((n) => n.id)).toEqual([2]);
   });
 
   it('пошкоджене сховище — як порожнє', () => {
     localStorage.setItem(ACCEPTED_NOTICE_STORAGE_KEY, '{oops');
-    expect(fresh().claim([notice(1)])).toHaveLength(1);
+    expect(fresh().candidates([notice(1)])).toHaveLength(1);
   });
 });

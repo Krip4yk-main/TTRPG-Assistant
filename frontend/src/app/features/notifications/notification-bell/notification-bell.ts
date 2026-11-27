@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DOCUMENT,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -95,6 +96,9 @@ export class NotificationBell {
     read: ElementRef<HTMLButtonElement>,
   });
 
+  /** Переривання анімації `acceptedNotice`, що зараз грає (`null` — не грає). */
+  private acceptedCancel: AbortController | null = null;
+
   protected readonly open = signal(false);
   protected readonly count = this.store.unreadCount;
   protected readonly hasRead = computed(() => this.store.items().some((n) => n.readAt));
@@ -135,36 +139,59 @@ export class NotificationBell {
         if (known) previous = c;
       });
     });
-    // Фірмова анімація `acceptedNotice`: уперше показане непрочитане «вас прийнято» (при
-    // відкритті панелі чи щойно підмішане згори) — один раз на сповіщення, на найновішому.
-    // Поки чинний дизайн його не анімує (немає ефекту, вимкнено, зменшений рух), сповіщення
-    // не вважається зіграним — програється пізніше під дизайном, що анімує.
+    // Фірмова анімація `acceptedNotice`: непрочитане «вас прийнято», ще без анімації, щойно його
+    // рядок справді видно в панелі (після відкриття, підмішування згори чи прокрутки) — один раз
+    // на сповіщення, на першому видимому. Зіграним вважається лише те, на якому ефект запущено;
+    // поки чинний дизайн момент не анімує (немає ефекту, вимкнено, зменшений рух) — нічого.
     effect(() => {
       if (!this.open() || !this.store.loaded()) return;
       if (!this.themes.effectEnabled('acceptedNotice')) return;
       const items = this.store.items();
       untracked(() => {
-        const [fresh] = this.acceptedNotice.claim(items);
-        if (fresh) this.playAccepted(fresh.id);
+        if (this.acceptedNotice.candidates(items).length === 0) return;
+        this.themes.preloadEffect('acceptedNotice');
+        afterNextRender(() => this.playVisibleAccepted(), { injector: this.injector });
       });
     });
+    // Панель закрилась (чи компонент знищено) — анімацію в ній перериваємо.
+    effect(() => {
+      if (!this.open()) untracked(() => this.cancelAccepted());
+    });
+    inject(DestroyRef).onDestroy(() => this.cancelAccepted());
     // Стор закрив панель (вихід/зміна користувача) — закриваємо й тут.
     effect(() => {
       if (!this.store.panelOpen()) untracked(() => this.open.set(false));
     });
   }
 
-  private playAccepted(id: number): void {
-    this.themes.preloadEffect('acceptedNotice');
-    afterNextRender(
-      () => {
-        const row = this.document.querySelector<HTMLElement>(
-          `#notifications-panel [data-notification-id="${id}"]`,
-        );
-        if (row) void this.themes.playEffect('acceptedNotice', row);
-      },
-      { injector: this.injector },
-    );
+  /**
+   * Перший кандидат `acceptedNotice`, чий рядок видно в `.panel-body` (хоч половину), —
+   * позначаємо зіграним і програємо ефект на ньому. Поки ефект триває — нових не починаємо.
+   */
+  protected playVisibleAccepted(): void {
+    if (this.acceptedCancel || !this.open()) return;
+    if (!this.themes.effectEnabled('acceptedNotice')) return;
+    const candidates = this.acceptedNotice.candidates(this.store.items());
+    if (candidates.length === 0) return;
+    const body = this.document.querySelector<HTMLElement>('#notifications-panel .panel-body');
+    if (!body) return;
+    const view = body.getBoundingClientRect();
+    for (const n of candidates) {
+      const row = body.querySelector<HTMLElement>(`[data-notification-id="${n.id}"]`);
+      if (!row || !isVisibleIn(row.getBoundingClientRect(), view)) continue;
+      this.acceptedNotice.markPlayed(n.id);
+      const cancel = new AbortController();
+      this.acceptedCancel = cancel;
+      void this.themes.playEffect('acceptedNotice', row, undefined, cancel.signal).finally(() => {
+        if (this.acceptedCancel === cancel) this.acceptedCancel = null;
+      });
+      return;
+    }
+  }
+
+  private cancelAccepted(): void {
+    this.acceptedCancel?.abort();
+    this.acceptedCancel = null;
   }
 
   protected toggle(): void {
@@ -272,4 +299,11 @@ export class NotificationBell {
   protected retry(): void {
     void this.store.loadFirst();
   }
+}
+
+/** Рядок видно у вікні прокрутки `view` хоча б наполовину (нульовий розмір — не видно). */
+function isVisibleIn(row: DOMRect, view: DOMRect): boolean {
+  if (row.height <= 0 || row.width <= 0) return false;
+  const shown = Math.min(row.bottom, view.bottom) - Math.max(row.top, view.top);
+  return shown >= row.height / 2;
 }
