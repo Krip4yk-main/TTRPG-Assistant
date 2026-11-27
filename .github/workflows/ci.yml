@@ -3,7 +3,7 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 concurrency:
@@ -24,6 +24,8 @@ jobs:
         env:
           # Лише для одноразової тестової БД у CI, не секрет.
           MYSQL_ROOT_PASSWORD: ci-root
+          # Базова тестова БД: з неї global-setup створює nri_test_1…N.
+          MYSQL_DATABASE: nri_test
         ports: ['3306:3306']
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root --silent"

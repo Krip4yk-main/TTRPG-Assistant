@@ -197,7 +197,7 @@ describe('notificationView', () => {
     const v = notificationView({ ...dto('tester.report'), category: 'moderation' }, 'UTC');
     expect(v.key).toBe('notifications.tester.report');
     expect(v.icon).toBe('bug_report');
-    expect(String(lookup(v.key))).toContain('звіт тестувальника');
+    expect(String(lookup(v.key))).toContain('відгук про сайт');
   });
 
   it('long pause reminder: text names the three choices; quick actions link to the game page', () => {

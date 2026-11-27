@@ -53,8 +53,8 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * подій, `schedule`): `session.summary` — учасникам гри на час сесії, один раз (`sessionId`,
  * `startsAt`, `excerpt` — початок підсумку). Приблизний час (не з подій, `sessions`):
  * `session.time_unpinned` — майстру за 24 год до початку вікна, один раз на час сесії:
- * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Звіти тестувальників (не з
- * подій, `moderation`, лише dev-сервер): `tester.report` — власнику платформи на кожен новий звіт
+ * уточни точний час (`sessionId`, `startsAt`, `startWindowMinutes`). Відгуки про сайт (не з
+ * подій, `moderation`; на dev — звіти тестерів, на prod — відгуки користувачів): `tester.report` — власнику платформи на кожен новий звіт
  * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Текст — `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
