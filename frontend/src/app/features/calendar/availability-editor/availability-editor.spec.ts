@@ -57,11 +57,15 @@ describe('gameBusyCells', () => {
   });
   const busyIndexes = (cells: unknown[][]) => cells.flatMap((c, i) => (c.length ? [i] : []));
 
+  // Фіксоване «зараз» до подій: інакше тест ламається, коли реальний час минає дату з фікстури.
+  const NOW = Date.parse('2026-11-23T00:00:00.000Z');
+
   it('uses the zoned minute of day (Asia/Kathmandu, UTC+5:45)', () => {
     // Пт 27.11 19:00–20:00 за Катманду = 13:15–14:15 UTC.
     const cells = gameBusyCells(
       [busy('2026-11-27T13:15:00.000Z', '2026-11-27T14:15:00.000Z')],
       'Asia/Kathmandu',
+      NOW,
     );
     expect(busyIndexes(cells)).toEqual([4 * 48 + 38, 4 * 48 + 39]);
   });
@@ -71,6 +75,7 @@ describe('gameBusyCells', () => {
     const cells = gameBusyCells(
       [busy('2026-11-27T17:10:00.000Z', '2026-11-27T17:40:00.000Z')],
       'Europe/Kyiv',
+      NOW,
     );
     expect(busyIndexes(cells)).toEqual([4 * 48 + 38, 4 * 48 + 39]);
   });
