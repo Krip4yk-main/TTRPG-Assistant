@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VIEW_MODE, VIEW_MODES, isViewMode, updateDefaultViewSchema } from './me.js';
+import { updateDefaultViewSchema } from './me.js';
+import { DEFAULT_VIEW_MODE, VIEW_MODES, isViewMode } from './view-mode.js';
 
 describe('updateDefaultViewSchema', () => {
   it('accepts player or gm', () => {

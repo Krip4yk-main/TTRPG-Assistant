@@ -1,35 +1,81 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, inject, linkedSignal, untracked } from '@angular/core';
+import { DEFAULT_VIEW_MODE, type MeDto, type ViewMode, isViewMode } from '@nri/shared';
+import { AuthStore } from '../auth/auth.store';
 
-export type ViewMode = 'player' | 'gm';
+export type { ViewMode } from '@nri/shared';
 
 const STORAGE_KEY = 'nri.viewMode';
-const DEFAULT_MODE: ViewMode = 'player';
 
-function isViewMode(value: unknown): value is ViewMode {
-  return value === 'player' || value === 'gm';
+/** Збережений у вкладці вид — разом з користувачем, для якого його обрано. */
+interface StoredView {
+  u: number;
+  m: ViewMode;
 }
 
-/** «Вид гравця / Вид майстра». Зберігається в localStorage, якщо він доступний. */
+/**
+ * «Вид гравця / Вид майстра» — свій у кожній вкладці: обраний вид живе в `sessionStorage`
+ * (переживає перезавантаження, не синхронізується між вкладками). Нова вкладка відкривається
+ * у «Виді за замовчуванням» з профілю (`MeDto.defaultView`); гість — завжди «Вид гравця».
+ */
 @Injectable({ providedIn: 'root' })
 export class ViewModeStore {
-  private readonly state = signal<ViewMode>(readStored());
-  readonly mode = this.state.asReadonly();
+  private readonly auth = inject(AuthStore);
+  private readonly activeUser = computed(() => {
+    const me = this.auth.me();
+    return this.auth.isActive() && me ? me : null;
+  });
+
+  private readonly activeUserId = computed(() => this.activeUser()?.id ?? null);
+
+  /**
+   * Перераховується лише при зміні користувача (вхід / вихід), а не при зміні налаштування
+   * «Вид за замовчуванням» — відкрита вкладка свій вид не міняє.
+   */
+  private readonly state = linkedSignal<number | null, ViewMode>({
+    source: this.activeUserId,
+    computation: () => untracked(() => initialMode(this.activeUser())),
+  });
+
+  readonly mode = computed<ViewMode>(() => (this.activeUser() ? this.state() : DEFAULT_VIEW_MODE));
 
   setMode(mode: ViewMode): void {
+    const user = this.activeUser();
+    if (!user) return;
     this.state.set(mode);
-    try {
-      localStorage.setItem(STORAGE_KEY, mode);
-    } catch {
-      // Приватний режим / заборонене сховище — працюємо лише в пам'яті.
-    }
+    writeStored({ u: user.id, m: mode });
   }
 }
 
-function readStored(): ViewMode {
+/**
+ * Вид вкладки для користувача: обраний у ній раніше або «Вид за замовчуванням». Його
+ * одразу запам'ятовуємо у вкладці — перезавантаження не підхопить пізнішої зміни налаштування.
+ */
+function initialMode(user: MeDto | null): ViewMode {
+  if (!user) return DEFAULT_VIEW_MODE;
+  const stored = readStored();
+  if (stored?.u === user.id) return stored.m;
+  const mode = isViewMode(user.defaultView) ? user.defaultView : DEFAULT_VIEW_MODE;
+  writeStored({ u: user.id, m: mode });
+  return mode;
+}
+
+function writeStored(view: StoredView): void {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return isViewMode(stored) ? stored : DEFAULT_MODE;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(view));
   } catch {
-    return DEFAULT_MODE;
+    // Приватний режим / заборонене сховище — працюємо лише в пам'яті.
+  }
+}
+
+function readStored(): StoredView | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const { u, m } = parsed as Partial<StoredView>;
+    return typeof u === 'number' && isViewMode(m) ? { u, m } : null;
+  } catch {
+    return null;
   }
 }

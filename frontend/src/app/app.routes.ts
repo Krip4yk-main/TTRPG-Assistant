@@ -2,7 +2,12 @@ import type { Routes } from '@angular/router';
 import { devLoginRoutes } from '../environments/runtime-config';
 import { activeGuard, guestGuard, notPendingGuard, pendingGuard } from './core/auth/auth.guards';
 import type { RouteSeo } from './core/seo/seo.service';
+import { gmPage, playerPage } from './core/view-mode/view-mode-routing';
 
+/**
+ * Сторінки виду (`gmPage` / `playerPage`): у «Виді гравця» не видно сторінок майстра, і навпаки;
+ * перехід на сторінку іншого виду перемикає вид (`ViewModeRouting`). Решта — спільні.
+ */
 export const routes: Routes = [
   {
     path: '',
@@ -46,12 +51,14 @@ export const routes: Routes = [
   {
     path: 'my-games',
     canActivate: [activeGuard],
+    data: gmPage('/my-applications'),
     title: 'titles.myGames',
     loadComponent: () => import('./features/games/my-games/my-games').then((m) => m.MyGames),
   },
   {
     path: 'my-applications',
     canActivate: [activeGuard],
+    data: playerPage('/my-games'),
     title: 'titles.myApplications',
     loadComponent: () =>
       import('./features/applications/my-applications/my-applications').then(
@@ -61,18 +68,21 @@ export const routes: Routes = [
   {
     path: 'games/new',
     canActivate: [activeGuard],
+    data: gmPage(),
     title: 'titles.newGame',
     loadComponent: () => import('./features/games/game-form/game-form').then((m) => m.GameForm),
   },
   {
     path: 'games/:id/edit',
     canActivate: [activeGuard],
+    data: gmPage(),
     title: 'titles.editGame',
     loadComponent: () => import('./features/games/game-form/game-form').then((m) => m.GameForm),
   },
   {
     path: 'games/:id/applications',
     canActivate: [activeGuard],
+    data: gmPage(),
     title: 'titles.gameApplications',
     loadComponent: () =>
       import('./features/applications/game-applications/game-applications').then(

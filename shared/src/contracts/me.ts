@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ianaTimezone } from '../schemas/common.js';
 import { APPLICATION_CONSTRAINT_MAX, APPLICATION_CONSTRAINTS_MAX } from './applications.js';
 import type { ThemeId, UiPrefsDto } from './theme.js';
+import { VIEW_MODES, type ViewMode } from './view-mode.js';
 
 export type UserStatus = 'pending' | 'active' | 'deleted';
 export type UserRole = 'owner' | 'admin' | 'moderator' | 'user';
@@ -22,16 +23,6 @@ export type AvatarProvider = 'google' | 'discord' | 'telegram';
 export interface AvatarOptionDto {
   source: AvatarProvider;
   previewUrl: string;
-}
-
-/** «Вид гравця / Вид майстра» — які сторінки й навігацію бачить користувач. */
-export const VIEW_MODES = ['player', 'gm'] as const;
-export type ViewMode = (typeof VIEW_MODES)[number];
-/** Вид нової вкладки, якщо користувач не змінив налаштування (і завжди — для гостя). */
-export const DEFAULT_VIEW_MODE: ViewMode = 'player';
-
-export function isViewMode(value: unknown): value is ViewMode {
-  return VIEW_MODES.includes(value as ViewMode);
 }
 
 /** Відповідь `GET /api/me`. */

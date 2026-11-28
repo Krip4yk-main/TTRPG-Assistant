@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth.store';
 import { isStaff } from '../../core/auth/roles';
+import { ViewModeRouting } from '../../core/view-mode/view-mode-routing';
 import { type ViewMode, ViewModeStore } from '../../core/view-mode/view-mode.store';
 
 /**
@@ -13,6 +14,7 @@ export class ShellController {
   readonly auth = inject(AuthStore);
   readonly viewMode = inject(ViewModeStore);
   private readonly router = inject(Router);
+  private readonly viewRouting = inject(ViewModeRouting);
 
   /** Персонал (модератор і вище) бачить у меню «Адмінку». */
   readonly isStaff = computed(() => this.auth.isActive() && isStaff(this.auth.me()?.role));
@@ -20,8 +22,9 @@ export class ShellController {
   private readonly retryingState = signal(false);
   readonly retrying = this.retryingState.asReadonly();
 
+  /** Перемикач виду: на сторінці іншого виду — перехід на відповідник або головну. */
   setMode(mode: ViewMode): void {
-    this.viewMode.setMode(mode);
+    void this.viewRouting.switchTo(mode);
   }
 
   async logout(): Promise<void> {
