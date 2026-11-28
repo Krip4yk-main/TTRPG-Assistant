@@ -82,6 +82,20 @@ const config = {
   themeStyleVersion: themeStyleVersion(),
 };
 
+const deployEnv = config.deployEnv;
+/**
+ * Режим dev-входу (build-time): local — форма на /login, beta — лише прихований маршрут /login/dev
+ * за кодом тестера, off — dev-входу немає (прод або вимкнено). Експортується окремою константою-літералом,
+ * щоб збірка відкидала недосяжний код (на проді в бандлі немає ні маршруту, ні ендпоінтів dev-входу).
+ */
+const devLoginMode = !config.devLogin
+  ? 'off'
+  : deployEnv === 'local'
+    ? 'local'
+    : deployEnv === 'dev'
+      ? 'beta'
+      : 'off';
+
 const source = `// Згенеровано scripts/gen-runtime-config.mjs — не редагуйте вручну (файл у .gitignore).
 export interface RuntimeConfig {
   /** Ім'я Telegram-бота для Login Widget; порожньо — віджет вимкнено. */
@@ -97,6 +111,11 @@ export interface RuntimeConfig {
   /** Версія бандлів стилів дизайнів для \`?v=\` (хеш вихідних стилів і пакетів шрифтів). */
   readonly themeStyleVersion: string;
 }
+
+export type DevLoginMode = 'local' | 'beta' | 'off';
+
+/** Режим dev-входу: local — форма на /login; beta — прихований маршрут /login/dev; off — немає. */
+export const devLoginMode: DevLoginMode = ${JSON.stringify(devLoginMode)};
 
 export const runtimeConfig: RuntimeConfig = ${JSON.stringify(config, null, 2)};
 `;

@@ -32,12 +32,12 @@
           'login.discord' | translate
         }}</a>
       }
-      @if (!telegramBot && !googleLogin && !discordLogin && !devLoginEnabled) {
+      @if (!telegramBot && !googleLogin && !discordLogin && !devLoginEnabled()) {
         <p class="nri-muted">{{ 'login.noProviders' | translate }}</p>
       }
     </div>
 
-    @if (devLoginEnabled) {
+    @if (devLoginEnabled()) {
       <form class="dev-login" [formGroup]="devForm" (ngSubmit)="devLogin()" novalidate>
         <h2>{{ 'login.dev.title' | translate }}</h2>
         <p class="nri-muted">{{ 'login.dev.hint' | translate }}</p>

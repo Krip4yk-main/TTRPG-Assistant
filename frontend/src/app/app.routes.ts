@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { devLoginMode } from '../environments/runtime-config';
 import { activeGuard, guestGuard, notPendingGuard, pendingGuard } from './core/auth/auth.guards';
 
 export const routes: Routes = [
@@ -16,6 +17,20 @@ export const routes: Routes = [
     title: 'titles.login',
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
+  // Прихований dev-вхід бети за кодом тестера (не лінкується, не в sitemap, noindex). Гілка за
+  // build-time константою: у прод-збірці маршруту немає.
+  ...(devLoginMode === 'beta'
+    ? [
+        {
+          path: 'login/dev',
+          canActivate: [guestGuard],
+          title: 'titles.devLogin',
+          data: { noindex: true },
+          loadComponent: () =>
+            import('./features/auth/dev-code-login/dev-code-login').then((m) => m.DevCodeLogin),
+        },
+      ]
+    : []),
   {
     path: 'complete-profile',
     canActivate: [pendingGuard],

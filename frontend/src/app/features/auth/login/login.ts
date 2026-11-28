@@ -22,7 +22,11 @@ import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { BannedLoginDetails, ErrorCode, MeDto } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
-import { runtimeConfig } from '../../../../environments/runtime-config';
+import {
+  devLoginMode,
+  type DevLoginMode,
+  runtimeConfig,
+} from '../../../../environments/runtime-config';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
@@ -72,7 +76,9 @@ export class Login implements OnInit {
   protected readonly banned = signal<BannedLoginDetails | null>(null);
 
   protected readonly telegramBot = runtimeConfig.telegramBotUsername;
-  protected readonly devLoginEnabled = runtimeConfig.devLogin;
+  /** Режим dev-входу (build-time); вхід — інпут лише для тестів. Форма — тільки в `local`. */
+  readonly mode = input<DevLoginMode>(devLoginMode);
+  protected readonly devLoginEnabled = computed(() => this.mode() === 'local');
   protected readonly googleLogin = runtimeConfig.googleLogin;
   protected readonly discordLogin = runtimeConfig.discordLogin;
   private readonly target = computed(() => safeReturnTo(this.returnTo()) ?? '/');

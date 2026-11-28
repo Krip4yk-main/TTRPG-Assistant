@@ -1,8 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import type { Observable } from 'rxjs';
+import { devLoginMode } from '../../../environments/runtime-config';
+import { throwError, type Observable } from 'rxjs';
 import type {
   CompleteProfileInput,
+  DevCodeLoginInput,
   DevLoginInput,
   IdentityDto,
   IdentityProvider,
@@ -28,8 +30,19 @@ export class AuthApi {
     return this.http.post<{ user: MeDto }>('/api/auth/telegram', data);
   }
 
+  /**
+   * Dev-вхід без OAuth — лише в режимі `local`. Гілка за build-time константою: у збірках
+   * beta/prod шлях ендпоінта до бандла не потрапляє.
+   */
   devLogin(input: DevLoginInput): Observable<{ user: MeDto }> {
+    if (devLoginMode !== 'local') return throwError(() => new Error('dev-login is disabled'));
     return this.http.post<{ user: MeDto }>('/api/auth/dev-login', input);
+  }
+
+  /** Dev-вхід за кодом тестера — лише в режимі `beta` (поза ним ендпоінта в бандлі немає). */
+  devCodeLogin(input: DevCodeLoginInput): Observable<{ user: MeDto }> {
+    if (devLoginMode !== 'beta') return throwError(() => new Error('dev-login is disabled'));
+    return this.http.post<{ user: MeDto }>('/api/auth/dev-login/code', input);
   }
 
   logout(): Observable<unknown> {

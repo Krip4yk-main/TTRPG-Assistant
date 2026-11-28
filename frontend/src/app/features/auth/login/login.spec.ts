@@ -231,3 +231,42 @@ describe('Login — Discord', () => {
     expect(el.textContent).not.toContain('login.noProviders');
   });
 });
+
+describe('Login — dev-login mode', () => {
+  async function render(mode: 'local' | 'beta' | 'off'): Promise<HTMLElement> {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(Login);
+    fixture.componentRef.setInput('mode', mode);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('local: the dev form is on /login', async () => {
+    const el = await render('local');
+    expect(el.querySelector('form.dev-login')).not.toBeNull();
+  });
+
+  it.each(['beta', 'off'] as const)('%s: no dev form and no hint about it on /login', async (m) => {
+    const el = await render(m);
+    expect(el.querySelector('form.dev-login')).toBeNull();
+    expect(el.textContent).not.toContain('login.dev.');
+    expect(el.querySelector('a[href*="login/dev"]')).toBeNull();
+  });
+});
