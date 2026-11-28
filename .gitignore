@@ -11,7 +11,6 @@ dist/
 coverage/
 .DS_Store
 Thumbs.db
-.superpowers/
 *.log
 backend/.env
 frontend/.env
@@ -37,3 +36,12 @@ CLAUDE.local.md
 .vscode/
 .idea/
 .cursor/
+# Тимчасові файли й налаштування асистентів/плагінів (лише для локальної роботи; загальна
+# документація — у docs/)
+.superpowers/
+.mcp.json
+.codex/
+.agents/
+.aider*
+.continue/
+.windsurf/
