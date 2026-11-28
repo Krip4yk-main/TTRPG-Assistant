@@ -44,7 +44,10 @@ mysqldump --defaults-extra-file="$MYSQL_CNF" \
   | gzip -c \
   | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -out "$PARTIAL"
 
-# Швидка перевірка цілісності: файл розшифровується, gzip-потік цілий.
+# Швидка перевірка цілісності: файл розшифровується, gzip-потік цілий. Перед нею оновлюємо
+# mtime: довга перевірка не пише в .partial, і clean_stale_partials паралельного запуску
+# не має прийняти його за застарілий.
+touch -- "$PARTIAL"
 openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in "$PARTIAL" | gzip -t \
   || die "integrity check of the new backup failed"
 
