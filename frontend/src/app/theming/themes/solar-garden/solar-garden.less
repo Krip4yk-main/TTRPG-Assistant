@@ -718,6 +718,9 @@
   // У спокої — приглушене, нахилене за кутом пакетика; наперед (наведення / клік / Enter) —
   // виходить на пакетик, більшає, справжні кольори. Підпис — на нижньому полі рамки.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -22px;
     width: 146px;
@@ -731,7 +734,7 @@
       box-shadow: 0 4px 10px rgba(60, 80, 40, 0.18);
       opacity: 0.95;
       filter: saturate(0.55) brightness(1.02);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #2f6b3c;

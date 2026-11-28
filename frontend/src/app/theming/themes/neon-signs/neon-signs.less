@@ -465,6 +465,9 @@
   // Наперед (наведення / клік / Enter) — виїжджає на короб, вирівнюється, збільшується й
   // світиться неоном гри.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(8deg);
+
     top: -34px;
     right: -24px;
     width: 156px;
@@ -477,7 +480,7 @@
       background: #e9e1d1;
       box-shadow: 0 8px 14px rgba(0, 0, 0, 0.6);
       filter: brightness(0.72) saturate(0.85);
-      transform: rotate(8deg);
+      transform: var(--sc-attach-rest);
 
       // Скотч угорі посередині.
       &::before {

@@ -951,6 +951,9 @@
   // іскрами. У спокої — сепія й тьмяно; наперед (наведення / клік / Enter) — виходить на аркуш,
   // збільшується, колір, бірюзова аура.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(5deg);
+
     top: -34px;
     right: -14px;
     width: 112px;
@@ -979,7 +982,7 @@
       box-shadow:
         0 8px 16px rgba(0, 0, 0, 0.55),
         inset 0 0 0 1.5px #4d3410;
-      transform: rotate(5deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #6fe6d2;

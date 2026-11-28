@@ -782,6 +782,9 @@
   // відклеюється на картку, більшає, справжні кольори, жорстка чорнильна тінь. Рвані краї — у
   // папері-підкладці `::before` (форма не на кнопці — контур фокусу не обрізається).
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(8deg);
+
     top: -30px;
     right: -24px;
     width: 154px;
@@ -792,7 +795,7 @@
       padding: 5px 5px 9px;
       background: none;
       filter: brightness(0.62) saturate(0.5);
-      transform: rotate(8deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #35e0c2;

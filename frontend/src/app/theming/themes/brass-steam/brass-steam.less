@@ -956,6 +956,9 @@
   // нахилена за кутом бланка; наперед (наведення / клік / Enter) — виходить на бланк, більшає,
   // справжні кольори.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -22px;
     width: 150px;
@@ -968,7 +971,7 @@
       background: #eef2f3;
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
       filter: brightness(0.72) saturate(0.7);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #f0d78f;

@@ -329,6 +329,9 @@
   // Наперед (наведення / клік / Enter) — виїжджає на панель, вирівнюється, збільшується й
   // отримує кольорову рамку неону гри з хроматичним зсувом.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -26px;
     width: 156px;
@@ -339,7 +342,7 @@
       border-radius: 6px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
       filter: brightness(0.62) saturate(0.55);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       // Сканлайни й відблиск скла знімка.
       &::after {

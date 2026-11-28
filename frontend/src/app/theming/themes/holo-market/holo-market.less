@@ -552,6 +552,10 @@
   // Наперед (наведення / клік / Enter) — кольорове, вирівнюється, виїжджає на панель і
   // збільшується, з хроматичним краєм і світінням кольору гри.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: perspective(500px) rotateY(-24deg) rotateZ(4deg);
+    --sc-attach-rest-origin: calc(100% - 3px) 50%;
+
     top: -36px;
     right: -30px;
     width: 160px;
@@ -563,7 +567,7 @@
       background: var(--sc-field);
       box-shadow: 0 0 18px color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 35%, transparent);
       opacity: 0.85;
-      transform: perspective(500px) rotateY(-24deg) rotateZ(4deg);
+      transform: var(--sc-attach-rest);
       transform-origin: 100% 50%;
 
       img {

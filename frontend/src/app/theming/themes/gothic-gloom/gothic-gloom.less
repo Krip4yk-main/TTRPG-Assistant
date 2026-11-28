@@ -802,6 +802,9 @@
   // ::after. Наперед (наведення / клік / Enter) — виходить на панель, вирівнюється, збільшується,
   // сепія зникає, тепле світло.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -20px;
     width: 120px;
@@ -810,7 +813,7 @@
     .attach {
       background: none;
       filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.7)) brightness(0.85);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       &::before {
         content: '';
