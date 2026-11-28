@@ -88,13 +88,20 @@
             }
           </div>
           <!-- Обгортка: tooltip на вимкненій кнопці не спрацьовує. -->
-          <span [matTooltip]="isLastIdentity() ? ('account.identities.lastHint' | translate) : ''">
+          @let blockKey = unlinkBlockKey(identity.provider);
+          <span [matTooltip]="blockKey ? (blockKey | translate) : ''">
             <button
               mat-stroked-button
               type="button"
-              [disabled]="busy() || isLastIdentity()"
+              [disabled]="busy() || !!blockKey"
               (click)="unlink(identity.provider)"
-              [attr.aria-describedby]="isLastIdentity() ? 'last-identity-hint' : null"
+              [attr.aria-describedby]="
+                blockKey === 'account.identities.staffHint'
+                  ? 'staff-telegram-hint'
+                  : blockKey
+                    ? 'last-identity-hint'
+                    : null
+              "
               [attr.aria-label]="
                 'account.identities.unlinkAria'
                   | translate: { provider: (providerKey(identity.provider) | translate) }
@@ -106,6 +113,11 @@
         </li>
       }
     </ul>
+    @if (isStaff() && hasTelegram()) {
+      <p id="staff-telegram-hint" class="nri-muted hint">
+        {{ 'account.identities.staffHint' | translate }}
+      </p>
+    }
     @if (isLastIdentity()) {
       <p id="last-identity-hint" class="nri-muted hint">
         {{ 'account.identities.lastHint' | translate }}

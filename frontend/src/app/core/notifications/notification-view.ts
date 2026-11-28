@@ -195,6 +195,9 @@ export function notificationView(n: NotificationDto, timeZone: string): Notifica
     view.icon = n.type === 'calendar.empty' ? 'edit_calendar' : 'sync_problem';
   } else if (n.type === 'session.rsvp_declined') {
     view.icon = 'event_busy';
+  } else if (n.type === 'staff.telegram_required') {
+    // Персоналу без Telegram — до налаштувань акаунта (прив'язка способів входу).
+    view.icon = 'link';
   } else if (n.type === 'tester.report') {
     // Звіт тестувальника (dev-сервер) — веде до «Звітів тестерів» в адмінці.
     view.icon = 'bug_report';

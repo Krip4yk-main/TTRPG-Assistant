@@ -20,6 +20,7 @@ const KNOWN_ACTIONS = new Set([
   'rating.cancel',
   'role.change',
   'owner.transfer',
+  'owner.bootstrap',
   'game.close',
   'game.dismiss_dead',
   'game.dismiss_suspicious',

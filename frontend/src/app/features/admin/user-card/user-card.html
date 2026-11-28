@@ -30,6 +30,11 @@
             }
           </h2>
           <span class="status role">{{ 'admin.roles.names.' + u.role | translate }}</span>
+          @if (u.role !== 'user' && !u.hasTelegram) {
+            <span class="status no-telegram" data-status="actioned">{{
+              'admin.roles.noTelegram' | translate
+            }}</span>
+          }
           @if (u.isBanned) {
             <span class="status" data-status="actioned">{{
               'moderation.blocked' | translate

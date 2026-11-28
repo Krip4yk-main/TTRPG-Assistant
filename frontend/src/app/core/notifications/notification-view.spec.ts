@@ -214,6 +214,16 @@ describe('notificationView', () => {
     expect(String(lookup(v.key))).toContain('відгук про сайт');
   });
 
+  it('staff.telegram_required: link icon and a text that asks to link Telegram', () => {
+    const v = notificationView(
+      { ...dto('staff.telegram_required'), category: 'moderation' },
+      'UTC',
+    );
+    expect(v.key).toBe('notifications.staff.telegram_required');
+    expect(v.icon).toBe('link');
+    expect(String(lookup(v.key))).toContain('Telegram');
+  });
+
   it('long pause reminder: text names the three choices; quick actions link to the game page', () => {
     const v = notificationView(dto('game.long_pause'), 'UTC');
     expect(v.key).toBe('notifications.game.long_pause');

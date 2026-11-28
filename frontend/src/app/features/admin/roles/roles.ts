@@ -97,6 +97,32 @@ export class AdminRoles {
     return this.picked()[u.publicId] ?? u.role;
   }
 
+  /** Людина без Telegram: позначка (персонал або той, кого можна призначити). */
+  protected noTelegram(u: AdminUserListItemDto): boolean {
+    return (
+      u.status === 'active' && !u.hasTelegram && (u.role !== 'user' || !!this.options(u).length)
+    );
+  }
+
+  /** Обрана нова роль персоналу без Telegram — бекенд відповів би 409 TELEGRAM_REQUIRED. */
+  protected roleBlocked(u: AdminUserListItemDto): boolean {
+    const role = this.selected(u);
+    return !u.hasTelegram && role !== 'user' && role !== u.role;
+  }
+
+  /** Передача прав адміну без Telegram неможлива (409 TELEGRAM_REQUIRED). */
+  protected transferBlocked(u: AdminUserListItemDto): boolean {
+    return !u.hasTelegram;
+  }
+
+  /** Чи показувати пояснення «спершу прив'яжіть Telegram» під рядком. */
+  protected showTelegramHint(u: AdminUserListItemDto): boolean {
+    return (
+      this.roleBlocked(u) ||
+      (this.isOwner() && u.role === 'admin' && u.status === 'active' && this.transferBlocked(u))
+    );
+  }
+
   protected pick(u: AdminUserListItemDto, role: AssignableRole): void {
     this.picked.update((p) => ({ ...p, [u.publicId]: role }));
   }
@@ -112,6 +138,8 @@ export class AdminRoles {
       this.notice.set({ publicId: u.publicId, key: 'admin.roles.saved', error: false });
     } catch (err) {
       const { code } = toApiError(err);
+      // Список застарів: людина без Telegram — запам'ятовуємо, щоб дію було заблоковано в UI.
+      if (code === 'TELEGRAM_REQUIRED') this.list.replace({ ...u, hasTelegram: false });
       this.notice.set({ publicId: u.publicId, key: `errors.${code}`, error: true });
     } finally {
       this.busy.set(null);
@@ -140,7 +168,7 @@ export class AdminRoles {
   }
 
   private applyCard(u: AdminUserListItemDto, card: AdminUserDto): void {
-    this.list.replace({ ...u, role: card.role });
+    this.list.replace({ ...u, role: card.role, hasTelegram: card.hasTelegram });
     this.picked.update((p) => {
       const next = { ...p };
       delete next[u.publicId];

@@ -121,6 +121,11 @@ export class AccountSettings {
   protected readonly hasDiscord = computed(() => this.has('discord'));
   /** Відв'язати не можна останній спосіб входу (бекенд відповів би 409 LAST_IDENTITY). */
   protected readonly isLastIdentity = computed(() => this.identities().length <= 1);
+  /** Персонал не може відв'язати Telegram (бекенд відповів би 409 TELEGRAM_REQUIRED_FOR_STAFF). */
+  protected readonly isStaff = computed(() => {
+    const role = this.me()?.role;
+    return !!role && role !== 'user';
+  });
   protected readonly canLinkTelegram = computed(
     () => !!runtimeConfig.telegramBotUsername && !this.hasTelegram(),
   );
@@ -220,6 +225,12 @@ export class AccountSettings {
 
   protected providerKey(provider: IdentityProvider): string {
     return `account.providers.${provider}`;
+  }
+
+  /** Чому кнопку «Відв'язати» вимкнено (ключ i18n) або `null`. */
+  protected unlinkBlockKey(provider: IdentityProvider): string | null {
+    if (provider === 'telegram' && this.isStaff()) return 'account.identities.staffHint';
+    return this.isLastIdentity() ? 'account.identities.lastHint' : null;
   }
 
   protected async unlink(provider: IdentityProvider): Promise<void> {

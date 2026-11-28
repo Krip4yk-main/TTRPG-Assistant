@@ -330,3 +330,67 @@ describe('AccountSettings Discord identity', () => {
     expect(el.querySelector('.identities')!.textContent).toContain('gm#1');
   });
 });
+
+describe('AccountSettings staff Telegram', () => {
+  let http: HttpTestingController;
+
+  async function render(role: MeDto['role']): Promise<HTMLElement> {
+    await TestBed.configureTestingModule({
+      imports: [AccountSettings],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    }).compileComponents();
+    TestBed.inject(AuthStore).setMe({
+      ...me,
+      role,
+      identities: [
+        { provider: 'telegram', displayName: 'tg' },
+        { provider: 'google', displayName: 'g' },
+      ],
+    });
+    const fixture = TestBed.createComponent(AccountSettings);
+    http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const unlinkButtons = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll<HTMLButtonElement>('.identities li button'));
+
+  afterEach(() => http.verify());
+
+  it('staff cannot unlink Telegram: the button is disabled and described by the explanation', async () => {
+    const el = await render('moderator');
+    const [telegram, google] = unlinkButtons(el);
+    expect(telegram.disabled).toBe(true);
+    expect(telegram.getAttribute('aria-describedby')).toBe('staff-telegram-hint');
+    expect(el.querySelector('#staff-telegram-hint')!.textContent).toContain(
+      'account.identities.staffHint',
+    );
+    // Other sign-in methods can still be unlinked by staff.
+    expect(google.disabled).toBe(false);
+  });
+
+  it('a regular user can unlink Telegram, no explanation is shown', async () => {
+    const el = await render('user');
+    expect(unlinkButtons(el)[0].disabled).toBe(false);
+    expect(el.querySelector('#staff-telegram-hint')).toBeNull();
+  });
+});

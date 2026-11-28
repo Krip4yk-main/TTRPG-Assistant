@@ -54,6 +54,7 @@ describe('AdminLog', () => {
           entry(1, 'catalog.system_create', 'game_system'),
           entry(2, 'game.close', 'game'),
           entry(3, 'something.new', 'widget'),
+          { ...entry(4, 'owner.bootstrap', 'user'), actor: null },
         ],
         nextCursor: null,
       });
@@ -68,6 +69,7 @@ describe('AdminLog', () => {
     expect(row(1)).toContain('admin.log.actions.catalog_system_create');
     expect(row(2)).toContain('admin.log.actions.game_close');
     expect(row(3)).toContain('something.new');
+    expect(row(4)).toContain('admin.log.actions.owner_bootstrap');
     http.verify();
 
     const log = uk.admin.log as unknown as {
@@ -75,6 +77,7 @@ describe('AdminLog', () => {
       targetTypes: Record<string, string>;
     };
     for (const a of [
+      'owner_bootstrap',
       'game_close',
       'game_dismiss_dead',
       'game_dismiss_suspicious',
