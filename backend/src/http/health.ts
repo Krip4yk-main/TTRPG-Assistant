@@ -63,12 +63,14 @@ export function healthRouter({ db, redis }: Pick<AppDeps, 'db' | 'redis'>): Rout
   }
 
   // Single-flight: одночасні запити чекають ту саму перевірку; готовий результат — на TTL
-  // від моменту завершення перевірки (`guarded` не відхиляється, тож проміс завжди успішний).
+  // від моменту завершення перевірки (`guarded` не відхиляється, а `.catch` нижче — запобіжник, тож проміс завжди успішний).
   let cached: { result: Readiness; until: number } | null = null;
   let inFlight: Promise<Readiness> | null = null;
   function readiness(): Promise<Readiness> {
     if (cached && Date.now() < cached.until) return Promise.resolve(cached.result);
     inFlight ??= probe()
+      // Запобіжник: якщо щось у перевірці все ж відхилиться — «усе недоступне», а не 500.
+      .catch((): Readiness => ({ ok: false, db: 'down', redis: 'down', worker: 'down' }))
       .then((result) => {
         cached = { result, until: Date.now() + HEALTH_CACHE_TTL_MS };
         return result;

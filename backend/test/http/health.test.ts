@@ -25,6 +25,8 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  // setSystemTime у тестах кешу не має протікати в інші тести.
+  vi.useRealTimers();
 });
 afterAll(async () => {
   await redis.flushdb();
