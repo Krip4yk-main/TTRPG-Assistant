@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient, provideHttpClient } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { DevCodeLogin } from './dev-code-login';
-import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { routes } from '../../../app.routes';
@@ -23,14 +22,6 @@ describe('DevCodeLogin', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         provideTranslateService(),
-        {
-          // Тести збираються в режимі local, де реальний AuthApi.devCodeLogin вимкнено: підміна.
-          provide: AuthApi,
-          useFactory: () => {
-            const client = TestBed.inject(HttpClient);
-            return { devCodeLogin: (b: unknown) => client.post('/api/auth/dev-login/code', b) };
-          },
-        },
         {
           provide: SocketService,
           useValue: {
@@ -144,26 +135,5 @@ describe('dev-code-login route', () => {
       expect(route.data?.['noindex']).toBe(true);
       expect(route.canActivate?.length).toBe(1);
     }
-  });
-});
-
-describe('AuthApi dev-login gating', () => {
-  it('the endpoint of another mode is refused client-side without any request', async () => {
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
-    });
-    const api = TestBed.inject(AuthApi);
-    const http = TestBed.inject(HttpTestingController);
-    // Тести — режим local: dev-вхід за кодом заборонено, а звичайний dev-вхід дозволений.
-    expect(devLoginMode).toBe('local');
-    await expect(
-      new Promise((resolve, reject) =>
-        api.devCodeLogin({ code: 'c', nickname: 'Tester_1' }).subscribe({
-          next: resolve,
-          error: reject,
-        }),
-      ),
-    ).rejects.toThrow();
-    http.verify();
   });
 });

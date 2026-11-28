@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
-import type { BannedLoginDetails, ErrorCode } from '@nri/shared';
+import type { BannedLoginDetails, DevCodeLoginInput, ErrorCode, MeDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
-import { AuthApi } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { bannedDetails } from '../../../core/auth/banned';
 import { nicknameValidator } from '../../../shared/forms/profile-validators';
@@ -42,7 +42,7 @@ const OWN_ERRORS: readonly ErrorCode[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DevCodeLogin {
-  private readonly api = inject(AuthApi);
+  private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
 
@@ -77,7 +77,10 @@ export class DevCodeLogin {
     this.actionError.set(null);
     try {
       const { user } = await firstValueFrom(
-        this.api.devCodeLogin({ code, nickname: nickname.trim() }),
+        this.http.post<{ user: MeDto }>('/api/auth/dev-login/code', {
+          code,
+          nickname: nickname.trim(),
+        } satisfies DevCodeLoginInput),
       );
       this.auth.setMe(user);
       await this.router.navigateByUrl(

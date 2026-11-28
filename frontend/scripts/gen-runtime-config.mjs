@@ -96,7 +96,34 @@ const devLoginMode = !config.devLogin
       ? 'beta'
       : 'off';
 
+/**
+ * Маршрути dev-входу: лише в beta — прихований `/login/dev` (guestGuard, noindex). Імпорти guard-а й
+ * компонента генеруються тільки в цій гілці, тож в інших збірках (зокрема prod) коду dev-входу
+ * за кодом у бандлі немає взагалі, навіть окремим чанком.
+ */
+const devLoginRoutesSource =
+  devLoginMode === 'beta'
+    ? `import type { Routes } from '@angular/router';
+import { guestGuard } from '../app/core/auth/auth.guards';
+
+export const devLoginRoutes: Routes = [
+  {
+    path: 'login/dev',
+    canActivate: [guestGuard],
+    title: 'titles.devLogin',
+    data: { noindex: true },
+    loadComponent: () =>
+      import('../app/features/auth/dev-code-login/dev-code-login').then((m) => m.DevCodeLogin),
+  },
+];
+`
+    : `import type { Routes } from '@angular/router';
+
+export const devLoginRoutes: Routes = [];
+`;
+
 const source = `// Згенеровано scripts/gen-runtime-config.mjs — не редагуйте вручну (файл у .gitignore).
+${devLoginRoutesSource}
 export interface RuntimeConfig {
   /** Ім'я Telegram-бота для Login Widget; порожньо — віджет вимкнено. */
   readonly telegramBotUsername: string;
