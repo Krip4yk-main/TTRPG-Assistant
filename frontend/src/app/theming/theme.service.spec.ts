@@ -62,6 +62,7 @@ const user: MeDto = {
   availableThemes: ALL,
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
 };
 
 // Окремі «чанки» дизайнів (тест не тягне справжні чанки): «Дошка» і кібер-родина.

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslatePipe } from '@ngx-translate/core';
+import { RANK_APPEARANCE } from '../../../../shared/action-rank';
 import type {
   MyGameActionEvent,
   MyGameActionVm,
@@ -36,6 +37,8 @@ export class QuestBoardMyGameItem implements MyGameItemSlot {
   readonly item = input.required<MyGameItemVm>();
   readonly busy = input(false);
   readonly action = output<MyGameActionEvent>();
+  /** Вигляд кнопки за рангом дії (залита / обведена / текстова). */
+  protected readonly appearance = RANK_APPEARANCE;
   /** Обрис пергаменту за id гри (спільне правило з оголошенням пошуку). */
   protected readonly paper = computed(() => paperVariant(this.item().id));
 

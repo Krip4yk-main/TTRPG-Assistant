@@ -31,6 +31,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -168,8 +169,8 @@ describe('MyGames', () => {
 
   it('renders cards with a status badge and status-specific actions', () => {
     expect(article(1).querySelector('.status')!.textContent).toContain('games.status.draft');
-    expect(actions(1)).toEqual(['edit', 'publish', 'cancel']);
-    expect(actions(2)).toEqual(['edit', 'start', 'cancel']);
+    expect(actions(1)).toEqual(['publish', 'edit', 'cancel']);
+    expect(actions(2)).toEqual(['start', 'edit', 'cancel']);
     expect(actions(3)).toEqual(['edit', 'finish', 'cancel']);
     expect(actions(4)).toEqual([]);
   });
@@ -296,10 +297,10 @@ describe('MyGames', () => {
     });
 
     it('«all ok» and «close» are offered for stale and dead games only', () => {
-      expect(actions(6)).toEqual(['still-alive', 'close-dead', 'edit', 'start', 'cancel']);
-      expect(actions(7)).toEqual(['still-alive', 'close-dead', 'edit', 'finish', 'cancel']);
+      expect(actions(6)).toEqual(['still-alive', 'edit', 'start', 'close-dead', 'cancel']);
+      expect(actions(7)).toEqual(['still-alive', 'edit', 'close-dead', 'finish', 'cancel']);
       expect(actions(8)).toEqual(['edit', 'finish', 'cancel']);
-      expect(actions(2)).toEqual(['edit', 'start', 'cancel']);
+      expect(actions(2)).toEqual(['start', 'edit', 'cancel']);
     });
 
     it('«all ok» clears the dead flag and says when it may return', async () => {
@@ -381,7 +382,7 @@ describe('MyGames', () => {
 
     it('a running campaign offers «pause»; the dialog result updates the card', async () => {
       await show([campaign(11, 'started')]);
-      expect(actions(11)).toEqual(['edit', 'finish', 'pause', 'cancel']);
+      expect(actions(11)).toEqual(['edit', 'pause', 'finish', 'cancel']);
       open.mockReturnValueOnce({
         afterClosed: () => of({ ...campaign(11, 'paused'), nextSessionAt: null }),
       });
@@ -393,7 +394,7 @@ describe('MyGames', () => {
         expect.objectContaining({ data: { gameId: 11, title: 'Гра 11' } }),
       );
       expect(article(11).querySelector('.status')!.textContent).toContain('games.status.paused');
-      expect(actions(11)).toEqual(['edit', 'resume', 'recruit', 'finish', 'cancel']);
+      expect(actions(11)).toEqual(['resume', 'edit', 'recruit', 'finish', 'cancel']);
       expect(el.textContent).toContain('games.pause.done.pause');
       http.expectOne('/api/games/mine').flush([campaign(11, 'paused')]);
       await settle();

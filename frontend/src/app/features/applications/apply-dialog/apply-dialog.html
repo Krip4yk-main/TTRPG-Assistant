@@ -51,7 +51,9 @@
         }
         @for (q of data.questions; track $index; let i = $index) {
           <div class="question-block">
-            <label class="question" [attr.for]="'apply-answer-' + i">{{ q }}</label>
+            <label class="question" [attr.for]="'apply-answer-' + i"
+              >{{ q }}<span class="required-mark" aria-hidden="true">*</span></label
+            >
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <textarea
                 matInput
@@ -163,7 +165,7 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">
+    <button mat-stroked-button type="button" (click)="cancel()">
       {{ 'common.cancel' | translate }}
     </button>
     <button mat-flat-button type="submit" [disabled]="submitting()">

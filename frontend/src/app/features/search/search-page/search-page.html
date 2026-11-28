@@ -29,13 +29,11 @@
         <h2 class="nri-visually-hidden">{{ 'search.results' | translate }}</h2>
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="sort">
           <mat-label>{{ 'search.sort.label' | translate }}</mat-label>
-          <select matNativeControl name="sort" (change)="onSort($event)">
+          <mat-select name="sort" [value]="filters().sort" (selectionChange)="onSort($event.value)">
             @for (s of sorts; track s) {
-              <option [value]="s" [selected]="filters().sort === s">
-                {{ 'search.sort.' + s | translate }}
-              </option>
+              <mat-option [value]="s">{{ 'search.sort.' + s | translate }}</mat-option>
             }
-          </select>
+          </mat-select>
         </mat-form-field>
       </div>
 

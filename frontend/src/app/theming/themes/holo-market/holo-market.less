@@ -542,26 +542,20 @@
     }
   }
 
-  // Підпис майстра: роль («майстер · ★ 4,5» / «майстер · ще немає рейтингу») — до двох
-  // рядків з «…» (повний текст — у підказці), щоб не обрізатися поруч із ціною.
+  // Підпис майстра: роль («майстер · ★ 4,5» / «майстер · ще немає рейтингу») переноситься
+  // (спільне правило сцени), тут — щільніший рядок, щоб поруч із ціною вміщалось.
   nri-sc-game-card .gm .role {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     line-height: 1.3;
-    white-space: normal;
-
-    // «ще немає рейтингу» (nri-gm-rating) теж переноситься.
-    .none {
-      font-size: inherit;
-      white-space: normal;
-    }
   }
 
   // ---- Обкладинка: ч/б голо-прев'ю, повернуте в 3D за верхнім правим кутом панелі ----
   // Наперед (наведення / клік / Enter) — кольорове, вирівнюється, виїжджає на панель і
   // збільшується, з хроматичним краєм і світінням кольору гри.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: perspective(500px) rotateY(-24deg) rotateZ(4deg);
+    --sc-attach-rest-origin: calc(100% - 3px) 50%;
+
     top: -36px;
     right: -30px;
     width: 160px;
@@ -573,7 +567,7 @@
       background: var(--sc-field);
       box-shadow: 0 0 18px color-mix(in srgb, var(--sc-n, var(--sc-neon-b)) 35%, transparent);
       opacity: 0.85;
-      transform: perspective(500px) rotateY(-24deg) rotateZ(4deg);
+      transform: var(--sc-attach-rest);
       transform-origin: 100% 50%;
 
       img {
@@ -593,21 +587,6 @@
           );
         pointer-events: none;
       }
-    }
-
-    // Підпис «ОБКЛАДИНКА» — плашка кольору гри вгорі ліворуч.
-    .cap {
-      position: absolute;
-      top: 5px;
-      left: 6px;
-      z-index: 2;
-      display: block;
-      padding: 1px 4px;
-      background: var(--sc-n, var(--sc-neon-b));
-      color: #04141a;
-      font: 700 0.5625rem/1.4 var(--sc-font-mono);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
     }
   }
 

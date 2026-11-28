@@ -153,6 +153,38 @@ a,
   }
 }
 
+// Ієрархія кнопок дій (спільна для всіх дизайнів, див. shared/action-rank.ts): головна — залита,
+// другорядні — обведені, небезпечні в рядках дій — текстова кнопка кольору небезпеки дизайну
+// (`--nri-danger-text`); підтвердження небезпечної дії в діалозі — залита кнопка кольору
+// небезпеки (`--nri-danger` / `--nri-on-danger`). Кольори — токени дизайну (на темних і світлих
+// ділянках свої); вимкнена кнопка лишається вимкненою — disabled-токени Material не чіпаємо.
+.mat-mdc-button-base.nri-danger {
+  --mat-button-text-label-text-color: var(--nri-danger-text, var(--mat-sys-error));
+  --mat-button-text-state-layer-color: var(--nri-danger-text, var(--mat-sys-error));
+  --mat-button-text-ripple-color: color-mix(
+    in srgb,
+    var(--nri-danger-text, var(--mat-sys-error)) 12%,
+    transparent
+  );
+}
+
+.mat-mdc-button-base.nri-danger-filled {
+  --mat-button-filled-container-color: var(--nri-danger, var(--mat-sys-error));
+  --mat-button-filled-label-text-color: var(--nri-on-danger, var(--mat-sys-on-error));
+  --mat-button-filled-state-layer-color: var(--nri-on-danger, var(--mat-sys-on-error));
+  --mat-button-filled-ripple-color: color-mix(
+    in srgb,
+    var(--nri-on-danger, var(--mat-sys-on-error)) 12%,
+    transparent
+  );
+}
+
+// Дії діалогу на вузькому екрані переносяться в рядки: проміжок між рядками, щоб рамка обведеної
+// кнопки не торкалася сусідньої (по горизонталі відступ дає сам Material).
+.mat-mdc-dialog-actions {
+  row-gap: var(--nri-space-sm);
+}
+
 // Текстова кнопка Material у ряду інших кнопок: внутрішній відступ компенсовано, щоб значок
 // стояв на краю ряду (перенесена — під сусідами, у ряду — на звичайному проміжку).
 .nri-text-button-flush {
@@ -232,6 +264,13 @@ html .cdk-overlay-dark-backdrop {
 .mat-mdc-autocomplete-panel.mat-mdc-autocomplete-panel {
   outline: 1px solid var(--nri-overlay-border);
   outline-offset: -1px;
+}
+
+// Одиночний вибір у mat-select: галочка вибраного варіанта за типовою схемою — світла
+// (on-secondary-container), тобто майже невидима на підсвіченому рядку; беремо колір акценту.
+// Мультиселект малює повні чекбокси — його не торкається.
+.mat-mdc-select-panel.mat-mdc-select-panel .mat-pseudo-checkbox-minimal {
+  --mat-pseudo-checkbox-minimal-selected-checkmark-color: var(--mat-sys-primary);
 }
 
 /* Програмний фокус (tabindex="-1") на заголовках і областях повідомлень — без рамки. */

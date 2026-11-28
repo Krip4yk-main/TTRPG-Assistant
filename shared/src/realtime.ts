@@ -41,7 +41,7 @@ export type GameWatchAck = { ok: true; members: boolean } | { ok: false };
  * профілю; лише в особисту кімнату `user:<id>` (усі сесії/вкладки/пристрої користувача,
  * зокрема й ту, що ініціювала зміну, — там це no-op). Гостям не надсилається.
  * - `appearance` — дизайн (`PATCH /api/me/theme`) або налаштування вигляду
- *   (`PATCH /api/me/ui-prefs`).
+ *   (`PATCH /api/me/ui-prefs`, `PATCH /api/me/default-view`).
  */
 export const ME_CHANGED_EVENT = 'me.changed';
 export const ME_CHANGE_SCOPES = ['appearance'] as const;

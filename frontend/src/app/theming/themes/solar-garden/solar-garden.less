@@ -35,8 +35,7 @@
 //     на сторінці без кнопок дій — інакше заступило б їх).
 //   Стіна: лоза — шар фону `.sc-wall` (≥ 600px).
 //   Шапка: стрічка сонячних панелей — `.top.sc-bar::before`.
-//   Обкладинка: гілочка — `.attach::before`; підпис «ОБКЛАДИНКА» (uk.json, спільний `.cap`) — на
-//     нижньому полі рамки.
+//   Обкладинка: гілочка — `.attach::before`.
 //   «Мої ігри»: корінець — смуга кнопок дій `.actions`.
 //   data-neon (варіант картки): колір корони (м'який відтінок, --sc-n-core) і рядка системи,
 //     ініціала майстра (--sc-n-text): фіалка, малина, морська хвиля, мед, зелень, теракота.
@@ -719,6 +718,9 @@
   // У спокої — приглушене, нахилене за кутом пакетика; наперед (наведення / клік / Enter) —
   // виходить на пакетик, більшає, справжні кольори. Підпис — на нижньому полі рамки.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -22px;
     width: 146px;
@@ -732,7 +734,7 @@
       box-shadow: 0 4px 10px rgba(60, 80, 40, 0.18);
       opacity: 0.95;
       filter: saturate(0.55) brightness(1.02);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #2f6b3c;
@@ -755,21 +757,6 @@
         background: @sg-twig 0 0 / 100% 100% no-repeat;
         pointer-events: none;
       }
-    }
-
-    .cap {
-      position: absolute;
-      right: 0;
-      bottom: 3px;
-      left: 0;
-      display: block;
-      color: #55654e;
-      font: 700 0.625rem/1.4 var(--sc-font-body);
-      letter-spacing: 0.14em;
-      text-align: center;
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
     }
   }
 

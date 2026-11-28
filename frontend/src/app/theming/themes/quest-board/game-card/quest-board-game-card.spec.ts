@@ -3,6 +3,8 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import type { SearchGameCardDto, UiPrefsDto } from '@nri/shared';
 import uk from '../../../../../assets/i18n/uk.json';
@@ -234,6 +236,78 @@ describe('QuestBoardGameCard — клік і відривання', () => {
     expect(navigate).toHaveBeenCalledTimes(2);
   });
 
+  /** Структура, порядок рядків і поведінка — ті самі, що в картці сцени (рішення 17). */
+  describe('рядки як у сцені', () => {
+    it('рядок системи з мітками праворуч; «Підходить» — під фактами; підпис і печатка внизу', async () => {
+      await mount();
+      const f = await create(8, { ageRating: '18+', fit: 'partial', summary: 'Опис.' });
+      const a = article(f);
+      const sysrow = a.querySelector('.sysrow')!;
+      expect(sysrow.querySelector('.sys')!.textContent).toContain('D&D 5e');
+      expect(sysrow.querySelector('.marks .age')!.textContent).toContain('18+');
+      // Порядок рядків — як у сцені.
+      const rows = [...a.children]
+        .filter((e) => !e.hasAttribute('aria-hidden'))
+        .map((e) =>
+          ['sysrow', 'title', 'desc', 'facts', 'fit', 'foot'].find((c) => e.classList.contains(c)),
+        );
+      expect(rows).toEqual(['sysrow', 'title', 'desc', 'facts', 'fit', 'foot']);
+      expect(a.querySelector('.facts + .fit')!.textContent).toContain(uk.search.fit.partial);
+      expect(a.querySelector('.foot > nri-qb-gm-signature.gm + .price')).not.toBeNull();
+    });
+
+    it('без збігу з розкладом — без стрічки', async () => {
+      const f = await mount();
+      expect(article(f).querySelector('.fit')).toBeNull();
+    });
+
+    it('мітки понад дві — «+N» (для читачів екрана — усі)', async () => {
+      await mount();
+      const f = await create(8, { ageRating: '18+', status: 'in_progress' } as never);
+      const base = f.componentInstance.game();
+      f.componentRef.setInput('game', {
+        ...base,
+        badges: [
+          ...base.badges,
+          { kind: 'status', value: 'x', labelKey: 'mark.a', icon: null },
+          { kind: 'status', value: 'x', labelKey: 'mark.b', icon: null },
+        ],
+      });
+      f.detectChanges();
+      const marks = article(f).querySelector('.marks')!;
+      expect(marks.querySelectorAll(':scope > nri-qb-badge')).toHaveLength(2);
+      expect(marks.querySelector('.more')!.textContent).toContain('+2');
+      expect(marks.querySelector('.nri-visually-hidden')!.textContent).toContain('mark.b');
+    });
+
+    it('позначки місць — стільки, скільки місць; заповнені — як каже текст; багато місць — лише текст', async () => {
+      await mount();
+      const f = await create(8, { nextSessionAt: '2027-03-02T17:00:00.000Z' } as never);
+      const a = article(f);
+      expect(a.querySelectorAll('.seats .pips b')).toHaveLength(5);
+      expect(a.querySelectorAll('.seats .pips b.on')).toHaveLength(3); // 3 з 5 зайняті
+      const many = await create(9, { maxPlayers: 12, freeSlots: 7 });
+      expect(article(many).querySelector('.pips')).toBeNull();
+      expect(article(many).querySelector('.seats-text')).not.toBeNull();
+    });
+
+    it('підпис майстра: «майстер · рейтинг», підказка — увесь рядок', async () => {
+      await mount();
+      const f = await create(8, { gmRating: 4.5 } as never);
+      const role = article(f).querySelector('.gm .role')!;
+      expect(role.textContent).toContain('·');
+      const tip = f.debugElement.query(By.css('.gm .role')).injector.get(MatTooltip).message;
+      expect(tip).toBe('майстер · ★ 4,5');
+    });
+
+    it('без плати — печатка з позначкою free', async () => {
+      const f = await mount();
+      expect(article(f).querySelector('.price')!.classList).toContain('free');
+      const paid = await create(8, { priceUah: 150 });
+      expect(article(paid).querySelector('.price')!.classList).not.toContain('free');
+    });
+  });
+
   describe('короткий опис, обрис і вкладка-обкладинка', () => {
     const COVER = 'https://example.com/cover.png';
     const attachment = (f: ComponentFixture<QuestBoardGameCard>) =>
@@ -260,7 +334,7 @@ describe('QuestBoardGameCard — клік і відривання', () => {
       expect(attachment(f)).toBeNull();
       const withCover = await create(8, { coverUrl: COVER });
       const button = attachment(withCover)!.querySelector('button')!;
-      expect(button.getAttribute('aria-label')).toBe('Арт до гри: Туман над Дніпром');
+      expect(button.getAttribute('aria-label')).toBe('Обкладинка гри: Туман над Дніпром');
       const img = button.querySelector('img')!;
       expect(img.getAttribute('src')).toBe(COVER);
       expect(img.getAttribute('alt')).toBe('');

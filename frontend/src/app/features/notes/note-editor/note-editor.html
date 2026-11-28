@@ -39,7 +39,7 @@
   }
   <div class="foot">
     @if (st === 'error') {
-      <button mat-button type="button" class="retry" (click)="retry()">
+      <button mat-stroked-button type="button" class="retry" (click)="retry()">
         {{ 'notes.retrySave' | translate }}
       </button>
     }

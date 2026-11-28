@@ -27,6 +27,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -379,7 +380,7 @@ describe('AvailabilityEditor', () => {
 
     it('is off on wide screens and on by default below 768 px', async () => {
       await setup('custom', empty);
-      expect(button('paint-toggle').getAttribute('aria-pressed')).toBe('false');
+      expect(button('paint-toggle').classList.contains('active')).toBe(false);
       TestBed.resetTestingModule();
 
       // Повна заглушка MediaQueryList: CDK BreakpointObserver теж її слухає.
@@ -395,7 +396,7 @@ describe('AvailabilityEditor', () => {
       try {
         await setup('custom', empty);
         expect(matchMedia).toHaveBeenCalledWith('(max-width: 767.98px)');
-        expect(button('paint-toggle').getAttribute('aria-pressed')).toBe('true');
+        expect(button('paint-toggle').classList.contains('active')).toBe(true);
       } finally {
         vi.unstubAllGlobals();
       }
@@ -464,7 +465,7 @@ describe('AvailabilityEditor', () => {
       expect(pressed(1, 10)).toBe('true');
       button('paint-toggle').click(); // вимкнути
       await settle();
-      expect(button('paint-toggle').getAttribute('aria-pressed')).toBe('false');
+      expect(button('paint-toggle').classList.contains('active')).toBe(false);
       // Поза режимом клік мишею нічого не перемикає (працює протягування).
       click(cell(1, 12));
       await settle();
@@ -473,6 +474,54 @@ describe('AvailabilityEditor', () => {
       click(cell(1, 10)); // перший тап після нового ввімкнення — «стирати»
       await settle();
       expect(pressed(1, 10)).toBe('false');
+    });
+
+    it('while painting the toggle reads «Зберегти» and, in custom mode, just ends painting', async () => {
+      await setup('custom', empty);
+      expect(button('paint-toggle').textContent).toContain('calendar.paint.toggle');
+      await enablePaint();
+      expect(button('paint-toggle').textContent).toContain('calendar.paint.save');
+      expect(button('paint-toggle').textContent).not.toContain('calendar.paint.toggle');
+      click(cell(1, 10));
+      await settle();
+      button('paint-toggle').click();
+      await settle();
+      expect(button('paint-toggle').textContent).toContain('calendar.paint.toggle');
+      expect(el().querySelector('.paint-hint')).toBeNull();
+      expect(pressed(1, 10)).toBe('true'); // клітинки лишаються
+      expect(emitted).toEqual([]); // застосування — окремою кнопкою
+    });
+
+    it('announces turning the paint mode on and off', async () => {
+      await setup('custom', empty);
+      await enablePaint();
+      expect(announce).toHaveBeenCalledWith('calendar.paint.on', 'polite');
+      button('paint-toggle').click();
+      await settle();
+      expect(announce).toHaveBeenCalledWith('calendar.paint.off', 'polite');
+    });
+
+    it('in save mode the «Зберегти» toggle ends painting and saves the calendar', async () => {
+      await setup('save');
+      await enablePaint();
+      click(cell(1, 38));
+      await settle();
+      button('paint-toggle').click();
+      await settle();
+      const put = http.expectOne((r) => r.method === 'PUT' && r.url === '/api/me/availability');
+      expect(put.request.body.slots).toEqual([{ weekday: 1, startMin: 1140, endMin: 1170 }]);
+      put.flush({ ...empty, slots: put.request.body.slots });
+      await settle();
+      expect(button('paint-toggle').textContent).toContain('calendar.paint.toggle');
+    });
+
+    it('in save mode with no changes «Зберегти» only ends painting (no request)', async () => {
+      await setup('save');
+      await enablePaint();
+      button('paint-toggle').click();
+      await settle();
+      http.expectNone((r) => r.method === 'PUT');
+      expect(button('paint-toggle').textContent).toContain('calendar.paint.toggle');
     });
 
     it('keyboard Enter toggles the focused cell once (no double toggle from click)', async () => {

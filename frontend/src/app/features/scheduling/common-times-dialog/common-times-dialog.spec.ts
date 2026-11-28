@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import { commonTimes, session } from '../scheduling-testing';
 import { CommonTimesDialog, type CommonTimesDialogData } from './common-times-dialog';
+import { openOptions, pickIndex } from '../../../../testing/mat-select';
 
 describe('CommonTimesDialog', () => {
   let fixture: ComponentFixture<CommonTimesDialog>;
@@ -161,10 +162,17 @@ describe('CommonTimesDialog', () => {
     expect(el.querySelector('.keeps-duration')!.textContent).toContain(
       'scheduling.finder.keepsDuration',
     );
-    const select = el.querySelector<HTMLSelectElement>('select.move-select')!;
-    expect([...select.options].map((o) => o.value)).toEqual(['41', '42']);
-    select.value = '42';
-    select.dispatchEvent(new Event('change'));
+    const select = el.querySelector<HTMLElement>('mat-select.move-select')!;
+    const labelId = select
+      .getAttribute('aria-labelledby')!
+      .split(' ')
+      .find((i) => i.startsWith('move-label-'))!;
+    expect(labelId).toBeTruthy();
+    expect(document.getElementById(labelId)!.textContent).toContain(
+      'scheduling.finder.whichSession',
+    );
+    expect(await openOptions(select, settle)).toHaveLength(2);
+    await pickIndex(select, 1, settle);
     el.querySelector<HTMLButtonElement>('button.confirm-move')!.click();
     const req = http.expectOne('/api/sessions/42/reschedule');
     expect(req.request.body).toEqual({

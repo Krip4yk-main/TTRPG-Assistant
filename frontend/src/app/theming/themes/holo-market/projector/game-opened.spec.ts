@@ -40,10 +40,27 @@ describe('foldIntoProjector («Голо-ринок»: згортання кар�
     for (const cls of ['puck', 'beam', 'scan']) {
       expect(overlay.querySelector(`.hm-open-${cls}`)).not.toBeNull();
     }
-    // Згортається сама панель картки — лінією в лінзу шайби (центр панелі 290 → 502).
+    // Панель картки складається вниз у лінзу шайби: точка стиснення — лінза (центр по ширині,
+    // 22 px під низом картки: 380 + 22 = 402 від верху панелі), без зсуву — лише масштаб.
     const fold = anims.find((a) => a.target === panel)!;
     expect(fold.options.fill).toBe('forwards');
-    expect(String(fold.frames.at(-1)!['transform'])).toContain('translateY(212px)');
+    expect(fold.frames.every((f) => f['transformOrigin'] === '180px 402px')).toBe(true);
+    expect(fold.frames.some((f) => String(f['transform']).includes('translate'))).toBe(false);
+    // Висота спадає монотонно (верх опускається до шайби), ширина звужується до лінзи (90/360).
+    const scales = fold.frames.map((f) =>
+      String(f['transform'])
+        .match(/scale\(([\d.]+), ([\d.]+)\)/)!
+        .slice(1)
+        .map(Number),
+    );
+    for (let i = 1; i < scales.length; i++) {
+      expect(scales[i][0]).toBeLessThanOrEqual(scales[i - 1][0]);
+      expect(scales[i][1]).toBeLessThan(scales[i - 1][1]);
+    }
+    expect(scales.at(-2)).toEqual([0.25, 0.04]);
+    expect(scales.at(-1)![1]).toBeLessThanOrEqual(0.01);
+    // Хроматичне розшарування під час складання.
+    expect(String(fold.frames[1]['filter'])).toContain('#ff5cb4');
     expect(fold.frames.at(-1)!['opacity']).toBe(0);
     // Шайбу картки ефект не чіпає, і стилів по ефекту немає (лише анімації).
     expect(anims.some((a) => a.target === puck)).toBe(false);

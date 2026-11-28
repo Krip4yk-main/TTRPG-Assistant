@@ -129,21 +129,20 @@
                           </p>
                           @if (sessions(); as list) {
                             @if (list.length) {
-                              <label class="move-label" [for]="'move-' + $index">{{
+                              <span class="move-label" [id]="'move-label-' + $index">{{
                                 'scheduling.finder.whichSession' | translate
-                              }}</label>
-                              <select
+                              }}</span>
+                              <mat-select
                                 class="move-select"
                                 [id]="'move-' + $index"
-                                #sel
-                                (change)="setTarget(sel.value)"
+                                [aria-labelledby]="'move-label-' + $index"
+                                [value]="targetId()"
+                                (selectionChange)="setTarget($event.value)"
                               >
                                 @for (s of list; track s.id) {
-                                  <option [value]="s.id" [selected]="s.id === targetId()">
-                                    {{ sessionLabel(s) }}
-                                  </option>
+                                  <mat-option [value]="s.id">{{ sessionLabel(s) }}</mat-option>
                                 }
-                              </select>
+                              </mat-select>
                               <div class="candidate-actions">
                                 <button
                                   mat-flat-button
@@ -205,6 +204,12 @@
     <span class="nri-muted selected-count" aria-live="polite">
       {{ 'scheduling.finder.selected' | translate: { n: selected().size } }}
     </span>
+  }
+  <!-- Як у решті діалогів: другорядна «Закрити», головна дія — біля правого краю. -->
+  <button mat-stroked-button type="button" (click)="close()">
+    {{ 'common.close' | translate }}
+  </button>
+  @if (state() === 'ready' && !result()?.noCalendars) {
     <button
       mat-flat-button
       type="button"
@@ -216,5 +221,4 @@
       {{ 'scheduling.finder.createPoll' | translate }}
     </button>
   }
-  <button mat-button type="button" (click)="close()">{{ 'common.close' | translate }}</button>
 </mat-dialog-actions>

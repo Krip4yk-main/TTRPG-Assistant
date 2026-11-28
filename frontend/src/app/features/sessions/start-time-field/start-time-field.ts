@@ -3,6 +3,7 @@ import { ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import { merge } from 'rxjs';
 import {
@@ -29,6 +30,7 @@ let nextId = 0;
     MatButtonToggleModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     TranslatePipe,
   ],
   templateUrl: './start-time-field.html',
@@ -57,8 +59,6 @@ export class StartTimeField {
 
   protected readonly approx = computed(() => this.state().window !== null);
   protected readonly disabled = computed(() => this.state().disabled);
-  /** «З» поза сіткою 30 хв (порожнє) — порожній варіант у списку. */
-  protected readonly offGrid = computed(() => !this.starts.includes(this.state().time));
   protected readonly ends = computed(() =>
     windowEndOptions(this.date(), this.state().time, this.timezone()),
   );

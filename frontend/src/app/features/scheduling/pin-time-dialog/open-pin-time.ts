@@ -14,7 +14,10 @@ export async function openPinTime(
   const { PinTimeDialog } = await import('./pin-time-dialog');
   const ref = dialog.open(PinTimeDialog, {
     data,
-    autoFocus: 'first-tabbable',
+    // Фокус на самому діалозі: вміст вантажиться, і першою фокусованою була б «Закрити» —
+    // програмний фокус малював на ній тінт, і активна кнопка виглядала вимкненою. З клавіатури
+    // Tab веде до першого елемента, як і раніше.
+    autoFocus: 'dialog',
     restoreFocus: true,
     width: '600px',
     maxWidth: 'calc(100vw - 32px)',

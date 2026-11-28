@@ -150,6 +150,25 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it('a static hover zone sits where the cover rests and toggles it on click', () => {
+    const zone = host.querySelector<HTMLElement>('.hover-zone')!;
+    // Декоративна, поза кнопкою: керує наведенням, не рухається разом з обкладинкою.
+    expect(zone).not.toBeNull();
+    expect(zone.getAttribute('aria-hidden')).toBe('true');
+    expect(zone.parentElement).toBe(host);
+    expect(button.contains(zone)).toBe(false);
+    // Натиск миші на зону — фокус на кнопці, як при натиску на неї саму (Tab іде далі від неї).
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    zone.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(button);
+    click(zone);
+    expect(host.classList).toContain('front');
+    click(zone);
+    expect(host.classList).not.toContain('front');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('Esc sends it back and cancels the hover enlargement until the pointer leaves', () => {
     click(button);
     const hover = vi.spyOn(host, 'matches').mockImplementation((sel) => sel === ':hover');

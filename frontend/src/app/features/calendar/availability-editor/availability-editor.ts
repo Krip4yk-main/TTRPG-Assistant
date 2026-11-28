@@ -318,6 +318,20 @@ export class AvailabilityEditor {
   protected togglePaintMode(): void {
     this.paintMode.update((on) => !on);
     this.paintAction.set(null);
+    this.say(this.paintMode() ? 'calendar.paint.on' : 'calendar.paint.off');
+  }
+
+  /**
+   * «Зберегти» (кнопка режиму, поки він увімкнений): завершує фарбування; у `save` ще й
+   * зберігає календар, якщо є зміни. У `custom` клітинки лишаються в редакторі до «Застосувати».
+   */
+  protected finishPainting(): void {
+    this.togglePaintMode();
+    if (this.mode() === 'save' && this.dirty()) void this.save();
+  }
+
+  private say(key: string): void {
+    void this.announcer.announce(this.translate.instant(key), 'polite');
   }
 
   /** «Готово»: наступний тап знову визначить дію. */

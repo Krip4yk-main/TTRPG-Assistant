@@ -24,6 +24,7 @@ const me: MeDto = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],

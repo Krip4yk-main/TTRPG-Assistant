@@ -31,6 +31,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -213,7 +214,17 @@ describe('SessionsList', () => {
 
   it('the GM can finish only sessions that already started', async () => {
     await create(true);
-    expect(buttons(2)).toEqual(['reschedule', 'cancel', 'finish']);
+    expect(buttons(2)).toEqual(['finish', 'reschedule', 'cancel']);
+    // Ранги: головна — залита, другорядні — обведені, небезпечна — текстова кольору небезпеки.
+    const ranks = [...row(2)!.querySelectorAll<HTMLElement>('button[data-action]')].map((b) => [
+      b.dataset['rank'],
+      b.classList.contains('nri-danger'),
+    ]);
+    expect(ranks).toEqual([
+      ['primary', false],
+      ['secondary', false],
+      ['danger', true],
+    ]);
     expect(buttons(3)).toEqual(['alternatives', 'reschedule', 'cancel']);
     expect(buttons(1)).toEqual([]);
     expect(buttons(4)).toEqual([]);
@@ -314,7 +325,7 @@ describe('SessionsList', () => {
     it('the GM gets «pin time» first on windowed sessions only', async () => {
       await create(true, true, [approxUpcoming, approxStarted, upcoming]);
       expect(buttons(8)).toEqual(['pin', 'alternatives', 'reschedule', 'cancel']);
-      expect(buttons(9)).toEqual(['pin', 'reschedule', 'cancel', 'finish']);
+      expect(buttons(9)).toEqual(['pin', 'reschedule', 'finish', 'cancel']);
       expect(buttons(3)).toEqual(['alternatives', 'reschedule', 'cancel']);
     });
 
@@ -373,7 +384,7 @@ describe('SessionsList', () => {
       await settle();
       expect(row(3)!.closest('.past')).not.toBeNull();
       expect(row(3)!.querySelector('.status')!.textContent).toContain('sessions.status.awaiting');
-      expect(buttons(3)).toEqual(['reschedule', 'cancel', 'finish']);
+      expect(buttons(3)).toEqual(['finish', 'reschedule', 'cancel']);
     });
 
     it('stops the clock when destroyed', async () => {

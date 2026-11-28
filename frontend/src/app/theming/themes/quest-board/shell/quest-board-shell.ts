@@ -7,6 +7,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { TranslatePipe } from '@ngx-translate/core';
 import { ShellController } from '../../../../layout/shell/shell-controller';
 import { UserName } from '../../../../shared/user-name/user-name';
+import { BrandMark } from '../../../../shared/brand-mark/brand-mark';
 import { NotificationBell } from '../../../../features/notifications/notification-bell/notification-bell';
 import { RateLink } from '../../../../features/ratings/rate-link/rate-link';
 import { SanctionsBanner } from '../../../../features/moderation/sanctions-banner/sanctions-banner';
@@ -34,6 +35,7 @@ import type { ShellSlot } from '../../../slots';
     SanctionsBanner,
     TranslatePipe,
     UserName,
+    BrandMark,
   ],
   templateUrl: './quest-board-shell.html',
   styleUrl: './quest-board-shell.less',

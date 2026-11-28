@@ -60,7 +60,7 @@
         <button
           mat-button
           type="button"
-          class="transfer danger"
+          class="transfer nri-danger"
           [disabled]="transferBlocked(u)"
           [attr.aria-describedby]="transferBlocked(u) ? 'tg-hint-' + u.publicId : null"
           (click)="transfer(u)"

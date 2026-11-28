@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import { poll, session } from '../scheduling-testing';
 import { PollCreateDialog, type PollCreateDialogData } from './poll-create-dialog';
+import { pickIndex, pickText } from '../../../../testing/mat-select';
 
 describe('PollCreateDialog', () => {
   let fixture: ComponentFixture<PollCreateDialog>;
@@ -55,6 +56,8 @@ describe('PollCreateDialog', () => {
     input.dispatchEvent(new Event(event));
   };
 
+  const sel = (cls: string) => el.querySelector<HTMLElement>(`mat-select.${cls}`)!;
+
   afterEach(() => http.verify());
 
   it('prefilled one-off options → POST with deadline and the chosen session', async () => {
@@ -70,7 +73,7 @@ describe('PollCreateDialog', () => {
     // Вид зафіксовано варіантами з підбору.
     expect(el.querySelector('mat-button-toggle-group')).toBeNull();
     expect(el.querySelectorAll('li.option').length).toBe(2);
-    setInput('select.target', '41', 'change');
+    await pickIndex(sel('target'), 1, settle);
     const before = Date.now();
     await submit();
     const req = http.expectOne('/api/games/7/polls');
@@ -93,7 +96,7 @@ describe('PollCreateDialog', () => {
 
   it('manual regular options in the game zone; duplicate refused; needs 2', async () => {
     await open({}, []);
-    setInput('select.add-weekday', '4', 'change');
+    await pickText(sel('add-weekday'), 'games.weekdaysLong.4', settle);
     setInput('input.add-time', '19:30');
     el.querySelector<HTMLButtonElement>('button.add-option')!.click();
     await settle();
@@ -102,10 +105,10 @@ describe('PollCreateDialog', () => {
     expect(el.textContent).toContain('scheduling.create.duplicate');
     await submit();
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('scheduling.create.count');
-    setInput('select.add-weekday', '6', 'change');
+    await pickText(sel('add-weekday'), 'games.weekdaysLong.6', settle);
     el.querySelector<HTMLButtonElement>('button.add-option')!.click();
     await settle();
-    setInput('select.deadline', '336', 'change');
+    await pickText(sel('deadline'), 'deadlines.336', settle);
     await submit();
     const req = http.expectOne('/api/games/7/polls');
     expect(req.request.body.kind).toBe('regular');
@@ -130,7 +133,7 @@ describe('PollCreateDialog', () => {
     el.querySelector<HTMLButtonElement>('button.add-option')!.click();
     await settle();
     expect(el.querySelectorAll('li.option').length).toBe(2);
-    setInput('select.deadline', '336', 'change');
+    await pickText(sel('deadline'), 'deadlines.336', settle);
     await submit();
     expect(el.querySelector('[role="alert"]')!.textContent).toContain(
       'scheduling.create.afterDeadline',

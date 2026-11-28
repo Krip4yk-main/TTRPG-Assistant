@@ -127,6 +127,19 @@ describe('ApplyDialog', () => {
     );
   });
 
+  it('marks each required question with a hidden «*» while the field is aria-required', async () => {
+    await create({ ...data, questions: ['Перше питання?', 'Друге питання?'] });
+    const labels = el.querySelectorAll<HTMLLabelElement>('label.question');
+    for (const label of Array.from(labels)) {
+      const mark = label.querySelector('.required-mark');
+      expect(mark?.textContent).toBe('*');
+      expect(mark?.getAttribute('aria-hidden')).toBe('true');
+    }
+    for (const area of Array.from(el.querySelectorAll('textarea.answer'))) {
+      expect(area.getAttribute('aria-required')).toBe('true');
+    }
+  });
+
   it('no game safety info: no safety section', async () => {
     await create();
     expect(el.querySelector('section.safety')).toBeNull();
@@ -465,6 +478,7 @@ describe('ApplyDialog', () => {
       status: 'active',
       timezone: 'Europe/Kyiv',
       myLimits: ['Без павуків', 'Без крові'],
+      defaultView: 'player',
     } as unknown as MeDto);
     await settle();
     el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();
@@ -492,6 +506,7 @@ describe('ApplyDialog', () => {
       status: 'active',
       timezone: 'Europe/Kyiv',
       myLimits: ['Без павуків', 'Без крові'],
+      defaultView: 'player',
     } as unknown as MeDto);
     await settle();
     el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();

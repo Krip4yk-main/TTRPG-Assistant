@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { SessionDto } from '@nri/shared';
 import { RescheduleDialog, type RescheduleDialogData } from './reschedule-dialog';
+import { openOptions, optionText } from '../../../../testing/mat-select';
 
 const session: SessionDto = {
   id: 41,
@@ -134,9 +135,9 @@ describe('RescheduleDialog', () => {
     await settle();
     form().patchValue({ time: '22:00' });
     await settle();
-    const to = [...el.querySelectorAll<HTMLOptionElement>('select.window-to option')].map((o) =>
-      o.textContent!.trim(),
-    );
+    const to = (
+      await openOptions(el.querySelector<HTMLElement>('mat-select.window-to')!, settle)
+    ).map(optionText);
     // 22:30, 23:00, 23:30 — того ж дня; 00:00 і далі — наступного.
     expect(to.slice(0, 3)).toEqual(Array(3).fill('sessions.window.end'));
     expect(to[3]).toBe('sessions.window.endNextDay');

@@ -60,10 +60,10 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">
+    <button mat-stroked-button type="button" (click)="cancel()">
       {{ 'common.cancel' | translate }}
     </button>
-    <button mat-flat-button type="submit" class="send danger" [disabled]="submitting()">
+    <button mat-flat-button type="submit" class="send nri-danger-filled" [disabled]="submitting()">
       {{ 'admin.sanction.submit' | translate }}
     </button>
   </mat-dialog-actions>

@@ -39,16 +39,20 @@ const vm = (g: MyGameCardDto, seen: 'new' | 'updated' | null = null) =>
 const actions = (g: MyGameCardDto) => vm(g).actions.map((a) => a.id);
 
 describe('toMyGameItemVm', () => {
-  it('status-specific actions; editing is a link', () => {
-    expect(actions(card(1, 'draft'))).toEqual(['edit', 'publish', 'cancel']);
-    expect(actions(card(2, 'recruiting'))).toEqual(['edit', 'start', 'cancel']);
+  it('status-specific actions ordered primary → secondary → danger; editing is a link', () => {
+    expect(actions(card(1, 'draft'))).toEqual(['publish', 'edit', 'cancel']);
+    expect(actions(card(2, 'recruiting'))).toEqual(['start', 'edit', 'cancel']);
+    // Без переходу вперед головна — редагування; «завершити» — небезпечна (незворотна).
     expect(actions(card(3, 'started'))).toEqual(['edit', 'finish', 'cancel']);
     expect(actions(card(4, 'finished'))).toEqual([]);
     expect(actions(card(5, 'cancelled'))).toEqual([]);
-    const edit = vm(card(2, 'recruiting')).actions[0]!;
-    expect(edit).toMatchObject({ link: ['/games', 2, 'edit'], emphasis: 'stroked' });
+    const ranks = (g: MyGameCardDto) => vm(g).actions.map((a) => a.rank);
+    expect(ranks(card(2, 'recruiting'))).toEqual(['primary', 'secondary', 'danger']);
+    expect(ranks(card(3, 'started'))).toEqual(['primary', 'danger', 'danger']);
+    const edit = vm(card(2, 'recruiting')).actions.find((a) => a.id === 'edit')!;
+    expect(edit).toMatchObject({ link: ['/games', 2, 'edit'], rank: 'secondary' });
     const cancel = vm(card(2, 'recruiting')).actions.find((a) => a.id === 'cancel')!;
-    expect(cancel).toMatchObject({ danger: true, link: null, labelKey: 'games.actions.cancel' });
+    expect(cancel).toMatchObject({ rank: 'danger', link: null, labelKey: 'games.actions.cancel' });
   });
 
   it('campaign pause: «pause» for running campaigns; «resume» / «recruit» on paused, plus edit', () => {
@@ -56,26 +60,24 @@ describe('toMyGameItemVm', () => {
       ...card(id, status),
       kind: 'campaign',
     });
-    expect(actions(campaign(1, 'recruiting'))).toEqual(['edit', 'start', 'pause', 'cancel']);
-    expect(actions(campaign(2, 'started'))).toEqual(['edit', 'finish', 'pause', 'cancel']);
-    expect(actions(campaign(3, 'draft'))).toEqual(['edit', 'publish', 'cancel']);
+    expect(actions(campaign(1, 'recruiting'))).toEqual(['start', 'edit', 'pause', 'cancel']);
+    expect(actions(campaign(2, 'started'))).toEqual(['edit', 'pause', 'finish', 'cancel']);
+    expect(actions(campaign(3, 'draft'))).toEqual(['publish', 'edit', 'cancel']);
     // Ваншот на паузу не ставиться.
     expect(actions(card(4, 'started'))).not.toContain('pause');
     const paused = vm(campaign(5, 'paused'));
-    expect(paused.actions.map((a) => a.id)).toEqual([
-      'edit',
-      'resume',
-      'recruit',
-      'finish',
-      'cancel',
+    // Як на панелі паузи сторінки гри: «Відновити» — головна, «Донабір» — другорядна,
+    // «Завершити» / «Скасувати» — небезпечні.
+    expect(paused.actions.map((a) => [a.id, a.rank])).toEqual([
+      ['resume', 'primary'],
+      ['edit', 'secondary'],
+      ['recruit', 'secondary'],
+      ['finish', 'danger'],
+      ['cancel', 'danger'],
     ]);
     expect(paused.statusKey).toBe('games.status.paused');
-    expect(paused.actions[0]).toMatchObject({ link: ['/games', 5, 'edit'] });
-    expect(paused.actions[1]).toMatchObject({
-      labelKey: 'games.actions.resume',
-      emphasis: 'stroked',
-      link: null,
-    });
+    expect(paused.actions[0]).toMatchObject({ labelKey: 'games.actions.resume', link: null });
+    expect(paused.actions[1]).toMatchObject({ link: ['/games', 5, 'edit'] });
     expect(paused.actions[2]).toMatchObject({ labelKey: 'games.actions.recruit', link: null });
     expect(paused.applications).toEqual({ link: ['/games', 5, 'applications'], pending: 0 });
   });
@@ -86,18 +88,21 @@ describe('toMyGameItemVm', () => {
     expect(vm({ ...card(1, 'recruiting'), coverUrl: url }).coverUrl).toBe(url);
   });
 
-  it('«all ok» and «close» come first, for stale and dead games only', () => {
+  it('«all ok» is the primary action and «close» a danger one, for stale and dead games only', () => {
     expect(actions({ ...card(6, 'recruiting'), staleness: 'stale' })).toEqual([
       'still-alive',
-      'close-dead',
       'edit',
       'start',
+      'close-dead',
       'cancel',
     ]);
+    expect(vm({ ...card(6, 'recruiting'), staleness: 'stale' }).actions.map((a) => a.rank)).toEqual(
+      ['primary', 'secondary', 'secondary', 'danger', 'danger'],
+    );
     expect(actions({ ...card(7, 'started'), staleness: 'dead', suspicious: true })).toEqual([
       'still-alive',
-      'close-dead',
       'edit',
+      'close-dead',
       'finish',
       'cancel',
     ]);

@@ -20,6 +20,13 @@ import type {
 import { SearchPage } from './search-page';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import {
+  isOptionSelected,
+  openOptions,
+  optionText,
+  pickText,
+  selectedText,
+} from '../../../../testing/mat-select';
 
 const me = {
   id: 1,
@@ -35,6 +42,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -152,10 +160,11 @@ describe('SearchPage', () => {
     await flush(req, { items: [card(3)], nextCursor: 'c2' });
     expect(ids()).toEqual([1, 2, 3]);
 
-    const format = el().querySelector<HTMLSelectElement>('select[name="format"]')!;
-    format.value = 'online';
-    format.dispatchEvent(new Event('change'));
-    await settle();
+    await pickText(
+      el().querySelector<HTMLElement>('mat-select[name="format"]')!,
+      'games.format.online',
+      settle,
+    );
 
     expect(router.url).toContain('format=online');
     req = expectSearch();
@@ -180,11 +189,11 @@ describe('SearchPage', () => {
   it('sort by GM rating is offered and sent as sort=gm_rating', async () => {
     await setup(null, '/?sort=gm_rating');
     expect(body(expectSearch()).sort).toBe('gm_rating');
-    const option = el().querySelector<HTMLOptionElement>(
-      'select[name="sort"] option[value="gm_rating"]',
-    )!;
-    expect(option.textContent).toContain('search.sort.gm_rating');
-    expect(option.selected).toBe(true);
+    const select = el().querySelector<HTMLElement>('mat-select[name="sort"]')!;
+    expect(selectedText(select)).toContain('search.sort.gm_rating');
+    const options = await openOptions(select, settle);
+    const option = options.find((o) => optionText(o).includes('search.sort.gm_rating'))!;
+    expect(isOptionSelected(option)).toBe(true);
   });
 
   it('load more appends items without duplicates', async () => {
@@ -249,10 +258,11 @@ describe('SearchPage', () => {
     await setup(me, '/?cal=off', slots);
     await flush(expectSearch(), { items: [card(1)], nextCursor: null });
 
-    const select = el().querySelector<HTMLSelectElement>('select[name=calendar]')!;
-    select.value = 'custom';
-    select.dispatchEvent(new Event('change'));
-    await settle();
+    await pickText(
+      el().querySelector<HTMLElement>('mat-select[name=calendar]')!,
+      'search.filters.calendar.custom',
+      settle,
+    );
     // Редактор стартує з копії збереженого календаря — без нового GET.
     const editor = el().querySelector('nri-availability-editor')!;
     expect(editor).not.toBeNull();

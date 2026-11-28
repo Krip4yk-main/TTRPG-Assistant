@@ -140,7 +140,8 @@
   --sc-amber-line: rgba(255, 154, 60, 0.55);
   --sc-amber-fill: rgba(255, 154, 60, 0.14);
   --sc-on-amber: #1e0f04;
-  --sc-red: #c8463a;
+  // Заливка небезпечного підтвердження: з --sc-on-red — 4.66:1 (≥ 4.5).
+  --sc-red: #c4443a;
   --sc-red-text: #ffb3a6;
   --sc-red-fill: rgba(120, 30, 20, 0.45);
   --sc-on-red: #fff6f2;
@@ -763,6 +764,9 @@
   // Наперед (наведення / клік / Enter) — виїжджає на плиту, вирівнюється, збільшується, ґрати
   // піднімаються, знімок світлішає.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(6deg);
+
     top: -34px;
     right: -24px;
     width: 152px;
@@ -776,7 +780,7 @@
       box-shadow:
         0 10px 16px rgba(0, 0, 0, 0.75),
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
-      transform: rotate(6deg);
+      transform: var(--sc-attach-rest);
 
       img {
         background: #000;
@@ -828,22 +832,6 @@
         opacity: 0;
         pointer-events: none;
       }
-    }
-
-    .cap {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      z-index: 3;
-      display: block;
-      padding: 1px 7px;
-      border-radius: 2px 2px 0 0;
-      background: #2c2b27;
-      color: #e9e2d3;
-      font: 700 0.625rem/1.4 var(--sc-font-mono);
-      letter-spacing: 0.12em;
-      white-space: nowrap;
-      transform: translateX(-50%);
     }
   }
 

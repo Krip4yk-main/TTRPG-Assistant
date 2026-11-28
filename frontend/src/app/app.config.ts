@@ -14,6 +14,7 @@ import { authInterceptor } from './core/api/auth.interceptor';
 import { AuthStore } from './core/auth/auth.store';
 import { PublicConfigStore } from './core/config/public-config.store';
 import { TranslatedTitleStrategy } from './core/i18n/translated-title.strategy';
+import { ViewModeRouting } from './core/view-mode/view-mode-routing';
 import { ThemeService } from './theming/theme.service';
 
 export const appConfig: ApplicationConfig = {
@@ -35,12 +36,14 @@ export const appConfig: ApplicationConfig = {
     }),
     { provide: MAT_ICON_DEFAULT_OPTIONS, useValue: { fontSet: 'material-symbols-outlined' } },
     // Перше завантаження /api/me (і кука CSRF) — до першої навігації; потім чинний дизайн
-    // (права з /me) і його слоти — до першого рендера, без мигання.
+    // (права з /me) і його слоти — до першого рендера, без мигання. Вид за сторінкою
+    // (`ViewModeRouting`) слухає роутер ще до першої навігації.
     provideAppInitializer(async () => {
       // Публічні налаштування — паралельно, без очікування: першому рендеру не заважають.
       void inject(PublicConfigStore).ensureLoaded();
       const auth = inject(AuthStore);
       const theme = inject(ThemeService);
+      inject(ViewModeRouting);
       await auth.load();
       await theme.init();
     }),

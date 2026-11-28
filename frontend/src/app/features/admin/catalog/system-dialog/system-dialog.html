@@ -55,12 +55,11 @@
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>{{ 'admin.catalog.genre' | translate }}</mat-label>
-      <select matNativeControl class="genre" formControlName="genreId" required>
-        <option [ngValue]="null" disabled></option>
+      <mat-select class="genre" formControlName="genreId" required>
         @for (g of data.genres; track g.id) {
-          <option [ngValue]="g.id">{{ 'genres.' + g.slug | translate }}</option>
+          <mat-option [value]="g.id">{{ 'genres.' + g.slug | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
       @if (c.genreId.hasError('unknown')) {
         <mat-error>{{ 'games.form.errors.UNKNOWN_GENRE' | translate }}</mat-error>
       } @else if (c.genreId.hasError('required')) {
@@ -84,7 +83,7 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">
+    <button mat-stroked-button type="button" (click)="cancel()">
       {{ 'common.cancel' | translate }}
     </button>
     <button mat-flat-button type="submit" class="confirm" [disabled]="submitting()">

@@ -8,7 +8,6 @@ import { TranslatePipe } from '@ngx-translate/core';
   selector: 'nri-delete-account-dialog',
   imports: [MatButtonModule, MatDialogModule, TranslatePipe],
   templateUrl: './delete-account-dialog.html',
-  styleUrl: './delete-account-dialog.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DeleteAccountDialog {}

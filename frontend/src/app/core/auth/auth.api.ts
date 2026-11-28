@@ -9,6 +9,7 @@ import type {
   IdentityProvider,
   MeDto,
   UpdateAvatarInput,
+  ViewMode,
 } from '@nri/shared';
 
 /** Дані Telegram Login Widget (передаються бекенду як є для перевірки підпису). */
@@ -66,6 +67,11 @@ export class AuthApi {
   /** Джерело аватара; `customUrl` — лише для `custom`. */
   changeAvatar(input: UpdateAvatarInput): Observable<MeDto> {
     return this.http.put<MeDto>('/api/me/avatar', input);
+  }
+
+  /** «Вид за замовчуванням» — з яким видом відкриваються нові вкладки. */
+  changeDefaultView(defaultView: ViewMode): Observable<MeDto> {
+    return this.http.patch<MeDto>('/api/me/default-view', { defaultView });
   }
 
   /** Приватні «Мої межі» (замінює весь список). */

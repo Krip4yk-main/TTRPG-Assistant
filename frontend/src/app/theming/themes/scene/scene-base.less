@@ -325,6 +325,14 @@
     font-weight: 700;
   }
 
+  // Підпис майстра на картці: «ще немає рейтингу» (nri-gm-rating) переноситься разом з
+  // рядком ролі й тим самим кеглем, а не тримається одним шматком (статичний текст не
+  // обрізається — scene-gm-signature.less).
+  nri-sc-gm-signature .role .none {
+    font-size: inherit;
+    white-space: normal;
+  }
+
   // ---- Оверлеї ----
   // Спливні поверхні — рівнем вище за панелі, з межею й глибокою тінню над затемненням.
   .mat-mdc-dialog-surface.mdc-dialog__surface,

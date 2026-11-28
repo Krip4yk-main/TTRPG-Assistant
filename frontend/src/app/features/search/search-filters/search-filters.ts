@@ -117,10 +117,15 @@ export class SearchFilters {
     this.changed.emit(p);
   }
 
-  /** Значення `<select>`/`<input>`; порожнє → фільтр не задано. */
+  /** Значення `<input>`; порожнє → фільтр не задано. */
   protected value(event: Event): string | undefined {
-    const v = (event.target as HTMLInputElement | HTMLSelectElement).value.trim();
+    const v = (event.target as HTMLInputElement).value.trim();
     return v === '' ? undefined : v;
+  }
+
+  /** Вибір у `mat-select` (порожній рядок — «будь-який» → фільтр не задано). */
+  protected onPick<K extends keyof SearchFilterState>(key: K, value: string): void {
+    this.patch({ [key]: value === '' ? undefined : value } as Partial<SearchFilterState>);
   }
 
   protected onSelect<K extends keyof SearchFilterState>(key: K, event: Event): void {
@@ -135,8 +140,7 @@ export class SearchFilters {
     });
   }
 
-  protected onCalendar(event: Event): void {
-    const v = this.value(event);
+  protected onCalendar(v: string): void {
     if (v === 'custom') this.customRequested.emit();
     else this.patch({ calendar: v === 'mine' ? 'mine' : 'off' });
   }

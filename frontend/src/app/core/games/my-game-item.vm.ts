@@ -2,6 +2,7 @@ import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
 import { formatWindow, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
 import type { ViewMode } from '../view-mode/view-mode.store';
+import { byRank, type ActionRank } from '../../shared/action-rank';
 import { NO_START_DATE_KEY, type LinePart } from './game-card.vm';
 import { toSeatsVm, type SeatsVm } from './seats.vm';
 
@@ -15,6 +16,14 @@ const ACTIONS: Record<GameStatus, GameAction[]> = {
   finished: [],
   cancelled: [],
 };
+
+/** Переходи вперед — головна дія картки, коли гра не позначена «давно не проводилась». */
+const FORWARD = new Set<MyGameActionId>(['publish', 'start', 'resume']);
+/**
+ * Небезпечні дії (незворотні): скасувати, завершити гру, закрити «мертву» — як на панелі паузи
+ * сторінки гри.
+ */
+const DANGER = new Set<MyGameActionId>(['cancel', 'finish', 'close-dead']);
 
 /** Кампейн можна поставити на паузу, поки він набирає чи триває. */
 const PAUSABLE = new Set<GameStatus>(['recruiting', 'started']);
@@ -41,9 +50,11 @@ export type MyGameActionId = 'still-alive' | 'close-dead' | 'edit' | 'recruit' |
 export interface MyGameActionVm {
   id: MyGameActionId;
   labelKey: string;
-  /** Вага кнопки: обведена (основна для рядка) чи текстова. */
-  emphasis: 'stroked' | 'text';
-  danger: boolean;
+  /**
+   * Ранг кнопки (спільне правило всіх дизайнів): головна — залита, другорядні — обведені,
+   * небезпечні — текстова кольору небезпеки. Рядок упорядкований за рангом.
+   */
+  rank: ActionRank;
   /** Посилання замість кнопки (редагування). */
   link: (string | number)[] | null;
 }
@@ -118,46 +129,41 @@ export function toMyGameItemVm(
   game: MyGameCardDto,
   { me, seen, viewMode = 'player' }: MyGameItemVmOptions,
 ): MyGameItemVm {
+  const stale = game.staleness !== 'ok';
+  const transitions: MyGameActionId[] = [...ACTIONS[game.status]];
+  if (game.status === 'paused') transitions.splice(1, 0, 'recruit');
+  if (game.kind === 'campaign' && PAUSABLE.has(game.status)) {
+    transitions.splice(transitions.indexOf('cancel'), 0, 'pause');
+  }
+  // Головна дія картки: «Все ок» на позначеній грі (картка питає саме про це), інакше перехід
+  // уперед (опублікувати / почати / відновити), інакше — редагування.
+  const forward = transitions.find((a) => FORWARD.has(a));
+  const primary: MyGameActionId | undefined = stale
+    ? 'still-alive'
+    : (forward ?? (EDITABLE.has(game.status) ? 'edit' : undefined));
+  const rankOf = (id: MyGameActionId): ActionRank =>
+    id === primary ? 'primary' : DANGER.has(id) ? 'danger' : 'secondary';
+
   const actions: MyGameActionVm[] = [];
-  if (game.staleness !== 'ok') {
+  if (stale) {
     actions.push(
-      {
-        id: 'still-alive',
-        labelKey: 'games.dead.stillAlive',
-        emphasis: 'stroked',
-        danger: false,
-        link: null,
-      },
-      {
-        id: 'close-dead',
-        labelKey: 'games.dead.close',
-        emphasis: 'text',
-        danger: true,
-        link: null,
-      },
+      { id: 'still-alive', labelKey: 'games.dead.stillAlive', rank: 'primary', link: null },
+      { id: 'close-dead', labelKey: 'games.dead.close', rank: 'danger', link: null },
     );
   }
   if (EDITABLE.has(game.status)) {
     actions.push({
       id: 'edit',
       labelKey: 'games.actions.edit',
-      emphasis: 'stroked',
-      danger: false,
+      rank: rankOf('edit'),
       link: ['/games', game.id, 'edit'],
     });
-  }
-  const transitions: MyGameActionId[] = [...ACTIONS[game.status]];
-  if (game.status === 'paused') transitions.splice(1, 0, 'recruit');
-  if (game.kind === 'campaign' && PAUSABLE.has(game.status)) {
-    transitions.splice(transitions.indexOf('cancel'), 0, 'pause');
   }
   for (const action of transitions) {
     actions.push({
       id: action,
       labelKey: `games.actions.${action}`,
-      // Із паузи головна дія — «Відновити».
-      emphasis: action === 'resume' ? 'stroked' : 'text',
-      danger: action === 'cancel',
+      rank: rankOf(action),
       link: null,
     });
   }
@@ -207,6 +213,6 @@ export function toMyGameItemVm(
     applications: HAS_APPLICATIONS.has(game.status)
       ? { link: ['/games', game.id, 'applications'], pending: game.pendingApplications }
       : null,
-    actions,
+    actions: byRank(actions),
   };
 }

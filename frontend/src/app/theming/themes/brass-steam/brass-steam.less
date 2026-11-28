@@ -952,10 +952,13 @@
 
   // ---- Обкладинка: ціанотипія під латунною скріпкою ----
   // Відбиток з білим полем (фон кнопки + padding), синій шар ціанотипії — ::after, скріпка —
-  // ::before, підпис «ОБКЛАДИНКА» — рамкою в куті (лише наперед). У спокої — синя, тьмяна,
+  // ::before. У спокої — синя, тьмяна,
   // нахилена за кутом бланка; наперед (наведення / клік / Enter) — виходить на бланк, більшає,
   // справжні кольори.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(7deg);
+
     top: -34px;
     right: -22px;
     width: 150px;
@@ -968,7 +971,7 @@
       background: #eef2f3;
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
       filter: brightness(0.72) saturate(0.7);
-      transform: rotate(7deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #f0d78f;
@@ -1007,25 +1010,6 @@
         pointer-events: none;
       }
     }
-
-    .cap {
-      position: absolute;
-      right: 9px;
-      bottom: 9px;
-      z-index: 2;
-      display: block;
-      padding: 1px 5px;
-      border: 1px solid rgba(232, 241, 255, 0.8);
-      background: rgba(10, 30, 60, 0.55);
-      color: #f4f8ff;
-      font: 400 0.75rem/1.3 var(--sc-font-mono);
-      font-variant-numeric: lining-nums;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-    }
   }
 
   .bs-attachment-front() {
@@ -1035,10 +1019,6 @@
 
     img {
       filter: none;
-    }
-
-    .cap {
-      opacity: 1;
     }
 
     &::after {
@@ -1067,8 +1047,7 @@
         transition: filter 350ms;
       }
 
-      &::after,
-      .cap {
+      &::after {
         transition: opacity 350ms;
       }
     }

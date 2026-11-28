@@ -36,8 +36,7 @@
 //   Заголовок сторінки: свічки — `nri-sc-page-header .page-header::before` (≥ 1360px),
 //     астролябія — `::after` (≥ 1100px); обидва — лише на сторінці без кнопок дій.
 //   Панель фільтрів: кутики — `::before` (замість неонової трубки основи).
-//   Обкладинка: кільце — `.attach::before`, ромб-самоцвіт — `.attach::after`, іскри —
-//     `.cap::before / ::after`.
+//   Обкладинка: кільце — `.attach::before`, ромб-самоцвіт — `.attach::after`, іскри — `.deco::before / ::after`.
 //   data-neon (варіант картки): колір рядка системи й зірочок шапки (фіалка, слива, глибока
 //     бірюза, бурштин, мох, червоне чорнило).
 
@@ -952,6 +951,9 @@
   // іскрами. У спокої — сепія й тьмяно; наперед (наведення / клік / Enter) — виходить на аркуш,
   // збільшується, колір, бірюзова аура.
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(5deg);
+
     top: -34px;
     right: -14px;
     width: 112px;
@@ -980,7 +982,7 @@
       box-shadow:
         0 8px 16px rgba(0, 0, 0, 0.55),
         inset 0 0 0 1.5px #4d3410;
-      transform: rotate(5deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #6fe6d2;
@@ -1028,25 +1030,19 @@
       }
     }
 
-    .cap {
+    // Іскри біля рами: якір — порожній aria-hidden `.deco` під рамою; з'являються, коли
+    // обкладинка наперед.
+    .deco {
       position: absolute;
       bottom: -32px;
       left: 50%;
       display: block;
-      padding: 3px 10px;
-      border-radius: 2px;
-      background: linear-gradient(#f7dc9a, #d5a24b);
-      color: #3b2a08;
-      font: 600 0.6875rem/1.2 var(--sc-font-mono);
-      font-variant-numeric: lining-nums;
-      letter-spacing: 0.14em;
-      white-space: nowrap;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+      width: 120px;
+      height: 22px;
       opacity: 0;
       transform: translateX(-50%);
       pointer-events: none;
 
-      // Іскри біля рами.
       &::before,
       &::after {
         content: '';
@@ -1083,7 +1079,7 @@
       filter: none;
     }
 
-    .cap {
+    .deco {
       opacity: 1;
     }
   }
@@ -1108,7 +1104,7 @@
         transition: filter 450ms;
       }
 
-      .cap {
+      .deco {
         transition: opacity 450ms;
       }
     }

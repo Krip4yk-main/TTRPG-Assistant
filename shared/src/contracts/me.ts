@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ianaTimezone } from '../schemas/common.js';
 import { APPLICATION_CONSTRAINT_MAX, APPLICATION_CONSTRAINTS_MAX } from './applications.js';
 import type { ThemeId, UiPrefsDto } from './theme.js';
+import { VIEW_MODES, type ViewMode } from './view-mode.js';
 
 export type UserStatus = 'pending' | 'active' | 'deleted';
 export type UserRole = 'owner' | 'admin' | 'moderator' | 'user';
@@ -50,7 +51,13 @@ export interface MeDto {
   uiPrefs: UiPrefsDto;
   /** Мої межі — приватні нотатки для підстановки в заявку; лише тут, нікому більше не показуються. */
   myLimits: string[];
+  /** «Вид за замовчуванням»: з яким видом відкривається нова вкладка. */
+  defaultView: ViewMode;
 }
+
+/** `PATCH /api/me/default-view` → `MeDto`. */
+export const updateDefaultViewSchema = z.object({ defaultView: z.enum(VIEW_MODES) }).strict();
+export type UpdateDefaultViewInput = z.infer<typeof updateDefaultViewSchema>;
 
 /**
  * `PATCH /api/me/timezone` → `MeDto`. Пояс акаунта визначає календар доступності (R5);

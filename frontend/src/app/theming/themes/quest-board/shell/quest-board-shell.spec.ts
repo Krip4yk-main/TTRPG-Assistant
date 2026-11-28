@@ -25,6 +25,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -91,6 +92,11 @@ describe('QuestBoardShell (slot «shell»)', () => {
     const menu = document.querySelector('.mat-mdc-menu-panel')!;
     expect(menu.querySelector('a[href="/my-games"]')).not.toBeNull();
     expect(menu.querySelector('a[href="/games/new"]')).not.toBeNull();
+  });
+
+  it('brand shows the shared d20 mark', async () => {
+    await settle();
+    expect(el.querySelector('.brand nri-brand-mark')).not.toBeNull();
   });
 
   it('player view shows «My applications»', async () => {

@@ -58,6 +58,7 @@ import {
 import { openSessionAlternatives } from '../../scheduling/session-alternatives-dialog/open-session-alternatives';
 import { openPinTime } from '../../scheduling/pin-time-dialog/open-pin-time';
 import { formatHours } from '../../../core/i18n/duration';
+import { RANK_APPEARANCE, byRank, type ActionRank } from '../../../shared/action-rank';
 
 /** Дія майстра над сесією; `pin` — «Уточнити час» сесії з приблизним часом. */
 export type SessionAction = 'pin' | 'alternatives' | 'reschedule' | 'cancel' | 'finish';
@@ -157,6 +158,8 @@ export class SessionsList {
   /** Розгорнуті списки учасників у зведенні RSVP (майстер). */
   protected readonly openSummaries = signal<ReadonlySet<number>>(new Set());
   protected readonly rsvpStatuses: readonly RsvpStatus[] = ['going', 'not_going'];
+  /** Вигляд кнопки дії за рангом (залита / обведена / текстова). */
+  protected readonly appearance = RANK_APPEARANCE;
   /** Розгорнуті довгі підсумки. */
   protected readonly openSummaryTexts = signal<ReadonlySet<number>>(new Set());
   /** X-Card: сесія, сигнал якої надсилається. */
@@ -442,15 +445,24 @@ export class SessionsList {
   /**
    * Дії майстра над сесією: лише `scheduled`; завершити — коли вже почалась. Сесії з
    * приблизним часом — спершу «Уточнити час» (без нього не почати гру й не завершити сесію).
+   * Ранг (спільне правило дизайнів): головна — «Уточнити час», інакше «Завершити»; «Скасувати» —
+   * небезпечна; решта — другорядні. Рядок упорядкований головна → другорядні → небезпечні.
    */
-  protected actions(s: SessionDto): SessionAction[] {
+  protected actions(s: SessionDto): { id: SessionAction; rank: ActionRank }[] {
     if (!this.isGm() || !this.manageable() || s.status !== 'scheduled') return [];
     const started = Date.parse(s.startsAt) <= this.now();
     // «Інший час» — підбір альтернатив у ±3 доби (лише для майбутньої сесії).
     const list: SessionAction[] = started
       ? ['reschedule', 'cancel', 'finish']
       : ['alternatives', 'reschedule', 'cancel'];
-    return s.startWindowMinutes !== null ? ['pin', ...list] : list;
+    const ids = s.startWindowMinutes !== null ? ['pin' as const, ...list] : list;
+    const primary = ids.includes('pin') ? 'pin' : ids.includes('finish') ? 'finish' : null;
+    return byRank(
+      ids.map((id) => ({
+        id,
+        rank: id === primary ? 'primary' : id === 'cancel' ? 'danger' : 'secondary',
+      })),
+    );
   }
 
   /**

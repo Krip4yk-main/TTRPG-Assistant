@@ -118,14 +118,18 @@
 
         <!-- Досвід -->
         <div class="field">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" floatLabel="always">
             <mat-label>{{ 'profile.fields.experience' | translate }}</mat-label>
-            <select matNativeControl name="experience" formControlName="experience">
-              <option [ngValue]="null">{{ 'profile.page.notSpecified' | translate }}</option>
+            <mat-select
+              name="experience"
+              formControlName="experience"
+              [placeholder]="'profile.page.notSpecified' | translate"
+            >
+              <mat-option [value]="null">{{ 'profile.page.notSpecified' | translate }}</mat-option>
               @for (e of experiences; track e) {
-                <option [ngValue]="e">{{ 'profile.experience.' + e | translate }}</option>
+                <mat-option [value]="e">{{ 'profile.experience.' + e | translate }}</mat-option>
               }
-            </select>
+            </mat-select>
           </mat-form-field>
           <ng-container
             [ngTemplateOutlet]="privacyToggle"
@@ -142,7 +146,7 @@
               'profileEdit.view' | translate
             }}</a>
           }
-          <a mat-button routerLink="/calendar">{{ 'profile.page.calendar' | translate }}</a>
+          <a mat-stroked-button routerLink="/calendar">{{ 'profile.page.calendar' | translate }}</a>
         </div>
         <div aria-live="polite">
           @if (message(); as m) {

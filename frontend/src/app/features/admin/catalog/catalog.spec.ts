@@ -9,6 +9,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { AdminCatalog } from './catalog';
+import { pickText } from '../../../../testing/mat-select';
 
 const me = {
   id: 1,
@@ -24,6 +25,7 @@ const me = {
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],
@@ -81,12 +83,8 @@ describe('AdminCatalog', () => {
     await settle();
   };
   const chooseGenre = async (id: number) => {
-    const select = overlay().querySelector<HTMLSelectElement>('select.genre')!;
-    select.selectedIndex = [...select.options].findIndex((o) =>
-      o.textContent!.includes(id === 11 ? 'genres.horror' : 'genres.fantasy'),
-    );
-    select.dispatchEvent(new Event('change'));
-    await settle();
+    const select = overlay().querySelector<HTMLElement>('mat-select.genre')!;
+    await pickText(select, id === 11 ? 'genres.horror' : 'genres.fantasy', settle);
   };
   const submitDialog = async () => {
     overlay().querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));

@@ -30,6 +30,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatRadioModule } from '@angular/material/radio';
 import type { ErrorStateMatcher } from '@angular/material/core';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -253,6 +254,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatSelectModule,
     MatRadioModule,
     TranslatePipe,
     WarningChip,

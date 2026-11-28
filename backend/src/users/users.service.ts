@@ -13,6 +13,7 @@ import {
   type ThemeId,
   type UpdateAvatarInput,
   type UpdateUiPrefsInput,
+  type ViewMode,
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import {
@@ -99,6 +100,7 @@ export async function getMe(deps: Pick<AppDeps, 'db'>, userId: number): Promise<
     availableThemes: availableThemes(u.role),
     uiPrefs: { tearAnimation: u.qbTearAnimation, sendAnimation: u.uiSendAnimation },
     myLimits: u.myLimits,
+    defaultView: u.defaultView,
   };
 }
 
@@ -267,6 +269,17 @@ export async function changeUiPrefs(
     .update(users)
     .set({ qbTearAnimation: prefs.tearAnimation, uiSendAnimation: prefs.sendAnimation })
     .where(eq(users.id, userId));
+  pingMeChanged(deps, userId, 'appearance');
+  return getMe(deps, userId);
+}
+
+/** Зберігає «Вид за замовчуванням» (`PATCH /api/me/default-view`). Відкриті вкладки свій вид не змінюють. */
+export async function changeDefaultView(
+  deps: AppDeps,
+  userId: number,
+  defaultView: ViewMode,
+): Promise<MeDto> {
+  await deps.db.update(users).set({ defaultView }).where(eq(users.id, userId));
   pingMeChanged(deps, userId, 'appearance');
   return getMe(deps, userId);
 }

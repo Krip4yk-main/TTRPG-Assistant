@@ -372,6 +372,13 @@
       "when": 1795830884662,
       "tag": "0052_plan20_staff_telegram",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1795866132447,
+      "tag": "0053_plan22_default_view",
+      "breakpoints": true
     }
   ]
 }

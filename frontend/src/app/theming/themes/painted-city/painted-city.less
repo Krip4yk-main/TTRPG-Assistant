@@ -37,8 +37,7 @@
 //     прокручується, неонова трубка основи `::before` прихована).
 //   sc-p1, sc-p2, sc-d1…sc-d4 — не вживаються.
 //   Обкладинка: папір афіші з рваними краями й дуотон-підкладка — `.attach::before`, скотч —
-//     `.attach::after`, світлина — `img` (multiply над підкладкою у спокої); підпис
-//     «ОБКЛАДИНКА» (uk.json, спільний `.cap`) — чорна наліпка внизу ліворуч.
+//     `.attach::after`, світлина — `img` (multiply над підкладкою у спокої).
 //   Стіна: мазки пензля (дві безшовні плитки 600 і 480px), сяйва, бризки фарби (≥ 1100px).
 //   data-neon (варіант картки): колір рядка системи, сяйва вгорі картки, крапок місць і кромки
 //     наведення (фіалка, рожевий, бірюза, золото, лайм, кіновар).
@@ -783,6 +782,9 @@
   // відклеюється на картку, більшає, справжні кольори, жорстка чорнильна тінь. Рвані краї — у
   // папері-підкладці `::before` (форма не на кнопці — контур фокусу не обрізається).
   nri-sc-attachment {
+    // Нахил у спокої — спільний для обкладинки й зони наведення (scene-attachment.less).
+    --sc-attach-rest: rotate(8deg);
+
     top: -30px;
     right: -24px;
     width: 154px;
@@ -793,7 +795,7 @@
       padding: 5px 5px 9px;
       background: none;
       filter: brightness(0.62) saturate(0.5);
-      transform: rotate(8deg);
+      transform: var(--sc-attach-rest);
 
       &:focus-visible {
         outline: 3px solid #35e0c2;
@@ -845,22 +847,6 @@
         mix-blend-mode: multiply;
         filter: grayscale(1) contrast(1.35);
       }
-    }
-
-    .cap {
-      position: absolute;
-      bottom: 14px;
-      left: 10px;
-      z-index: 2;
-      display: block;
-      padding: 1px 6px;
-      background: @pc-ink;
-      color: #f8eedb;
-      font: 600 0.6875rem/1.4 var(--sc-font-mono);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
     }
   }
 
