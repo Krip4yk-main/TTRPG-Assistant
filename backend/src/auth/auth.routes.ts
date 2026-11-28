@@ -132,7 +132,10 @@ export function authRouter(deps: AppDeps): Router {
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.isBanned) throw await bannedError(deps, userId);
     // Ідентичність перевірена підписом віджета — лише тут (і в прив'язці нижче) бутстрап власника.
-    await bootstrapOwner(deps, userId, identity, 'login');
+    // Збій бутстрапу (наприклад, взаємне блокування) не має ламати сам вхід.
+    await bootstrapOwner(deps, userId, identity, 'login').catch((err: unknown) => {
+      console.error('owner bootstrap failed', err);
+    });
     await startSession(req, res, userId);
     res.json({ user: await getMe(deps, userId) });
   });
@@ -140,7 +143,9 @@ export function authRouter(deps: AppDeps): Router {
   router.post('/telegram/link', requireTelegram, auth, async (req, res) => {
     const identity = verify(req.body);
     await linkIdentity(deps, req.user!.userId, identity);
-    await bootstrapOwner(deps, req.user!.userId, identity, 'link');
+    await bootstrapOwner(deps, req.user!.userId, identity, 'link').catch((err: unknown) => {
+      console.error('owner bootstrap failed', err);
+    });
     const rows = await db
       .select({ provider: authIdentities.provider, displayName: authIdentities.displayName })
       .from(authIdentities)

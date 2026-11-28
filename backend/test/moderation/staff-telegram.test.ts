@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { linkIdentity } from '../../src/auth/identity.service.js';
 import { eq } from 'drizzle-orm';
 import { authIdentities, notifications, telegramOutbox, users } from '../../src/db/schema/index.js';
 import { runStaffTelegramReminders } from '../../src/moderation/staff-telegram.js';
@@ -62,5 +63,18 @@ describe('runStaffTelegramReminders', () => {
     ]);
     expect(runs.flat()).toHaveLength(2);
     expect(await db.select().from(notifications)).toHaveLength(2);
+  });
+});
+
+describe('linking Telegram clears the staff reminder', () => {
+  it('marks the unread staff.telegram_required notification read; others untouched', async () => {
+    const mod = await createUser(db, { role: 'moderator' });
+    const other = await createUser(db, { role: 'admin' });
+    await runStaffTelegramReminders(deps, NOW);
+    await linkIdentity(deps, mod.id, { provider: 'telegram', subject: '777', displayName: 'm' });
+    const rows = await db.select().from(notifications);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.userId === mod.id)!.readAt).not.toBeNull();
+    expect(rows.find((r) => r.userId === other.id)!.readAt).toBeNull();
   });
 });

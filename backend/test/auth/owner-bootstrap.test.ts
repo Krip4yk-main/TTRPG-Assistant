@@ -156,6 +156,22 @@ describe('OWNER_TELEGRAM_ID bootstrap — linking Telegram', () => {
   });
 });
 
+describe('bootstrap failure never breaks the login', () => {
+  it('bootstrap throwing (e.g. deadlock) → login still 200, no owner', async () => {
+    const u = await createUser(db, { nickname: 'Existing' });
+    await db
+      .insert(authIdentities)
+      .values({ userId: u.id, provider: 'telegram', subject: OWNER_TG });
+    vi.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('Deadlock found'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { res } = await tgLogin(OWNER_TG);
+    expect(res.status).toBe(200);
+    expect(res.body.user.role).toBe('user');
+    expect(errSpy).toHaveBeenCalledWith('owner bootstrap failed', expect.any(Error));
+    expect(await owners()).toEqual([]);
+  });
+});
+
 describe('bootstrapOwner — guards and races', () => {
   const tg = { provider: 'telegram', subject: OWNER_TG } as const;
   async function linkedUser(over: Partial<typeof users.$inferInsert> = {}) {

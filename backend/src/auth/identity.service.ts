@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { AppDeps } from '../app.js';
-import { authIdentities, identityTombstones, users } from '../db/schema/index.js';
+import { authIdentities, identityTombstones, notifications, users } from '../db/schema/index.js';
 import { logEvent } from '../events/events.service.js';
 import type { Db } from '../db/client.js';
 import type { Tx } from '../applications/applications.rules.js';
@@ -215,6 +215,19 @@ export async function linkIdentity(
         avatarUrl: identity.avatarUrl ?? null,
       });
       await recomputeAvatar(tx, userId);
+      // Персонал прив'язав Telegram — нагадування «прив'яжіть Telegram» більше не актуальне.
+      if (identity.provider === 'telegram') {
+        await tx
+          .update(notifications)
+          .set({ readAt: new Date() })
+          .where(
+            and(
+              eq(notifications.userId, userId),
+              eq(notifications.type, 'staff.telegram_required'),
+              isNull(notifications.readAt),
+            ),
+          );
+      }
     });
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;
