@@ -14,8 +14,9 @@ import { Directive, ElementRef, computed, inject, input, signal } from '@angular
  * назва в aria-label кнопки. Якщо картинка не завантажилась (`onError()`), вкладення зникає
  * (`.failed`, до зміни адреси).
  *
- * Шаблон компонента дизайну: кнопка з `[attr.aria-pressed]="front()"` і `(blur)="onBlur()"`,
- * у ній `<img [src]="src()" alt="" (error)="onError()">`.
+ * Шаблон компонента дизайну: нерухома зона наведення `<span class="hover-zone" aria-hidden>` і
+ * кнопка з `[attr.aria-pressed]="front()"` і `(blur)="onBlur()"`, у ній
+ * `<img [src]="src()" alt="" (error)="onError()">`. Натиск миші на зону фокусує кнопку.
  */
 @Directive({
   selector: '[nriCoverAttachment]',
@@ -27,6 +28,7 @@ import { Directive, ElementRef, computed, inject, input, signal } from '@angular
     '[class.failed]': 'failed()',
     '(click)': 'toggle()',
     '(pointerdown)': 'pointerInside = true',
+    '(mousedown)': 'onMouseDown($event)',
     '(mouseleave)': 'onLeave()',
     '(document:pointerdown)': 'onDocumentPointerDown($event)',
     '(document:keydown.escape)': 'dismiss()',
@@ -57,6 +59,18 @@ export class CoverAttachment {
     this.pointerInside = false;
     this.dismissed.set(false);
     this.front.update((v) => !v);
+  }
+
+  /**
+   * Натиск миші на вкладенні поза кнопкою (зона наведення в спокої: сама обкладинка тоді курсор
+   * не ловить) — фокус на кнопку, як при натиску на неї саму: Tab іде далі від неї, а blur
+   * повертає вкладення. Без прокрутки й без рамки фокуса (миша — не клавіатура).
+   */
+  protected onMouseDown(event: MouseEvent): void {
+    const button = this.host.querySelector('button');
+    if (!button || button.contains(event.target as Node)) return;
+    event.preventDefault();
+    button.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
   }
 
   /** Картинка не завантажилась — вкладення ховається. */

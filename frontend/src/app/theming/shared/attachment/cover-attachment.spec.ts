@@ -157,6 +157,11 @@ describe.each(CASES)('cover attachment — %s', (_name, component, selector, inp
     expect(zone.getAttribute('aria-hidden')).toBe('true');
     expect(zone.parentElement).toBe(host);
     expect(button.contains(zone)).toBe(false);
+    // Натиск миші на зону — фокус на кнопці, як при натиску на неї саму (Tab іде далі від неї).
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    zone.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(button);
     click(zone);
     expect(host.classList).toContain('front');
     click(zone);
