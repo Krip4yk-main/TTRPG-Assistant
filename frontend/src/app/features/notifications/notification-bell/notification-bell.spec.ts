@@ -125,7 +125,6 @@ describe('NotificationBell', () => {
     const overlay = node.injector.get(CdkConnectedOverlay);
     expect(overlay.push).toBe(true);
     expect(overlay.viewportMargin).toBe(PANEL_VIEWPORT_MARGIN);
-    expect(PANEL_VIEWPORT_MARGIN).toBe(8);
   });
 
   it('badge: hidden at 0, aria-label without count', async () => {

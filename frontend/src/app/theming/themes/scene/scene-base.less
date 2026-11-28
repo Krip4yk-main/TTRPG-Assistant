@@ -183,7 +183,8 @@
     font-size: clamp(1.625rem, 7.4vw, 2rem);
   }
 
-  :where(&) h2 {
+  // Як і h1: `body h2` не залежить від порядку підключення глобальних стилів.
+  :where(&) body h2 {
     font-size: 1.4rem;
   }
 
