@@ -22,10 +22,11 @@ export type DevLoginInput = z.infer<typeof devLoginSchema>;
 
 /**
  * Dev-вхід на беті (`POST /api/auth/dev-login/code`): код доступу тестера + нікнейм.
- * Ключа власника немає — персонал так не входить.
+ * Ключа власника немає — персонал так не входить. Нікнейм — за правилами профілю (сервер
+ * доступний з інтернету: без пробілів, невидимих символів тощо).
  */
 export const devCodeLoginSchema = z.object({
   code: z.string().min(1).max(256),
-  nickname: z.string().min(1).max(32),
+  nickname: completeProfileSchema.shape.nickname,
 });
 export type DevCodeLoginInput = z.infer<typeof devCodeLoginSchema>;

@@ -2,14 +2,13 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { and, eq } from 'drizzle-orm';
-import { devCodeLoginSchema, devLoginSchema } from '@nri/shared';
+import { devCodeLoginSchema, devLoginSchema, type EventType } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import type { DevLoginCode, Env } from '../config/env.js';
-import { authIdentities, users } from '../db/schema/index.js';
+import { authIdentities, events, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { getMe } from '../users/users.service.js';
 import { isDuplicateKey } from '../db/errors.js';
-import { logEvent } from '../events/events.service.js';
 import { resolveLogin } from './identity.service.js';
 import { bannedError } from '../appeals/appeals.service.js';
 
@@ -106,12 +105,13 @@ type StartSession = (req: Request, res: Response, userId: number) => Promise<voi
 /** `local`: власник — лише за `DEV_OWNER_KEY`. `beta`: персонал не входить узагалі. */
 type Policy = { mode: 'local'; ownerKey: string | undefined } | { mode: 'beta' };
 
-/** Вхід або створення dev-акаунта за нікнеймом; повертає id і чи створено його цим запитом. */
+/**
+ * Знаходить або створює dev-акаунт за нікнеймом і перевіряє, чи можна в нього ввійти; повертає
+ * id і чи створено його цим запитом. Сесію не відкриває — це робить викликач (на беті — лише
+ * після запису в журнал).
+ */
 async function devSignIn(
   deps: AppDeps,
-  req: Request,
-  res: Response,
-  startSession: StartSession,
   nickname: string,
   policy: Policy,
 ): Promise<{ userId: number; created: boolean }> {
@@ -147,7 +147,6 @@ async function devSignIn(
       throw new AppError(403, 'FORBIDDEN');
     }
     if (u.isBanned) throw await bannedError(deps, u.id);
-    await startSession(req, res, userId);
     return { userId, created: false };
   }
 
@@ -170,7 +169,6 @@ async function devSignIn(
     if (isDuplicateKey(err)) throw new AppError(409, 'NICKNAME_TAKEN');
     throw err;
   }
-  await startSession(req, res, created.userId);
   return { userId: created.userId, created: created.isNew };
 }
 
@@ -185,10 +183,8 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
     router.post('/dev-login', async (req, res) => {
       if (!isLocalRequest(req)) throw new AppError(404, 'NOT_FOUND');
       const { nickname, ownerKey } = bodySchema.parse(req.body);
-      const { userId } = await devSignIn(deps, req, res, startSession, nickname, {
-        mode: 'local',
-        ownerKey,
-      });
+      const { userId } = await devSignIn(deps, nickname, { mode: 'local', ownerKey });
+      await startSession(req, res, userId);
       res.json({ user: await getMe(deps, userId) });
     });
   }
@@ -203,17 +199,17 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
       );
       if (codeIndex === -1) throw new AppError(403, 'FORBIDDEN');
       const { nickname } = devCodeLoginSchema.parse(raw);
-      const { userId, created } = await devSignIn(deps, req, res, startSession, nickname, {
-        mode: 'beta',
-      });
+      const { userId, created } = await devSignIn(deps, nickname, { mode: 'beta' });
       const codeLabel = env.DEV_LOGIN_CODES[codeIndex]!.label;
-      await logEvent(db, {
-        type: 'auth.dev_login',
+      // Журнал — до сесії і без «тихого» logEvent: не вдалося записати — входу немає (500).
+      await db.insert(events).values({
+        type: 'auth.dev_login' satisfies EventType,
         userId,
         entityType: 'user',
         entityId: userId,
         payload: { codeLabel, codeIndex, created },
       });
+      await startSession(req, res, userId);
       console.info(`[dev-login] code "${codeLabel}" -> user ${userId}${created ? ' (new)' : ''}`);
       res.json({ user: await getMe(deps, userId) });
     });

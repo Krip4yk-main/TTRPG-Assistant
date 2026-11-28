@@ -23,6 +23,7 @@ const PROD_IN_DEPLOY = 'must be production when DEPLOY_ENV is dev or prod';
 const NOT_ON_PROD = 'must not be set when DEPLOY_ENV=prod';
 const CODES_REQUIRED_ON_DEV = 'required when DEV_LOGIN_ENABLED=true on DEPLOY_ENV=dev';
 const CODE_TOO_SHORT = 'each code must be at least 24 characters (at most 256)';
+const CODE_LOW_ENTROPY = 'each code must have at least 8 distinct characters (use random codes)';
 const CODES_MALFORMED = 'comma-separated codes or label:code, labels [A-Za-z0-9_.-], no duplicates';
 /** Показуються поруч із ключем; значень у тексті помилки немає ніколи (там можуть бути секрети). */
 const EXPLAINED = new Set([
@@ -31,10 +32,13 @@ const EXPLAINED = new Set([
   NOT_ON_PROD,
   CODES_REQUIRED_ON_DEV,
   CODE_TOO_SHORT,
+  CODE_LOW_ENTROPY,
   CODES_MALFORMED,
 ]);
 
 export const DEV_LOGIN_CODE_MIN = 24;
+/** Проти очевидно слабких кодів (`aaaa…`, `abcabc…`): мінімум різних символів. */
+const DEV_LOGIN_CODE_MIN_DISTINCT = 8;
 const DEV_LOGIN_CODE_MAX = 256;
 const DEV_LOGIN_LABEL = /^[A-Za-z0-9_.-]{1,32}$/;
 
@@ -46,7 +50,7 @@ export interface DevLoginCode {
 
 /**
  * `DEV_LOGIN_CODES`: коди через кому, кожен — `код` або `мітка:код` (до першої `:`). Без мітки
- * мітка — `#позиція` (з 1). Код ≥ 24 символів; порожні записи й дублікати — помилка старту.
+ * мітка — `#позиція` (з 1). Код ≥ 24 символів, з них ≥ 8 різних; порожні записи й дублікати — помилка старту.
  */
 const devLoginCodes = z
   .string()
@@ -69,6 +73,7 @@ const devLoginCodes = z
       if (code.length < DEV_LOGIN_CODE_MIN || code.length > DEV_LOGIN_CODE_MAX) {
         return fail(CODE_TOO_SHORT);
       }
+      if (new Set(code).size < DEV_LOGIN_CODE_MIN_DISTINCT) return fail(CODE_LOW_ENTROPY);
       out.push({ label, code });
     }
     const unique = (xs: string[]) => new Set(xs).size === xs.length;

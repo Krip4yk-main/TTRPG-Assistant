@@ -26,12 +26,24 @@ describe('devLoginSchema', () => {
 
 describe('devCodeLoginSchema', () => {
   it('requires code and nickname, has no ownerKey', () => {
-    expect(devCodeLoginSchema.safeParse({ code: 'c', nickname: 'x' }).success).toBe(true);
+    expect(devCodeLoginSchema.safeParse({ code: 'c', nickname: 'Tester_1' }).success).toBe(true);
     expect(devCodeLoginSchema.safeParse({ nickname: 'x' }).success).toBe(false);
     expect(devCodeLoginSchema.safeParse({ code: 'c', nickname: 'x'.repeat(33) }).success).toBe(
       false,
     );
-    const parsed = devCodeLoginSchema.parse({ code: 'c', nickname: 'x', ownerKey: 'k' });
+    const parsed = devCodeLoginSchema.parse({ code: 'c', nickname: 'xyz', ownerKey: 'k' });
     expect(parsed).not.toHaveProperty('ownerKey');
+  });
+});
+describe('devCodeLoginSchema nickname', () => {
+  it('uses the profile nickname rules (no spaces, invisible chars, too short)', () => {
+    for (const nickname of [
+      'Te ster',
+      `Tester${String.fromCharCode(0x200b)}`,
+      'Tes\u0007ter',
+      'ab',
+      'x'.repeat(33),
+    ])
+      expect(devCodeLoginSchema.safeParse({ code: 'c', nickname }).success).toBe(false);
   });
 });

@@ -53,6 +53,17 @@ describe('DEV_LOGIN_CODES', () => {
     );
   });
 
+  it('refuses low-entropy codes (fewer than 8 distinct characters)', () => {
+    for (const code of ['a'.repeat(24), 'abcdefg'.repeat(4)]) {
+      expect(startupError({ ...base, DEV_LOGIN_CODES: `bob:${code}` })).toMatch(
+        /DEV_LOGIN_CODES \(each code must have at least 8 distinct characters/,
+      );
+    }
+    expect(
+      loadEnv({ ...base, DEV_LOGIN_CODES: `bob:${'abcdefgh'.repeat(3)}` }).DEV_LOGIN_CODES,
+    ).toHaveLength(1);
+  });
+
   it('refuses empty entries, empty/invalid labels and duplicates', () => {
     for (const DEV_LOGIN_CODES of [
       `${CODE_A},,${CODE_B}`,

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
 import { DEV_LOGIN_CODE_ATTEMPTS } from '../../src/http/security.js';
-import { authIdentities, events, users } from '../../src/db/schema/index.js';
+import { authIdentities, events, sessions, users } from '../../src/db/schema/index.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
 
 const base = await testDeps();
@@ -122,8 +122,46 @@ describe('beta (DEPLOY_ENV=dev) dev login by code', () => {
 
   it('valid code with invalid nickname -> 400', async () => {
     const app = await appWith(BETA);
-    const res = await codeLogin(app, { code: CODE_ALICE, nickname: 'x'.repeat(33) }, nextIp());
-    expect(res.status).toBe(400);
+    const ip = nextIp();
+    for (const nickname of [
+      'x'.repeat(33),
+      'Te ster',
+      `Tester${String.fromCharCode(0x200b)}`,
+      'ab',
+    ]) {
+      const res = await codeLogin(app, { code: CODE_ALICE, nickname }, ip);
+      expect(res.status).toBe(400);
+    }
+    expect(await db.select().from(users)).toHaveLength(0);
+  });
+
+  it('audit write failure -> no session (event is written before the cookie)', async () => {
+    const ok = await appWith(BETA);
+    expect((await codeLogin(ok, { code: CODE_ALICE, nickname: 'Tester' }, nextIp())).status).toBe(
+      200,
+    );
+    await db.delete(sessions);
+    const d = await testDeps(BETA);
+    d.redis.disconnect();
+    // БД, у якій запис у журнал подій падає (інші таблиці — як є).
+    const brokenDb = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === 'insert') {
+          return (table: unknown) =>
+            table === events
+              ? { values: () => Promise.reject(new Error('audit down')) }
+              : target.insert(table as typeof users);
+        }
+        return Reflect.get(target, prop, receiver) as unknown;
+      },
+    });
+    const app = createApp({ ...d, db: brokenDb, redis });
+    const res = await codeLogin(app, { code: CODE_ALICE, nickname: 'Tester' }, nextIp());
+    expect(res.status).toBe(500);
+    expect((res.headers['set-cookie'] as unknown as string[] | undefined) ?? []).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/nri_sid=/)]),
+    );
+    expect(await db.select().from(sessions)).toHaveLength(0);
   });
 
   it('staff cannot log in with a tester code (owner key is ignored on beta)', async () => {
