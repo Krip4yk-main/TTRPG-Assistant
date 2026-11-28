@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -17,6 +18,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -30,6 +32,8 @@ import {
   selectableTimezones,
   type ErrorCode,
   type IdentityProvider,
+  VIEW_MODES,
+  type ViewMode,
 } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
@@ -92,6 +96,7 @@ interface Message {
     MatIconModule,
     MatAutocompleteModule,
     MatInputModule,
+    MatSelectModule,
     MatSlideToggleModule,
     MatTooltipModule,
     TranslatePipe,
@@ -154,6 +159,11 @@ export class AccountSettings {
   protected readonly autoBusy = signal<boolean | null>(null);
   protected readonly autoBusyBusy = signal(false);
   protected readonly autoBusyMessage = signal<Message | null>(null);
+  /** «Вид за замовчуванням»: показуємо обране одразу, при помилці — повертаємо збережене. */
+  protected readonly viewModes = VIEW_MODES;
+  protected readonly defaultView = linkedSignal(() => this.me()?.defaultView ?? 'player');
+  protected readonly defaultViewBusy = signal(false);
+  protected readonly defaultViewMessage = signal<Message | null>(null);
   protected readonly queryErrorKey = computed(() => {
     const code = this.error();
     if (!code) return null;
@@ -347,6 +357,26 @@ export class AccountSettings {
       }
     } finally {
       this.autoBusyBusy.set(false);
+    }
+  }
+
+  /** Нові вкладки відкриваються в цьому виді; відкриті (і ця) свій вид не змінюють. */
+  protected async setDefaultView(value: ViewMode): Promise<void> {
+    if (this.defaultViewBusy() || value === this.me()?.defaultView) return;
+    this.defaultViewBusy.set(true);
+    this.defaultViewMessage.set(null);
+    this.defaultView.set(value);
+    try {
+      this.auth.setMe(await firstValueFrom(this.api.changeDefaultView(value)));
+      this.defaultViewMessage.set({ kind: 'info', key: 'account.defaultView.saved' });
+    } catch (err) {
+      this.defaultView.set(this.me()?.defaultView ?? 'player');
+      const { code } = toApiError(err);
+      if (code !== 'UNAUTHENTICATED') {
+        this.defaultViewMessage.set({ kind: 'error', key: `errors.${code}` });
+      }
+    } finally {
+      this.defaultViewBusy.set(false);
     }
   }
 

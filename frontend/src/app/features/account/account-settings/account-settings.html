@@ -33,6 +33,38 @@
   <!-- Вигляд: вибір дизайну (коли доступно кілька) і власні налаштування чинного дизайну -->
   <nri-theme-picker />
 
+  <!-- Вид за замовчуванням: з яким видом відкривається нова вкладка -->
+  <section class="nri-card default-view" aria-labelledby="default-view-title">
+    <h2 id="default-view-title">{{ 'account.defaultView.title' | translate }}</h2>
+    <mat-form-field class="default-view-field">
+      <mat-label>{{ 'account.defaultView.label' | translate }}</mat-label>
+      <mat-select
+        [value]="defaultView()"
+        [disabled]="defaultViewBusy()"
+        aria-describedby="default-view-hint"
+        (selectionChange)="setDefaultView($event.value)"
+      >
+        @for (mode of viewModes; track mode) {
+          <mat-option [value]="mode">{{ 'shell.viewMode.' + mode | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <p id="default-view-hint" class="nri-muted hint">
+      {{ 'account.defaultView.hint' | translate }}
+    </p>
+    <div aria-live="polite">
+      @if (defaultViewMessage(); as msg) {
+        <p
+          [class.nri-alert]="msg.kind === 'error'"
+          [class.nri-notice]="msg.kind === 'info'"
+          [attr.role]="msg.kind === 'error' ? 'alert' : null"
+        >
+          {{ msg.key | translate }}
+        </p>
+      }
+    </div>
+  </section>
+
   <!-- Календар: автозайнятість від ігор -->
   <section class="nri-card auto-busy" aria-labelledby="auto-busy-title">
     <h2 id="auto-busy-title">{{ 'account.calendar.title' | translate }}</h2>

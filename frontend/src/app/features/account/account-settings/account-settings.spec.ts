@@ -183,6 +183,53 @@ describe('AccountSettings nickname', () => {
     });
   });
 
+  describe('default view', () => {
+    const select = () => el.querySelector<HTMLElement>('.default-view mat-select')!;
+    const pick = async (label: string) => {
+      fixture.detectChanges();
+      select().querySelector<HTMLElement>('.mat-mdc-select-trigger')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const panel = document.getElementById(select().getAttribute('aria-controls')!)!;
+      const options = [...panel.querySelectorAll<HTMLElement>('mat-option')];
+      expect(options.map((o) => o.textContent!.trim())).toEqual([
+        'shell.viewMode.player',
+        'shell.viewMode.gm',
+      ]);
+      options.find((o) => o.textContent!.trim() === label)!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it('shows the saved default; picking another PATCHes /api/me/default-view and refreshes me()', async () => {
+      fixture.detectChanges();
+      expect(select().textContent).toContain('shell.viewMode.player');
+      await pick('shell.viewMode.gm');
+      const req = http.expectOne('/api/me/default-view');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ defaultView: 'gm' });
+      req.flush({ ...me, defaultView: 'gm' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(auth.me()?.defaultView).toBe('gm');
+      expect(el.querySelector('.default-view')!.textContent).toContain('account.defaultView.saved');
+    });
+
+    it('a failed PATCH reverts the choice and shows the error', async () => {
+      await pick('shell.viewMode.gm');
+      http
+        .expectOne('/api/me/default-view')
+        .flush({ error: { code: 'INTERNAL' } }, { status: 500, statusText: 'Server Error' });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(select().textContent).toContain('shell.viewMode.player');
+      expect(auth.me()?.defaultView).toBe('player');
+      expect(el.querySelector('.default-view [role=alert]')!.textContent).toContain(
+        'errors.INTERNAL',
+      );
+    });
+  });
+
   describe('time zone', () => {
     const tzInput = () =>
       el.querySelector<HTMLInputElement>('form.timezone input[name="timezone"]')!;
