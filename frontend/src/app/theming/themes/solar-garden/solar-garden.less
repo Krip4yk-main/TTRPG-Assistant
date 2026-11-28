@@ -35,8 +35,7 @@
 //     на сторінці без кнопок дій — інакше заступило б їх).
 //   Стіна: лоза — шар фону `.sc-wall` (≥ 600px).
 //   Шапка: стрічка сонячних панелей — `.top.sc-bar::before`.
-//   Обкладинка: гілочка — `.attach::before`; підпис «ОБКЛАДИНКА» (uk.json, спільний `.cap`) — на
-//     нижньому полі рамки.
+//   Обкладинка: гілочка — `.attach::before`.
 //   «Мої ігри»: корінець — смуга кнопок дій `.actions`.
 //   data-neon (варіант картки): колір корони (м'який відтінок, --sc-n-core) і рядка системи,
 //     ініціала майстра (--sc-n-text): фіалка, малина, морська хвиля, мед, зелень, теракота.
@@ -755,21 +754,6 @@
         background: @sg-twig 0 0 / 100% 100% no-repeat;
         pointer-events: none;
       }
-    }
-
-    .cap {
-      position: absolute;
-      right: 0;
-      bottom: 3px;
-      left: 0;
-      display: block;
-      color: #55654e;
-      font: 700 0.625rem/1.4 var(--sc-font-body);
-      letter-spacing: 0.14em;
-      text-align: center;
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
     }
   }
 

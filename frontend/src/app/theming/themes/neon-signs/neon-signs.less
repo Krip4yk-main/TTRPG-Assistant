@@ -494,9 +494,7 @@
         pointer-events: none;
       }
 
-      // Відблиск і відсвіт неону гри на папері (screen-змішування лягає й на підпис
-      // «ОБКЛАДИНКА» — він декоративний, aria-hidden; ім'я вкладення — в aria-label кнопки, а
-      // контраст підпису в спокої — у шапці файлу, на притемненому папері 4.9).
+      // Відблиск і відсвіт неону гри на папері (screen-змішування).
       &::after {
         content: '';
         position: absolute;
@@ -511,23 +509,6 @@
         mix-blend-mode: screen;
         pointer-events: none;
       }
-    }
-
-    // Підпис на нижньому полі постера.
-    .cap {
-      position: absolute;
-      right: 8px;
-      bottom: 2px;
-      left: 8px;
-      display: block;
-      overflow: hidden;
-      color: #3a3040;
-      font: 700 0.5625rem/14px var(--sc-font-mono);
-      letter-spacing: 0.06em;
-      text-align: left;
-      text-overflow: ellipsis;
-      text-transform: uppercase;
-      white-space: nowrap;
     }
   }
 
