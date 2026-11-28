@@ -230,6 +230,8 @@ export interface AdminUserDto {
   role: UserRole;
   status: 'pending' | 'active' | 'deleted';
   isBanned: boolean;
+  /** Чи прив'язаний Telegram (персонал без нього — позначка «Без Telegram», План 20). */
+  hasTelegram: boolean;
   createdAt: string;
   sanctions: SanctionDto[];
   /** Скарги на цю людину; `reporter` прихований для модераторів. */
@@ -330,6 +332,8 @@ export interface AdminUserListItemDto {
   role: UserRole;
   status: 'active' | 'deleted';
   isBanned: boolean;
+  /** Чи прив'язаний Telegram (персонал без нього — позначка «Без Telegram», План 20). */
+  hasTelegram: boolean;
 }
 
 /**

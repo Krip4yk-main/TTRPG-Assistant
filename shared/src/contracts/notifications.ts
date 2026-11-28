@@ -58,7 +58,10 @@ export type SiteOptionalCategory = (typeof SITE_OPTIONAL_CATEGORIES)[number];
  * `startsAt`, назва гри); анонімно — без `actor` і без жодних даних про того, хто натиснув;
  * термінове: тихі години не затримують і звук не вимикають. Відгуки про сайт (не з
  * подій, `moderation`; на dev — звіти тестерів, на prod — відгуки користувачів): `tester.report` — власнику платформи на кожен новий звіт
- * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Текст — `notifications.<type>`.
+ * (без параметрів); лише на сайті (`SITE_ONLY_TYPES`). Персонал без Telegram (не з подій,
+ * `moderation`, План 20): `staff.telegram_required` — модератору/адміну/власнику без прив'язаного
+ * Telegram, один раз назавжди: прив'язати Telegram (без параметрів, лише на сайті). Текст —
+ * `notifications.<type>`.
  */
 export const NOTIFICATION_TYPES = [
   'application.created',
@@ -106,11 +109,15 @@ export const NOTIFICATION_TYPES = [
   'calendar.empty',
   'calendar.import_broken',
   'tester.report',
+  'staff.telegram_required',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** Типи лише для сайту: у Telegram не ставляться (службові сповіщення тестового сервера). */
-export const SITE_ONLY_TYPES: readonly NotificationType[] = ['tester.report'];
+export const SITE_ONLY_TYPES: readonly NotificationType[] = [
+  'tester.report',
+  'staff.telegram_required',
+];
 
 /** Дозволені офсети нагадувань, хвилини до початку сесії: 15 хв, 1 год, 3 год, 24 год, 48 год. */
 export const REMINDER_OFFSETS = [15, 60, 180, 1440, 2880] as const;
@@ -325,6 +332,8 @@ export function notificationLink(type: NotificationType, p: NotificationParams):
   if (type === 'moderation.digest') return '/admin/complaints';
   if (type === 'complaint.resolved') return '/';
   if (type === 'tester.report') return '/admin/tester-reports';
+  // Персонал без Telegram — до налаштувань акаунта (там прив'язується Telegram).
+  if (type === 'staff.telegram_required') return '/account';
   // Санкції — сторінка «Обмеження акаунта» (фронтенд, Task 5).
   if (type === 'sanction.imposed' || type === 'sanction.lifted' || type === 'appeal.decided') {
     return '/my-sanctions';

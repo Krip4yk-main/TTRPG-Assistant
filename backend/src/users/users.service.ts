@@ -328,7 +328,7 @@ export async function unlinkIdentity(
   await db.transaction(async (tx) => {
     // Лок рядка користувача серіалізує паралельні відв'язування.
     const [u] = await tx
-      .select({ isBanned: users.isBanned })
+      .select({ isBanned: users.isBanned, role: users.role })
       .from(users)
       .where(eq(users.id, userId))
       .for('update');
@@ -342,6 +342,11 @@ export async function unlinkIdentity(
       .where(eq(authIdentities.userId, userId));
     const target = rows.find((r) => r.provider === provider);
     if (!target) throw new AppError(404, 'NOT_FOUND');
+    // Персонал — лише з Telegram (План 20): спершу зняти роль. Лок рядка `users` вище серіалізує
+    // це з призначенням ролі (`changeRole` блокує той самий рядок).
+    if (provider === 'telegram' && u && u.role !== 'user') {
+      throw new AppError(409, 'TELEGRAM_REQUIRED_FOR_STAFF');
+    }
     if (rows.length <= 1) throw new AppError(409, 'LAST_IDENTITY');
     // Надгробок на кожне відв'язування: бан (зараз чи пізніше) закриває цій ідентичності
     // повторну реєстрацію й прив'язку (ухилення від бану).

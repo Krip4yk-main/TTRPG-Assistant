@@ -53,6 +53,10 @@ export const ERROR_CODES = [
   'SANCTION_ACTIVE',
   'SANCTION_NOT_ACTIVE',
   'OWNER_TRANSFER_INVALID',
+  /** Призначити персонал (чи передати власність) можна лише користувачу з прив'язаним Telegram. */
+  'TELEGRAM_REQUIRED',
+  /** Персонал не може відв'язати Telegram, доки має роль. */
+  'TELEGRAM_REQUIRED_FOR_STAFF',
   'APPEAL_DECIDED',
   'RATING_ALREADY_MODERATED',
   'GAME_CREATION_BLOCKED',

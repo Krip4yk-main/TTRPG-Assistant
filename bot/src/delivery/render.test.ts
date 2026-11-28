@@ -29,6 +29,7 @@ describe('renderNotification', () => {
     'calendar.import_broken',
     // Лише на сайті (у Telegram не ставиться), без гри.
     'tester.report',
+    'staff.telegram_required',
   ];
   const gameTypes = NOTIFICATION_TYPES.filter((k) => !MODERATION.includes(k));
 

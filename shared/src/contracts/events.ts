@@ -14,6 +14,11 @@ export const EVENT_TYPES = [
   'identity.unlinked',
   /** Вхід тестера на беті за кодом доступу (payload: мітка й номер коду, без самого коду). */
   'auth.dev_login',
+  /**
+   * Власника призначено автоматично: перевірений вхід чи прив'язка Telegram з id =
+   * `OWNER_TELEGRAM_ID`, коли власника ще не було (payload: `{ via: 'login' | 'link' }`).
+   */
+  'user.owner_bootstrapped',
   'profile.updated',
   'availability.updated',
   // ігри

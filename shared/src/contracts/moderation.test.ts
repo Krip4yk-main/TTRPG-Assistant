@@ -47,6 +47,8 @@ describe('moderation constants', () => {
       'OWNER_TRANSFER_INVALID',
       'APPEAL_DECIDED',
       'RATING_ALREADY_MODERATED',
+      'TELEGRAM_REQUIRED',
+      'TELEGRAM_REQUIRED_FOR_STAFF',
     ]) {
       expect(ERROR_CODES).toContain(code);
     }

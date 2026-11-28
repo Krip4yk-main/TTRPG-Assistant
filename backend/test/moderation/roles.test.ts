@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
-import { complaints, moderationLog, users } from '../../src/db/schema/index.js';
+import { authIdentities, complaints, moderationLog, users } from '../../src/db/schema/index.js';
 import { ROLE_RANK } from '../../src/moderation/permissions.js';
 import { imposeSanction } from '../../src/moderation/sanctions.service.js';
 import { deleteAccount } from '../../src/users/users.service.js';
@@ -27,8 +27,14 @@ const ROLES: Role[] = ['user', 'moderator', 'admin', 'owner'];
 const ASSIGNABLE = ['user', 'moderator', 'admin'] as const;
 
 let seq = 0;
-async function user(role: Role = 'user', nickname = `N${++seq}`) {
+/** Користувач із прив'язаним Telegram (персонал — лише з ним, План 20); `telegram: false` — без. */
+async function user(role: Role = 'user', nickname = `N${++seq}`, { telegram = true } = {}) {
   const u = await createUser(db, { nickname, role, birthDate: bornYearsAgo(30) });
+  if (telegram) {
+    await db
+      .insert(authIdentities)
+      .values({ userId: u.id, provider: 'telegram', subject: `tg-${u.id}` });
+  }
   return { ...u, cookie: await login(u.id) };
 }
 const roleOf = async (id: number) =>
@@ -107,6 +113,36 @@ describe('RF 1 — PUT /api/admin/users/:publicId/role', () => {
     expect((await call('get', '/api/admin/appeals', mod.cookie)).status).toBe(200);
   });
 
+  it('staff only with Telegram: assigning moderator/admin without it → 409, removing the role is fine', async () => {
+    const owner = await user('owner');
+    const admin = await user('admin');
+    const plain = await user('user', 'NoTg', { telegram: false });
+    for (const [actor, next] of [
+      [admin, 'moderator'],
+      [owner, 'moderator'],
+      [owner, 'admin'],
+    ] as const) {
+      const res = await setRole(actor.cookie, plain.publicId, next);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('TELEGRAM_REQUIRED');
+    }
+    expect(await roleOf(plain.id)).toBe('user');
+    expect(await db.select().from(moderationLog)).toEqual([]);
+    // Наявний персонал без Telegram: роль не знімається сама, але зняти її можна…
+    const legacyMod = await user('moderator', 'LegacyMod', { telegram: false });
+    const legacyAdmin = await user('admin', 'LegacyAdmin', { telegram: false });
+    // …а підвищити/змінити на іншу роль персоналу — ні.
+    expect((await setRole(owner.cookie, legacyMod.publicId, 'admin')).status).toBe(409);
+    expect((await setRole(owner.cookie, legacyAdmin.publicId, 'moderator')).status).toBe(409);
+    // Та сама роль — як і раніше без змін і без помилки.
+    expect((await setRole(owner.cookie, legacyMod.publicId, 'moderator')).status).toBe(200);
+    expect((await setRole(owner.cookie, legacyMod.publicId, 'user')).status).toBe(200);
+    expect(await roleOf(legacyMod.id)).toBe('user');
+    // Прав на ціль немає — 403 раніше за 409 (не розкриваємо, чи є Telegram).
+    const mod = await user('moderator');
+    expect((await setRole(mod.cookie, plain.publicId, 'moderator')).status).toBe(403);
+  });
+
   it('the actor role is read from the DB, not the cached session', async () => {
     const admin = await user('admin');
     const u = await user();
@@ -164,6 +200,17 @@ describe('POST /api/admin/owner/transfer', () => {
     expect(gone!.status).toBe('deleted');
   });
 
+  it('an admin without Telegram cannot become the owner (409 TELEGRAM_REQUIRED)', async () => {
+    const owner = await user('owner');
+    const admin = await user('admin', 'NoTg', { telegram: false });
+    const res = await transfer(owner.cookie, admin.publicId, 'NoTg');
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('TELEGRAM_REQUIRED');
+    expect(await roleOf(owner.id)).toBe('owner');
+    expect(await roleOf(admin.id)).toBe('admin');
+    expect(await db.select().from(moderationLog)).toEqual([]);
+  });
+
   it('a banned admin cannot become the owner', async () => {
     const owner = await user('owner');
     const admin = await user('admin', 'Banned');
@@ -189,6 +236,7 @@ describe('admin users: search and card', () => {
       role: 'user',
       status: 'active',
       isBanned: false,
+      hasTelegram: true,
     });
     const byId = await call('get', `/api/admin/users?q=${a.publicId}`, mod.cookie);
     expect(byId.body.items.map((u: { publicId: string }) => u.publicId)).toEqual([a.publicId]);
@@ -197,6 +245,24 @@ describe('admin users: search and card', () => {
     expect(page.body.items).toHaveLength(2);
     expect(page.body.nextCursor).not.toBeNull();
     expect((await call('get', '/api/admin/users', a.cookie)).status).toBe(403);
+  });
+
+  it('hasTelegram flag in the list and the card (staff without Telegram are flagged)', async () => {
+    const owner = await user('owner', 'Boss');
+    const legacy = await user('admin', 'LegacyAdmin', { telegram: false });
+    const list = await call('get', '/api/admin/users', owner.cookie);
+    const flags = Object.fromEntries(
+      list.body.items.map((u: { nickname: string; hasTelegram: boolean }) => [
+        u.nickname,
+        u.hasTelegram,
+      ]),
+    );
+    expect(flags).toEqual({ Boss: true, LegacyAdmin: false });
+    const card = await call('get', `/api/admin/users/${legacy.publicId}`, owner.cookie);
+    expect(card.body).toMatchObject({ role: 'admin', hasTelegram: false });
+    expect(
+      (await call('get', `/api/admin/users/${owner.publicId}`, owner.cookie)).body,
+    ).toMatchObject({ hasTelegram: true });
   });
 
   it('card: role, sanctions, complaints — reporter hidden from moderators, shown to admins', async () => {

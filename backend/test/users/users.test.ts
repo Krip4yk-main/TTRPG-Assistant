@@ -584,6 +584,30 @@ describe('DELETE /api/me/identities/:provider', () => {
     expect(ok.body.identities).toEqual([{ provider: 'google', displayName: null }]);
   });
 
+  it.each(['moderator', 'admin', 'owner'] as const)(
+    '%s cannot unlink Telegram (409 TELEGRAM_REQUIRED_FOR_STAFF) until the role is removed',
+    async (role) => {
+      const u = await createUser(db, { nickname: 'Staff', role });
+      await db.insert(authIdentities).values([
+        { userId: u.id, provider: 'telegram', subject: 't' },
+        { userId: u.id, provider: 'google', subject: 'g' },
+      ]);
+      const cookie = await login(u.id);
+      const res = await call('delete', '/api/me/identities/telegram', cookie);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('TELEGRAM_REQUIRED_FOR_STAFF');
+      expect(
+        await db.select().from(authIdentities).where(eq(authIdentities.userId, u.id)),
+      ).toHaveLength(2);
+      // Інші способи входу персонал відв'язує як звичайно.
+      expect((await call('delete', '/api/me/identities/google', cookie)).status).toBe(200);
+      await db.insert(authIdentities).values({ userId: u.id, provider: 'google', subject: 'g' });
+      // Роль знято — Telegram відв'язується.
+      await db.update(users).set({ role: 'user' }).where(eq(users.id, u.id));
+      expect((await call('delete', '/api/me/identities/telegram', cookie)).status).toBe(200);
+    },
+  );
+
   it('404 when not linked, 400 for unknown provider', async () => {
     const u = await createUser(db, { nickname: 'Hero' });
     await db.insert(authIdentities).values({ userId: u.id, provider: 'telegram', subject: 't' });
@@ -708,6 +732,21 @@ describe('DELETE /api/me', () => {
     expect(res.body.error.code).toBe('OWNER_CANNOT_DELETE');
     const [row] = await db.select().from(users).where(eq(users.id, u.id));
     expect(row!.status).toBe('active');
+  });
+
+  it('staff ⇒ Telegram holds on deletion: a deleted moderator/admin loses the role with the identities', async () => {
+    for (const role of ['moderator', 'admin'] as const) {
+      const u = await createUser(db, { nickname: `Del${role}`, role });
+      await db
+        .insert(authIdentities)
+        .values({ userId: u.id, provider: 'telegram', subject: `del-${role}` });
+      await deleteAccount(deps, u.id);
+      const [row] = await db.select().from(users).where(eq(users.id, u.id));
+      expect(row).toMatchObject({ status: 'deleted', role: 'user' });
+      expect(await db.select().from(authIdentities).where(eq(authIdentities.userId, u.id))).toEqual(
+        [],
+      );
+    }
   });
 
   it('re-deleting an identity keeps an earlier ban', async () => {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, ne, or, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, like, ne, or, gt, sql } from 'drizzle-orm';
 import {
   adminUsersQuerySchema,
   ownerTransferSchema,
@@ -9,7 +9,7 @@ import {
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { evictUserSessionCache } from '../auth/session.service.js';
-import { sanctions, users } from '../db/schema/index.js';
+import { authIdentities, sanctions, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { complaintsAboutUser, complaintVisibleTo, type StaffViewer } from './complaints.service.js';
 import { writeLog } from './log.js';
@@ -17,6 +17,32 @@ import { assertCan, assertCanActOn, type Role } from './permissions.js';
 import { runAfterCommit, sanctionDto } from './sanctions.service.js';
 
 type Deps = Pick<AppDeps, 'db' | 'redis' | 'env'> & Partial<Pick<AppDeps, 'realtime'>>;
+type DbLike = Pick<AppDeps['db'], 'select'>;
+
+// ---------- персонал ⇒ Telegram (План 20) ----------
+
+/** SQL-умова «у користувача (колонка `userIdCol`) прив'язаний Telegram». */
+export function telegramLinked(db: DbLike, userIdCol: typeof users.id) {
+  return exists(
+    db
+      .select({ x: sql`1` })
+      .from(authIdentities)
+      .where(and(eq(authIdentities.userId, userIdCol), eq(authIdentities.provider, 'telegram'))),
+  );
+}
+
+/**
+ * Чи прив'язаний Telegram. У транзакції зміни ролі — після X-локу рядка `users` цілі: відв'язка
+ * (`unlinkIdentity`) блокує той самий рядок, тож роль і Telegram не розходяться.
+ */
+export async function hasTelegram(db: DbLike, userId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: authIdentities.id })
+    .from(authIdentities)
+    .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, 'telegram')))
+    .limit(1);
+  return row !== undefined;
+}
 
 // ---------- пошук і картка ----------
 
@@ -43,6 +69,7 @@ export async function searchUsers(
       role: users.role,
       status: users.status,
       isBanned: users.isBanned,
+      hasTelegram: telegramLinked(deps.db, users.id),
     })
     .from(users)
     .where(
@@ -63,6 +90,8 @@ export async function searchUsers(
       role: r.role,
       status: r.status as AdminUserListItemDto['status'],
       isBanned: r.isBanned,
+      // MySQL віддає EXISTS числом 0/1.
+      hasTelegram: Boolean(Number(r.hasTelegram)),
     })),
     nextCursor: rows.length > limit ? page[page.length - 1]!.id : null,
   };
@@ -100,6 +129,7 @@ export async function adminUserCard(
     role: u.role,
     status: u.status,
     isBanned: u.isBanned,
+    hasTelegram: await hasTelegram(deps.db, u.id),
     createdAt: u.createdAt.toISOString(),
     sanctions: list,
     complaints: await complaintsAboutUser(deps.db, viewer, u.id),
@@ -113,7 +143,8 @@ export async function adminUserCard(
  * призначити/зняти модератора — адмін+ (`roles.moderator`), адміна — лише власник
  * (`roles.admin`); ціль — лише з нижчою роллю (`assertCanActOn`: себе, рівного чи вищого не
  * можна; власника — лише передачею). Та сама роль — без змін і без журналу. Після коміту —
- * скидання кешу сесій цілі: нова роль діє з наступного запиту.
+ * скидання кешу сесій цілі: нова роль діє з наступного запиту. Призначити модератора чи адміна
+ * можна лише цілі з прив'язаним Telegram — інакше 409 `TELEGRAM_REQUIRED` (План 20).
  */
 export async function changeRole(
   deps: Deps,
@@ -152,6 +183,10 @@ export async function changeRole(
     assertCanActOn(role, t.role);
     if (next === 'admin' || t.role === 'admin') assertCan(role, 'roles.admin');
     if (t.role === next) return { targetId: t.id, changed: false };
+    // Персонал — лише з Telegram (План 20); зняти роль (→ user) можна завжди.
+    if (next !== 'user' && !(await hasTelegram(tx, t.id))) {
+      throw new AppError(409, 'TELEGRAM_REQUIRED');
+    }
     await tx.update(users).set({ role: next }).where(eq(users.id, t.id));
     await writeLog(tx, {
       actorId,
@@ -179,7 +214,8 @@ const sameNickname = (a: string, b: string | null) =>
  * Ціль — чинний адмін (активний, не забанений), нік підтверджено (без регістру); інакше 400
  * `OWNER_TRANSFER_INVALID` (`details.reason`: `NOT_ADMIN` | `NICKNAME_MISMATCH`). Ціль стає
  * власником, колишній власник — адміном (і далі може видалити акаунт). Обидва рядки — під
- * X-локом у порядку id. Журнал `owner.transfer`; після коміту — скидання кешу сесій обох.
+ * X-локом у порядку id. Ціль без прив'язаного Telegram — 409 `TELEGRAM_REQUIRED` (План 20).
+ * Журнал `owner.transfer`; після коміту — скидання кешу сесій обох.
  */
 export async function transferOwner(
   deps: Deps,
@@ -218,6 +254,8 @@ export async function transferOwner(
     if (!sameNickname(confirmNickname, t.nickname)) {
       throw new AppError(400, 'OWNER_TRANSFER_INVALID', { reason: 'NICKNAME_MISMATCH' });
     }
+    // Новий власник — лише з Telegram (План 20; адмін без нього — дані до цього правила).
+    if (!(await hasTelegram(tx, t.id))) throw new AppError(409, 'TELEGRAM_REQUIRED');
     await tx.update(users).set({ role: 'owner' }).where(eq(users.id, t.id));
     await tx.update(users).set({ role: 'admin' }).where(eq(users.id, actorId));
     await writeLog(tx, {
