@@ -26,6 +26,7 @@ import { firstValueFrom, map } from 'rxjs';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { AvailabilityApi } from '../../../core/availability/availability.api';
 import { CalendarApi } from '../../../core/calendar/calendar.api';
+import { formatHours } from '../../../core/i18n/duration';
 import { browserTimeZone, fromIsoDate, provideUkDates, toIsoDate } from '../../../core/i18n/dates';
 import {
   CELLS_PER_DAY,
@@ -216,6 +217,7 @@ export class AvailabilityEditor {
     );
   });
   protected readonly selectedCount = computed(() => this.cells().filter(Boolean).length);
+  protected readonly selectedHours = computed(() => formatHours(this.selectedCount() * 30));
   protected readonly dirty = computed(() => this.serialize() !== this.snapshot());
 
   constructor() {

@@ -156,7 +156,7 @@
         </div>
       </div>
       <p class="nri-muted count" aria-live="polite">
-        {{ 'calendar.selected' | translate: { hours: selectedCount() / 2 } }}
+        {{ 'calendar.selected' | translate: { hours: selectedHours() } }}
       </p>
       @if (!custom) {
         <ul class="legend">

@@ -267,6 +267,7 @@ function dateFromStored(x: unknown): Date | null | undefined {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GameForm {
+  private readonly document = inject(DOCUMENT);
   private readonly api = inject(GamesApi);
   private readonly catalogStore = inject(CatalogStore);
   private readonly auth = inject(AuthStore);
@@ -541,6 +542,11 @@ export class GameForm {
       control.markAsDirty();
       control.markAsTouched();
     }
+  }
+
+  /** Втрата фокусу вікна (alt-tab) теж дає blur — напівнабраний текст тоді не додаємо. */
+  protected addCustomOnBlur(): void {
+    if (this.document.hasFocus()) this.addCustomWarning();
   }
 
   protected addCustomWarning(): void {

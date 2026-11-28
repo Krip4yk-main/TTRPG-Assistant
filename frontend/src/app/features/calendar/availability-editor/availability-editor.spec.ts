@@ -2,7 +2,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateService, TranslateService } from '@ngx-translate/core';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, of } from 'rxjs';
@@ -199,6 +199,15 @@ describe('AvailabilityEditor', () => {
     await settle();
     http.expectNone('/api/me');
     expect(emitted).toEqual([saved]);
+  });
+
+  it('the weekly total uses a decimal comma', async () => {
+    await setup('save', { ...empty, slots: [{ weekday: 2, startMin: 600, endMin: 810 }] });
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('uk', { calendar: { selected: '{{hours}} год' } });
+    translate.use('uk');
+    await settle();
+    expect(el().querySelector('.count')!.textContent!.trim()).toBe('3,5 год');
   });
 
   it('dragging over selected cells clears them', async () => {

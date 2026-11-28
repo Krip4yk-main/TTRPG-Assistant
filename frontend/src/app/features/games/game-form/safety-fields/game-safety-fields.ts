@@ -1,9 +1,11 @@
+import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
   effect,
   input,
+  inject,
   output,
   signal,
   untracked,
@@ -63,6 +65,7 @@ const OTHER: Record<SafetyKind, SafetyKind> = { lines: 'veils', veils: 'lines' }
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GameSafetyFields {
+  private readonly document = inject(DOCUMENT);
   readonly tools = input.required<readonly SafetyTool[]>();
   readonly lines = input.required<SafetyList>();
   readonly veils = input.required<SafetyList>();
@@ -141,6 +144,11 @@ export class GameSafetyFields {
         ? { ...other, warningIds: other.warningIds.filter((x) => x !== id) }
         : undefined,
     );
+  }
+
+  /** Втрата фокусу вікна (alt-tab) теж дає blur — напівнабраний текст тоді не додаємо. */
+  protected addCustomOnBlur(kind: SafetyKind): void {
+    if (this.document.hasFocus()) this.addCustom(kind);
   }
 
   /** Власне формулювання: обрізане, без повторів (без урахування регістру), до 10 у списку. */

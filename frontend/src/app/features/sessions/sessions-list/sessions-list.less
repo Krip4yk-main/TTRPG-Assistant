@@ -176,8 +176,12 @@ h3 {
       grid-column: 1 / -1;
     }
 
+    /* Порожній підпис лишається в дереві доступності (live region), але не займає місця. */
     > .x-card-sent:empty {
-      display: none;
+      height: 0;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
     }
   }
 }

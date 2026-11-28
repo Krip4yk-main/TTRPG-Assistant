@@ -733,6 +733,24 @@ describe('GameForm', () => {
       expect(q<HTMLInputElement>('input.custom-warning-input').value).toBe('');
     });
 
+    it('blur while the window has lost focus (alt-tab) adds nothing', async () => {
+      await setup();
+      const spy = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+      try {
+        for (const sel of [`${kind('lines')} input.custom-input`, 'input.custom-warning-input']) {
+          const input = q<HTMLInputElement>(sel);
+          input.value = 'Напівнабране';
+          input.dispatchEvent(new Event('input'));
+          input.dispatchEvent(new Event('blur'));
+          await settle();
+          expect(input.value).toBe('Напівнабране');
+        }
+        expect(el.querySelectorAll('.custom-chip')).toHaveLength(0);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('a new game: the section is collapsed and nothing is required', async () => {
       await setup();
       expect(details().open).toBe(false);

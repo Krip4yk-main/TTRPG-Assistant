@@ -498,7 +498,7 @@
               [formControl]="newCustomWarning"
               maxlength="60"
               (keydown.enter)="$event.preventDefault(); addCustomWarning()"
-              (blur)="addCustomWarning()"
+              (blur)="addCustomOnBlur()"
             />
           </mat-form-field>
           <button
