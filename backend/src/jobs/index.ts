@@ -15,6 +15,11 @@ import {
 } from '../games/dead-games/long-pause.js';
 import { DIGEST_EVERY_MS, DIGEST_JOB, sendModerationDigest } from '../moderation/digest.js';
 import {
+  runStaffTelegramReminders,
+  STAFF_TELEGRAM_EVERY_MS,
+  STAFF_TELEGRAM_JOB,
+} from '../moderation/staff-telegram.js';
+import {
   EXPIRE_EVERY_MS,
   EXPIRE_JOB,
   expireSanctions,
@@ -133,4 +138,10 @@ export function registerJobs(): void {
     await runApplicationsHousekeeping(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
   });
   registerRecurring(APPLICATIONS_HOUSEKEEPING_JOB, { everyMs: APPLICATIONS_HOUSEKEEPING_EVERY_MS });
+
+  // Персонал без Telegram: одне сповіщення «прив'яжи Telegram» назавжди (умовний UPDATE).
+  registerHandler(STAFF_TELEGRAM_JOB, async (deps, _payload, job) => {
+    await runStaffTelegramReminders(deps, new Date(Math.max(Date.now(), job.runAt.getTime())));
+  });
+  registerRecurring(STAFF_TELEGRAM_JOB, { everyMs: STAFF_TELEGRAM_EVERY_MS });
 }

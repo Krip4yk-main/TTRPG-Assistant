@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `staff_telegram_reminded_at` datetime;

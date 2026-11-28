@@ -37,6 +37,11 @@ export const users = mysqlTable('users', {
   role: mysqlEnum('role', ['owner', 'admin', 'moderator', 'user']).notNull().default('user'),
   status: mysqlEnum('status', ['pending', 'active', 'deleted']).notNull().default('pending'),
   isBanned: boolean('is_banned').notNull().default(false),
+  /**
+   * Коли персоналу без Telegram надіслано сповіщення `staff.telegram_required` (План 20); NULL —
+   * ще ні. Ставиться в транзакції зі сповіщенням умовним UPDATE — рівно один раз назавжди.
+   */
+  staffTelegramRemindedAt: datetime('staff_telegram_reminded_at'),
   /** Лічильник періодів бану (кожен новий бан — `+1`). */
   banEpoch: int('ban_epoch').notNull().default(0),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Kyiv'),
