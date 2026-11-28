@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { PublicConfigDto } from '@nri/shared';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 
 /** Поки конфіг не завантажено (або запит не вдався) — усе вимкнено. */
 const EMPTY: PublicConfigDto = {
@@ -68,7 +68,9 @@ export class PublicConfigStore {
 
   private async fetch(): Promise<void> {
     try {
-      const raw = await firstValueFrom(this.http.get<unknown>('/api/public-config'));
+      const raw = await firstValueFrom(
+        this.http.get<unknown>('/api/public-config').pipe(timeout(10000)),
+      );
       this.state.set(parsePublicConfig(raw));
       this.loadedFlag.set(true);
       this.failedFlag.set(false);

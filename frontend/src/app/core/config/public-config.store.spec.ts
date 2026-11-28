@@ -58,6 +58,20 @@ describe('PublicConfigStore', () => {
     expect(store.failed()).toBe(false);
   });
 
+  it('fails a hanging request after 10 s so the retry UI can appear', async () => {
+    vi.useFakeTimers();
+    try {
+      const p = store.ensureLoaded();
+      http.expectOne('/api/public-config');
+      await vi.advanceTimersByTimeAsync(10_001);
+      await p;
+      expect(store.loaded()).toBe(false);
+      expect(store.failed()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores a malformed response', async () => {
     const p = store.ensureLoaded();
     http.expectOne('/api/public-config').flush({ nope: 1 });

@@ -322,6 +322,8 @@
     },
     "identities": {
       "title": "Способи входу",
+      "configUnavailable": "Сервіс тимчасово недоступний, тож кнопки прив’язки не завантажились.",
+      "configRetry": "Спробувати ще раз",
       "unlink": "Відв’язати",
       "unlinkAria": "Відв’язати {{provider}}",
       "linkTelegram": "Прив’язати Telegram",

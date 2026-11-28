@@ -143,6 +143,18 @@ export class AccountSettings {
   protected readonly maxBirthDate = new Date();
   protected readonly errorState = eagerErrorState;
 
+  protected async retryConfig(): Promise<void> {
+    if (this.retrying()) return;
+    this.retrying.set(true);
+    try {
+      await this.publicConfig.ensureLoaded();
+    } finally {
+      this.retrying.set(false);
+    }
+  }
+
+  protected readonly configFailed = this.publicConfig.failed;
+  protected readonly retrying = signal(false);
   protected readonly busy = signal(false);
   protected readonly identityMessage = signal<Message | null>(null);
   protected readonly telegramPending = signal(false);

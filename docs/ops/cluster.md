@@ -20,7 +20,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
 | `ttrpg-backend`  | API + воркер джобів (один процес), WebSocket `/socket.io`; той самий образ — для Job-а міграцій | 3000 | [`backend/.env.template`](../../backend/.env.template) |
 | `ttrpg-bot`      | Telegram-бот (long polling, порти не слухає); ходить у бекенд по внутрішньому API               | —    | [`bot/.env.template`](../../bot/.env.template)         |
-| `ttrpg-frontend` | nginx зі статикою SPA (`nginx-unprivileged`); налаштування фронтенду — з бекенду                | 8080 | не потрібен (але змінна `DEPLOY_ENV`, див. нижче)      |
+| `ttrpg-frontend` | nginx зі статикою SPA (`nginx-unprivileged`); налаштування фронтенду — з бекенду                | 8080 | не потрібен (змінні не потрібні, див. нижче)           |
 | `ttrpg-backup`   | планувальник бекапів БД (довго працюючий процес); див. «Бекапи»                                 | —    | `BACKUP_*` з [`.env.template`](../../.env.template)    |
 
 Усі процеси працюють не від root. Запускайте з init-процесом (`--init` / tini), щоб сигнали та зомбі оброблялися коректно.
@@ -47,7 +47,7 @@ backup: sha256:<64 hex>
 
 - **backend** — [`backend/.env.template`](../../backend/.env.template). Обов'язково: `NODE_ENV=production`, `DEPLOY_ENV=dev` (бета) або `prod`, `PUBLIC_BASE_URL=https://…` (інакше бекенд не стартує), `DATABASE_URL`, `REDIS_URL`, `IDENTITY_PEPPER`, `INTERNAL_API_KEY`, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_USERNAME`, `TRUST_PROXY`, `OWNER_TELEGRAM_ID` (див. [deploy.md](deploy.md#перший-власник-платформи)). Необов'язково: `GOOGLE_*`, `DISCORD_*` (кнопки входу з'являться самі), `CALENDAR_IMPORT_KEY`.
 - **bot** — [`bot/.env.template`](../../bot/.env.template): `TELEGRAM_BOT_TOKEN`, `BACKEND_INTERNAL_URL` (напр. `http://<сервіс-backend>:3000/api/internal`), `INTERNAL_API_KEY` дослівно як у backend, `PUBLIC_BASE_URL`.
-- **frontend** — `.env` не потрібен, але контейнеру потрібна змінна середовища **`DEPLOY_ENV`**: `dev` на беті (nginx додає `X-Robots-Tag: noindex, nofollow`), `prod` (за замовчуванням в образі) на проді. Це не секрет, одне значення в маніфесті.
+- **frontend** — `.env` і змінні не потрібні: `DEPLOY_ENV` образ бере з гілки під час збірки (`dev` на беті — nginx додає `X-Robots-Tag: noindex, nofollow`; `prod` на проді). Перевизначати змінною `DEPLOY_ENV` у контейнері необов'язково.
 - **backup** — [`.env.template`](../../.env.template) (розділ `BACKUP_*`): див. «Бекапи».
 - **Job міграцій** — той самий `.env`, що й backend.
 
@@ -71,7 +71,7 @@ backup: sha256:<64 hex>
 
 ### Прев'ю посилань, sitemap, robots
 
-Боти прев'ю (Telegram, Discord, Facebook, Twitter, Slack, LinkedIn, WhatsApp) не виконують JS: для сторінок ігор і профілів ingress має віддавати їм мінімальний HTML з OG-метаданими: `/games/<id>` → `/api/og/games/<id>`, `/users/<publicId>` → `/api/og/users/<publicId>`, сторінка спонсорів → `/api/og/sponsors`. Googlebot отримує звичайний SPA. Готові правила для nginx (`map $http_user_agent`) — у [README, «SEO і прев'ю посилань»](../../README.md#seo-і-превю-посилань). `/sitemap.xml` і `/robots.txt` віддає бекенд (на беті — `Disallow: /`).
+Боти прев'ю (Telegram, Discord, Facebook, Twitter, Slack, LinkedIn, WhatsApp) не виконують JS: для сторінок ігор і профілів ingress має віддавати їм мінімальний HTML з OG-метаданими: `/games/<id>` → `/api/og/games/<id>`, `/users/<publicId>` → `/api/og/users/<publicId>`, сторінка спонсорів `/sponsors` → `/api/og/sponsors`. Googlebot отримує звичайний SPA. Готові правила для nginx (`map $http_user_agent`) — у [README, «SEO і прев'ю посилань»](../../README.md#seo-і-превю-посилань). `/sitemap.xml` і `/robots.txt` віддає бекенд (на беті — `Disallow: /`).
 
 ## Міграції
 

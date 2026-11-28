@@ -19,7 +19,9 @@ RUN npm run build -w shared && npm run build -w frontend
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 COPY frontend/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 # Шаблон обробляє entrypoint nginx-образу (envsubst за змінною DEPLOY_ENV).
-ENV DEPLOY_ENV=prod
+# Береться з тієї ж гілки, що й збірка (NG_APP_DEPLOY_ENV); у кластері можна перевизначити змінною DEPLOY_ENV.
+ARG NG_APP_DEPLOY_ENV="prod"
+ENV DEPLOY_ENV=${NG_APP_DEPLOY_ENV}
 COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/frontend/dist/frontend/browser /usr/share/nginx/html
 EXPOSE 8080

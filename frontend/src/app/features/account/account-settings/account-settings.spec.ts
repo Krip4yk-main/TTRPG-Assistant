@@ -314,6 +314,49 @@ describe('AccountSettings Discord identity', () => {
     http.verify();
   });
 
+  it('shows an unavailable note with retry when the public config failed to load', async () => {
+    await TestBed.configureTestingModule({
+      imports: [AccountSettings],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    }).compileComponents();
+    TestBed.inject(AuthStore).setMe({ ...me, identities: me.identities });
+    http = TestBed.inject(HttpTestingController);
+    const store = TestBed.inject(PublicConfigStore);
+    const first = store.ensureLoaded();
+    http.expectOne('/api/public-config').flush('x', { status: 500, statusText: 'x' });
+    await first;
+    const fixture = TestBed.createComponent(AccountSettings);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('account.identities.configUnavailable');
+    el.querySelector<HTMLButtonElement>('button.retry-config')!.click();
+    http.expectOne('/api/public-config').flush({
+      telegramBotUsername: null,
+      providers: { telegram: false, google: false, discord: true },
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('account.identities.configUnavailable');
+  });
+
   it('no «link Discord» button while the flag is off', async () => {
     const el = await render(false, me.identities);
     expect(el.querySelector('a.link-discord')).toBeNull();

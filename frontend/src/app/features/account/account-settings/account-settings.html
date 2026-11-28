@@ -124,6 +124,18 @@
       </p>
     }
 
+    @if (configFailed()) {
+      <p class="nri-alert" role="alert">{{ 'account.identities.configUnavailable' | translate }}</p>
+      <button
+        mat-stroked-button
+        class="retry-config"
+        type="button"
+        [disabled]="retrying()"
+        (click)="retryConfig()"
+      >
+        {{ 'account.identities.configRetry' | translate }}
+      </button>
+    }
     <div class="link-actions">
       @if (canLinkTelegram()) {
         <button mat-flat-button type="button" [disabled]="busy()" (click)="linkTelegram()">
