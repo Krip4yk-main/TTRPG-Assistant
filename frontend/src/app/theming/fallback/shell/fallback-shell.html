@@ -1,7 +1,10 @@
 <a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | translate }}</a>
 
 <header class="bar" role="banner">
-  <a class="brand" routerLink="/">{{ 'app.title' | translate }}</a>
+  <a class="brand" routerLink="/">
+    <nri-brand-mark [size]="24" />
+    <span>{{ 'app.title' | translate }}</span>
+  </a>
   @if (auth.isActive()) {
     @defer (on idle) {
       <nri-rate-link />
