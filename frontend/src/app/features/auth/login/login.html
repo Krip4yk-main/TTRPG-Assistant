@@ -32,7 +32,12 @@
           'login.discord' | translate
         }}</a>
       }
-      @if (!telegramBot() && !googleLogin() && !discordLogin() && !devLoginEnabled()) {
+      @if (configFailed()) {
+        <p class="nri-alert" role="alert">{{ 'login.unavailable' | translate }}</p>
+        <button mat-stroked-button type="button" [disabled]="retrying()" (click)="retryConfig()">
+          {{ 'login.retry' | translate }}
+        </button>
+      } @else if (!telegramBot() && !googleLogin() && !discordLogin() && !devLoginEnabled()) {
         <p class="nri-muted">{{ 'login.noProviders' | translate }}</p>
       }
     </div>

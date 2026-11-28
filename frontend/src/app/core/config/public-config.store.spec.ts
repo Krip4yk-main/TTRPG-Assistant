@@ -46,6 +46,7 @@ describe('PublicConfigStore', () => {
     http.expectOne('/api/public-config').flush('x', { status: 500, statusText: 'x' });
     await first;
     expect(store.loaded()).toBe(false);
+    expect(store.failed()).toBe(true);
     expect(store.googleLogin()).toBe(false);
     const second = store.ensureLoaded();
     http.expectOne('/api/public-config').flush({
@@ -54,6 +55,7 @@ describe('PublicConfigStore', () => {
     });
     await second;
     expect(store.googleLogin()).toBe(true);
+    expect(store.failed()).toBe(false);
   });
 
   it('ignores a malformed response', async () => {

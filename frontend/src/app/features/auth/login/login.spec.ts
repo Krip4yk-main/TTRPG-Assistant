@@ -248,6 +248,48 @@ describe('Login — providers from the public config', () => {
   });
 });
 
+describe('Login — public config failed to load', () => {
+  it('shows an unavailable notice with retry instead of "no providers"; retry loads the providers', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const store = TestBed.inject(PublicConfigStore);
+    const first = store.ensureLoaded();
+    http.expectOne('/api/public-config').flush('x', { status: 500, statusText: 'x' });
+    await first;
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('login.unavailable');
+    expect(el.textContent).not.toContain('login.noProviders');
+    el.querySelector<HTMLButtonElement>('.providers button')!.click();
+    http.expectOne('/api/public-config').flush({
+      telegramBotUsername: null,
+      providers: { telegram: false, google: true, discord: false },
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('login.unavailable');
+    expect(el.querySelector('a.google')).not.toBeNull();
+  });
+});
+
 describe('Login — dev-login mode', () => {
   async function render(mode: DevLoginMode, url: string): Promise<HTMLElement> {
     TestBed.configureTestingModule({

@@ -45,9 +45,12 @@ export class PublicConfigStore {
   private readonly http = inject(HttpClient);
   private readonly state = signal<PublicConfigDto>(EMPTY);
   private readonly loadedFlag = signal(false);
+  private readonly failedFlag = signal(false);
   private loading: Promise<void> | null = null;
 
   readonly loaded = this.loadedFlag.asReadonly();
+  /** Остання спроба завантаження не вдалась (бекенд недоступний чи відповів не так). */
+  readonly failed = this.failedFlag.asReadonly();
   /** Ім'я бота для Login Widget; порожній рядок — Telegram вимкнено. */
   readonly telegramBotUsername = computed(() => this.state().telegramBotUsername ?? '');
   readonly telegramLogin = computed(() => this.state().providers.telegram);
@@ -68,8 +71,10 @@ export class PublicConfigStore {
       const raw = await firstValueFrom(this.http.get<unknown>('/api/public-config'));
       this.state.set(parsePublicConfig(raw));
       this.loadedFlag.set(true);
+      this.failedFlag.set(false);
     } catch {
       // Бекенд недоступний чи відповів не так: способи входу лишаються вимкненими.
+      this.failedFlag.set(true);
     }
   }
 }

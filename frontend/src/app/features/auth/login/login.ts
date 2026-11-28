@@ -90,6 +90,10 @@ export class Login implements OnInit {
   protected readonly googleUrl = computed(() => this.api.googleStartUrl('login', this.target()));
   protected readonly discordUrl = computed(() => this.api.discordStartUrl('login', this.target()));
 
+  /** Конфіг не завантажився (бекенд недоступний): замість «немає способів входу» — повтор. */
+  protected readonly configFailed = this.publicConfig.failed;
+  protected readonly retrying = signal(false);
+
   protected readonly busy = signal(false);
   private readonly actionError = signal<ErrorCode | null>(null);
   protected readonly errorKey = computed(() => {
@@ -119,22 +123,37 @@ export class Login implements OnInit {
     });
     const win = window as TelegramWindow;
     inject(DestroyRef).onDestroy(() => delete win[TELEGRAM_CALLBACK]);
-    afterNextRender(() => {
-      const host = this.telegramContainer()?.nativeElement;
-      const bot = this.telegramBot();
-      if (!bot || !host) return;
-      win[TELEGRAM_CALLBACK] = (user) => void this.onTelegramAuth(user);
-      const script = document.createElement('script');
-      script.async = true;
-      script.src = TELEGRAM_WIDGET_SRC;
-      script.dataset['telegramLogin'] = bot;
-      script.dataset['size'] = 'large';
-      script.dataset['radius'] = '8';
-      script.dataset['lang'] = 'uk';
-      script.dataset['requestAccess'] = 'write';
-      script.dataset['onauth'] = `${TELEGRAM_CALLBACK}(user)`;
-      host.appendChild(script);
-    });
+    afterNextRender(() => this.mountTelegramWidget());
+  }
+
+  protected async retryConfig(): Promise<void> {
+    if (this.retrying()) return;
+    this.retrying.set(true);
+    try {
+      await this.publicConfig.ensureLoaded();
+    } finally {
+      this.retrying.set(false);
+    }
+    // Контейнер віджета з'явиться після наступного рендера.
+    afterNextRender(() => this.mountTelegramWidget(), { injector: this.injector });
+  }
+
+  private mountTelegramWidget(): void {
+    const win = window as TelegramWindow;
+    const host = this.telegramContainer()?.nativeElement;
+    const bot = this.telegramBot();
+    if (!bot || !host || host.childElementCount > 0) return;
+    win[TELEGRAM_CALLBACK] = (user) => void this.onTelegramAuth(user);
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = TELEGRAM_WIDGET_SRC;
+    script.dataset['telegramLogin'] = bot;
+    script.dataset['size'] = 'large';
+    script.dataset['radius'] = '8';
+    script.dataset['lang'] = 'uk';
+    script.dataset['requestAccess'] = 'write';
+    script.dataset['onauth'] = `${TELEGRAM_CALLBACK}(user)`;
+    host.appendChild(script);
   }
 
   ngOnInit(): void {

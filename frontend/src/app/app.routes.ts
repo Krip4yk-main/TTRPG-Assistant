@@ -30,7 +30,8 @@ export const routes: Routes = [
   },
   {
     path: 'account',
-    canActivate: [activeGuard],
+    // Кнопки прив'язки провайдерів залежать від /api/public-config.
+    canActivate: [activeGuard, publicConfigGuard],
     title: 'titles.account',
     loadComponent: () =>
       import('./features/account/account-settings/account-settings').then((m) => m.AccountSettings),
