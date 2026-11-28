@@ -32,8 +32,8 @@
 2. **Telegram:** у @BotFather створіть окремого тестового бота (`/newbot`) — його токен і username лише для dev. Для Login Widget задайте домен: `/setdomain` → dev-домен.
 3. **Google:** окремий OAuth client (Web); redirect URI `https://<dev-домен>/api/auth/google/callback`.
 4. **Discord:** окремий Application; Redirects `https://<dev-домен>/api/auth/discord/callback`.
-5. `cp .env.dev.template .env.dev` і заповніть (власні паролі MySQL; `BACKUP_ENABLED=false`; `NG_APP_TELEGRAM_BOT_USERNAME` — тестовий бот).
-6. `cp backend/.env.template backend/.env`: `NODE_ENV=production`, `PUBLIC_BASE_URL=https://<dev-домен>`, `TRUST_PROXY` за кількістю проксі, `DEV_LOGIN_ENABLED=false`, **нові** `IDENTITY_PEPPER`, `INTERNAL_API_KEY`, `CALENDAR_IMPORT_KEY` (`openssl rand -base64 32`), токен і username тестового бота, ключі Google/Discord з кроків 3–4.
+5. `cp .env.dev.template .env.dev` і заповніть (власні паролі MySQL; `BACKUP_ENABLED=false`; `NG_APP_TELEGRAM_BOT_USERNAME` — тестовий бот; `NG_APP_DEV_LOGIN=true`, якщо потрібен dev-вхід за кодом).
+6. `cp backend/.env.template backend/.env`: `NODE_ENV=production`, `PUBLIC_BASE_URL=https://<dev-домен>`, `TRUST_PROXY` за кількістю проксі (на беті >= 1), `DEV_LOGIN_ENABLED=true` і `DEV_LOGIN_CODES` для тестерів (див. «Dev-вхід за середовищами»; без тестерів `false`), **нові** `IDENTITY_PEPPER`, `INTERNAL_API_KEY`, `CALENDAR_IMPORT_KEY` (`openssl rand -base64 32`), токен і username тестового бота, ключі Google/Discord з кроків 3–4.
 7. `cp bot/.env.template bot/.env`: токен тестового бота, `INTERNAL_API_KEY` дослівно як у `backend/.env`, `PUBLIC_BASE_URL=https://<dev-домен>`.
 8. Запуск:
 
@@ -45,6 +45,43 @@
 9. Перевірка: `curl -sI https://<dev-домен>/robots.txt` (є `X-Robots-Tag: noindex, nofollow`, тіло `Disallow: /`); у браузері — банер «Тестове середовище».
 
 `--env-file` вказуйте при **кожній** команді compose (`logs`, `down`, `ps` теж), інакше змінні не підставляться.
+
+## Dev-вхід за середовищами
+
+|                           | local                                                             | dev (бета)                                              | prod                                                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Форма на `/login`         | так (за `NG_APP_DEV_LOGIN=true`)                                  | **ні**                                                  | ні                                                                                                                                       |
+| Як увійти                 | нікнейм (+ `DEV_OWNER_KEY` для власника), лише з localhost        | прихований маршрут `/login/dev`: код тестера + нікнейм  | неможливо                                                                                                                                |
+| Бекенд-маршрут            | `POST /api/auth/dev-login`                                        | `POST /api/auth/dev-login/code` (`/dev-login` дає 404)  | обидва дають 404                                                                                                                         |
+| Власник/адміни/модератори | можна (за `DEV_OWNER_KEY`)                                        | **заборонено**, `DEV_OWNER_KEY` не діє                  | немає                                                                                                                                    |
+| Умови                     | `NODE_ENV=development`, `DEV_LOGIN_ENABLED=true`, `TRUST_PROXY=0` | `DEV_LOGIN_ENABLED=true` і непорожній `DEV_LOGIN_CODES` | бекенд **не стартує**, якщо задано `DEV_LOGIN_ENABLED=true`, `DEV_LOGIN_CODES` чи `DEV_OWNER_KEY` (`false` і порожні значення дозволені) |
+| Збірка фронтенду          | `NG_APP_DEV_LOGIN=true`                                           | `NG_APP_DEPLOY_ENV=dev` і `NG_APP_DEV_LOGIN=true`       | у збірці немає ні маршруту, ні коду dev-входу                                                                                            |
+
+### Як дати тестеру доступ на беті
+
+1. Згенеруйте код лише з base64url або hex-символів (без `:` і `,`), щонайменше 24 символи і не менше 8 різних символів: `openssl rand -hex 16` (32 символи).
+2. У `backend/.env` додайте запис `мітка:код` до `DEV_LOGIN_CODES` (записи через кому), наприклад `DEV_LOGIN_CODES=olena:<код1>,petro:<код2>`. Мітка (`[A-Za-z0-9_.-]`, до 32 символів) потрібна, щоб у журналі було видно, чий код використано. Мітки й коди мають бути унікальні.
+3. Переконайтеся, що `DEV_LOGIN_ENABLED=true`, і перезапустіть бекенд (`docker compose --env-file .env.dev -f docker-compose.prod.yml up -d backend`).
+4. Надішліть тестеру приватно посилання `https://<beta-host>/login/dev` і його код. Посилання ніде в UI не показується, сторінка `noindex`. Тестер вводить код і вигаданий нікнейм (3-32 символи, за правилами профілю): створюється dev-акаунт, повторний вхід з тим самим нікнеймом відкриває той самий акаунт.
+
+Фронтенд беті має бути зібраний із `NG_APP_DEPLOY_ENV=dev` (compose бере з `DEPLOY_ENV`) і `NG_APP_DEV_LOGIN=true` (змінна в `.env.dev`), інакше маршруту `/login/dev` у збірці не буде. Після зміни перебудуйте образ (`build frontend`).
+
+### Як відкликати код
+
+Приберіть запис із `DEV_LOGIN_CODES` у `backend/.env` і перезапустіть бекенд. Новий вхід з цим кодом стане неможливим.
+
+Увага: **вже відкриті сесії тестера не закриваються** відкликанням коду. Сесія живе незалежно від коду (до `SESSION_TTL_DAYS`, 30 днів, продовжується при активності). Щоб завершити сесії конкретного тестера, заблокуйте його акаунт через адмін-панель (бан відкликає всі сесії) або видаліть акаунт. Усіх відразу можна вигнати, видаливши рядки з таблиці `sessions` та очистивши Redis (кеш сесій живе до 5 хв); це окрема ручна операція.
+
+### Обмеження й підводні камені
+
+- **Персонал.** Через код тестера не можна ввійти в акаунти `owner`/`admin`/`moderator`: dev-акаунт із такою роллю отримує 403, а нікнейм не-dev акаунта - 409. Власник і команда входять лише справжніми провайдерами.
+- **Ліміти.** Невдалі спроби коду: 10 за 15 хв з однієї IP (`429`); успішні входи ліміт не витрачають. Додатково діє спільний ліміт `/api/auth` (20 запитів за 5 хв): багато тестерів за одним NAT можуть його вичерпати.
+- **`TRUST_PROXY`.** На беті має бути `TRUST_PROXY` >= 1 (за кількістю проксі, зазвичай `1`). Інакше всі тестери мають одну IP (проксі) і один спільний лічильник спроб. Бекенд попереджає про це на старті.
+- **Невірний код** завжди дає однакову відповідь 403 без підказок; код порівнюється за постійний час.
+
+### Журнал dev-входів
+
+Кожен успішний вхід на беті пишеться в таблицю `events`: `type='auth.dev_login'`, `user_id`, `payload={codeLabel, codeIndex, created}` (самого коду там немає). Запис робиться до відкриття сесії; якщо він не вдався, вхід відхиляється. Також у логу контейнера бекенду є рядок `[dev-login] code "<мітка>" -> user <id>` (`docker compose ... logs backend | grep dev-login`). В адмін-журналі (він показує `moderation_log`) ці записи не відображаються.
 
 ## Як не переплутати токени
 

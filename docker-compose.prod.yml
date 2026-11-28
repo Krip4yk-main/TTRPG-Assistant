@@ -115,6 +115,7 @@ services:
         NG_APP_TELEGRAM_BOT_USERNAME: ${NG_APP_TELEGRAM_BOT_USERNAME:-}
         NG_APP_GOOGLE_LOGIN: ${NG_APP_GOOGLE_LOGIN:-}
         NG_APP_DISCORD_LOGIN: ${NG_APP_DISCORD_LOGIN:-}
+        NG_APP_DEV_LOGIN: ${NG_APP_DEV_LOGIN:-false}
     environment:
       # nginx: на dev додає X-Robots-Tag: noindex, nofollow
       DEPLOY_ENV: ${DEPLOY_ENV:-prod}
