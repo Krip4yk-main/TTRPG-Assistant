@@ -60,6 +60,20 @@ monthly_copy_needed() {
   [ "$2" = "no" ]
 }
 
+# Прибирає недописані бекапи (.nri-*.partial), що лишилися від перерваних запусків
+# (OOM, kill -9, вимкнення сервера — trap EXIT тоді не спрацьовує). Чіпаємо лише файли без
+# запису понад PARTIAL_STALE_MIN хвилин: паралельний ручний запуск пише свій .partial
+# безперервно, тож його не зачепимо.
+PARTIAL_STALE_MIN="${PARTIAL_STALE_MIN:-10}"
+clean_stale_partials() {
+  local old
+  find "$BACKUP_DIR" -maxdepth 1 -type f -name '.nri-*.partial' -mmin +"$PARTIAL_STALE_MIN" \
+    | while IFS= read -r old; do
+      rm -f -- "$old"
+      log "removed stale partial: ${old#"$BACKUP_DIR"/}"
+    done
+}
+
 # Локальна ротація: лишаємо найновіші N файлів у каталозі (імена сортуються за датою).
 rotate_dir() {
   local dir="$1" keep="$2" old

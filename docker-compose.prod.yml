@@ -131,6 +131,9 @@ services:
       context: .
       dockerfile: scripts/ops/Dockerfile.backup
     init: true
+    # `docker compose stop`/оновлення: планувальник дочікується бекапу, що вже йде (дамп,
+    # перевірка, вивантаження), а не обриває його через типові 10 с.
+    stop_grace_period: 10m
     environment:
       # false — сервіс нічого не робить (dev-сервер); див. docs/ops/environments.md
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}

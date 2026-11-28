@@ -30,6 +30,7 @@ trap cleanup EXIT
 
 mkdir -p "$BACKUP_DIR/monthly"
 umask 077
+clean_stale_partials
 
 NAME="nri-$(date -u +%Y-%m-%dT%H%MZ).sql.gz.enc"
 TARGET="$BACKUP_DIR/$NAME"
