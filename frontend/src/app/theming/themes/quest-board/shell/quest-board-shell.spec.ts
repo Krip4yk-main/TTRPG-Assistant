@@ -152,6 +152,7 @@ describe('QuestBoardShell (slot «shell»)', () => {
     expect(el.querySelector('a.skip-link[href="#main-content"]')).not.toBeNull();
     expect(el.querySelector('main#main-content')).not.toBeNull();
     expect(el.querySelector('footer a[href="/about"]')).not.toBeNull();
+    expect(el.querySelector('footer a[href="/sponsors"]')?.textContent).toContain('shell.sponsors');
   });
 
   it('active user gets the notification bell (deferred chunk, reserved placeholder)', async () => {

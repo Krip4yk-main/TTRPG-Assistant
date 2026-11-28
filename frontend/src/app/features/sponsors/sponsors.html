@@ -1,0 +1,24 @@
+<div class="nri-page">
+  <h1>{{ 'sponsors.title' | translate }}</h1>
+
+  <section class="promo">
+    <picture>
+      <source type="image/webp" [attr.srcset]="promo.webpSrcset" [attr.sizes]="promo.sizes" />
+      <img
+        class="promo-image"
+        [src]="promo.png"
+        [width]="promo.width"
+        [height]="promo.height"
+        [alt]="'sponsors.promoAlt' | translate"
+        loading="eager"
+        decoding="async"
+      />
+    </picture>
+    <p class="contact">
+      {{ 'sponsors.contact' | translate }}
+      <a [href]="contact.href" target="_blank" rel="noopener noreferrer">{{ contact.label }}</a>
+    </p>
+  </section>
+
+  <!-- Майбутні секції: «План витрат на рік», список спонсорів. -->
+</div>

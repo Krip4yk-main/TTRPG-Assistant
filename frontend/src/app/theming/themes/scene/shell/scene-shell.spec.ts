@@ -122,6 +122,12 @@ describe('SceneShell (slot «shell»): home by view mode', () => {
     expect(el.querySelector('a[href="/login"]')).not.toBeNull();
   });
 
+  it('footer links «About» and «Sponsors»', async () => {
+    await settle();
+    expect(el.querySelector('footer a[href="/about"]')).not.toBeNull();
+    expect(el.querySelector('footer a[href="/sponsors"]')?.textContent).toContain('shell.sponsors');
+  });
+
   it('player view shows the "My applications" link', async () => {
     TestBed.inject(ViewModeStore).setMode('player');
     await settle();

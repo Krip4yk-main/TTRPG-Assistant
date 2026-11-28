@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import { devLoginRoutes } from '../environments/runtime-config';
 import { activeGuard, guestGuard, notPendingGuard, pendingGuard } from './core/auth/auth.guards';
+import type { RouteSeo } from './core/seo/seo.service';
 
 export const routes: Routes = [
   {
@@ -140,6 +141,18 @@ export const routes: Routes = [
     path: 'about',
     title: 'titles.about',
     loadComponent: () => import('./features/about/about').then((m) => m.About),
+  },
+  {
+    // Сторінка для спонсорів: промо-картинка вантажиться лише тут (окремий лінивий чанк).
+    path: 'sponsors',
+    title: 'titles.sponsors',
+    data: {
+      seo: {
+        descriptionKey: 'sponsors.seo.description',
+        image: 'assets/promo/nri-promo-1920x1080.png',
+      } satisfies RouteSeo,
+    },
+    loadComponent: () => import('./features/sponsors/sponsors').then((m) => m.Sponsors),
   },
   {
     // Неіснуюча адреса — сторінка 404 (адреса в рядку браузера лишається).

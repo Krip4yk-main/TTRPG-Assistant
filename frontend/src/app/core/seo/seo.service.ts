@@ -12,6 +12,15 @@ export interface SeoOptions {
   noindex?: boolean;
 }
 
+/**
+ * Статичні метадані сторінки без даних (`data.seo` маршруту): опис — ключ i18n, картинка —
+ * шлях від кореня сайту (в `og:image` стає абсолютним URL).
+ */
+export interface RouteSeo {
+  descriptionKey: string;
+  image?: string;
+}
+
 /** Найдовший опис у `meta[name=description]` / `og:description`. */
 const MAX_DESCRIPTION = 200;
 

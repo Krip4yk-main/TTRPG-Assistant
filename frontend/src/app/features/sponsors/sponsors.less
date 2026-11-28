@@ -1,0 +1,23 @@
+:host {
+  display: block;
+}
+
+.promo {
+  display: grid;
+  gap: var(--nri-space-md);
+}
+
+// Картинка масштабується під ширину сторінки (без горизонтального скролу на 375 px);
+// width/height в розмітці резервують місце до завантаження (без зсуву макета).
+.promo-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--nri-radius-md);
+}
+
+.contact {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
