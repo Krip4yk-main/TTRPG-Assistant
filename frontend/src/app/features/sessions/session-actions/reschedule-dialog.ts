@@ -29,6 +29,7 @@ import {
 import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { SESSION_DURATIONS } from '../session-durations';
 import { StartTimeField } from '../start-time-field/start-time-field';
+import { formatHours } from '../../../core/i18n/duration';
 
 export interface RescheduleDialogData {
   session: SessionDto;
@@ -109,8 +110,8 @@ export class RescheduleDialog {
     });
   }
 
-  protected hours(minutes: number): number {
-    return minutes / 60;
+  protected hours(minutes: number): string {
+    return formatHours(minutes);
   }
 
   protected async submit(): Promise<void> {

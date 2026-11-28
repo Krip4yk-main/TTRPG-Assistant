@@ -35,6 +35,7 @@ import {
 } from '../../../core/i18n/dates';
 import { SESSION_DURATIONS } from '../session-durations';
 import { StartTimeField } from '../start-time-field/start-time-field';
+import { formatHours } from '../../../core/i18n/duration';
 
 export interface ScheduleRuleDialogData {
   game: Pick<
@@ -158,8 +159,8 @@ export class ScheduleRuleDialog {
     });
   }
 
-  protected hours(minutes: number): number {
-    return minutes / 60;
+  protected hours(minutes: number): string {
+    return formatHours(minutes);
   }
 
   protected isWeekly(r: Recurrence): boolean {

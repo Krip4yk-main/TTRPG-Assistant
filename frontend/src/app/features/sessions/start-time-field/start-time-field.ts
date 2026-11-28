@@ -12,6 +12,7 @@ import {
   WINDOW_START_TIMES,
   windowEndOptions,
 } from './start-window';
+import { formatHours } from '../../../core/i18n/duration';
 
 let nextId = 0;
 
@@ -81,8 +82,8 @@ export class StartTimeField {
     });
   }
 
-  protected hours(minutes: number): number {
-    return minutes / 60;
+  protected hours(minutes: number): string {
+    return formatHours(minutes);
   }
 
   /** Перемикач: приблизний час — вікно типової ширини з початком на сітці 30 хв. */

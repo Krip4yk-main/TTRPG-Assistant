@@ -83,6 +83,7 @@ import {
   ComplaintDialog,
   type ComplaintDialogData,
 } from '../../moderation/complaint-dialog/complaint-dialog';
+import { formatHours } from '../../../core/i18n/duration';
 
 const EDITABLE = new Set<GameStatus>(['draft', 'recruiting', 'started', 'paused']);
 const NOINDEX_STATUSES = new Set<GameStatus>(['draft', 'cancelled', 'paused']);
@@ -373,7 +374,7 @@ export class GameDetails {
       return { ...weekly, end, nextDay: localDate(endAt, viewer) !== localDate(start, viewer) };
     },
   );
-  protected readonly durationHours = computed(() => (this.game()?.durationMinutes ?? 0) / 60);
+  protected readonly durationHours = computed(() => formatHours(this.game()?.durationMinutes ?? 0));
   protected readonly returnTo = computed(() => `/games/${this.id()}`);
 
   constructor() {

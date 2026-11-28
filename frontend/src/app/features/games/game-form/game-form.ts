@@ -88,6 +88,7 @@ import {
   removeGameDraft,
   writeGameDraft,
 } from '../../../core/games/game-draft-storage';
+import { formatHours } from '../../../core/i18n/duration';
 
 type SystemChoice = number | 'other' | null;
 
@@ -514,7 +515,7 @@ export class GameForm {
   }
 
   protected hours(minutes: number): string {
-    return (minutes / 60).toLocaleString('uk-UA');
+    return formatHours(minutes);
   }
 
   protected warningSelected(id: number): boolean {
