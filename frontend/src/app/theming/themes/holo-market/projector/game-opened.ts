@@ -4,8 +4,9 @@ import type { ThemeEffect } from '../../../theme.registry';
 /**
  * «Голо-ринок»: гру відкривають з картки — «Згортання в проєктор». Грає на самій картці
  * (`source` — хост картки), сторінка гри відкривається лише після нього. Голо-панель картки
- * сплющується в скан-лінію з рожево-бірюзовим розшаруванням, лінія світла «засмоктується» вниз
- * у шайбу-проєктор під карткою (`.sc-d3`), шайба спалахує, і промінь угору з лінією розгортки
+ * складається вниз у шайбу-проєктор під карткою (`.sc-d3`), наче її засмоктує: точка стиснення —
+ * лінза шайби, верх картки опускається до проєктора, ширина звужується до лінзи, з
+ * рожево-бірюзовим розшаруванням; шайба спалахує, і промінь угору з лінією розгортки
  * «відправляє» гру далі — тут відкривається сторінка. Шайба картки лишається на місці (її ефект
  * не чіпає); решта картки — анімацією (`fill: forwards`, згорнута до переходу; картка знімає це
  * сама, якщо пережила перехід). Разом ≈ 1.4 с. Вигляд — класи `hm-open-*` (`game-opened.less`).
@@ -13,15 +14,13 @@ import type { ThemeEffect } from '../../../theme.registry';
 
 /** Таймінги фаз, мс від початку. */
 const T = {
-  /** Картка: сплющується (до `SQUASH`), далі лінія летить у шайбу. */
+  /** Картка: складається вниз у лінзу шайби. */
   fold: [0, 640],
   puck: [0, 1400],
   flare: [560, 820],
   beam: [640, 1400],
   scan: [680, 1300],
 } as const;
-/** Частка `T.fold`, на якій картка вже сплющена в лінію. */
-const SQUASH = 0.6;
 /** Ширина шайби-проєктора, px (як `.sc-d3` у бандлі дизайну). */
 const PUCK_W = 90;
 /** Від низу картки до верху шайби, px (`.sc-d3`: `bottom: -32px`, висота 10px). */
@@ -49,30 +48,44 @@ export const foldIntoProjector: ThemeEffect = async (source, signal) => {
     const puck = add('hm-open-puck', region);
     puck.style.width = `${PUCK_W}px`;
 
-    // Сплющення в скан-лінію, далі лінія світла летить униз у шайбу й стискається до лінзи.
-    const lens = rect.bottom + PUCK_GAP;
+    // Складання вниз у шайбу: точка стиснення — лінза шайби (`transform-origin` у кожній
+    // частині — відносно неї), тож верх картки опускається до проєктора, а ширина звужується до
+    // лінзи — картку наче засмоктує в шайбу, з рожево-бірюзовим розшаруванням.
+    const lensX = rect.left + rect.width / 2;
+    const lensY = rect.bottom + PUCK_GAP;
     for (const part of parts) {
       const r = part.getBoundingClientRect();
-      const toPuck = lens - (r.top + r.height / 2);
+      const origin = `${lensX - r.left}px ${lensY - r.top}px`;
       const narrow = Math.min(1, PUCK_W / Math.max(r.width, 1));
+      const sx = (k: number) => +(1 - (1 - narrow) * k).toFixed(4);
       play(
         part,
         [
-          { transform: 'translateY(0) scale(1, 1)', filter: 'none', opacity: 1 },
+          { transformOrigin: origin, transform: 'scale(1, 1)', filter: 'none', opacity: 1 },
           {
-            offset: SQUASH * 0.5,
-            transform: 'translateY(0) scale(1, 0.35)',
+            offset: 0.35,
+            transformOrigin: origin,
+            transform: `scale(${sx(0.08)}, 0.6)`,
             filter: 'drop-shadow(-4px 0 0 #ff5cb4) drop-shadow(4px 0 0 #5ef2ff)',
             opacity: 1,
           },
           {
-            offset: SQUASH,
-            transform: 'translateY(0) scale(1, 0.02)',
+            offset: 0.7,
+            transformOrigin: origin,
+            transform: `scale(${sx(0.4)}, 0.18)`,
             filter: 'drop-shadow(-3px 0 0 #ff5cb4) drop-shadow(3px 0 0 #5ef2ff)',
             opacity: 1,
           },
           {
-            transform: `translateY(${toPuck}px) scale(${narrow}, 0.01)`,
+            offset: 0.9,
+            transformOrigin: origin,
+            transform: `scale(${sx(1)}, 0.04)`,
+            filter: 'drop-shadow(-2px 0 0 #ff5cb4) drop-shadow(2px 0 0 #5ef2ff)',
+            opacity: 0.9,
+          },
+          {
+            transformOrigin: origin,
+            transform: `scale(${+(narrow * 0.4).toFixed(4)}, 0.01)`,
             filter: 'none',
             opacity: 0,
           },
