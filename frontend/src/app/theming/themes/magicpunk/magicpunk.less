@@ -36,7 +36,7 @@
 //   Заголовок сторінки: свічки — `nri-sc-page-header .page-header::before` (≥ 1360px),
 //     астролябія — `::after` (≥ 1100px); обидва — лише на сторінці без кнопок дій.
 //   Панель фільтрів: кутики — `::before` (замість неонової трубки основи).
-//   Обкладинка: кільце — `.attach::before`, ромб-самоцвіт — `.attach::after`.
+//   Обкладинка: кільце — `.attach::before`, ромб-самоцвіт — `.attach::after`, іскри — `.deco::before / ::after`.
 //   data-neon (варіант картки): колір рядка системи й зірочок шапки (фіалка, слива, глибока
 //     бірюза, бурштин, мох, червоне чорнило).
 
@@ -1026,6 +1026,42 @@
         transform: rotate(45deg);
       }
     }
+
+    // Іскри біля рами: якір — порожній aria-hidden `.deco` під рамою; з'являються, коли
+    // обкладинка наперед.
+    .deco {
+      position: absolute;
+      bottom: -32px;
+      left: 50%;
+      display: block;
+      width: 120px;
+      height: 22px;
+      opacity: 0;
+      transform: translateX(-50%);
+      pointer-events: none;
+
+      &::before,
+      &::after {
+        content: '';
+        position: absolute;
+        background: @mp-spark 0 0 / 100% 100% no-repeat;
+        filter: drop-shadow(0 0 4px #6fe6d2);
+      }
+
+      &::before {
+        bottom: 110px;
+        left: -12px;
+        width: 14px;
+        height: 14px;
+      }
+
+      &::after {
+        right: -14px;
+        bottom: 72px;
+        width: 11px;
+        height: 11px;
+      }
+    }
   }
 
   .mp-attachment-front() {
@@ -1038,6 +1074,10 @@
 
     img {
       filter: none;
+    }
+
+    .deco {
+      opacity: 1;
     }
   }
 
@@ -1059,6 +1099,10 @@
 
       img {
         transition: filter 450ms;
+      }
+
+      .deco {
+        transition: opacity 450ms;
       }
     }
 

@@ -318,6 +318,7 @@ export class AvailabilityEditor {
   protected togglePaintMode(): void {
     this.paintMode.update((on) => !on);
     this.paintAction.set(null);
+    this.say(this.paintMode() ? 'calendar.paint.on' : 'calendar.paint.off');
   }
 
   /**
@@ -327,6 +328,10 @@ export class AvailabilityEditor {
   protected finishPainting(): void {
     this.togglePaintMode();
     if (this.mode() === 'save' && this.dirty()) void this.save();
+  }
+
+  private say(key: string): void {
+    void this.announcer.announce(this.translate.instant(key), 'polite');
   }
 
   /** «Готово»: наступний тап знову визначить дію. */

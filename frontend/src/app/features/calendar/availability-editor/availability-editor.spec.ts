@@ -491,6 +491,15 @@ describe('AvailabilityEditor', () => {
       expect(emitted).toEqual([]); // застосування — окремою кнопкою
     });
 
+    it('announces turning the paint mode on and off', async () => {
+      await setup('custom', empty);
+      await enablePaint();
+      expect(announce).toHaveBeenCalledWith('calendar.paint.on', 'polite');
+      button('paint-toggle').click();
+      await settle();
+      expect(announce).toHaveBeenCalledWith('calendar.paint.off', 'polite');
+    });
+
     it('in save mode the «Зберегти» toggle ends painting and saves the calendar', async () => {
       await setup('save');
       await enablePaint();
