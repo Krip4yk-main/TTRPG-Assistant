@@ -1,6 +1,9 @@
 # Deploy to the dev (beta) cluster. Drafted by Kane (cluster side: lab/cluster/pods/ttrpg/), adapted in this repo.
 #
-# What it does, on every push to main (or started by hand from the Actions tab):
+# Branches: all code lands on `beta` first (deploys here, to the dev cluster); `main` is production and gets beta's
+# code later (a separate production workflow, once the cluster's production side exists).
+#
+# What it does, on every push to beta (or started by hand from the Actions tab):
 #   1. builds the three images from his own Dockerfiles (backend, bot, frontend)
 #   2. pushes them to ghcr.io, tagged with the commit ID
 #   3. reads each pushed image's digest (the fingerprint of its exact content) and writes the three digests into
@@ -11,7 +14,7 @@
 #
 # Why digests: a tag on ghcr.io can be overwritten with other content; a digest names one exact image, so the cluster
 # runs what this run built and nothing else.
-# Why a branch of its own: the commit never lands on main, so his local main never falls behind a robot commit.
+# Why a branch of its own: the commit never lands on beta or main, so no local branch falls behind a robot commit.
 # The branch deploy holds only deploy/images.yaml; the workflow makes it at its first run.
 #
 # One-time setup on his side:
@@ -36,7 +39,7 @@ name: Deploy to the dev cluster
 
 on:
   push:
-    branches: [main]
+    branches: [beta]
   workflow_dispatch:
 
 # a newer push replaces a build still running, so the last push wins
