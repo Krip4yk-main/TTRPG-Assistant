@@ -16,7 +16,6 @@ Thumbs.db
 backend/.env
 frontend/.env
 bot/.env
-.claude/launch.json
 
 # Скріншоти, макети й інші медіа для показу/рецензій — не в репозиторії
 .media/
@@ -29,3 +28,12 @@ bot/.env
 backups/
 !backend/src/db/migrations/*.sql
 !docker/mysql-init.sql
+
+# Локальні налаштування інструментів розробника й асистентів (скіли, плагіни, конфіги) —
+# у кожного свої, у репозиторії не потрібні
+.claude/
+CLAUDE.local.md
+.playwright-mcp/
+.vscode/
+.idea/
+.cursor/
