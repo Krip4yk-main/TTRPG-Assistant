@@ -1,0 +1,189 @@
+# Deploy to the clusters. Drafted by Kane (cluster side: lab/cluster/pods/ttrpg/), adapted in this repo.
+#
+# Branches: all code lands on `beta` first (deploys to the dev cluster); `main` is production and gets beta's
+# code later. Both branches use this one workflow; everything that differs between them is derived from the
+# branch name here, nothing is set in repository variables.
+#
+#   branch  image tags       frontend build                                   digest file on the branch deploy
+#   beta    beta-<commit>    NG_APP_DEPLOY_ENV=dev,  NG_APP_DEV_LOGIN=true    deploy/images.yaml
+#   main    prod-<commit>    NG_APP_DEPLOY_ENV=prod, NG_APP_DEV_LOGIN=false   deploy/images-prod.yaml
+#
+# What it does, on every push to beta or main (or started by hand from the Actions tab, on one of those two):
+#   1. builds the four images from the repository's own Dockerfiles (backend, bot, frontend, backup)
+#   2. pushes them to ghcr.io, tagged with the environment and the commit ID (the tags are for people)
+#   3. reads each pushed image's digest (the fingerprint of its exact content) and writes the four digests into
+#      the digest file of this branch, on the branch deploy
+# The cluster's Argo CD reads the digest file from the branch deploy about every 30 s and rolls the services to
+# those digests (lab/cluster/pods/ttrpg/). Nothing reaches into the lab; the workflow needs no secret besides
+# GitHub's own token. Everything else (bot name, login providers, secrets, backup settings) is in .env on the
+# server: the only build-time settings are the frontend's environment and dev login, and they come from the branch.
+#
+# Why digests: a tag on ghcr.io can be overwritten with other content; a digest names one exact image, so the
+# cluster runs what this run built and nothing else.
+# Why tags with the environment: beta and main can build the same commit, and the frontend differs between
+# them; the tags beta-<commit> and prod-<commit> keep those two builds apart.
+# Why a branch of its own: the commit never lands on beta or main, so no local branch falls behind a robot
+# commit. The branch deploy holds only the digest files; the workflow makes it at its first run. A beta run
+# writes only deploy/images.yaml and a main run only deploy/images-prod.yaml, never the other one's file.
+#
+# Digest file format (the same for both files):
+#   # built from commit <commit>
+#   backend: sha256:<64 hex>
+#   bot: sha256:<64 hex>
+#   frontend: sha256:<64 hex>
+#   backup: sha256:<64 hex>
+#
+# One-time setup on his side:
+#   - after the first run: each of the four packages (ttrpg-backend, ttrpg-bot, ttrpg-frontend, ttrpg-backup)
+#     set to public (github.com/<owner>?tab=packages -> the package -> Package settings -> Change visibility);
+#     GitHub makes a new package private, and the cluster pulls without a login
+#   - no repository variables: the settings of the servers live in their .env files (docs/ops/cluster.md)
+#   - the dev accounts his docs/ops/environments.md asks for (a test Telegram bot, Google and Discord OAuth apps
+#     with the dev address as redirect); their secret halves go to Kane for sealing
+# Going back to an earlier build: re-run that commit's run of this workflow; it builds that commit again and
+# writes its digests.
+# The image names and each digest file's path, branch and four keys are fixed on the cluster's side
+# (lab/cluster/pods/ttrpg/shape.nix); a change here needs the same change there.
+
+name: Deploy to the clusters
+
+on:
+  push:
+    branches: [beta, main]
+  workflow_dispatch:
+
+# a newer push to the same branch replaces a build still running, so the last push wins; beta and main have
+# groups of their own and never cancel each other
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # beta -> dev, main -> prod; the tag prefix and the digest file follow from the branch
+  DEPLOY_ENV: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+  TAG_PREFIX: ${{ github.ref_name == 'main' && 'prod' || 'beta' }}
+  DIGEST_FILE: ${{ github.ref_name == 'main' && 'deploy/images-prod.yaml' || 'deploy/images.yaml' }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.part }}
+    # a manual run from any other branch builds nothing
+    if: github.ref_name == 'beta' || github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - part: backend
+            file: backend/Dockerfile
+          - part: bot
+            file: bot/Dockerfile
+          - part: frontend
+            file: frontend/Dockerfile
+            # built into the pages: the environment banner and the hidden /login/dev page
+            args: |
+              NG_APP_DEPLOY_ENV=${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+              NG_APP_DEV_LOGIN=${{ github.ref_name == 'main' && 'false' || 'true' }}
+          - part: backup
+            file: scripts/ops/Dockerfile.backup
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          # only the frontend takes build arguments
+          build-args: ${{ matrix.args }}
+          push: true
+          # the owner's name in lower case: ghcr.io accepts no capitals
+          tags: ghcr.io/krip4yk-main/ttrpg-${{ matrix.part }}:${{ env.TAG_PREFIX }}-${{ github.sha }}
+          cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.part }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.part }}
+
+  pin:
+    name: Point the cluster at this build
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write the four image digests into this branch's digest file on the branch deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # the digest of the image this run pushed for a part (backend, bot, frontend, backup)
+          digest() {
+            docker buildx imagetools inspect "ghcr.io/krip4yk-main/ttrpg-$1:${TAG_PREFIX}-${GITHUB_SHA}" \
+              --format '{{json .Manifest}}' | jq -r .digest
+          }
+          # read all four first, so a failure stops the run before the branch deploy is touched
+          backend=$(digest backend)
+          bot=$(digest bot)
+          frontend=$(digest frontend)
+          backup=$(digest backup)
+          git init -q work
+          cd work
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # beta and main runs can finish at the same moment and both push to deploy; the push that loses the race
+          # is refused (not a fast-forward), so every attempt starts from the branch as it is now and writes only
+          # this run's file on top of it
+          for attempt in 1 2 3 4 5; do
+            # the branch deploy as it is now, or a new empty one at the first run
+            if git fetch -q --depth 1 origin deploy; then
+              git checkout -q -f -B deploy FETCH_HEAD
+            else
+              git update-ref -d refs/heads/deploy 2>/dev/null || true
+              git checkout -q -f --orphan deploy
+              git rm -rq -f --cached . 2>/dev/null || true
+            fi
+            mkdir -p deploy
+            {
+              echo "# built from commit ${GITHUB_SHA}"
+              echo "backend: ${backend}"
+              echo "bot: ${bot}"
+              echo "frontend: ${frontend}"
+              echo "backup: ${backup}"
+            } > "${DIGEST_FILE}"
+            cat "${DIGEST_FILE}"
+            # stop here if a digest is missing or malformed, before anything is pushed
+            test "$(grep -c -E '^(backend|bot|frontend|backup): sha256:[0-9a-f]{64}$' "${DIGEST_FILE}")" = 4
+            git add "${DIGEST_FILE}"
+            if git diff --cached --quiet; then
+              echo "${DIGEST_FILE} already names these images"
+              exit 0
+            fi
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -q -m "deploy ${DEPLOY_ENV} ${GITHUB_SHA}"
+            if git push -q origin deploy; then
+              exit 0
+            fi
+            echo "push refused (attempt ${attempt}); fetching deploy again"
+            sleep $((attempt * 2))
+          done
+          echo "could not push to deploy after 5 attempts" >&2
+          exit 1
