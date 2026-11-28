@@ -51,5 +51,6 @@
   "0049_drop_legacy_purge_job.sql": "1a3f57ec41e2990db8e6f6931e40d8a1f5f603c0001fb94e0866491bcbbc5b56",
   "0050_plan17_safety_tools.sql": "bb9dd1ee293131d42279cd662bc3fa7b0542c4fc3390a94f1df5b9376b2cd007",
   "0051_plan17_my_limits.sql": "86c5845885a1346f74ff32aa513e4baadb3fe94731c5719ecb5b67002bdf0200",
-  "0052_plan20_staff_telegram.sql": "6625aba50d18308bba798951cafd5e0d21ba44c9274c5789f942248e53716f77"
+  "0052_plan20_staff_telegram.sql": "6625aba50d18308bba798951cafd5e0d21ba44c9274c5789f942248e53716f77",
+  "0053_plan22_default_view.sql": "2a66c2be903d18e5330e85c9f0c61725781f3b4680c5e6d7dfaa44a1e4dbc408"
 }
