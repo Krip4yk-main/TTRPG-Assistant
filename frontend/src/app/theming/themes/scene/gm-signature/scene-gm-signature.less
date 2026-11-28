@@ -55,17 +55,15 @@
   }
 }
 
-// «майстер · ★ рейтинг» — завжди один рядок (висота картки стала): що не вміщається — «…»
-// (повний текст — у підказці).
+// «майстер · ★ рейтинг» — статичний текст не обрізається: що не вміщається в рядок, переноситься
+// на наступний (картка стала: місце віддає опис, що стискається першим).
 .role {
   display: block;
   min-width: 0;
-  overflow: hidden;
   color: var(--sc-ink-muted);
   font-size: 0.8125rem;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 
   > * + * {
     margin-left: 5px;

@@ -82,18 +82,23 @@ nri-qb-attachment {
 
 // Однорядкові поля: «…» замість переносу (повний текст — у підказці).
 .sys,
-.title,
 .facts dd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+// Назва — до двох рядків, далі «…» (повна — у підказці).
 .title {
   flex: none;
   margin: 0 0 var(--nri-space-xs);
   font-size: 1.6rem;
   line-height: 1.2;
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 // Позначки детектора «мертвих» ігор — приписка на полях: штамп + пояснення.

@@ -68,18 +68,23 @@
 
 // Однорядкові поля: «…» замість переносу (повний текст — у підказці).
 .sys,
-.title,
 .facts dd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+// Назва — до двох рядків, далі «…» (повна — у підказці).
 .title {
   flex: none;
   margin: 2px 0 4px;
   color: var(--sc-ink);
   font: 600 1.15rem/1.3 var(--sc-font-display);
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 // Позначки детектора «мертвих» ігор: мітка + пояснення.
