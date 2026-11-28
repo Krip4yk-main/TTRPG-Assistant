@@ -586,6 +586,11 @@ describe('SessionsList', () => {
       await settle();
       expect(dialogOpen.mock.calls.at(-1)![0]).toBe(ConfirmDialog);
       http.expectNone('/api/sessions/1/summary/send');
+      // Кнопки зайняті на час підтвердження; після «Скасувати» — знову доступні.
+      await settle();
+      expect(
+        row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.disabled,
+      ).toBe(false);
 
       dialogOpen.mockReturnValueOnce({ afterClosed: () => of(true) });
       row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
@@ -598,6 +603,25 @@ describe('SessionsList', () => {
       expect(summaryButtons(1)).toEqual(['edit']);
       expect(row(1)!.querySelector('.summary-sent')!.textContent).toContain('sessions.summarySent');
       expect(el.textContent).toContain('sessions.done.summarySent');
+    });
+
+    it('a fast double click on «send» opens one confirmation and sends once', async () => {
+      await create(true, true, [done]);
+      const confirmed = new Subject<boolean>();
+      dialogOpen.mockReturnValue({ afterClosed: () => confirmed });
+      const send = row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!;
+      send.click();
+      send.click();
+      await settle();
+      expect(dialogOpen.mock.calls.filter(([c]) => c === ConfirmDialog)).toHaveLength(1);
+      confirmed.next(true);
+      confirmed.complete();
+      await settle();
+      http
+        .expectOne('/api/sessions/1/summary/send')
+        .flush({ ...done, summarySentAt: '2026-11-02T10:00:00.000Z' });
+      await settle();
+      expect(summaryButtons(1)).toEqual(['edit']);
     });
 
     it('a failed send shows the translated error and keeps the button', async () => {

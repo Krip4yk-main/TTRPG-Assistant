@@ -296,11 +296,13 @@ export class SessionsList {
 
   protected async runSummary(s: SessionDto, action: SummaryAction): Promise<void> {
     if (this.busy()) return;
-    // Надсилання незворотне (учасники одразу отримують сповіщення) — спершу підтвердження.
-    if (action === 'send' && !(await this.confirmSend())) return;
+    // Зайнято вже на час підтвердження: подвійний клік не відкриє другого діалогу й не
+    // надішле підсумок двічі.
     this.busy.set(true);
-    this.message.set(null);
     try {
+      // Надсилання незворотне (учасники одразу отримують сповіщення) — спершу підтвердження.
+      if (action === 'send' && !(await this.confirmSend())) return;
+      this.message.set(null);
       const dto =
         action === 'edit'
           ? await firstValueFrom(
