@@ -70,6 +70,7 @@ describe('ViewModeStore', () => {
   it('зміна виду за замовчуванням не перемикає відкриту вкладку (і після перезавантаження)', () => {
     const store = reopen(me(1, 'player'));
     expect(store.mode()).toBe('player'); // каркас читає вид одразу при показі
+    TestBed.tick(); // ефект запам'ятовує вид, з яким вкладка відкрилась
     TestBed.inject(AuthStore).setMe(me(1, 'gm'));
     expect(store.mode()).toBe('player');
     expect(reopen(me(1, 'gm')).mode()).toBe('player');
@@ -91,6 +92,20 @@ describe('ViewModeStore', () => {
     expect(reopen(me(1)).mode()).toBe('player');
     sessionStorage.setItem(KEY, JSON.stringify({ u: 1, m: 'admin' }));
     expect(reopen(me(1)).mode()).toBe('player');
+  });
+
+  it('запис початкового виду — поза обчисленням: до ефекту сховище порожнє, після — вид', () => {
+    const store = reopen(me(1, 'gm'));
+    expect(store.mode()).toBe('gm');
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+    TestBed.tick();
+    expect(JSON.parse(sessionStorage.getItem(KEY) ?? 'null')).toEqual({ u: 1, m: 'gm' });
+  });
+
+  it('при старті прибирає застарілий спільний ключ з localStorage', () => {
+    localStorage.setItem(KEY, 'gm');
+    reopen(me(1));
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 
   it('якщо сховище кидає — працює в пам’яті без помилки', () => {

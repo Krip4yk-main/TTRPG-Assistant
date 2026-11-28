@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, linkedSignal, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, linkedSignal, untracked } from '@angular/core';
 import { DEFAULT_VIEW_MODE, type MeDto, type ViewMode, isViewMode } from '@nri/shared';
 import { AuthStore } from '../auth/auth.store';
 
@@ -38,6 +38,22 @@ export class ViewModeStore {
 
   readonly mode = computed<ViewMode>(() => (this.activeUser() ? this.state() : DEFAULT_VIEW_MODE));
 
+  constructor() {
+    // Старий спільний для вкладок вид (до «свого виду у кожній вкладці») — більше не діє.
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Сховище недоступне — нічого прибирати.
+    }
+    // Вид, з яким вкладка відкрилась, запам'ятовуємо одразу (поза обчисленням стану):
+    // перезавантаження не підхопить пізнішої зміни «Виду за замовчуванням».
+    effect(() => {
+      const user = this.activeUser();
+      const mode = this.mode();
+      if (user) writeStored({ u: user.id, m: mode });
+    });
+  }
+
   setMode(mode: ViewMode): void {
     const user = this.activeUser();
     if (!user) return;
@@ -47,16 +63,14 @@ export class ViewModeStore {
 }
 
 /**
- * Вид вкладки для користувача: обраний у ній раніше або «Вид за замовчуванням». Його
- * одразу запам'ятовуємо у вкладці — перезавантаження не підхопить пізнішої зміни налаштування.
+ * Вид вкладки для користувача: обраний у ній раніше або «Вид за замовчуванням». Обчислення
+ * чисте — запис у сховище робить ефект у конструкторі.
  */
 function initialMode(user: MeDto | null): ViewMode {
   if (!user) return DEFAULT_VIEW_MODE;
   const stored = readStored();
   if (stored?.u === user.id) return stored.m;
-  const mode = isViewMode(user.defaultView) ? user.defaultView : DEFAULT_VIEW_MODE;
-  writeStored({ u: user.id, m: mode });
-  return mode;
+  return isViewMode(user.defaultView) ? user.defaultView : DEFAULT_VIEW_MODE;
 }
 
 function writeStored(view: StoredView): void {

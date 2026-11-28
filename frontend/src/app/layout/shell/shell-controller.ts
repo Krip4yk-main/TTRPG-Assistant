@@ -22,9 +22,14 @@ export class ShellController {
   private readonly retryingState = signal(false);
   readonly retrying = this.retryingState.asReadonly();
 
-  /** Перемикач виду: на сторінці іншого виду — перехід на відповідник або головну. */
-  setMode(mode: ViewMode): void {
-    void this.viewRouting.switchTo(mode);
+  /**
+   * Перемикач виду: на сторінці іншого виду — перехід на відповідник або головну. Якщо перехід
+   * скасовано (незбережені зміни), `toggle` повертаємо до справжнього виду — інакше перемикач
+   * показував би вид, якого немає.
+   */
+  async setMode(mode: ViewMode, toggle?: { value: unknown }): Promise<void> {
+    const switched = await this.viewRouting.switchTo(mode);
+    if (!switched && toggle) toggle.value = this.viewMode.mode();
   }
 
   async logout(): Promise<void> {

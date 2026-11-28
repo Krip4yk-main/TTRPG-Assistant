@@ -28,6 +28,16 @@ const routes: Routes = [
   { path: 'games/:id/applications', children: [], data: gmPage() },
   { path: 'games/:id', children: [] },
   { path: 'calendar', children: [] },
+  {
+    path: 'my-games/broken',
+    children: [],
+    data: gmPage(),
+    resolve: {
+      boom: () => {
+        throw new Error('chunk failed');
+      },
+    },
+  },
 ];
 
 function setup(defaultView: ViewMode = 'player') {
@@ -123,6 +133,24 @@ describe('ViewModeRouting', () => {
       await router.navigateByUrl('/my-applications');
       expect(router.url).toBe('/games/new');
       expect(store.mode()).toBe('gm');
+    });
+  });
+
+  describe('вид застосовується лише після успішної навігації', () => {
+    it('збій навігації (помилка резолвера) вид не змінює', async () => {
+      const { router, store } = setup();
+      await router.navigateByUrl('/calendar');
+      await router.navigateByUrl('/my-games/broken').catch(() => undefined);
+      expect(store.mode()).toBe('player');
+    });
+
+    it('навігація, витіснена іншою, вид не змінює — застосовується вид останньої', async () => {
+      const { router, store } = setup();
+      const first = router.navigateByUrl('/my-games');
+      const second = router.navigateByUrl('/calendar');
+      await Promise.all([first, second]);
+      expect(router.url).toBe('/calendar');
+      expect(store.mode()).toBe('player');
     });
   });
 

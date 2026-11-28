@@ -48,10 +48,11 @@
 
   @if (auth.isActive()) {
     <mat-button-toggle-group
+      #viewToggle="matButtonToggleGroup"
       class="view-mode"
       hideSingleSelectionIndicator
       [value]="viewMode.mode()"
-      (change)="shell.setMode($event.value)"
+      (change)="shell.setMode($event.value, viewToggle)"
       [attr.aria-label]="'shell.viewMode.label' | translate"
     >
       <mat-button-toggle value="player">
