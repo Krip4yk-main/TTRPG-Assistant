@@ -52,6 +52,8 @@ export const users = mysqlTable('users', {
   qbTearAnimation: boolean('qb_tear_animation').notNull().default(true),
   /** Налаштування вигляду дизайну «Магіпанк»: заявка відлітає в конверті (за замовчуванням — так). */
   uiSendAnimation: boolean('ui_send_animation').notNull().default(true),
+  /** «Вид за замовчуванням» (`ViewMode`): з яким видом відкривається нова вкладка. */
+  defaultView: mysqlEnum('default_view', ['player', 'gm']).notNull().default('player'),
   /** Приватні «Мої межі» (масив рядків); віддаються лише власнику через `MeDto`. */
   myLimits: json('my_limits')
     .$type<string[]>()

@@ -115,6 +115,7 @@ describe('GET /api/me', () => {
       ],
       uiPrefs: { tearAnimation: true, sendAnimation: true },
       myLimits: [],
+      defaultView: 'player',
     });
     expect((await request(app).get('/api/me')).status).toBe(401);
   });
@@ -411,6 +412,51 @@ describe('PATCH /api/me/ui-prefs', () => {
     const p = await createUser(db, { status: 'pending' });
     const res = await call('patch', '/api/me/ui-prefs', await login(p.id), {
       tearAnimation: false,
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/me/default-view', () => {
+  it('saves the default view; /api/me returns it (default player)', async () => {
+    const u = await createUser(db, { nickname: 'View' });
+    const cookie = await login(u.id);
+    expect((await call('get', '/api/me', cookie)).body.defaultView).toBe('player');
+    const res = await call('patch', '/api/me/default-view', cookie, { defaultView: 'gm' });
+    expect(res.status).toBe(200);
+    expect(res.body.defaultView).toBe('gm');
+    expect((await call('get', '/api/me', cookie)).body.defaultView).toBe('gm');
+    const [row] = await db.select().from(users).where(eq(users.id, u.id));
+    expect(row!.defaultView).toBe('gm');
+    const back = await call('patch', '/api/me/default-view', cookie, { defaultView: 'player' });
+    expect(back.body.defaultView).toBe('player');
+  });
+
+  it('strict body: empty, unknown value or extra keys → 400', async () => {
+    const u = await createUser(db, { nickname: 'View2' });
+    const cookie = await login(u.id);
+    for (const body of [
+      {},
+      { defaultView: 'admin' },
+      { defaultView: 1 },
+      { defaultView: 'gm', extra: 1 },
+    ]) {
+      const bad = await call('patch', '/api/me/default-view', cookie, body);
+      expect(bad.status).toBe(400);
+      expect(bad.body.error.code).toBe('VALIDATION');
+    }
+  });
+
+  it('guest: 401; pending account: 403', async () => {
+    const guest = await request(app)
+      .patch('/api/me/default-view')
+      .set('Cookie', 'nri_csrf=t')
+      .set('X-CSRF-Token', 't')
+      .send({ defaultView: 'gm' });
+    expect(guest.status).toBe(401);
+    const p = await createUser(db, { status: 'pending' });
+    const res = await call('patch', '/api/me/default-view', await login(p.id), {
+      defaultView: 'gm',
     });
     expect(res.status).toBe(403);
   });

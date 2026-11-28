@@ -6,6 +6,7 @@ import {
   changeTimezoneSchema,
   completeProfileSchema,
   updateAvatarSchema,
+  updateDefaultViewSchema,
   updateMyLimitsSchema,
   updateThemeSchema,
   updateUiPrefsSchema,
@@ -19,6 +20,7 @@ import { TG_LINK_PREFIX } from '../internal/internal.routes.js';
 import {
   changeAvatar,
   changeBirthDate,
+  changeDefaultView,
   changeNickname,
   changeTheme,
   changeUiPrefs,
@@ -89,6 +91,11 @@ export function usersRouter(deps: AppDeps): Router {
   router.patch('/ui-prefs', auth, requireActive, async (req, res) => {
     const prefs = updateUiPrefsSchema.parse(req.body);
     res.json(await changeUiPrefs(deps, req.user!.userId, prefs));
+  });
+
+  router.patch('/default-view', auth, requireActive, async (req, res) => {
+    const { defaultView } = updateDefaultViewSchema.parse(req.body);
+    res.json(await changeDefaultView(deps, req.user!.userId, defaultView));
   });
 
   router.post('/telegram-link-token', auth, requireActive, async (req, res) => {

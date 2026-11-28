@@ -24,6 +24,16 @@ export interface AvatarOptionDto {
   previewUrl: string;
 }
 
+/** «Вид гравця / Вид майстра» — які сторінки й навігацію бачить користувач. */
+export const VIEW_MODES = ['player', 'gm'] as const;
+export type ViewMode = (typeof VIEW_MODES)[number];
+/** Вид нової вкладки, якщо користувач не змінив налаштування (і завжди — для гостя). */
+export const DEFAULT_VIEW_MODE: ViewMode = 'player';
+
+export function isViewMode(value: unknown): value is ViewMode {
+  return VIEW_MODES.includes(value as ViewMode);
+}
+
 /** Відповідь `GET /api/me`. */
 export interface MeDto {
   id: number;
@@ -50,7 +60,13 @@ export interface MeDto {
   uiPrefs: UiPrefsDto;
   /** Мої межі — приватні нотатки для підстановки в заявку; лише тут, нікому більше не показуються. */
   myLimits: string[];
+  /** «Вид за замовчуванням»: з яким видом відкривається нова вкладка. */
+  defaultView: ViewMode;
 }
+
+/** `PATCH /api/me/default-view` → `MeDto`. */
+export const updateDefaultViewSchema = z.object({ defaultView: z.enum(VIEW_MODES) }).strict();
+export type UpdateDefaultViewInput = z.infer<typeof updateDefaultViewSchema>;
 
 /**
  * `PATCH /api/me/timezone` → `MeDto`. Пояс акаунта визначає календар доступності (R5);

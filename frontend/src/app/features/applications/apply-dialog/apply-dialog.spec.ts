@@ -478,6 +478,7 @@ describe('ApplyDialog', () => {
       status: 'active',
       timezone: 'Europe/Kyiv',
       myLimits: ['Без павуків', 'Без крові'],
+      defaultView: 'player',
     } as unknown as MeDto);
     await settle();
     el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();
@@ -505,6 +506,7 @@ describe('ApplyDialog', () => {
       status: 'active',
       timezone: 'Europe/Kyiv',
       myLimits: ['Без павуків', 'Без крові'],
+      defaultView: 'player',
     } as unknown as MeDto);
     await settle();
     el.querySelector<HTMLButtonElement>('button.add-constraint')!.click();

@@ -30,6 +30,7 @@ const me = (role: UserRole): MeDto => ({
   availableThemes: ['quest-board'],
   uiPrefs: { tearAnimation: true, sendAnimation: true },
   myLimits: [],
+  defaultView: 'player',
   avatarSource: 'auto',
   customAvatarUrl: null,
   avatarOptions: [],

@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `default_view` enum('player','gm') DEFAULT 'player' NOT NULL;
