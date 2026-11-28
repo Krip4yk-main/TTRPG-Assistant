@@ -44,12 +44,18 @@
         inputmode="url"
         autocomplete="off"
         [attr.aria-invalid]="urlError() ? 'true' : null"
+        [attr.aria-describedby]="
+          urlError() ? 'avatar-url-hint avatar-url-error' : 'avatar-url-hint'
+        "
       />
-      <mat-hint>{{ 'avatarPicker.urlHint' | translate }}</mat-hint>
+      <mat-hint id="avatar-url-hint"
+        >{{ 'avatarPicker.urlHint' | translate }}
+        {{ 'avatarPicker.urlLimitHint' | translate }}</mat-hint
+      >
     </mat-form-field>
   }
   @if (urlError(); as key) {
-    <p class="nri-alert url-error" role="alert">{{ key | translate }}</p>
+    <p id="avatar-url-error" class="nri-alert url-error" role="alert">{{ key | translate }}</p>
   }
 
   <div class="actions">

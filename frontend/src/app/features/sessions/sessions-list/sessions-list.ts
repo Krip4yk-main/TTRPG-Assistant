@@ -35,6 +35,10 @@ import { formatDateTime, formatWindow, viewerTimeZone } from '../../../core/i18n
 import { SessionsApi } from '../../../core/sessions/sessions.api';
 import { changedKeys, Highlighter } from '../../../core/realtime/highlight';
 import { ViewsService } from '../../../core/views/views.service';
+import {
+  ConfirmDialog,
+  type ConfirmDialogData,
+} from '../../../shared/confirm-dialog/confirm-dialog';
 import { NoteEditor } from '../../notes/note-editor/note-editor';
 import {
   FinishSessionDialog,
@@ -53,6 +57,7 @@ import {
 } from '../session-actions/session-summary-dialog';
 import { openSessionAlternatives } from '../../scheduling/session-alternatives-dialog/open-session-alternatives';
 import { openPinTime } from '../../scheduling/pin-time-dialog/open-pin-time';
+import { formatHours } from '../../../core/i18n/duration';
 
 /** Дія майстра над сесією; `pin` — «Уточнити час» сесії з приблизним часом. */
 export type SessionAction = 'pin' | 'alternatives' | 'reschedule' | 'cancel' | 'finish';
@@ -291,6 +296,8 @@ export class SessionsList {
 
   protected async runSummary(s: SessionDto, action: SummaryAction): Promise<void> {
     if (this.busy()) return;
+    // Надсилання незворотне (учасники одразу отримують сповіщення) — спершу підтвердження.
+    if (action === 'send' && !(await this.confirmSend())) return;
     this.busy.set(true);
     this.message.set(null);
     try {
@@ -327,6 +334,20 @@ export class SessionsList {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private async confirmSend(): Promise<boolean> {
+    const data: ConfirmDialogData = {
+      title: 'sessions.summarySendConfirm.title',
+      text: 'sessions.summarySendConfirm.text',
+      confirm: 'sessions.summarySendConfirm.confirm',
+    };
+    const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
+      data,
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+    return !!(await firstValueFrom(ref.afterClosed()));
   }
 
   /** Оптимістично: показуємо вибір одразу, при помилці — повертаємо попередній. */
@@ -401,8 +422,8 @@ export class SessionsList {
     return s.status === 'scheduled' && s.startWindowMinutes !== null;
   }
 
-  protected hours(s: SessionDto): number {
-    return s.durationMinutes / 60;
+  protected hours(s: SessionDto): string {
+    return formatHours(s.durationMinutes);
   }
 
   /**

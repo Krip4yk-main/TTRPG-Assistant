@@ -14,6 +14,7 @@ import { FinishSessionDialog, PIN_FIRST } from '../finish-session-dialog/finish-
 import { PinTimeDialog } from '../../scheduling/pin-time-dialog/pin-time-dialog';
 import { RescheduleDialog } from '../session-actions/reschedule-dialog';
 import { CancelSessionDialog } from '../session-actions/cancel-session-dialog';
+import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { SessionSummaryDialog } from '../session-actions/session-summary-dialog';
 
 const me = {
@@ -580,6 +581,13 @@ describe('SessionsList', () => {
       expect(row(1)!.textContent).toContain('Знайшли дві карти');
       expect(el.textContent).toContain('sessions.done.summary');
 
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
+      row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
+      await settle();
+      expect(dialogOpen.mock.calls.at(-1)![0]).toBe(ConfirmDialog);
+      http.expectNone('/api/sessions/1/summary/send');
+
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(true) });
       row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
       await settle();
       const sentAt = '2026-11-02T10:00:00.000Z';
@@ -594,6 +602,7 @@ describe('SessionsList', () => {
 
     it('a failed send shows the translated error and keeps the button', async () => {
       await create(true, true, [done]);
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(true) });
       row(1)!.querySelector<HTMLButtonElement>('[data-summary-action="send"]')!.click();
       await settle();
       http

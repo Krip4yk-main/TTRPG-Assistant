@@ -133,6 +133,29 @@ describe('AvatarPicker', () => {
     expect(auth.me()?.avatarSource).toBe('custom');
   });
 
+  it('the URL input points at the hint (with the check limit) and, once failed, at the error', async () => {
+    await choose('custom');
+    const input = el().querySelector<HTMLInputElement>('input[name=customAvatarUrl]')!;
+    const describedBy = () => input.getAttribute('aria-describedby')!.split(' ');
+    expect(describedBy()).toEqual(['avatar-url-hint']);
+    expect(el().querySelector('#avatar-url-hint')!.textContent).toContain(
+      'avatarPicker.urlLimitHint',
+    );
+
+    input.value = 'https://x.example/a';
+    input.dispatchEvent(new Event('input'));
+    await save();
+    put().flush(
+      {
+        error: { code: 'IMAGE_URL_INVALID', details: { field: 'customUrl', reason: 'not_image' } },
+      },
+      { status: 422, statusText: 'Unprocessable' },
+    );
+    await settle();
+    expect(describedBy()).toEqual(['avatar-url-hint', 'avatar-url-error']);
+    expect(el().querySelector('#avatar-url-error')!.getAttribute('role')).toBe('alert');
+  });
+
   it.each(['not_image', 'too_large'])(
     'IMAGE_URL_INVALID %s shows the reason next to the field',
     async (reason) => {
