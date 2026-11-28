@@ -6,10 +6,16 @@
   }
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button type="button" [mat-dialog-close]="false" cdkFocusInitial>
+  <button mat-stroked-button type="button" [mat-dialog-close]="false" cdkFocusInitial>
     {{ 'common.cancel' | translate }}
   </button>
-  <button mat-flat-button type="button" [class.danger]="data.danger" [mat-dialog-close]="true">
+  <!-- Небезпечне підтвердження — текстова кнопка кольору небезпеки (спільне правило рангів). -->
+  <button
+    [matButton]="data.danger ? 'text' : 'filled'"
+    type="button"
+    [class.nri-danger]="data.danger"
+    [mat-dialog-close]="true"
+  >
     {{ data.confirm | translate }}
   </button>
 </mat-dialog-actions>

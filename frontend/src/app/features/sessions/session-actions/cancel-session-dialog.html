@@ -26,10 +26,10 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button type="button" cdkFocusInitial (click)="cancel()">
+    <button mat-stroked-button type="button" cdkFocusInitial (click)="cancel()">
       {{ 'sessions.cancel.keep' | translate }}
     </button>
-    <button mat-flat-button type="submit" class="danger" [disabled]="submitting()">
+    <button mat-button type="submit" class="nri-danger" [disabled]="submitting()">
       {{ 'sessions.cancel.submit' | translate }}
     </button>
   </mat-dialog-actions>

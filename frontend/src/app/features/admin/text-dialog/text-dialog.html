@@ -31,14 +31,14 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button type="button" cdkFocusInitial (click)="cancel()">
+    <button mat-stroked-button type="button" cdkFocusInitial (click)="cancel()">
       {{ 'common.cancel' | translate }}
     </button>
     <button
-      mat-flat-button
+      [matButton]="data.danger ? 'text' : 'filled'"
       type="submit"
       class="confirm"
-      [class.danger]="data.danger"
+      [class.nri-danger]="data.danger"
       [disabled]="submitting()"
     >
       {{ data.confirm | translate }}
