@@ -33,15 +33,16 @@
 #   frontend: sha256:<64 hex>
 #   backup: sha256:<64 hex>
 #
-# One-time setup on his side:
+# One-time setup on the owner's side:
 #   - after the first run: each of the four packages (ttrpg-backend, ttrpg-bot, ttrpg-frontend, ttrpg-backup)
 #     set to public (github.com/<owner>?tab=packages -> the package -> Package settings -> Change visibility);
 #     GitHub makes a new package private, and the cluster pulls without a login
 #   - no repository variables: the settings of the servers live in their .env files (docs/ops/cluster.md)
-#   - the dev accounts his docs/ops/environments.md asks for (a test Telegram bot, Google and Discord OAuth apps
+#   - the dev accounts the owner's docs/ops/environments.md asks for (a test Telegram bot, Google and Discord OAuth apps
 #     with the dev address as redirect); their secret halves go to Kane for sealing
 # Going back to an earlier build: re-run that commit's run of this workflow; it builds that commit again and
-# writes its digests.
+# writes its digests. Note: if a newer push to the same branch has arrived, the re-run is cancelled by it
+# (cancel-in-progress below), so roll back with a commit on the branch or re-run when no newer push follows.
 # The image names and each digest file's path, branch and four keys are fixed on the cluster's side
 # (lab/cluster/pods/ttrpg/shape.nix); a change here needs the same change there.
 

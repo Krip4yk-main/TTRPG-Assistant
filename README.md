@@ -42,6 +42,8 @@ npm run dev -w bot
 
 ## Розгортання
 
+Деплой у кластер: пуш у `beta` (dev) або `main` (prod) запускає `.github/workflows/deploy.yml`, що збирає чотири образи (`backend`, `bot`, `frontend`, `backup`) і пише їх дайджести в гілку `deploy`. Опис для DevOps — [`docs/ops/cluster.md`](docs/ops/cluster.md); налаштування серверів лише в `.env`.
+
 ### Збірка образів
 
 Усі образи збираються з кореня репозиторію (базовий образ `node:26-alpine`, процеси працюють не від root; фронтенд — `nginxinc/nginx-unprivileged`):
@@ -50,9 +52,10 @@ npm run dev -w bot
 docker build -f backend/Dockerfile -t nri-backend .
 docker build -f bot/Dockerfile -t nri-bot .
 docker build -f frontend/Dockerfile -t nri-frontend .
+docker build -f scripts/ops/Dockerfile.backup -t ttrpg-backup .
 ```
 
-Ім'я Telegram-бота й увімкнені способи входу фронтенд бере під час запуску з бекенду (`GET /api/public-config`, з його `.env`); у збірці лишаються лише `NG_APP_DEPLOY_ENV` і `NG_APP_DEV_LOGIN` (за замовчуванням `false`), образ — nginx зі статикою на порту 8080 (SPA: `try_files … /index.html`). Бекенд слухає порт 3000. Запускайте контейнери з `docker run --init` (або `init: true` у compose), щоб сигнали та зомбі-процеси оброблялися коректно.
+Ім'я Telegram-бота й увімкнені способи входу фронтенд бере під час запуску з бекенду (`GET /api/public-config`, з його `.env`); у збірці лишаються лише `NG_APP_DEPLOY_ENV` і `NG_APP_DEV_LOGIN` (за замовчуванням `false`), образ — nginx зі статикою на порту 8080 (SPA: `try_files … /index.html`). Кнопки на `/login` (Telegram, Google, Discord) і ім'я бота залежать від відповіді бекенду `/api/public-config`: у локальній розробці бекенд має бути запущений, інакше форма входу покаже «сервіс недоступний». Бекенд слухає порт 3000. Запускайте контейнери з `docker run --init` (або `init: true` у compose), щоб сигнали та зомбі-процеси оброблялися коректно.
 
 ### Змінні середовища
 

@@ -17,6 +17,8 @@
 | Індексація                                                   | —                                          | заборонена: `X-Robots-Tag: noindex, nofollow`, `robots.txt` `Disallow: /` | дозволена                     |
 | Банер у UI                                                   | немає                                      | «Тестове середовище»                                                      | немає                         |
 
+У кластері середовище визначає гілка: `beta` = dev, `main` = prod (див. [cluster.md](cluster.md)); налаштування серверів — лише в `.env`. Нижче — запуск на окремому сервері через compose.
+
 ## Як це працює
 
 - Бекенд на `dev` додає `X-Robots-Tag: noindex, nofollow` до всіх відповідей і віддає `/robots.txt` з `Disallow: /`.
