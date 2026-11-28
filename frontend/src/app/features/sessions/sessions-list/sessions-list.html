@@ -199,6 +199,33 @@
     }
     @let noteOpen = openNotes().has(s.id);
     <div class="actions">
+      <!-- Дії за рангом (головна → другорядні → небезпечні), далі — службові перемикачі. -->
+      @for (a of actions(s); track a.id) {
+        <button
+          [matButton]="appearance[a.rank]"
+          type="button"
+          [attr.data-action]="a.id"
+          [attr.data-rank]="a.rank"
+          [class.nri-danger]="a.rank === 'danger'"
+          [disabled]="busy()"
+          [attr.aria-label]="'sessions.actionsAria.' + a.id | translate: { when: when(s) }"
+          (click)="run(s, a.id)"
+        >
+          {{ 'sessions.actions.' + a.id | translate }}
+        </button>
+      }
+      @if (canRate(s)) {
+        <a
+          mat-stroked-button
+          class="rate-link"
+          [routerLink]="['/games', gameId(), 'rate']"
+          [queryParams]="{ session: s.id }"
+          [attr.aria-label]="'ratings.sessionLinkAria' | translate: { when: when(s) }"
+        >
+          <mat-icon aria-hidden="true">star</mat-icon>
+          {{ 'ratings.sessionLink' | translate }}
+        </a>
+      }
       <button
         mat-button
         type="button"
@@ -231,31 +258,6 @@
             {{ 'sessions.xCard.sent' | translate }}
           }
         </span>
-      }
-      @if (canRate(s)) {
-        <a
-          mat-stroked-button
-          class="rate-link"
-          [routerLink]="['/games', gameId(), 'rate']"
-          [queryParams]="{ session: s.id }"
-          [attr.aria-label]="'ratings.sessionLinkAria' | translate: { when: when(s) }"
-        >
-          <mat-icon aria-hidden="true">star</mat-icon>
-          {{ 'ratings.sessionLink' | translate }}
-        </a>
-      }
-      @for (a of actions(s); track a) {
-        <button
-          mat-stroked-button
-          type="button"
-          [attr.data-action]="a"
-          [class.danger]="a === 'cancel'"
-          [disabled]="busy()"
-          [attr.aria-label]="'sessions.actionsAria.' + a | translate: { when: when(s) }"
-          (click)="run(s, a)"
-        >
-          {{ 'sessions.actions.' + a | translate }}
-        </button>
       }
     </div>
     <div class="note-panel" [id]="'session-note-' + s.id">
