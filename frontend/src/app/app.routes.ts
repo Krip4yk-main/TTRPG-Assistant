@@ -149,7 +149,7 @@ export const routes: Routes = [
     data: {
       seo: {
         descriptionKey: 'sponsors.seo.description',
-        image: 'assets/promo/nri-promo-1920x1080.png',
+        image: 'assets/promo/nri-promo-og.jpg',
       } satisfies RouteSeo,
     },
     loadComponent: () => import('./features/sponsors/sponsors').then((m) => m.Sponsors),

@@ -15,10 +15,13 @@ const CACHE = 'public, max-age=3600';
 
 /** Сторінка для спонсорів (`/sponsors`): статичні OG-метадані, картинка — промо 1920×1080 з ассетів фронтенду. */
 export const SPONSORS_PATH = '/sponsors';
-export const SPONSORS_OG_IMAGE_PATH = '/assets/promo/nri-promo-1920x1080.png';
+/** Окрема легка картинка для прев'ю (1200×630 JPEG): PNG 1920 завеликий для ботів і WhatsApp. */
+export const SPONSORS_OG_IMAGE_PATH = '/assets/promo/nri-promo-og.jpg';
 const SPONSORS_TITLE = `Спонсорам — ${SITE_NAME}`;
 const SPONSORS_DESCRIPTION =
   'НРІ Асистент — безкоштовний український сервіс пошуку настільних рольових ігор для гравців і майстрів. Шукаємо спонсорів: t.me/krip4yk.';
+const SPONSORS_OG_IMAGE_ALT =
+  'Промо НРІ Асистента: «Знайди свою партію.» Сервіс пошуку настільних рольових ігор для гравців і майстрів, 10 дизайнів на вибір. Шукаємо спонсорів: t.me/krip4yk.';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -38,6 +41,10 @@ type OgInput = {
   type: 'website' | 'profile';
   description?: string;
   image?: string | null;
+  /** Розміри й опис картинки (`og:image:width/height/alt`) — лише разом з `image`. */
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAlt?: string;
   noindex?: boolean;
 };
 
@@ -66,6 +73,19 @@ function renderOg(o: OgInput): string {
       `<meta property="og:image" content="${i}">`,
       `<meta name="twitter:image" content="${i}">`,
     );
+    if (o.imageWidth && o.imageHeight) {
+      tags.push(
+        `<meta property="og:image:width" content="${o.imageWidth}">`,
+        `<meta property="og:image:height" content="${o.imageHeight}">`,
+      );
+    }
+    if (o.imageAlt) {
+      const a = escapeHtml(o.imageAlt);
+      tags.push(
+        `<meta property="og:image:alt" content="${a}">`,
+        `<meta name="twitter:image:alt" content="${a}">`,
+      );
+    }
   }
   if (o.noindex) tags.push('<meta name="robots" content="noindex">');
   return `<!doctype html>\n<html lang="uk">\n<head>\n<meta charset="utf-8">\n${tags.join('\n')}\n</head>\n<body></body>\n</html>\n`;
@@ -181,6 +201,9 @@ export function ogRouter(deps: AppDeps): Router {
         type: 'website',
         description: SPONSORS_DESCRIPTION,
         image: `${base}${SPONSORS_OG_IMAGE_PATH}`,
+        imageWidth: 1200,
+        imageHeight: 630,
+        imageAlt: SPONSORS_OG_IMAGE_ALT,
         // Тестовий сервер не індексується, як і решта сторінок там.
         noindex: env.DEPLOY_ENV === 'dev',
       }),

@@ -8,8 +8,8 @@ export const SPONSORS_PROMO = {
   png: 'assets/promo/nri-promo-1920x1080.png',
   width: 1920,
   height: 1080,
-  // Ширина вмісту сторінки — не більша за --nri-content-max-width (960px).
-  sizes: '(min-width: 960px) 960px, 100vw',
+  // Рамка сторінки — не ширша за --nri-content-max-width (960px), на вужчих екранах — на всю ширину.
+  sizes: '(max-width: 960px) 100vw, 960px',
 } as const;
 
 /** Контакт для спонсорів. */

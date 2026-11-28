@@ -51,6 +51,8 @@ describe('Sponsors', () => {
     expect(img.getAttribute('src')).toBe('assets/promo/nri-promo-1920x1080.png');
     expect(img.getAttribute('width')).toBe('1920');
     expect(img.getAttribute('height')).toBe('1080');
+    expect(img.getAttribute('fetchpriority')).toBe('high');
+    expect(source.getAttribute('sizes')).toBe('(max-width: 960px) 100vw, 960px');
     const alt = img.getAttribute('alt')!;
     for (const part of [
       'Знайди свою партію',
@@ -78,7 +80,7 @@ describe('Sponsors', () => {
     expect(meta.getTag("property='og:title'")?.content).toBe('Спонсорам');
     expect(meta.getTag("property='og:description'")?.content).toContain('t.me/krip4yk');
     const image = meta.getTag("property='og:image'")?.content ?? '';
-    expect(image).toMatch(/^https?:\/\/.+\/assets\/promo\/nri-promo-1920x1080\.png$/);
+    expect(image).toMatch(/^https?:\/\/.+\/assets\/promo\/nri-promo-og\.jpg$/);
     expect(meta.getTag('name="robots"')).toBeNull();
     await harness.navigateByUrl('/about');
     expect(meta.getTag("property='og:image'")).toBeNull();

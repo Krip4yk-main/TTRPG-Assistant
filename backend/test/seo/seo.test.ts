@@ -139,8 +139,11 @@ describe('og previews', () => {
     expect(res.text).toContain('<meta property="og:url" content="https://nri.example/sponsors">');
     expect(res.text).toMatch(/<meta property="og:description" content="[^"]*t\.me\/krip4yk/);
     expect(res.text).toContain(
-      '<meta property="og:image" content="https://nri.example/assets/promo/nri-promo-1920x1080.png">',
+      '<meta property="og:image" content="https://nri.example/assets/promo/nri-promo-og.jpg">',
     );
+    expect(res.text).toContain('<meta property="og:image:width" content="1200">');
+    expect(res.text).toContain('<meta property="og:image:height" content="630">');
+    expect(res.text).toMatch(/<meta property="og:image:alt" content="[^"]*Знайди свою партію/);
     expect(res.text).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(res.text).not.toContain('noindex');
   });
