@@ -48,11 +48,13 @@ function limiter(
   limit: number,
   skip?: (req: Request) => boolean,
   keyGenerator?: (req: Request) => string,
+  opts: { skipSuccessfulRequests?: boolean } = {},
 ): RequestHandler {
   return rateLimit({
     windowMs: windowSec * 1000,
     limit,
     skip,
+    skipSuccessfulRequests: opts.skipSuccessfulRequests ?? false,
     ...(keyGenerator ? { keyGenerator } : {}),
     standardHeaders: 'draft-7',
     legacyHeaders: false,
@@ -72,6 +74,14 @@ function limiter(
     },
   });
 }
+
+/**
+ * Dev-вхід за кодом на беті: ≤ 10 невдалих спроб за 15 хв з однієї IP (успішні не рахуються).
+ * IP — `req.ip`, тобто з `X-Forwarded-For` лише за `TRUST_PROXY` > 0 (інакше — адреса проксі,
+ * і ліміт спільний для всіх: суворіше, але не слабше).
+ */
+export const DEV_LOGIN_CODE_ATTEMPTS = 10;
+export const DEV_LOGIN_CODE_WINDOW_SEC = 15 * 60;
 
 export const IMAGE_CHECK_MAX = 20;
 export const IMAGE_CHECK_WINDOW_SEC = 3600;
@@ -121,6 +131,15 @@ export function rateLimiters(env: Env, redis: Redis) {
       (req) => `u:${req.user!.userId}`,
     ),
     calFeedIp: limiter(redis, 'calip', CAL_FEED_WINDOW_SEC, CAL_FEED_IP_MAX),
+    devLoginCode: limiter(
+      redis,
+      'devcode',
+      DEV_LOGIN_CODE_WINDOW_SEC,
+      DEV_LOGIN_CODE_ATTEMPTS,
+      undefined,
+      undefined,
+      { skipSuccessfulRequests: true },
+    ),
     /** Звіти на dev: ≤ 10 на годину з однієї IP (гості теж надсилають). */
     testerReport: limiter(redis, 'tester', 3600, TESTER_REPORTS_PER_HOUR),
     /**

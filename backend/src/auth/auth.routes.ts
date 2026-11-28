@@ -8,7 +8,7 @@ import type { ErrorCode } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
-import { devLoginEnabled, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
+import { devLoginMode, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
 import { getMe } from '../users/users.service.js';
 import { bannedError, issueAppealToken } from '../appeals/appeals.service.js';
@@ -106,7 +106,7 @@ export function authRouter(deps: AppDeps): Router {
   };
 
   warnDevLoginMisconfig(env);
-  if (devLoginEnabled(env)) router.use(devLoginRouter(deps, startSession));
+  if (devLoginMode(env)) router.use(devLoginRouter(deps, startSession));
 
   const requireTelegram: RequestHandler = (_req, _res, next) => {
     if (!env.TELEGRAM_BOT_TOKEN) throw new AppError(404, 'NOT_FOUND');

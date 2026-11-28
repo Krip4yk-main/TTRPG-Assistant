@@ -8,6 +8,7 @@ import type { Redis } from './redis/client.js';
 import { AppError, errorHandler, notFoundHandler } from './http/errors.js';
 import type { OAuthProvider } from './auth/providers/oauth.js';
 import { authRouter } from './auth/auth.routes.js';
+import { DEV_LOGIN_CODE_PATH, devLoginMode } from './auth/dev-login.js';
 import { appealsRouter } from './appeals/appeals.routes.js';
 import { loadSession, requireActive, requireAuth } from './auth/session.middleware.js';
 import { internalRouter } from './internal/internal.routes.js';
@@ -95,6 +96,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(calendarFeedPublicRouter(deps, { ip: limits.calFeedIp, token: limits.calFeedToken }));
   // Rate limiter — ДО парсерів тіла: клієнт поза лімітом не змусить розбирати 1 МБ.
   app.use(['/api/auth', '/api/appeals'], limits.auth);
+  // Перебір кодів dev-входу на беті: окремий суворий ліміт (лише там маршрут і існує).
+  if (devLoginMode(env) === 'beta')
+    app.post(`/api/auth${DEV_LOGIN_CODE_PATH}`, limits.devLoginCode);
   // Відгуки: на dev — гості теж, ліміт з IP до сесії; поза dev — лише користувачі (ліміт нижче).
   const devFeedback = env.DEPLOY_ENV === 'dev';
   if (devFeedback) app.post('/api/tester-reports', limits.testerReport);
