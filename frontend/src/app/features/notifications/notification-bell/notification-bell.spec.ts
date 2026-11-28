@@ -354,9 +354,13 @@ describe('NotificationBell', () => {
 
     await open([notification(3), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })], 1);
     expect(btn().disabled).toBe(false);
+    // Подвійне натискання, поки чанк діалогу вантажиться, — лише один діалог.
     btn().click();
+    btn().click();
+    await vi.waitFor(() => expect(document.querySelector('mat-dialog-actions')).not.toBeNull());
     await flushAsync();
     await settle();
+    expect(document.querySelectorAll('mat-dialog-container')).toHaveLength(1);
     const confirm = document.querySelector<HTMLButtonElement>(
       'mat-dialog-actions button.mat-warn, mat-dialog-actions button:last-of-type',
     )!;

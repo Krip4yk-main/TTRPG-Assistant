@@ -43,10 +43,7 @@ import {
   notificationTime,
   notificationView,
 } from '../../../core/notifications/notification-view';
-import {
-  ConfirmDialog,
-  type ConfirmDialogData,
-} from '../../../shared/confirm-dialog/confirm-dialog';
+import type { ConfirmDialogData } from '../../../shared/confirm-dialog/confirm-dialog';
 import { NotificationsStore } from '../../../core/notifications/notifications.store';
 import { AcceptedNoticeMoment } from '../../../theming/moments/accepted-notice';
 import { ThemeService } from '../../../theming/theme.service';
@@ -284,18 +281,36 @@ export class NotificationBell {
     void this.store.remove(n);
   }
 
-  /** Видалити прочитані — лише після підтвердження (діалог відкривається над панеллю). */
+  /** Чанк діалогу підтвердження ще вантажиться (див. `removeRead`). */
+  private loadingConfirm = false;
+
+  /**
+   * Видалити прочитані — лише після підтвердження (діалог відкривається над панеллю). Діалог —
+   * окремим чанком, вантажиться при першому натисканні; повторне натискання, поки він
+   * вантажиться, другого діалогу не відкриває.
+   */
   protected async removeRead(): Promise<void> {
-    const ref = this.dialog.open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
-      data: {
-        title: 'notifications.panel.removeRead.title',
-        text: 'notifications.panel.removeRead.text',
-        confirm: 'notifications.panel.removeRead.confirm',
-        danger: true,
+    if (this.loadingConfirm) return;
+    this.loadingConfirm = true;
+    let ConfirmDialog;
+    try {
+      ({ ConfirmDialog } = await import('../../../shared/confirm-dialog/confirm-dialog'));
+    } finally {
+      this.loadingConfirm = false;
+    }
+    const ref = this.dialog.open<InstanceType<typeof ConfirmDialog>, ConfirmDialogData, boolean>(
+      ConfirmDialog,
+      {
+        data: {
+          title: 'notifications.panel.removeRead.title',
+          text: 'notifications.panel.removeRead.text',
+          confirm: 'notifications.panel.removeRead.confirm',
+          danger: true,
+        },
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
       },
-      autoFocus: 'first-tabbable',
-      restoreFocus: true,
-    });
+    );
     if (!(await firstValueFrom(ref.afterClosed()))) return;
     await this.store.removeRead();
   }
