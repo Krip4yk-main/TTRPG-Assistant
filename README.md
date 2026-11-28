@@ -112,7 +112,7 @@ location / {
 
 #### SEO і прев'ю посилань
 
-`/sitemap.xml` і `/robots.txt` віддає бекенд (без сесії; кеш 1 год) — проксіюйте їх на backend. Боти прев'ю посилань (Telegram, Discord, Facebook, Twitter, Slack, LinkedIn, WhatsApp) не виконують JS, тож для сторінок ігор і профілів їх варто перенаправляти на мінімальні HTML-документи з OG-метаданими (`/api/og/games/:id`, `/api/og/users/:publicId`). Googlebot рендерить JS і має отримувати SPA, тому в список ботів його не додавайте. Блоки нижче розмістіть **перед** `location /`; `map` — у контексті `http`:
+`/sitemap.xml` і `/robots.txt` віддає бекенд (без сесії; кеш 1 год) — проксіюйте їх на backend. Боти прев'ю посилань (Telegram, Discord, Facebook, Twitter, Slack, LinkedIn, WhatsApp) не виконують JS, тож для сторінок ігор і профілів їх варто перенаправляти на мінімальні HTML-документи з OG-метаданими (`/api/og/games/:id`, `/api/og/users/:publicId`, для сторінки спонсорів — `/api/og/sponsors` з промо-картинкою `/assets/promo/nri-promo-1920x1080.png`). Googlebot рендерить JS і має отримувати SPA, тому в список ботів його не додавайте. Блоки нижче розмістіть **перед** `location /`; `map` — у контексті `http`:
 
 ```nginx
 map $http_user_agent $is_preview_bot {
@@ -138,6 +138,12 @@ location ~ ^/games/(\d+)$ {
 
 location ~ ^/users/([a-z0-9]+)$ {
   if ($is_preview_bot) { rewrite ^/users/([a-z0-9]+)$ /api/og/users/$1 last; }
+  proxy_pass http://frontend:8080;
+  proxy_set_header Host $host;
+}
+
+location = /sponsors {
+  if ($is_preview_bot) { rewrite ^ /api/og/sponsors last; }
   proxy_pass http://frontend:8080;
   proxy_set_header Host $host;
 }
