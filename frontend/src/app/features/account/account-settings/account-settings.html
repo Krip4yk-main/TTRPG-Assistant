@@ -23,7 +23,7 @@
         {{ 'account.profile.calendar' | translate }}
       </a>
       @if (me(); as user) {
-        <a mat-button [routerLink]="['/users', user.publicId]">
+        <a mat-stroked-button [routerLink]="['/users', user.publicId]">
           {{ 'account.profile.view' | translate }}
         </a>
       }
@@ -279,7 +279,7 @@
       </button>
     </form>
     @if (deviceZone(); as device) {
-      <button mat-button type="button" class="use-device-tz" (click)="useDeviceZone()">
+      <button mat-stroked-button type="button" class="use-device-tz" (click)="useDeviceZone()">
         {{ 'account.timezone.useDevice' | translate: { tz: device } }}
       </button>
     }
@@ -301,8 +301,8 @@
         {{ 'account.danger.logoutAll' | translate }}
       </button>
       <button
-        mat-flat-button
-        class="danger"
+        mat-button
+        class="nri-danger"
         type="button"
         [disabled]="busy()"
         (click)="deleteAccount()"

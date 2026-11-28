@@ -212,9 +212,9 @@
               </span>
               @if (canLeave()) {
                 <button
-                  mat-stroked-button
+                  mat-button
                   type="button"
-                  class="leave danger"
+                  class="leave nri-danger"
                   [disabled]="busy()"
                   (click)="leave()"
                 >
@@ -228,9 +228,9 @@
                 {{ 'games.details.pending' | translate }}
               </span>
               <button
-                mat-stroked-button
+                mat-button
                 type="button"
-                class="withdraw"
+                class="withdraw nri-danger"
                 [disabled]="busy()"
                 (click)="withdraw()"
               >

@@ -25,7 +25,13 @@
     @if (restored()) {
       <div class="nri-notice restored-notice" role="status">
         <span>{{ 'games.form.restored' | translate }}</span>
-        <button mat-button type="button" [disabled]="busy()" (click)="discardChanges()">
+        <button
+          mat-button
+          type="button"
+          class="nri-danger"
+          [disabled]="busy()"
+          (click)="discardChanges()"
+        >
           {{ 'games.form.discard' | translate }}
         </button>
       </div>
@@ -641,19 +647,26 @@
 
       @if (!closed()) {
         <div class="form-actions">
-          <a mat-button routerLink="/my-games">{{ 'common.cancel' | translate }}</a>
+          <!-- Ранги: небезпечна «Відкинути» — найдалі від головної; «Скасувати» — обведена;
+               «Зберегти» — головна для опублікованої гри, для чернетки головна — «Опублікувати». -->
           @if (hasChanges()) {
             <button
               mat-button
               type="button"
-              class="discard"
+              class="discard nri-danger"
               [disabled]="busy()"
               (click)="discardChanges()"
             >
               {{ 'games.form.discard' | translate }}
             </button>
           }
-          <button mat-stroked-button type="submit" class="save" [disabled]="busy()">
+          <a mat-stroked-button routerLink="/my-games">{{ 'common.cancel' | translate }}</a>
+          <button
+            [matButton]="isDraft() ? 'outlined' : 'filled'"
+            type="submit"
+            class="save"
+            [disabled]="busy()"
+          >
             {{ (isDraft() ? 'games.form.saveDraft' : 'games.form.save') | translate }}
           </button>
           @if (isDraft()) {

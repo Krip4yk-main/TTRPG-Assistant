@@ -131,9 +131,9 @@
                   @if (a.status === 'pending') {
                     <div class="actions">
                       <button
-                        mat-stroked-button
+                        mat-button
                         type="button"
-                        class="withdraw danger"
+                        class="withdraw nri-danger"
                         [disabled]="busyId() !== null"
                         [attr.aria-label]="
                           'games.applications.my.withdrawAria' | translate: { title: a.game.title }

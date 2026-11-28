@@ -32,7 +32,7 @@
           </div>
           <div class="actions">
             <button
-              mat-stroked-button
+              mat-flat-button
               type="button"
               data-action="still-alive"
               [disabled]="busyId() !== null"
@@ -47,7 +47,7 @@
             <button
               mat-button
               type="button"
-              class="danger"
+              class="nri-danger"
               data-action="close-dead"
               [disabled]="busyId() !== null"
               [attr.aria-label]="
