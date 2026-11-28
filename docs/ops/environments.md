@@ -33,7 +33,7 @@
 3. **Google:** окремий OAuth client (Web); redirect URI `https://<dev-домен>/api/auth/google/callback`.
 4. **Discord:** окремий Application; Redirects `https://<dev-домен>/api/auth/discord/callback`.
 5. `cp .env.dev.template .env.dev` і заповніть (власні паролі MySQL; `BACKUP_ENABLED=false`; `NG_APP_TELEGRAM_BOT_USERNAME` — тестовий бот; `NG_APP_DEV_LOGIN=true`, якщо потрібен dev-вхід за кодом).
-6. `cp backend/.env.template backend/.env`: `NODE_ENV=production`, `PUBLIC_BASE_URL=https://<dev-домен>`, `TRUST_PROXY` за кількістю проксі (на беті >= 1), `DEV_LOGIN_ENABLED=true` і `DEV_LOGIN_CODES` для тестерів (див. «Dev-вхід за середовищами»; без тестерів `false`), **нові** `IDENTITY_PEPPER`, `INTERNAL_API_KEY`, `CALENDAR_IMPORT_KEY` (`openssl rand -base64 32`), токен і username тестового бота, ключі Google/Discord з кроків 3–4.
+6. `cp backend/.env.template backend/.env`: `NODE_ENV=production`, `PUBLIC_BASE_URL=https://<dev-домен>`, `TRUST_PROXY` за кількістю проксі (на беті >= 1), `DEV_LOGIN_ENABLED=true` і `DEV_LOGIN_CODES` для тестерів (див. «Dev-вхід за середовищами»; без тестерів `false`), **нові** `IDENTITY_PEPPER`, `INTERNAL_API_KEY`, `CALENDAR_IMPORT_KEY` (`openssl rand -base64 32`), токен і username тестового бота, ключі Google/Discord з кроків 3–4. `OWNER_TELEGRAM_ID` — ваш числовий Telegram id (окремо для кожного середовища; вхід через Telegram-віджет з ним робить власником, якщо його ще немає — див. [deploy.md](deploy.md#перший-власник-платформи)).
 7. `cp bot/.env.template bot/.env`: токен тестового бота, `INTERNAL_API_KEY` дослівно як у `backend/.env`, `PUBLIC_BASE_URL=https://<dev-домен>`.
 8. Запуск:
 
