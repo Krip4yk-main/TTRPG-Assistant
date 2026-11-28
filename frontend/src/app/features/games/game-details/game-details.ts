@@ -38,6 +38,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiError } from '../../../core/api/api-error';
 import { ApplicationsApi } from '../../../core/applications/applications.api';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { NO_START_DATE_KEY } from '../../../core/games/game-card.vm';
 import { CatalogStore } from '../../../core/catalog/catalog.store';
 import { GamesApi } from '../../../core/games/games.api';
 import { RatingsApi } from '../../../core/ratings/ratings.api';
@@ -344,7 +345,7 @@ export class GameDetails {
   });
   /** Підпис, коли найближчої сесії немає: чернетка без дати — «Дату ще не визначено». */
   protected readonly noNextKey = computed(() =>
-    this.game()?.startsAt === null ? 'games.my.noStartDate' : 'search.card.noNext',
+    this.game()?.startsAt === null ? NO_START_DATE_KEY : 'search.card.noNext',
   );
   /**
    * Тижневий розклад (дні й час) — теж у поясі глядача: дні задані в поясі гри й

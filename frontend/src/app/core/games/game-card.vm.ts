@@ -9,6 +9,9 @@ import { formatWindow, viewerTimeZone } from '../i18n/dates';
 import type { ViewMode } from '../view-mode/view-mode.store';
 import { toSeatsVm, type SeatsVm } from './seats.vm';
 
+/** Спільний ключ i18n для гри без дати старту (чернетка) — «Дату ще не визначено». */
+export const NO_START_DATE_KEY = 'games.noStartDate';
+
 /**
  * Бейдж (позначка) для слотів дизайну. `kind` + `value` — семантика (дизайн за ними обирає
  * колір чи форму), `labelKey` — готовий ключ i18n, `icon` — ім'я Material Symbols або `null`.

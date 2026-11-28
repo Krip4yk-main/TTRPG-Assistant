@@ -2,7 +2,7 @@ import type { GameAction, GameStatus, MeDto, MyGameCardDto } from '@nri/shared';
 import { formatWindow, viewerTimeZone } from '../i18n/dates';
 import type { SeenBadge } from '../views/views.service';
 import type { ViewMode } from '../view-mode/view-mode.store';
-import type { LinePart } from './game-card.vm';
+import { NO_START_DATE_KEY, type LinePart } from './game-card.vm';
 import { toSeatsVm, type SeatsVm } from './seats.vm';
 
 /** Дії-переходи, доступні в кожному статусі (редагування — окремо). */
@@ -200,7 +200,7 @@ export function toMyGameItemVm(
     ],
     nextSession,
     nextSessionApprox: nextSession !== null && game.nextSessionWindowMinutes !== null,
-    noNextKey: game.startsAt === null ? 'games.my.noStartDate' : 'games.my.noNextSession',
+    noNextKey: game.startsAt === null ? NO_START_DATE_KEY : 'games.my.noNextSession',
     freeSlots: game.freeSlots,
     maxPlayers: game.maxPlayers,
     seats: toSeatsVm(game.freeSlots, game.maxPlayers, viewMode),

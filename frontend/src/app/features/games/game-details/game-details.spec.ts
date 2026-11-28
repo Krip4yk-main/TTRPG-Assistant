@@ -1083,7 +1083,7 @@ describe('GameDetails', () => {
 
     it('a draft without a start date: «date not set yet», weekdays without a time', async () => {
       await open(me, (r) => r.flush({ ...game, startsAt: null, nextSessionAt: null }));
-      expect(nextSessionText()).toContain('games.my.noStartDate');
+      expect(nextSessionText()).toContain('games.noStartDate');
       expect(el().querySelector('.schedule-zone')).toBeNull();
     });
 
