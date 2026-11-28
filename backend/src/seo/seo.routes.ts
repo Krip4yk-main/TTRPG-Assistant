@@ -13,6 +13,13 @@ const SITEMAP_KEY = 'seo:sitemap';
 const SITEMAP_TTL_SEC = 600;
 const CACHE = 'public, max-age=3600';
 
+/** Сторінка для спонсорів (`/sponsors`): статичні OG-метадані, картинка — промо 1920×1080 з ассетів фронтенду. */
+export const SPONSORS_PATH = '/sponsors';
+export const SPONSORS_OG_IMAGE_PATH = '/assets/promo/nri-promo-1920x1080.png';
+const SPONSORS_TITLE = `Спонсорам — ${SITE_NAME}`;
+const SPONSORS_DESCRIPTION =
+  'НРІ Асистент — безкоштовний український сервіс пошуку настільних рольових ігор для гравців і майстрів. Шукаємо спонсорів: t.me/krip4yk.';
+
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -146,6 +153,7 @@ export function seoRootRouter(deps: AppDeps): Router {
     const urls = [
       entry(''),
       entry('/about'),
+      entry(SPONSORS_PATH),
       ...gameRows.map((g) => entry(`/games/${g.id}`, g.updatedAt)),
       ...userRows.map((u) => entry(`/users/${u.publicId}`, u.updatedAt)),
     ];
@@ -162,6 +170,22 @@ export function ogRouter(deps: AppDeps): Router {
   const { db, env } = deps;
   const base = env.PUBLIC_BASE_URL.replace(/\/+$/, '');
   const router = Router();
+
+  router.get('/sponsors', (_req, res) => {
+    res.set('Cache-Control', CACHE);
+    sendHtml(
+      res,
+      renderOg({
+        title: SPONSORS_TITLE,
+        url: `${base}${SPONSORS_PATH}`,
+        type: 'website',
+        description: SPONSORS_DESCRIPTION,
+        image: `${base}${SPONSORS_OG_IMAGE_PATH}`,
+        // Тестовий сервер не індексується, як і решта сторінок там.
+        noindex: env.DEPLOY_ENV === 'dev',
+      }),
+    );
+  });
 
   router.get('/games/:id', async (req, res) => {
     const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : NaN;

@@ -66,6 +66,7 @@ describe('sitemap.xml / robots.txt', () => {
     expect(res.text).toContain(`<loc>${BASE}/games/${open}</loc>`);
     expect(res.text).toContain(`<loc>${BASE}/games/${started}</loc>`);
     expect(res.text).toContain(`<loc>${BASE}/about</loc>`);
+    expect(res.text).toContain(`<loc>${BASE}/sponsors</loc>`);
     expect(res.text).toContain('<lastmod>');
     for (const id of [adult, draft, done]) expect(res.text).not.toContain(`/games/${id}<`);
     expect(res.text).not.toContain(del.publicId);
@@ -125,6 +126,33 @@ describe('dev environment indexing', () => {
 });
 
 describe('og previews', () => {
+  it('sponsors page: static og tags with the absolute promo image on prod', async () => {
+    const prodApp = createApp({
+      ...deps,
+      env: { ...deps.env, DEPLOY_ENV: 'prod', PUBLIC_BASE_URL: 'https://nri.example/' },
+    });
+    const res = await request(prodApp).get('/api/og/sponsors');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/html/);
+    expect(res.text).toContain('<title>Спонсорам — НРІ Асистент</title>');
+    expect(res.text).toContain('<meta property="og:title" content="Спонсорам — НРІ Асистент">');
+    expect(res.text).toContain('<meta property="og:url" content="https://nri.example/sponsors">');
+    expect(res.text).toMatch(/<meta property="og:description" content="[^"]*t\.me\/krip4yk/);
+    expect(res.text).toContain(
+      '<meta property="og:image" content="https://nri.example/assets/promo/nri-promo-1920x1080.png">',
+    );
+    expect(res.text).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(res.text).not.toContain('noindex');
+  });
+
+  it('sponsors page is noindex on dev', async () => {
+    const devApp = createApp({ ...deps, env: { ...deps.env, DEPLOY_ENV: 'dev' } });
+    const res = await request(devApp).get('/api/og/sponsors');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('<meta name="robots" content="noindex">');
+    expect(res.headers['x-robots-tag']).toBe('noindex, nofollow');
+  });
+
   it('escapes game title and builds og tags', async () => {
     const id = await insertGame({
       title: '<script>alert("x")</script>&',
