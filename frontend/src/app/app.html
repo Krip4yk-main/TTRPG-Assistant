@@ -1,3 +1,9 @@
 <nri-slot name="shell" />
-<nri-env-banner />
-<nri-tester-report />
+<!--
+  Окремі чанки (не в початковому бандлі): плашка dev-середовища й кнопка звіту/відгуку з
+  діалогом (тягне zod зі shared) не потрібні для першого кадру.
+-->
+@defer (on idle) {
+  <nri-env-banner />
+  <nri-tester-report />
+}
