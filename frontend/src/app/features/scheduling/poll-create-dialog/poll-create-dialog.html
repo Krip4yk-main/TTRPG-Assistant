@@ -65,16 +65,19 @@
           </p>
           <div class="add-row">
             @if (pollKind() === 'regular') {
-              <label class="input">
-                <span>{{ 'scheduling.create.weekday' | translate }}</span>
-                <select class="add-weekday" #wd (change)="setWeekday(wd.value)">
+              <div class="input">
+                <span id="poll-weekday-label">{{ 'scheduling.create.weekday' | translate }}</span>
+                <mat-select
+                  class="add-weekday"
+                  aria-labelledby="poll-weekday-label"
+                  [value]="addWeekday()"
+                  (selectionChange)="setWeekday($event.value)"
+                >
                   @for (d of weekdays; track d) {
-                    <option [value]="d" [selected]="d === addWeekday()">
-                      {{ 'games.weekdaysLong.' + d | translate }}
-                    </option>
+                    <mat-option [value]="d">{{ 'games.weekdaysLong.' + d | translate }}</mat-option>
                   }
-                </select>
-              </label>
+                </mat-select>
+              </div>
             } @else {
               <label class="input">
                 <span>{{ 'scheduling.create.date' | translate }}</span>
@@ -115,39 +118,47 @@
       }
     </section>
 
-    <label class="input">
-      <span class="group-label">{{ 'scheduling.create.deadline' | translate }}</span>
-      <select
+    <div class="input">
+      <span class="group-label" id="poll-deadline-label">{{
+        'scheduling.create.deadline' | translate
+      }}</span>
+      <mat-select
         class="deadline"
-        #dl
+        aria-labelledby="poll-deadline-label"
         aria-describedby="poll-deadline-hint"
-        (change)="deadlineHours.set(numberValue(dl.value))"
+        [value]="deadlineHours()"
+        (selectionChange)="deadlineHours.set($event.value)"
       >
         @for (h of deadlines; track h) {
-          <option [value]="h" [selected]="h === deadlineHours()">
-            {{ 'scheduling.create.deadlines.' + h | translate }}
-          </option>
+          <mat-option [value]="h">{{ 'scheduling.create.deadlines.' + h | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
       <span class="nri-muted hint" id="poll-deadline-hint">{{
         'scheduling.create.deadlineHint' | translate: { when: deadlineLabel() }
       }}</span>
-    </label>
+    </div>
 
     @if (pollKind() === 'one_off') {
-      <label class="input">
-        <span class="group-label">{{ 'scheduling.create.target' | translate }}</span>
-        <select class="target" #tg (change)="setTarget(tg.value)">
-          <option value="" [selected]="targetId() === null">
+      <div class="input">
+        <span class="group-label" id="poll-target-label">{{
+          'scheduling.create.target' | translate
+        }}</span>
+        <mat-select
+          class="target"
+          aria-labelledby="poll-target-label"
+          [value]="targetId() ?? 0"
+          (selectionChange)="setTarget($event.value)"
+        >
+          <mat-option [value]="0">
             {{ 'scheduling.create.targetNone.' + (campaign ? 'campaign' : 'oneshot') | translate }}
-          </option>
+          </mat-option>
           @for (s of sessions(); track s.id) {
-            <option [value]="s.id" [selected]="s.id === targetId()">
+            <mat-option [value]="s.id">
               {{ 'scheduling.create.targetSession' | translate: { when: sessionLabel(s) } }}
-            </option>
+            </mat-option>
           }
-        </select>
-      </label>
+        </mat-select>
+      </div>
     }
 
     <div aria-live="assertive">

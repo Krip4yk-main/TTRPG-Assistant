@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   nextWeeklyStart,
@@ -61,7 +62,14 @@ const draftKey = (o: Pick<OptionDraft, 'weekday' | 'startMin' | 'startsAt'>) =>
  */
 @Component({
   selector: 'nri-poll-create-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatIconModule, TranslatePipe],
+  imports: [
+    MatButtonModule,
+    MatButtonToggleModule,
+    MatDialogModule,
+    MatIconModule,
+    MatSelectModule,
+    TranslatePipe,
+  ],
   templateUrl: './poll-create-dialog.html',
   styleUrl: './poll-create-dialog.less',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -174,17 +182,13 @@ export class PollCreateDialog {
     this.options.update((list) => [...list, draft]);
   }
 
-  protected numberValue(value: string): number {
-    return Number(value);
-  }
-
-  protected setWeekday(value: string): void {
-    const d = Number(value);
+  protected setWeekday(value: number): void {
+    const d = value;
     if (Number.isInteger(d) && d >= 0 && d <= 6) this.addWeekday.set(d as Weekday);
   }
 
-  protected setTarget(value: string): void {
-    this.targetId.set(Number(value) || null);
+  protected setTarget(value: number): void {
+    this.targetId.set(value || null);
   }
 
   protected async submit(): Promise<void> {

@@ -4,6 +4,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   POLL_MAX_OPTIONS,
@@ -59,6 +60,7 @@ type Tab = 'regular' | 'oneOff';
     MatCheckboxModule,
     MatDialogModule,
     MatIconModule,
+    MatSelectModule,
     TranslatePipe,
     ParticipantStatuses,
   ],
@@ -200,8 +202,8 @@ export class CommonTimesDialog {
     return formatSlot(s.startsAt, this.tz);
   }
 
-  protected setTarget(value: string): void {
-    this.targetId.set(Number(value) || null);
+  protected setTarget(value: number): void {
+    this.targetId.set(value || null);
   }
 
   protected async move(c: OneOffCandidateDto): Promise<void> {

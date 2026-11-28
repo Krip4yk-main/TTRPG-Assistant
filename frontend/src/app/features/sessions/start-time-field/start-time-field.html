@@ -39,9 +39,6 @@
       <mat-form-field appearance="outline" subscriptSizing="dynamic" floatLabel="always">
         <mat-label>{{ 'sessions.window.from' | translate }}</mat-label>
         <mat-select class="window-from" [formControl]="time()" [required]="required()">
-          @if (offGrid()) {
-            <mat-option value=""></mat-option>
-          }
           @for (t of starts; track t) {
             <mat-option [value]="t">{{ t }}</mat-option>
           }

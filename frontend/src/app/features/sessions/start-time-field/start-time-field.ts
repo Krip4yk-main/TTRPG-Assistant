@@ -59,8 +59,6 @@ export class StartTimeField {
 
   protected readonly approx = computed(() => this.state().window !== null);
   protected readonly disabled = computed(() => this.state().disabled);
-  /** «З» поза сіткою 30 хв (порожнє) — порожній варіант у списку. */
-  protected readonly offGrid = computed(() => !this.starts.includes(this.state().time));
   protected readonly ends = computed(() =>
     windowEndOptions(this.date(), this.state().time, this.timezone()),
   );
