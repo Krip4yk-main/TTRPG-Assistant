@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
+import { HEALTH_CACHE_TTL_MS } from '../../src/http/health.js';
 import {
   WORKER_HEARTBEAT_KEY,
   WORKER_PROGRESS_KEY,
@@ -161,5 +162,68 @@ describe('GET /api/health', () => {
     expect(res.body.db).toBe('down');
     expect(took).toBeGreaterThanOrEqual(900);
     expect(took).toBeLessThan(2500);
+  });
+});
+
+describe('GET /api/health — cache and single-flight', () => {
+  /** Залежності з лічильником перевірок БД (решта — справжні). */
+  function countingDeps(execute: () => Promise<unknown> = () => Promise.resolve([])) {
+    const calls = { db: 0 };
+    const app = createApp({
+      ...deps,
+      db: {
+        execute: () => {
+          calls.db++;
+          return execute();
+        },
+      } as never,
+    });
+    return { app, calls };
+  }
+
+  it('concurrent requests share one probe', async () => {
+    await writeWorkerProgress(redis);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { app, calls } = countingDeps(() => gate.then(() => []));
+    const pending = Promise.all([1, 2, 3].map(() => request(app).get('/api/health')));
+    await vi.waitFor(() => expect(calls.db).toBe(1));
+    release();
+    const results = await pending;
+    expect(calls.db).toBe(1);
+    for (const res of results) {
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true, db: 'ok', redis: 'ok', worker: 'ok' });
+    }
+  });
+
+  it('reuses the result within the TTL and probes again after it', async () => {
+    await writeWorkerProgress(redis);
+    const { app, calls } = countingDeps();
+    expect((await request(app).get('/api/health')).status).toBe(200);
+    expect((await request(app).get('/api/health')).status).toBe(200);
+    expect(calls.db).toBe(1);
+    vi.setSystemTime(Date.now() + HEALTH_CACHE_TTL_MS + 10);
+    expect((await request(app).get('/api/health')).status).toBe(200);
+    expect(calls.db).toBe(2);
+  });
+
+  it('does not keep a failure longer than the TTL', async () => {
+    await writeWorkerProgress(redis);
+    let fail = true;
+    const { app, calls } = countingDeps(() =>
+      fail ? Promise.reject(new Error('boom')) : Promise.resolve([]),
+    );
+    const down = await request(app).get('/api/health');
+    expect(down.status).toBe(503);
+    expect(down.body.db).toBe('down');
+    fail = false;
+    // У межах TTL — той самий результат, без нової перевірки.
+    expect((await request(app).get('/api/health')).status).toBe(503);
+    expect(calls.db).toBe(1);
+    vi.setSystemTime(Date.now() + HEALTH_CACHE_TTL_MS + 10);
+    const up = await request(app).get('/api/health');
+    expect(up.status).toBe(200);
+    expect(calls.db).toBe(2);
   });
 });

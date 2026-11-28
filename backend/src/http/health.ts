@@ -5,8 +5,14 @@ import { WORKER_PROGRESS_KEY, isProgressFresh } from '../jobs/liveness.js';
 
 /** Ліміт кожної перевірки. */
 export const HEALTH_CHECK_TIMEOUT_MS = 1000;
+/**
+ * Скільки живе готовий результат `/api/health` (і успішний, і невдалий): часті опитування
+ * моніторингу не б'ють щоразу по БД і Redis, а збій видно не пізніше ніж за цей час.
+ */
+export const HEALTH_CACHE_TTL_MS = 2000;
 
 type Status = 'ok' | 'down' | 'stale';
+type Readiness = { ok: boolean; db: Status; redis: Status; worker: Status };
 
 /** Виконує перевірку з таймаутом; будь-яка помилка чи прострочення → fallback. */
 async function guarded(
@@ -41,7 +47,7 @@ export function healthRouter({ db, redis }: Pick<AppDeps, 'db' | 'redis'>): Rout
     res.json({ ok: true });
   });
 
-  router.get('/api/health', async (_req, res) => {
+  async function probe(): Promise<Readiness> {
     const [dbStatus, redisStatus, worker] = await Promise.all([
       guarded('db', async () => (await db.execute(sql`SELECT 1`), 'ok'), 'down'),
       guarded('redis', async () => ((await redis.ping()) === 'PONG' ? 'ok' : 'down'), 'down'),
@@ -53,7 +59,29 @@ export function healthRouter({ db, redis }: Pick<AppDeps, 'db' | 'redis'>): Rout
       ),
     ]);
     const ok = dbStatus === 'ok' && redisStatus === 'ok' && worker === 'ok';
-    res.status(ok ? 200 : 503).json({ ok, db: dbStatus, redis: redisStatus, worker });
+    return { ok, db: dbStatus, redis: redisStatus, worker };
+  }
+
+  // Single-flight: одночасні запити чекають ту саму перевірку; готовий результат — на TTL
+  // від моменту завершення перевірки (`guarded` не відхиляється, тож проміс завжди успішний).
+  let cached: { result: Readiness; until: number } | null = null;
+  let inFlight: Promise<Readiness> | null = null;
+  function readiness(): Promise<Readiness> {
+    if (cached && Date.now() < cached.until) return Promise.resolve(cached.result);
+    inFlight ??= probe()
+      .then((result) => {
+        cached = { result, until: Date.now() + HEALTH_CACHE_TTL_MS };
+        return result;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+    return inFlight;
+  }
+
+  router.get('/api/health', async (_req, res) => {
+    const result = await readiness();
+    res.status(result.ok ? 200 : 503).json(result);
   });
 
   return router;
