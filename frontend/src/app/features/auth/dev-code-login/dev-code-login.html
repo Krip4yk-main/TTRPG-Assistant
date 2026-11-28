@@ -9,44 +9,52 @@
   } @else {
     <div class="nri-card">
       <h1>{{ 'login.devCode.title' | translate }}</h1>
-      <p class="nri-muted">{{ 'login.devCode.hint' | translate }}</p>
+      @if (availability() === 'disabled') {
+        <p class="nri-muted disabled-note" role="status">
+          {{ 'login.devCode.disabled' | translate }}
+        </p>
+      } @else {
+        <p class="nri-muted">{{ 'login.devCode.hint' | translate }}</p>
 
-      @if (errorKey(); as key) {
-        <p class="nri-alert" role="alert">{{ key | translate }}</p>
+        @if (errorKey(); as key) {
+          <p class="nri-alert" role="alert">{{ key | translate }}</p>
+        }
+
+        @if (availability() === 'enabled') {
+          <form class="dev-login" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'login.devCode.code' | translate }}</mat-label>
+              <input
+                matInput
+                type="password"
+                formControlName="code"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                required
+              />
+              @if (form.controls.code.hasError('required')) {
+                <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'login.dev.nickname' | translate }}</mat-label>
+              <input matInput formControlName="nickname" autocomplete="off" required />
+              <mat-hint>{{ 'profile.hints.nickname' | translate }}</mat-hint>
+              @if (form.controls.nickname.hasError('required')) {
+                <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
+              } @else if (form.controls.nickname.hasError('nicknameFormat')) {
+                <mat-error>{{ 'profile.errors.NICKNAME_FORMAT' | translate }}</mat-error>
+              }
+            </mat-form-field>
+            <div class="actions">
+              <button mat-stroked-button type="submit" [disabled]="busy()">
+                {{ 'login.devCode.submit' | translate }}
+              </button>
+            </div>
+          </form>
+        }
       }
-
-      <form class="dev-login" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-        <mat-form-field appearance="outline">
-          <mat-label>{{ 'login.devCode.code' | translate }}</mat-label>
-          <input
-            matInput
-            type="password"
-            formControlName="code"
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-            required
-          />
-          @if (form.controls.code.hasError('required')) {
-            <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
-          }
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>{{ 'login.dev.nickname' | translate }}</mat-label>
-          <input matInput formControlName="nickname" autocomplete="off" required />
-          <mat-hint>{{ 'profile.hints.nickname' | translate }}</mat-hint>
-          @if (form.controls.nickname.hasError('required')) {
-            <mat-error>{{ 'profile.errors.REQUIRED' | translate }}</mat-error>
-          } @else if (form.controls.nickname.hasError('nicknameFormat')) {
-            <mat-error>{{ 'profile.errors.NICKNAME_FORMAT' | translate }}</mat-error>
-          }
-        </mat-form-field>
-        <div class="actions">
-          <button mat-stroked-button type="submit" [disabled]="busy()">
-            {{ 'login.devCode.submit' | translate }}
-          </button>
-        </div>
-      </form>
     </div>
   }
 </section>

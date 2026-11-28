@@ -23,16 +23,13 @@ import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '@ngx-translate/core';
 import type { BannedLoginDetails, ErrorCode, MeDto } from '@nri/shared';
 import { firstValueFrom, type Observable } from 'rxjs';
-import {
-  devLoginMode,
-  type DevLoginMode,
-  runtimeConfig,
-} from '../../../../environments/runtime-config';
+import { devLoginMode, type DevLoginMode } from '../../../../environments/runtime-config';
 import { isErrorCode, toApiError } from '../../../core/api/api-error';
 import { safeReturnTo } from '../../../core/api/auth.interceptor';
 import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { appealStatusOf, bannedDetails } from '../../../core/auth/banned';
+import { PublicConfigStore } from '../../../core/config/public-config.store';
 import { BannedNotice } from '../banned-notice/banned-notice';
 
 /** Режим dev-входу (build-time). Токен, а не інпут: роутер скидає непов'язані інпути в undefined. */
@@ -66,6 +63,7 @@ export class Login implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly injector = inject(Injector);
+  private readonly publicConfig = inject(PublicConfigStore);
 
   /** `?error=CODE` після OAuth-редиректу або відхиленої реєстрації. */
   readonly error = input<string>();
@@ -81,12 +79,13 @@ export class Login implements OnInit {
   /** Акаунт заблоковано: показуємо екран апеляції замість способів входу. */
   protected readonly banned = signal<BannedLoginDetails | null>(null);
 
-  protected readonly telegramBot = runtimeConfig.telegramBotUsername;
+  /** Ім'я Telegram-бота й увімкнені провайдери — з бекенду (`/api/public-config`). */
+  protected readonly telegramBot = this.publicConfig.telegramBotUsername;
   /** Форма dev-входу на /login — лише в режимі `local`. */
   private readonly devLoginMode = inject(DEV_LOGIN_MODE);
   protected readonly devLoginEnabled = computed(() => this.devLoginMode === 'local');
-  protected readonly googleLogin = runtimeConfig.googleLogin;
-  protected readonly discordLogin = runtimeConfig.discordLogin;
+  protected readonly googleLogin = this.publicConfig.googleLogin;
+  protected readonly discordLogin = this.publicConfig.discordLogin;
   private readonly target = computed(() => safeReturnTo(this.returnTo()) ?? '/');
   protected readonly googleUrl = computed(() => this.api.googleStartUrl('login', this.target()));
   protected readonly discordUrl = computed(() => this.api.discordStartUrl('login', this.target()));
@@ -122,12 +121,13 @@ export class Login implements OnInit {
     inject(DestroyRef).onDestroy(() => delete win[TELEGRAM_CALLBACK]);
     afterNextRender(() => {
       const host = this.telegramContainer()?.nativeElement;
-      if (!this.telegramBot || !host) return;
+      const bot = this.telegramBot();
+      if (!bot || !host) return;
       win[TELEGRAM_CALLBACK] = (user) => void this.onTelegramAuth(user);
       const script = document.createElement('script');
       script.async = true;
       script.src = TELEGRAM_WIDGET_SRC;
-      script.dataset['telegramLogin'] = this.telegramBot;
+      script.dataset['telegramLogin'] = bot;
       script.dataset['size'] = 'large';
       script.dataset['radius'] = '8';
       script.dataset['lang'] = 'uk';

@@ -43,6 +43,7 @@ import {
   provideUkDates,
   toIsoDate,
 } from '../../../core/i18n/dates';
+import { PublicConfigStore } from '../../../core/config/public-config.store';
 import { SocketService } from '../../../core/realtime/socket.service';
 import {
   eagerErrorState,
@@ -51,7 +52,6 @@ import {
   timezoneValidator,
 } from '../../../shared/forms/profile-validators';
 import { UserName } from '../../../shared/user-name/user-name';
-import { runtimeConfig } from '../../../../environments/runtime-config';
 import { DeleteAccountDialog } from '../delete-account-dialog/delete-account-dialog';
 import { ThemePicker } from '../theme-picker/theme-picker';
 
@@ -110,6 +110,7 @@ export class AccountSettings {
   private readonly dialog = inject(MatDialog);
   private readonly translate = inject(TranslateService);
   private readonly calendarApi = inject(CalendarApi);
+  private readonly publicConfig = inject(PublicConfigStore);
 
   /** `?error=CODE` після невдалої прив'язки Google чи Discord. */
   readonly error = input<string>();
@@ -127,12 +128,14 @@ export class AccountSettings {
     return !!role && role !== 'user';
   });
   protected readonly canLinkTelegram = computed(
-    () => !!runtimeConfig.telegramBotUsername && !this.hasTelegram(),
+    () => !!this.publicConfig.telegramBotUsername() && !this.hasTelegram(),
   );
-  protected readonly canLinkGoogle = computed(() => runtimeConfig.googleLogin && !this.hasGoogle());
+  protected readonly canLinkGoogle = computed(
+    () => this.publicConfig.googleLogin() && !this.hasGoogle(),
+  );
   protected readonly googleLinkUrl = this.api.googleStartUrl('link', '/account');
   protected readonly canLinkDiscord = computed(
-    () => runtimeConfig.discordLogin && !this.hasDiscord(),
+    () => this.publicConfig.discordLogin() && !this.hasDiscord(),
   );
   protected readonly discordLinkUrl = this.api.discordStartUrl('link', '/account');
   protected readonly birthDateIso = computed(() => this.me()?.birthDate ?? null);

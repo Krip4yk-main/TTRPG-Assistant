@@ -67,9 +67,6 @@ jobs:
             # built into the pages: the dev banner, the test bot, the login buttons
             args: |
               NG_APP_DEPLOY_ENV=dev
-              NG_APP_TELEGRAM_BOT_USERNAME=${{ vars.DEV_TELEGRAM_BOT_USERNAME }}
-              NG_APP_GOOGLE_LOGIN=${{ vars.DEV_GOOGLE_LOGIN }}
-              NG_APP_DISCORD_LOGIN=${{ vars.DEV_DISCORD_LOGIN }}
               NG_APP_DEV_LOGIN=${{ vars.DEV_TESTER_LOGIN }}
     steps:
       - uses: actions/checkout@v7

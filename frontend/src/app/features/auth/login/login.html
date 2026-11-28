@@ -17,22 +17,22 @@
     }
 
     <div class="providers">
-      @if (telegramBot) {
+      @if (telegramBot()) {
         <div
           class="telegram"
           #telegramWidget
           [attr.aria-label]="'login.telegram' | translate"
         ></div>
       }
-      @if (googleLogin) {
+      @if (googleLogin()) {
         <a mat-flat-button class="google" [href]="googleUrl()">{{ 'login.google' | translate }}</a>
       }
-      @if (discordLogin) {
+      @if (discordLogin()) {
         <a mat-flat-button class="discord" [href]="discordUrl()">{{
           'login.discord' | translate
         }}</a>
       }
-      @if (!telegramBot && !googleLogin && !discordLogin && !devLoginEnabled()) {
+      @if (!telegramBot() && !googleLogin() && !discordLogin() && !devLoginEnabled()) {
         <p class="nri-muted">{{ 'login.noProviders' | translate }}</p>
       }
     </div>

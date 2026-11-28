@@ -93,7 +93,7 @@ export class AuthApi {
     return `/api/auth/google/start?${q.toString()}`;
   }
 
-  /** Те саме для Discord (вмикається `runtimeConfig.discordLogin`). */
+  /** Те саме для Discord (вмикається `providers.discord` з `/api/public-config`). */
   discordStartUrl(mode: OAuthMode, returnTo: string): string {
     const q = new URLSearchParams({ mode, returnTo });
     return `/api/auth/discord/start?${q.toString()}`;

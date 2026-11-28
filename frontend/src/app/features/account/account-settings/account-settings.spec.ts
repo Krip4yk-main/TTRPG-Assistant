@@ -9,7 +9,7 @@ import { AccountSettings } from './account-settings';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { browserZone } from '../../../core/i18n/dates';
 import { SocketService } from '../../../core/realtime/socket.service';
-import { runtimeConfig } from '../../../../environments/runtime-config';
+import { PublicConfigStore } from '../../../core/config/public-config.store';
 
 const me: MeDto = {
   id: 1,
@@ -271,12 +271,9 @@ describe('AccountSettings nickname', () => {
 });
 
 describe('AccountSettings Discord identity', () => {
-  const config = runtimeConfig as { discordLogin: boolean };
-  const initial = config.discordLogin;
   let http: HttpTestingController;
 
   async function render(flag: boolean, identities: MeDto['identities']): Promise<HTMLElement> {
-    config.discordLogin = flag;
     await TestBed.configureTestingModule({
       imports: [AccountSettings],
       providers: [
@@ -296,8 +293,15 @@ describe('AccountSettings Discord identity', () => {
       ],
     }).compileComponents();
     TestBed.inject(AuthStore).setMe({ ...me, identities });
-    const fixture = TestBed.createComponent(AccountSettings);
     http = TestBed.inject(HttpTestingController);
+    const store = TestBed.inject(PublicConfigStore);
+    const loading = store.ensureLoaded();
+    http.expectOne('/api/public-config').flush({
+      telegramBotUsername: null,
+      providers: { telegram: false, google: false, discord: flag },
+    });
+    await loading;
+    const fixture = TestBed.createComponent(AccountSettings);
     fixture.detectChanges();
     await fixture.whenStable();
     http.expectOne('/api/me/settings').flush({ calendarAutoBusy: true });
@@ -307,7 +311,6 @@ describe('AccountSettings Discord identity', () => {
   }
 
   afterEach(() => {
-    config.discordLogin = initial;
     http.verify();
   });
 

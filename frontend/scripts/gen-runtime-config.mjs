@@ -72,9 +72,6 @@ function themeStyleVersion() {
 }
 
 const config = {
-  telegramBotUsername: get('NG_APP_TELEGRAM_BOT_USERNAME').replace(/^@/, ''),
-  googleLogin: get('NG_APP_GOOGLE_LOGIN') === 'true',
-  discordLogin: get('NG_APP_DISCORD_LOGIN') === 'true',
   devLogin: get('NG_APP_DEV_LOGIN') === 'true',
   deployEnv: ['dev', 'prod'].includes(get('NG_APP_DEPLOY_ENV'))
     ? get('NG_APP_DEPLOY_ENV')
@@ -125,12 +122,6 @@ export const devLoginRoutes: Routes = [];
 const source = `// Згенеровано scripts/gen-runtime-config.mjs — не редагуйте вручну (файл у .gitignore).
 ${devLoginRoutesSource}
 export interface RuntimeConfig {
-  /** Ім'я Telegram-бота для Login Widget; порожньо — віджет вимкнено. */
-  readonly telegramBotUsername: string;
-  /** Показувати вхід / прив'язку через Google. */
-  readonly googleLogin: boolean;
-  /** Показувати вхід / прив'язку через Discord. */
-  readonly discordLogin: boolean;
   /** Показувати форму dev-входу. */
   readonly devLogin: boolean;
   /** Середовище розгортання (local, dev або prod); на dev показується банер «Тестове середовище». */

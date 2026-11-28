@@ -10,6 +10,8 @@ import { SocketService } from '../../../core/realtime/socket.service';
 import { routes } from '../../../app.routes';
 import { devLoginMode } from '../../../../environments/runtime-config';
 
+const STATUS = '/api/auth/dev-login/code/status';
+
 describe('DevCodeLogin', () => {
   let http: HttpTestingController;
   let el: HTMLElement;
@@ -36,7 +38,9 @@ describe('DevCodeLogin', () => {
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(DevCodeLogin);
     fixture.detectChanges();
+    http.expectOne(STATUS).flush(null, { status: 204, statusText: 'No Content' });
     await fixture.whenStable();
+    fixture.detectChanges();
     el = fixture.nativeElement as HTMLElement;
   }
 
@@ -59,6 +63,75 @@ describe('DevCodeLogin', () => {
   };
 
   afterEach(() => http.verify());
+
+  it('backend reports dev login off (404): shows the disabled note instead of the form', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(DevCodeLogin);
+    fixture.detectChanges();
+    http
+      .expectOne(STATUS)
+      .flush({ error: { code: 'NOT_FOUND' } }, { status: 404, statusText: 'x' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('form')).toBeNull();
+    expect(el.textContent).toContain('login.devCode.disabled');
+  });
+
+  it('a failing probe (5xx) does not hide the form', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        provideTranslateService(),
+        {
+          provide: SocketService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            on: () => new Subject(),
+            sessionLost$: new Subject(),
+          },
+        },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(DevCodeLogin);
+    fixture.detectChanges();
+    http.expectOne(STATUS).flush('x', { status: 500, statusText: 'x' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('form')).not.toBeNull();
+  });
+
+  it('a 404 on submit (switched off meanwhile) swaps the form for the disabled note', async () => {
+    await render();
+    type('code', 'x');
+    type('nickname', 'Tester_1');
+    await submit();
+    await fail(404, 'NOT_FOUND');
+    expect(el.querySelector('form')).toBeNull();
+    expect(el.textContent).toContain('login.devCode.disabled');
+  });
 
   it('renders code (password) and nick fields with labels', async () => {
     await render();

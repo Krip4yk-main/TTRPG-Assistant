@@ -49,6 +49,12 @@ export class DevCodeLogin {
   /** `?returnTo=/path` — куди повернутися після входу (лише внутрішні шляхи). */
   readonly returnTo = input<string>();
 
+  /**
+   * Чи ввімкнено dev-вхід на бекенді: проба `GET /api/auth/dev-login/code/status` (204 — так,
+   * 404 — вимкнено в `.env`). Будь-яка інша відповідь не блокує форму: помилку покаже сабміт.
+   */
+  protected readonly availability = signal<'checking' | 'enabled' | 'disabled'>('checking');
+
   protected readonly banned = signal<BannedLoginDetails | null>(null);
   protected readonly busy = signal(false);
   private readonly actionError = signal<ErrorCode | null>(null);
@@ -65,6 +71,21 @@ export class DevCodeLogin {
       validators: [Validators.required, nicknameValidator],
     }),
   });
+
+  constructor() {
+    void this.probe();
+  }
+
+  private async probe(): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.get('/api/auth/dev-login/code/status', { responseType: 'text' }),
+      );
+      this.availability.set('enabled');
+    } catch (err) {
+      this.availability.set(toApiError(err).status === 404 ? 'disabled' : 'enabled');
+    }
+  }
 
   protected async submit(): Promise<void> {
     if (this.busy()) return;
@@ -87,7 +108,12 @@ export class DevCodeLogin {
         user.status === 'pending' ? '/complete-profile' : (safeReturnTo(this.returnTo()) ?? '/'),
       );
     } catch (err) {
-      const { code: errCode, details } = toApiError(err);
+      const { code: errCode, details, status } = toApiError(err);
+      if (status === 404) {
+        // Dev-вхід вимкнули в `.env` просто зараз.
+        this.availability.set('disabled');
+        return;
+      }
       const ban = errCode === 'ACCOUNT_BANNED' ? bannedDetails(details) : null;
       if (ban) this.banned.set(ban);
       else this.actionError.set(errCode);

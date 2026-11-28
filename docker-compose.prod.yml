@@ -112,9 +112,6 @@ services:
       # Налаштування фронтенду вшиваються на збірці (не секрети), див. frontend/.env.template
       args:
         NG_APP_DEPLOY_ENV: ${DEPLOY_ENV:-prod}
-        NG_APP_TELEGRAM_BOT_USERNAME: ${NG_APP_TELEGRAM_BOT_USERNAME:-}
-        NG_APP_GOOGLE_LOGIN: ${NG_APP_GOOGLE_LOGIN:-}
-        NG_APP_DISCORD_LOGIN: ${NG_APP_DISCORD_LOGIN:-}
         NG_APP_DEV_LOGIN: ${NG_APP_DEV_LOGIN:-false}
     environment:
       # nginx: на dev додає X-Robots-Tag: noindex, nofollow

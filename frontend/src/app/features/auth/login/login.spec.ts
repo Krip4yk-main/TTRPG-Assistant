@@ -11,7 +11,7 @@ import { DEV_LOGIN_MODE, Login } from './login';
 import type { DevLoginMode } from '../../../../environments/runtime-config';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { runtimeConfig } from '../../../../environments/runtime-config';
+import { PublicConfigStore } from '../../../core/config/public-config.store';
 
 describe('Login — banned account', () => {
   let harness: RouterTestingHarness;
@@ -183,12 +183,11 @@ describe('Login — banned account', () => {
   });
 });
 
-describe('Login — Discord', () => {
-  const config = runtimeConfig as { discordLogin: boolean };
-  const initial = config.discordLogin;
-
-  async function render(flag: boolean): Promise<HTMLElement> {
-    config.discordLogin = flag;
+describe('Login — providers from the public config', () => {
+  async function render(
+    flag: boolean,
+    telegramBotUsername: string | null = null,
+  ): Promise<HTMLElement> {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -206,6 +205,15 @@ describe('Login — Discord', () => {
         },
       ],
     });
+    const store = TestBed.inject(PublicConfigStore);
+    const loading = store.ensureLoaded();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/public-config')
+      .flush({
+        telegramBotUsername,
+        providers: { telegram: telegramBotUsername !== null, google: false, discord: flag },
+      });
+    await loading;
     const fixture = TestBed.createComponent(Login);
     fixture.componentRef.setInput('returnTo', '/calendar');
     fixture.detectChanges();
@@ -213,8 +221,15 @@ describe('Login — Discord', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  afterEach(() => {
-    config.discordLogin = initial;
+  it('Telegram widget gets the bot name from the backend config', async () => {
+    const el = await render(false, 'nri_test_bot');
+    const script = el.querySelector<HTMLScriptElement>('.telegram script');
+    expect(script?.dataset['telegramLogin']).toBe('nri_test_bot');
+  });
+
+  it('nothing configured: no Telegram widget', async () => {
+    const el = await render(false);
+    expect(el.querySelector('.telegram')).toBeNull();
   });
 
   it('no Discord button while the flag is off', async () => {

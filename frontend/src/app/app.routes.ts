@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import { devLoginRoutes } from '../environments/runtime-config';
 import { activeGuard, guestGuard, notPendingGuard, pendingGuard } from './core/auth/auth.guards';
+import { publicConfigGuard } from './core/config/public-config.guard';
 import type { RouteSeo } from './core/seo/seo.service';
 
 export const routes: Routes = [
@@ -14,7 +15,7 @@ export const routes: Routes = [
   },
   {
     path: 'login',
-    canActivate: [guestGuard],
+    canActivate: [guestGuard, publicConfigGuard],
     title: 'titles.login',
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
