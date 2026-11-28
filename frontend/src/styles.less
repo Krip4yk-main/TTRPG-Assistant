@@ -91,9 +91,11 @@ a,
   outline-offset: 2px;
 }
 
-// У групі перемикачів (`overflow: hidden`, заокруглення) зовнішнє кільце обрізалося б.
+// У групі перемикачів (`overflow: hidden`, заокруглення) зовнішнє кільце обрізалося б, тож
+// кільце — всередині сегмента, кольором його ж тексту: контраст із заливкою вибраного й
+// невибраного сегмента гарантує сам дизайн (кольорове кільце зливалося з залитим сегментом).
 .mat-button-toggle-button:focus-visible {
-  outline: 2px solid var(--nri-focus-ring);
+  outline: 2px solid currentColor;
   outline-offset: -4px;
 }
 
