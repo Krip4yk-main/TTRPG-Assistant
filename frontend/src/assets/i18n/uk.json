@@ -156,6 +156,11 @@
   },
   "questBoard": {
     "gm": "майстер",
+    "gmRole": {
+      "plain": "майстер",
+      "rated": "майстер · ★ {{rating}}",
+      "none": "майстер · ще немає рейтингу"
+    },
     "card": {
       "when": "Коли",
       "where": "Де"
@@ -166,7 +171,7 @@
       "price": "{{price}} грн"
     },
     "attachment": {
-      "label": "Арт до гри: {{title}}"
+      "label": "Обкладинка гри: {{title}}"
     },
     "shell": {
       "navMenu": "Навігація"

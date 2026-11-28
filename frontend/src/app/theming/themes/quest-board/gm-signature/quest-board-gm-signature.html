@@ -18,9 +18,13 @@
         <nri-blocked-badge />
       }
     </span>
-    <small class="role">
+    <!-- Рядок «майстер · ★ рейтинг» (як у сцені) не обрізається — переноситься; підказка (той
+         самий текст повністю) лишається запобіжником. -->
+    @let tip = roleTip();
+    <small class="role" [nriTruncateTooltip]="tip.key | translate: tip.params">
       <span aria-hidden="true">{{ 'questBoard.gm' | translate }}</span>
       @if (g.showRating) {
+        <span aria-hidden="true">·</span>
         <nri-gm-rating [value]="g.rating" [showEmpty]="true" />
       }
     </small>

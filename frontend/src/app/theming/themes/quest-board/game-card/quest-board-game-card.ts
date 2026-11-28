@@ -24,8 +24,10 @@ import { ThemeService } from '../../../theme.service';
 import { noticeTilt, paperVariant } from '../paper';
 import { isCardOpenClick } from '../../../shared/card-click';
 
-/** Скільки бейджів-штампів видно в рядку (решта — «+N»): рядок не переноситься. */
-const MAX_STAMPS = 3;
+/** Скільки міток видно в рядку системи (решта — «+N»): рядок не переноситься (як у сцені). */
+const MAX_MARKS = 2;
+/** Більше місць — без позначок (лише текст), щоб рядок не переповнювався (як у сцені). */
+const MAX_PIPS = 8;
 /** Тривалість анімації відривання (як у `qb-tear` з quest-board.less), мс. */
 export const TEAR_MS = 520;
 /**
@@ -36,9 +38,12 @@ let activeTear: symbol | null = null;
 
 /**
  * Слот `game-card` дизайну «Дошка оголошень»: оголошення, приколоте шпилькою до стіни.
- * Збіг з розкладом — стрічка з моху, ціна — сургучна печатка, під назвою — короткий опис,
- * далі «Коли / Де / Місця» і підпис майстра. Обкладинка — вкладка під аркушем (виходить
- * наперед при наведенні чи кліку). Обмежена картка — лише назва, вік і майстер під «завісою».
+ * Структура й порядок рядків — ті самі, що в картці сцени (`nri-sc-game-card`): рядок
+ * «система · тип · жанр» з мітками (вік, статус) праворуч, назва (до 2 рядків), короткий опис
+ * (до 3), «Коли / Де / Місця» (місця — ще й позначками-кнопками), «Підходить вашому розкладу»
+ * (стрічка з моху), підпис майстра й ціна (сургучна печатка). Обкладинка — вкладка під
+ * аркушем (виходить наперед при наведенні чи кліку). Обмежена картка — лише назва, вік і
+ * майстер під «завісою».
  * Розмір оголошення сталий: довгі рядки обрізаються «…», повний текст — у підказці.
  *
  * Усе оголошення клікабельне — відкриває сторінку гри (як посилання-назва, яке лишається
@@ -66,19 +71,28 @@ let activeTear: symbol | null = null;
 })
 export class QuestBoardGameCard implements GameCardSlot {
   readonly game = input.required<GameCardVm>();
-  protected readonly maxStamps = MAX_STAMPS;
+  protected readonly maxMarks = MAX_MARKS;
 
   /** «Випадковий» нахил і зсув за id гри: стабільні між перерисовками й сторінками. */
   protected readonly tilt = computed(() => noticeTilt(this.game().id));
   /** Обрис пергаменту за id гри (спільне правило з «Моїми іграми»). */
   protected readonly paper = computed(() => paperVariant(this.game().id));
-  /** Перший збіг з розкладом — стрічкою вгорі; решта бейджів — штампами під системою. */
-  protected readonly ribbon = computed<BadgeVm | null>(
+  /** Збіг з розкладом — стрічкою під фактами; решта бейджів — мітками в рядку системи. */
+  protected readonly fit = computed<BadgeVm | null>(
     () => this.game().badges.find((b) => b.kind === 'fit') ?? null,
   );
-  protected readonly stamps = computed(() => {
-    const ribbon = this.ribbon();
-    return this.game().badges.filter((b) => b !== ribbon);
+  protected readonly marks = computed(() => {
+    const fit = this.fit();
+    return this.game().badges.filter((b) => b !== fit);
+  });
+  /**
+   * Позначки місць (декор; число — у тексті поруч), як «діоди» сцени: «заповнені» (`.on`) —
+   * перші `seats.count` (гравцю — зайняті, майстру — вільні).
+   */
+  protected readonly pips = computed<boolean[]>(() => {
+    const g = this.game();
+    if (g.restricted || g.seats.max > MAX_PIPS) return [];
+    return Array.from({ length: g.seats.max }, (_, i) => i < g.seats.count);
   });
 
   private readonly router = inject(Router);

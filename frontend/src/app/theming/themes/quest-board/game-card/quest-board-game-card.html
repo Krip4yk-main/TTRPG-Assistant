@@ -19,18 +19,12 @@
     <div class="veil" aria-hidden="true">
       <mat-icon>visibility_off</mat-icon>
     </div>
-    <div class="stamps">
-      @for (b of g.badges.slice(0, maxStamps); track $index) {
-        <nri-qb-badge [badge]="b" />
-      }
-      @if (g.badges.length > maxStamps) {
-        <span class="more" aria-hidden="true">+{{ g.badges.length - maxStamps }}</span>
-        <span class="nri-visually-hidden">
-          @for (b of g.badges.slice(maxStamps); track $index) {
-            <nri-qb-badge [badge]="b" />
-          }
-        </span>
-      }
+    <div class="sysrow">
+      <span class="marks">
+        @for (b of g.badges; track $index) {
+          <nri-qb-badge [badge]="b" />
+        }
+      </span>
     </div>
     <h2 class="title">
       <a #open class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
@@ -41,7 +35,9 @@
         'games.restricted.login' | translate
       }}</a>
     }
-    <footer class="foot gm"><nri-qb-gm-signature [gm]="g.gm" /></footer>
+    <footer class="foot">
+      <nri-qb-gm-signature class="gm" [gm]="g.gm" />
+    </footer>
   </article>
 } @else {
   <!-- Обкладинка — вкладка під аркушем у верхньому правому куті (поза аркушем: він її
@@ -59,27 +55,27 @@
     [attr.data-paper]="paper()"
   >
     <span class="qb-pin" aria-hidden="true"></span>
-    @if (ribbon(); as r) {
-      <span class="ribbon"><nri-qb-badge [badge]="r" /></span>
-    }
-    @let sys = g.systemLine | nriLine;
-    <p class="sys" [nriTruncateTooltip]="sys">{{ sys }}</p>
-    @if (stamps().length > 0) {
-      <!-- Бейджі — один рядок: зайві ховаються за «+N» (для читачів екрана — усі). -->
-      <div class="stamps">
-        @for (b of stamps().slice(0, maxStamps); track $index) {
-          <nri-qb-badge [badge]="b" />
-        }
-        @if (stamps().length > maxStamps) {
-          <span class="more" aria-hidden="true">+{{ stamps().length - maxStamps }}</span>
-          <span class="nri-visually-hidden">
-            @for (b of stamps().slice(maxStamps); track $index) {
-              <nri-qb-badge [badge]="b" />
-            }
-          </span>
-        }
-      </div>
-    }
+    <!-- Рядок системи з мітками (як у сцені): мітки — один рядок, зайві ховаються за «+N»
+         (для читачів екрана — усі). -->
+    <div class="sysrow">
+      @let sys = g.systemLine | nriLine;
+      <span class="sys" [nriTruncateTooltip]="sys">{{ sys }}</span>
+      @if (marks().length > 0) {
+        <span class="marks">
+          @for (b of marks().slice(0, maxMarks); track $index) {
+            <nri-qb-badge [badge]="b" />
+          }
+          @if (marks().length > maxMarks) {
+            <span class="more" aria-hidden="true">+{{ marks().length - maxMarks }}</span>
+            <span class="nri-visually-hidden">
+              @for (b of marks().slice(maxMarks); track $index) {
+                <nri-qb-badge [badge]="b" />
+              }
+            </span>
+          }
+        </span>
+      }
+    </div>
     <h2 class="title">
       <a #open class="open" [attr.href]="gameUrl()" [nriTruncateTooltip]="g.title">{{ g.title }}</a>
     </h2>
@@ -88,28 +84,47 @@
     }
     <dl class="facts">
       @if (g.showSchedule) {
-        <dt>{{ 'questBoard.card.when' | translate }}</dt>
-        @let next =
-          g.nextSession
-            ? g.nextSessionApprox
-              ? ('games.approxTime' | translate: { when: g.nextSession })
-              : g.nextSession
-            : ('search.card.noNext' | translate);
-        <dd class="next" [nriTruncateTooltip]="next">{{ next }}</dd>
+        <div>
+          <dt>{{ 'questBoard.card.when' | translate }}</dt>
+          @let next =
+            g.nextSession
+              ? g.nextSessionApprox
+                ? ('games.approxTime' | translate: { when: g.nextSession })
+                : g.nextSession
+              : ('search.card.noNext' | translate);
+          <dd [nriTruncateTooltip]="next">{{ next }}</dd>
+        </div>
       }
-      @let where = g.whereLine | nriLine;
-      <dt>{{ 'questBoard.card.where' | translate }}</dt>
-      <dd [nriTruncateTooltip]="where">{{ where }}</dd>
+      <div>
+        @let where = g.whereLine | nriLine;
+        <dt>{{ 'questBoard.card.where' | translate }}</dt>
+        <dd [nriTruncateTooltip]="where">{{ where }}</dd>
+      </div>
       @if (g.showSchedule) {
-        <dt>{{ 'search.card.slots' | translate }}</dt>
-        <dd>
-          {{ g.seats.textKey | translate: { count: g.seats.count, max: g.seats.max } }}
-        </dd>
+        <div>
+          <dt>{{ 'search.card.slots' | translate }}</dt>
+          <dd class="seats">
+            @if (pips().length > 0) {
+              <span class="pips" aria-hidden="true" [attr.data-seats]="g.seats.mode">
+                @for (on of pips(); track $index) {
+                  <b [class.on]="on"></b>
+                }
+              </span>
+            }
+            <span class="seats-text">{{
+              g.seats.textKey | translate: { count: g.seats.count, max: g.seats.max }
+            }}</span>
+          </dd>
+        </div>
       }
     </dl>
+    <!-- Збіг з розкладом — стрічка з моху під фактами (місце — як у сцені). -->
+    @if (fit(); as f) {
+      <div class="fit"><nri-qb-badge [badge]="f" /></div>
+    }
     <footer class="foot">
-      <div class="gm"><nri-qb-gm-signature [gm]="g.gm" /></div>
-      <p class="qb-seal price">
+      <nri-qb-gm-signature class="gm" [gm]="g.gm" />
+      <p class="qb-seal price" [class.free]="g.priceUah === null">
         <span class="nri-visually-hidden">{{ 'questBoard.seal.label' | translate }}:</span>
         @if (g.priceUah === null) {
           {{ 'questBoard.seal.free' | translate }}
