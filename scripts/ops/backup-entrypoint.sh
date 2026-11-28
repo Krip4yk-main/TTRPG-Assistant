@@ -27,6 +27,7 @@ schedule() {
   fi
   # Fail closed одразу на старті, а не о 03:30.
   require_passphrase
+  require_writable_dir
   log "scheduler started: backup daily 03:30 UTC, restore-check Sundays 04:30 UTC"
   local last_backup="" last_check="" today
   trap 'log "scheduler stopped"; exit 0' TERM INT

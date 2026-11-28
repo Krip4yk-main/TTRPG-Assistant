@@ -28,7 +28,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$BACKUP_DIR/monthly"
+require_writable_dir
 umask 077
 clean_stale_partials
 

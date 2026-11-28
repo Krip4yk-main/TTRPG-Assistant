@@ -12,10 +12,15 @@ COPY scripts/ops/backup-lib.sh scripts/ops/backup.sh scripts/ops/restore-check.s
 RUN sed -i 's/\r$//' /opt/backup/*.sh \
   && chmod 0755 /opt/backup/*.sh \
   && mkdir -p /backups/monthly \
-  && chown -R mysql:mysql /backups \
-  && chmod 0700 /backups
-USER mysql
-ENV BACKUP_DIR=/backups TMPDIR=/tmp
+  && chown -R 999:0 /backups \
+  && chmod -R 0770 /backups
+# Числовий UID (999 = mysql): Kubernetes із runAsNonRoot не може перевірити ім'я. Образ не залежить
+# від UID: Kubernetes може запустити його з довільним (runAsUser / fsGroup / OpenShift) — тому
+# /backups належить групі 0 і групово-записуваний, а пишемо лише в BACKUP_DIR (змонтований том)
+# і TMPDIR. HOME=/tmp — щоб rclone/openssl не шукали домашній каталог неіснуючого користувача.
+# Усе налаштовується лише змінними оточення (.env): BACKUP_*, BACKUP_S3_*, BACKUP_ENABLED.
+USER 999
+ENV BACKUP_DIR=/backups TMPDIR=/tmp HOME=/tmp XDG_CACHE_HOME=/tmp
 VOLUME ["/backups"]
 ENTRYPOINT ["/opt/backup/backup-entrypoint.sh"]
 CMD ["schedule"]

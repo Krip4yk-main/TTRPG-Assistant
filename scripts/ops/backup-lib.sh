@@ -19,6 +19,15 @@ require_passphrase() {
   export BACKUP_PASSPHRASE
 }
 
+# Fail closed і зрозуміло: каталог локальних копій (том) має існувати й бути записуваним поточним
+# UID (у Kubernetes — довільним; том потребує fsGroup або відповідних прав). Створює monthly/.
+require_writable_dir() {
+  local d="${1:-$BACKUP_DIR}"
+  if ! mkdir -p -- "$d/monthly" 2>/dev/null || [ ! -w "$d" ] || [ ! -w "$d/monthly" ]; then
+    die "$d is not writable by uid $(id -u) — mount a volume there and make it writable (fsGroup / chmod g+w)"
+  fi
+}
+
 # Створює option-файл MySQL (права 600) у приватному тимчасовому каталозі.
 # TMPDIR у контейнері — tmpfs (/tmp), тож пароль не потрапляє на диск.
 # Результат: змінні WORK_DIR і MYSQL_CNF. Прибирання — cleanup_work_dir (у trap).
