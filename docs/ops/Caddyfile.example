@@ -1,0 +1,90 @@
+# Приклад Caddyfile для reverse proxy НРІ Асистента з автоматичним HTTPS (Let's Encrypt).
+#
+# Необов'язковий: стек (docker-compose.prod.yml) цей файл не використовує і без нього працює
+# так само — це лише готовий варіант, якщо на сервері ставлять Caddy (v2.8+), а не nginx.
+#
+# Як застосувати (на КОЖНОМУ сервері окремо — бета і прод мають свій домен):
+#   1. DNS: запис A (і AAAA, якщо є IPv6) домену → IP сервера; порти 80 і 443 відкриті.
+#   2. Скопіюйте файл у /etc/caddy/Caddyfile, замініть example.com на свій домен,
+#      email — на свій (Let's Encrypt шле на нього попередження про сертифікат).
+#   3. sudo systemctl reload caddy — Caddy сам отримає сертифікат і продовжуватиме його.
+#   4. У backend/.env: TRUST_PROXY=1 (Caddy — один проксі перед бекендом),
+#      PUBLIC_BASE_URL=https://<домен>.
+#
+# Cloudflare з проксі (оранжева хмарка) перед сервером: SSL/TLS режим «Full (strict)»,
+# у backend/.env TRUST_PROXY=2, а в глобальний блок нижче додайте діапазони IP Cloudflare
+# (https://www.cloudflare.com/ips/), щоб Caddy передав справжній IP клієнта:
+#   servers {
+#     trusted_proxies static 173.245.48.0/20 103.21.244.0/22 ...
+#   }
+#
+# Бекенд і фронтенд з docker-compose.prod.yml слухають лише 127.0.0.1:3000 і 127.0.0.1:8080.
+# Caddy сам додає X-Forwarded-For / X-Forwarded-Proto / Host, WebSocket (/socket.io)
+# проксює без додаткових налаштувань.
+
+{
+	email admin@example.com
+}
+
+example.com {
+	encode zstd gzip
+
+	# Журнал запитів; ICS-фід (/api/cal/) не логуємо — у шляху секретний токен.
+	log
+	log_skip /api/cal/*
+
+	# Внутрішній API лише для бота (той ходить напряму по мережі Docker) — назовні 404.
+	handle /api/internal/* {
+		respond 404
+	}
+
+	# sitemap і robots віддає бекенд.
+	handle /sitemap.xml {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /robots.txt {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# Боти прев'ю посилань не виконують JS — для них мінімальні HTML з OG-метаданими.
+	# Googlebot сюди НЕ додавати: він рендерить SPA.
+	@botGame {
+		path_regexp game ^/games/(\d+)$
+		header_regexp User-Agent (?i)(TelegramBot|Discordbot|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|WhatsApp)
+	}
+	handle @botGame {
+		rewrite * /api/og/games/{re.game.1}
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	@botUser {
+		path_regexp user ^/users/([a-z0-9]+)$
+		header_regexp User-Agent (?i)(TelegramBot|Discordbot|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|WhatsApp)
+	}
+	handle @botUser {
+		rewrite * /api/og/users/{re.user.1}
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	@botSponsors {
+		path /sponsors
+		header_regexp User-Agent (?i)(TelegramBot|Discordbot|facebookexternalhit|Twitterbot|Slackbot|LinkedInBot|WhatsApp)
+	}
+	handle @botSponsors {
+		rewrite * /api/og/sponsors
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# API і сокети → бекенд.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /socket.io/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# Усе інше — статика фронтенду (SPA і її власні заголовки кешу/безпеки — у frontend/nginx.conf).
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}

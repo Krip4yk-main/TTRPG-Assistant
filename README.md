@@ -80,7 +80,7 @@ docker build -f frontend/Dockerfile -t nri-frontend   --build-arg NG_APP_TELEGRA
 - усе інше → frontend:8080;
 - `/api/internal/*` має **блокуватися** для публічного інтернету (повертати 404/403): бот звертається до бекенду напряму по внутрішній мережі.
 
-Приклад для nginx:
+Приклад для nginx (адреси `backend:3000` / `frontend:8080` — якщо nginx у тій самій мережі Docker; для проксі на хості — `127.0.0.1:3000` / `127.0.0.1:8080`). Варіант з автоматичним HTTPS на Caddy — [`docs/ops/Caddyfile.example`](docs/ops/Caddyfile.example).
 
 ```nginx
 location /api/internal/ { return 404; }   # має стояти перед /api/
