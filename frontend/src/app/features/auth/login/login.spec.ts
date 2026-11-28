@@ -7,7 +7,8 @@ import { Router, provideRouter, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
-import { Login } from './login';
+import { DEV_LOGIN_MODE, Login } from './login';
+import type { DevLoginMode } from '../../../../environments/runtime-config';
 import { SocketService } from '../../../core/realtime/socket.service';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { runtimeConfig } from '../../../../environments/runtime-config';
@@ -233,13 +234,16 @@ describe('Login — Discord', () => {
 });
 
 describe('Login — dev-login mode', () => {
-  async function render(mode: 'local' | 'beta' | 'off'): Promise<HTMLElement> {
+  async function render(mode: DevLoginMode, url: string): Promise<HTMLElement> {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
+        provideLocationMocks(),
+        // Як у app.config: інпути компонента прив'язані до адреси.
+        provideRouter([{ path: 'login', component: Login }], withComponentInputBinding()),
         provideTranslateService(),
+        { provide: DEV_LOGIN_MODE, useValue: mode },
         {
           provide: SocketService,
           useValue: {
@@ -251,22 +255,29 @@ describe('Login — dev-login mode', () => {
         },
       ],
     });
-    const fixture = TestBed.createComponent(Login);
-    fixture.componentRef.setInput('mode', mode);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    return fixture.nativeElement as HTMLElement;
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url, Login);
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    return harness.routeNativeElement as HTMLElement;
   }
 
   it('local: the dev form is on /login', async () => {
-    const el = await render('local');
+    const el = await render('local', '/login');
     expect(el.querySelector('form.dev-login')).not.toBeNull();
   });
 
-  it.each(['beta', 'off'] as const)('%s: no dev form and no hint about it on /login', async (m) => {
-    const el = await render(m);
-    expect(el.querySelector('form.dev-login')).toBeNull();
-    expect(el.textContent).not.toContain('login.dev.');
-    expect(el.querySelector('a[href*="login/dev"]')).toBeNull();
-  });
+  it.each(['beta', 'off'] as const)(
+    '%s: no dev form and no hint about it on /login, even with ?mode=local',
+    async (m) => {
+      for (const url of ['/login', '/login?mode=local']) {
+        TestBed.resetTestingModule();
+        const el = await render(m, url);
+        expect(el.querySelector('form.dev-login')).toBeNull();
+        expect(el.textContent).not.toContain('login.dev.');
+        expect(el.querySelector('a[href*="login/dev"]')).toBeNull();
+      }
+    },
+  );
 });

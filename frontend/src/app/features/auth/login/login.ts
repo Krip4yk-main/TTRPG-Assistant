@@ -8,6 +8,7 @@ import {
   afterNextRender,
   computed,
   effect,
+  InjectionToken,
   inject,
   input,
   signal,
@@ -33,6 +34,11 @@ import { AuthApi, type TelegramAuthData } from '../../../core/auth/auth.api';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { appealStatusOf, bannedDetails } from '../../../core/auth/banned';
 import { BannedNotice } from '../banned-notice/banned-notice';
+
+/** Режим dev-входу (build-time). Токен, а не інпут: роутер скидає непов'язані інпути в undefined. */
+export const DEV_LOGIN_MODE = new InjectionToken<DevLoginMode>('DEV_LOGIN_MODE', {
+  factory: () => devLoginMode,
+});
 
 const TELEGRAM_WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
 /** Глобальна функція, яку викликає віджет Telegram (`data-onauth`). */
@@ -76,9 +82,9 @@ export class Login implements OnInit {
   protected readonly banned = signal<BannedLoginDetails | null>(null);
 
   protected readonly telegramBot = runtimeConfig.telegramBotUsername;
-  /** Режим dev-входу (build-time); вхід — інпут лише для тестів. Форма — тільки в `local`. */
-  readonly mode = input<DevLoginMode>(devLoginMode);
-  protected readonly devLoginEnabled = computed(() => this.mode() === 'local');
+  /** Форма dev-входу на /login — лише в режимі `local`. */
+  private readonly devLoginMode = inject(DEV_LOGIN_MODE);
+  protected readonly devLoginEnabled = computed(() => this.devLoginMode === 'local');
   protected readonly googleLogin = runtimeConfig.googleLogin;
   protected readonly discordLogin = runtimeConfig.discordLogin;
   private readonly target = computed(() => safeReturnTo(this.returnTo()) ?? '/');
