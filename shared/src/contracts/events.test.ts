@@ -30,6 +30,9 @@ describe('EVENT_TYPES', () => {
     for (const t of ['user.registered', 'game.created', 'game.cancelled', 'user.deleted'])
       expect(EVENT_TYPES).toContain(t);
   });
+  it('has the beta dev-login audit event', () => {
+    expect(EVENT_TYPES).toContain('auth.dev_login');
+  });
   it('has no duplicates', () => {
     expect(new Set(EVENT_TYPES).size).toBe(EVENT_TYPES.length);
   });

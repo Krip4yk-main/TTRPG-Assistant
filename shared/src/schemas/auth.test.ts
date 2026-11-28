@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { completeProfileSchema, devLoginSchema } from './auth.js';
+import { completeProfileSchema, devCodeLoginSchema, devLoginSchema } from './auth.js';
 
 describe('completeProfileSchema', () => {
   const ok = { nickname: 'Майстер_Ігор', birthDate: '2000-01-01' };
@@ -21,5 +21,17 @@ describe('devLoginSchema', () => {
   it('accepts nickname with optional ownerKey', () => {
     expect(devLoginSchema.safeParse({ nickname: 'x' }).success).toBe(true);
     expect(devLoginSchema.safeParse({ nickname: 'x', ownerKey: 'k' }).success).toBe(true);
+  });
+});
+
+describe('devCodeLoginSchema', () => {
+  it('requires code and nickname, has no ownerKey', () => {
+    expect(devCodeLoginSchema.safeParse({ code: 'c', nickname: 'x' }).success).toBe(true);
+    expect(devCodeLoginSchema.safeParse({ nickname: 'x' }).success).toBe(false);
+    expect(devCodeLoginSchema.safeParse({ code: 'c', nickname: 'x'.repeat(33) }).success).toBe(
+      false,
+    );
+    const parsed = devCodeLoginSchema.parse({ code: 'c', nickname: 'x', ownerKey: 'k' });
+    expect(parsed).not.toHaveProperty('ownerKey');
   });
 });

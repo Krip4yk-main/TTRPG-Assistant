@@ -19,3 +19,13 @@ export const devLoginSchema = z.object({
   ownerKey: z.string().optional(),
 });
 export type DevLoginInput = z.infer<typeof devLoginSchema>;
+
+/**
+ * Dev-вхід на беті (`POST /api/auth/dev-login/code`): код доступу тестера + нікнейм.
+ * Ключа власника немає — персонал так не входить.
+ */
+export const devCodeLoginSchema = z.object({
+  code: z.string().min(1).max(256),
+  nickname: z.string().min(1).max(32),
+});
+export type DevCodeLoginInput = z.infer<typeof devCodeLoginSchema>;

@@ -12,6 +12,8 @@ export const EVENT_TYPES = [
   'user.deleted',
   'identity.linked',
   'identity.unlinked',
+  /** Вхід тестера на беті за кодом доступу (payload: мітка й номер коду, без самого коду). */
+  'auth.dev_login',
   'profile.updated',
   'availability.updated',
   // ігри
