@@ -28,6 +28,7 @@ import {
   hasSafetyInfo,
   safetyTextKey,
 } from '@nri/shared';
+import { TapTooltip } from '../../../../shared/tap-tooltip/tap-tooltip';
 import { WarningChip } from '../../../../shared/warning-chip/warning-chip';
 
 export type SafetyKind = 'lines' | 'veils';
@@ -57,6 +58,7 @@ const OTHER: Record<SafetyKind, SafetyKind> = { lines: 'veils', veils: 'lines' }
     MatIconModule,
     MatInputModule,
     MatTooltipModule,
+    TapTooltip,
     TranslatePipe,
     WarningChip,
   ],
