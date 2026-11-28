@@ -234,6 +234,7 @@ export class AccountSettings {
   }
 
   protected async unlink(provider: IdentityProvider): Promise<void> {
+    if (this.unlinkBlockKey(provider)) return;
     await this.run(this.identityMessage, async () => {
       const { identities } = await firstValueFrom(this.api.unlinkIdentity(provider));
       const me = this.me();

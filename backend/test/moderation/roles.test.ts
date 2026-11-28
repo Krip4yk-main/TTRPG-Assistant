@@ -1,8 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { createApp } from '../../src/app.js';
-import { authIdentities, complaints, moderationLog, users } from '../../src/db/schema/index.js';
+import {
+  authIdentities,
+  complaints,
+  moderationLog,
+  notifications,
+  users,
+} from '../../src/db/schema/index.js';
 import { ROLE_RANK } from '../../src/moderation/permissions.js';
+import { runStaffTelegramReminders } from '../../src/moderation/staff-telegram.js';
 import { imposeSanction } from '../../src/moderation/sanctions.service.js';
 import { deleteAccount } from '../../src/users/users.service.js';
 import { closeDeps, createUser, resetDb, testDeps } from '../helpers.js';
@@ -141,6 +148,21 @@ describe('RF 1 — PUT /api/admin/users/:publicId/role', () => {
     // Прав на ціль немає — 403 раніше за 409 (не розкриваємо, чи є Telegram).
     const mod = await user('moderator');
     expect((await setRole(mod.cookie, plain.publicId, 'moderator')).status).toBe(403);
+  });
+
+  it('removing the staff role marks the unread «link Telegram» reminder as read', async () => {
+    const owner = await user('owner');
+    const legacy = await user('moderator', 'LegacyRem', { telegram: false });
+    await runStaffTelegramReminders(deps, new Date());
+    const unread = () =>
+      db
+        .select()
+        .from(notifications)
+        .where(and(eq(notifications.userId, legacy.id), isNull(notifications.readAt)));
+    expect(await unread()).toHaveLength(1);
+    expect((await setRole(owner.cookie, legacy.publicId, 'user')).status).toBe(200);
+    expect(await unread()).toEqual([]);
+    expect(await db.select().from(notifications)).toHaveLength(1);
   });
 
   it('the actor role is read from the DB, not the cached session', async () => {

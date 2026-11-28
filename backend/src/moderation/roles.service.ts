@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, inArray, like, ne, or, gt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, isNull, like, ne, or, gt, sql } from 'drizzle-orm';
 import {
   adminUsersQuerySchema,
   ownerTransferSchema,
@@ -9,7 +9,7 @@ import {
 } from '@nri/shared';
 import type { AppDeps } from '../app.js';
 import { evictUserSessionCache } from '../auth/session.service.js';
-import { authIdentities, sanctions, users } from '../db/schema/index.js';
+import { authIdentities, notifications, sanctions, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { complaintsAboutUser, complaintVisibleTo, type StaffViewer } from './complaints.service.js';
 import { writeLog } from './log.js';
@@ -40,7 +40,8 @@ export async function hasTelegram(db: DbLike, userId: number): Promise<boolean> 
     .select({ id: authIdentities.id })
     .from(authIdentities)
     .where(and(eq(authIdentities.userId, userId), eq(authIdentities.provider, 'telegram')))
-    .limit(1);
+    .limit(1)
+    .for('share');
   return row !== undefined;
 }
 
@@ -188,6 +189,19 @@ export async function changeRole(
       throw new AppError(409, 'TELEGRAM_REQUIRED');
     }
     await tx.update(users).set({ role: next }).where(eq(users.id, t.id));
+    // Роль знято — нагадування «прив'яжіть Telegram» більше не актуальне.
+    if (next === 'user') {
+      await tx
+        .update(notifications)
+        .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(notifications.userId, t.id),
+            eq(notifications.type, 'staff.telegram_required'),
+            isNull(notifications.readAt),
+          ),
+        );
+    }
     await writeLog(tx, {
       actorId,
       action: 'role.change',

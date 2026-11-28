@@ -70,6 +70,7 @@ describe('AdminLog', () => {
     expect(row(2)).toContain('admin.log.actions.game_close');
     expect(row(3)).toContain('something.new');
     expect(row(4)).toContain('admin.log.actions.owner_bootstrap');
+    expect(row(4)).toContain('admin.system');
     http.verify();
 
     const log = uk.admin.log as unknown as {

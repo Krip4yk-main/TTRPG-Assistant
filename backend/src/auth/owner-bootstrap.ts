@@ -10,10 +10,12 @@ type Deps = Pick<AppDeps, 'env' | 'db' | 'redis'>;
 
 /** Попередження «власник уже інший» — раз на процес (не на кожен вхід). */
 let warnedOtherOwner = false;
+let warnedNotPromotable = false;
 
 /** Лише для тестів: дозволяє знову побачити попередження. */
 export function resetOwnerBootstrapWarning(): void {
   warnedOtherOwner = false;
+  warnedNotPromotable = false;
 }
 
 const activeOwner = and(eq(users.role, 'owner'), ne(users.status, 'deleted'));
@@ -61,7 +63,10 @@ export async function bootstrapOwner(
       .from(users)
       .where(eq(users.id, userId))
       .for('update');
-    if (!u || u.status === 'deleted' || u.isBanned) return null;
+    if (!u || u.status === 'deleted' || u.isBanned) {
+      warnNotPromotable();
+      return null;
+    }
     // Захист у глибину: цей Telegram справді прив'язаний саме до цього акаунта.
     const [linked] = await tx
       .select({ id: authIdentities.id })
@@ -72,8 +77,12 @@ export async function bootstrapOwner(
           eq(authIdentities.provider, 'telegram'),
           eq(authIdentities.subject, ownerTelegramId),
         ),
-      );
-    if (!linked) return null;
+      )
+      .for('share');
+    if (!linked) {
+      warnNotPromotable();
+      return null;
+    }
     await tx.update(users).set({ role: 'owner' }).where(eq(users.id, userId));
     await writeLog(tx, {
       actorId: null,
@@ -97,5 +106,14 @@ function warnOtherOwner(): void {
   console.warn(
     '[owner-bootstrap] OWNER_TELEGRAM_ID is set, but the platform already has another owner — ' +
       'ignored (use the owner transfer in the admin panel)',
+  );
+}
+
+function warnNotPromotable(): void {
+  if (warnedNotPromotable) return;
+  warnedNotPromotable = true;
+  console.warn(
+    '[owner-bootstrap] the account with OWNER_TELEGRAM_ID cannot become the owner ' +
+      '(banned, deleted or identity mismatch) — ignored',
   );
 }
