@@ -1,0 +1,145 @@
+# Deploy to the dev (beta) cluster. Drafted by Kane (cluster side: lab/cluster/pods/ttrpg/), adapted in this repo.
+#
+# What it does, on every push to main (or started by hand from the Actions tab):
+#   1. builds the three images from his own Dockerfiles (backend, bot, frontend)
+#   2. pushes them to ghcr.io, tagged with the commit ID
+#   3. reads each pushed image's digest (the fingerprint of its exact content) and writes the three digests into
+#      deploy/images.yaml on the branch deploy
+# The cluster's Argo CD reads deploy/images.yaml from the branch deploy about every 30 s and rolls the three services
+# to those digests (lab/cluster/pods/ttrpg/). Nothing reaches into the lab; the workflow needs no secret besides
+# GitHub's own token.
+#
+# Why digests: a tag on ghcr.io can be overwritten with other content; a digest names one exact image, so the cluster
+# runs what this run built and nothing else.
+# Why a branch of its own: the commit never lands on main, so his local main never falls behind a robot commit.
+# The branch deploy holds only deploy/images.yaml; the workflow makes it at its first run.
+#
+# One-time setup on his side:
+#   - after the first run: each of the three packages (ttrpg-backend, ttrpg-bot, ttrpg-frontend) set to public
+#     (github.com/<owner>?tab=packages -> the package -> Package settings -> Change visibility); GitHub makes a new
+#     package private, and the cluster pulls without a login
+#   - repository variables (Settings -> Secrets and variables -> Actions -> Variables), the frontend's build
+#     settings (not secrets; they end up in the public pages):
+#       DEV_TELEGRAM_BOT_USERNAME   the test bot's name, without @
+#       DEV_GOOGLE_LOGIN            true to show the Google login button, else empty
+#       DEV_DISCORD_LOGIN           true to show the Discord login button, else empty
+#       DEV_TESTER_LOGIN            true to build the hidden /login/dev page (tester codes, docs/ops/environments.md
+#                                   «Dev-вхід за середовищами»); the backend also needs DEV_LOGIN_ENABLED + DEV_LOGIN_CODES
+#   - the dev accounts his docs/ops/environments.md asks for (a test Telegram bot, Google and Discord OAuth apps with
+#     the dev address as redirect); their secret halves go to Kane for sealing
+# Going back to an earlier build: re-run that commit's run of this workflow; it builds that commit again and writes
+# its digests.
+# The image names and the images file's path, branch and three keys are fixed on the cluster's side
+# (lab/cluster/pods/ttrpg/shape.nix); a change here needs the same change there.
+
+name: Deploy to the dev cluster
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# a newer push replaces a build still running, so the last push wins
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - part: backend
+          - part: bot
+          - part: frontend
+            # built into the pages: the dev banner, the test bot, the login buttons
+            args: |
+              NG_APP_DEPLOY_ENV=dev
+              NG_APP_TELEGRAM_BOT_USERNAME=${{ vars.DEV_TELEGRAM_BOT_USERNAME }}
+              NG_APP_GOOGLE_LOGIN=${{ vars.DEV_GOOGLE_LOGIN }}
+              NG_APP_DISCORD_LOGIN=${{ vars.DEV_DISCORD_LOGIN }}
+              NG_APP_DEV_LOGIN=${{ vars.DEV_TESTER_LOGIN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.part }}/Dockerfile
+          build-args: ${{ matrix.args }}
+          push: true
+          # the owner's name in lower case: ghcr.io accepts no capitals
+          tags: ghcr.io/krip4yk-main/ttrpg-${{ matrix.part }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.part }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.part }}
+
+  pin:
+    name: Point the cluster at this build
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write the three image digests into deploy/images.yaml on the branch deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # the digest of the image this run pushed for a part (backend, bot, frontend)
+          digest() {
+            docker buildx imagetools inspect "ghcr.io/krip4yk-main/ttrpg-$1:${GITHUB_SHA}" \
+              --format '{{json .Manifest}}' | jq -r .digest
+          }
+          git init -q work
+          cd work
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # the branch deploy as it is now, or a new empty one at the first run
+          if git fetch -q --depth 1 origin deploy; then
+            git checkout -q -b deploy FETCH_HEAD
+          else
+            git checkout -q --orphan deploy
+          fi
+          mkdir -p deploy
+          {
+            echo "# built from commit ${GITHUB_SHA}"
+            echo "backend: $(digest backend)"
+            echo "bot: $(digest bot)"
+            echo "frontend: $(digest frontend)"
+          } > deploy/images.yaml
+          cat deploy/images.yaml
+          # stop here if a digest is missing or malformed, before anything is pushed
+          test "$(grep -c -E '^(backend|bot|frontend): sha256:[0-9a-f]{64}$' deploy/images.yaml)" = 3
+          git add deploy/images.yaml
+          if git diff --cached --quiet; then
+            echo "deploy/images.yaml already names these images"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "deploy ${GITHUB_SHA}"
+          git push -q origin deploy
