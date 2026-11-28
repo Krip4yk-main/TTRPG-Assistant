@@ -107,6 +107,14 @@ const schema = z
     TELEGRAM_BOT_TOKEN: optional,
     TELEGRAM_BOT_USERNAME: optional,
     TELEGRAM_LOGIN_MAX_AGE_SEC: z.coerce.number().int().positive().default(86400),
+    /**
+     * Telegram user id власника платформи (План 20): перевірений вхід чи прив'язка Telegram з
+     * цим id, коли власника ще немає, робить акаунт власником. Не задано — як раніше.
+     */
+    OWNER_TELEGRAM_ID: z
+      .string()
+      .regex(/^[1-9]\d{0,19}$/)
+      .optional(),
     GOOGLE_CLIENT_ID: optional,
     GOOGLE_CLIENT_SECRET: optional,
     DISCORD_CLIENT_ID: optional,

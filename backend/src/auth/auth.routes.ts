@@ -10,6 +10,7 @@ import { authIdentities, users } from '../db/schema/index.js';
 import { AppError } from '../http/errors.js';
 import { devLoginMode, devLoginRouter, warnDevLoginMisconfig } from './dev-login.js';
 import { linkIdentity, resolveLogin } from './identity.service.js';
+import { bootstrapOwner } from './owner-bootstrap.js';
 import { getMe } from '../users/users.service.js';
 import { bannedError, issueAppealToken } from '../appeals/appeals.service.js';
 import { verifyTelegramLogin } from './providers/telegram.js';
@@ -130,6 +131,8 @@ export function authRouter(deps: AppDeps): Router {
     const [u] = await db.select().from(users).where(eq(users.id, userId));
     if (!u || u.status === 'deleted') throw new AppError(401, 'UNAUTHENTICATED');
     if (u.isBanned) throw await bannedError(deps, userId);
+    // Ідентичність перевірена підписом віджета — лише тут (і в прив'язці нижче) бутстрап власника.
+    await bootstrapOwner(deps, userId, identity, 'login');
     await startSession(req, res, userId);
     res.json({ user: await getMe(deps, userId) });
   });
@@ -137,6 +140,7 @@ export function authRouter(deps: AppDeps): Router {
   router.post('/telegram/link', requireTelegram, auth, async (req, res) => {
     const identity = verify(req.body);
     await linkIdentity(deps, req.user!.userId, identity);
+    await bootstrapOwner(deps, req.user!.userId, identity, 'link');
     const rows = await db
       .select({ provider: authIdentities.provider, displayName: authIdentities.displayName })
       .from(authIdentities)
