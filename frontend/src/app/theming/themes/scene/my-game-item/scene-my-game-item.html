@@ -64,8 +64,9 @@
     @for (a of game.actions; track a.id) {
       @if (a.link) {
         <a
-          mat-stroked-button
+          [matButton]="appearance[a.rank]"
           [attr.data-action]="a.id"
+          [attr.data-rank]="a.rank"
           [routerLink]="a.link"
           [attr.aria-label]="
             'games.actions.aria'
@@ -73,27 +74,13 @@
           "
           >{{ a.labelKey | translate }}</a
         >
-      } @else if (a.emphasis === 'stroked') {
-        <button
-          mat-stroked-button
-          type="button"
-          [attr.data-action]="a.id"
-          [class.danger]="a.danger"
-          [disabled]="busy()"
-          [attr.aria-label]="
-            'games.actions.aria'
-              | translate: { action: (a.labelKey | translate), title: game.title }
-          "
-          (click)="emit(a)"
-        >
-          {{ a.labelKey | translate }}
-        </button>
       } @else {
         <button
-          mat-button
+          [matButton]="appearance[a.rank]"
           type="button"
           [attr.data-action]="a.id"
-          [class.danger]="a.danger"
+          [attr.data-rank]="a.rank"
+          [class.nri-danger]="a.rank === 'danger'"
           [disabled]="busy()"
           [attr.aria-label]="
             'games.actions.aria'

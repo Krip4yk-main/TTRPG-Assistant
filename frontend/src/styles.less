@@ -155,6 +155,16 @@ a,
 
 // Текстова кнопка Material у ряду інших кнопок: внутрішній відступ компенсовано, щоб значок
 // стояв на краю ряду (перенесена — під сусідами, у ряду — на звичайному проміжку).
+// Ієрархія кнопок дій (спільна для всіх дизайнів, див. shared/action-rank.ts): головна — залита,
+// другорядні — обведені, небезпечні — текстова кнопка кольору небезпеки дизайну. Колір — токен
+// `--nri-danger-text` дизайну (на темних і світлих ділянках він свій); вимкнена кнопка лишається
+// вимкненою — токени disabled Material не перевизначаються.
+.mat-mdc-button-base.nri-danger {
+  --mat-button-text-label-text-color: var(--nri-danger-text);
+  --mat-button-text-state-layer-color: var(--nri-danger-text);
+  --mat-button-text-ripple-color: color-mix(in srgb, var(--nri-danger-text) 12%, transparent);
+}
+
 .nri-text-button-flush {
   margin-inline-start: calc(-1 * var(--mat-button-text-with-icon-horizontal-padding, 12px));
 }

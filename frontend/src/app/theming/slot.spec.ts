@@ -137,7 +137,7 @@ describe('nri-slot', () => {
     const actions = Array.from(el.querySelectorAll<HTMLElement>('[data-action]')).map(
       (a) => a.dataset['action'],
     );
-    expect(actions).toEqual(['edit', 'start', 'cancel']);
+    expect(actions).toEqual(['start', 'edit', 'cancel']);
     el.querySelector<HTMLButtonElement>('[data-action="start"]')!.click();
     expect(events).toEqual([{ name: 'action', value: { action: 'start' } }]);
   });

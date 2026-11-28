@@ -336,10 +336,10 @@ describe.each(DESIGNS)('slot contract — design «%s»', (_name, slots) => {
       const actions = Array.from(el.querySelectorAll<HTMLElement>('[data-action]'));
       expect(actions.map((a) => a.getAttribute('data-action'))).toEqual([
         'still-alive',
-        'close-dead',
         'edit',
         'start',
         'pause',
+        'close-dead',
         'cancel',
       ]);
       for (const a of actions) expect(getComputedStyle(a).display).not.toBe('none');
