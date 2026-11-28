@@ -53,6 +53,8 @@ export function devLoginMode(env: DevEnv): DevLoginMode {
 
 /** Шлях входу за кодом (відносно `/api/auth`). */
 export const DEV_LOGIN_CODE_PATH = '/dev-login/code';
+/** Проба для сторінки `/login/dev`: 204 — dev-вхід за кодом увімкнено (лише в режимі `beta`), інакше 404. */
+export const DEV_LOGIN_STATUS_PATH = '/dev-login/code/status';
 
 /** Гучне попередження, якщо налаштування dev-входу не діють або діють не так, як очікують. */
 export function warnDevLoginMisconfig(env: DevEnv): void {
@@ -190,6 +192,10 @@ export function devLoginRouter(deps: AppDeps, startSession: StartSession): Route
   }
 
   if (mode === 'beta') {
+    // Лише факт «увімкнено»: без тіла, без підрахунку невдалих спроб (їх лічить лише POST коду).
+    router.get(DEV_LOGIN_STATUS_PATH, (_req, res) => {
+      res.status(204).end();
+    });
     // Код перевіряється першим: без нього — 403 без підказок (ще до розбору нікнейма).
     router.post(DEV_LOGIN_CODE_PATH, async (req, res) => {
       const raw = (req.body ?? {}) as Record<string, unknown>;

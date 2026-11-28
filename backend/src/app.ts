@@ -54,6 +54,7 @@ import {
 } from './tester-reports/tester-reports.routes.js';
 import type { RealtimeHub } from './realtime/socket.js';
 import { healthRouter } from './http/health.js';
+import { publicConfigRouter } from './http/public-config.js';
 import { csrfProtection, rateLimiters } from './http/security.js';
 
 export type AppDeps = {
@@ -90,6 +91,8 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(cookieParser());
   // Health-check — до rate limiter, CSRF та сесії: без cookie, дешево, не залежить від них.
   app.use(healthRouter(deps));
+  // Публічні налаштування для фронтенду: без cookie/CSRF/сесії, кеш на хвилину, загальний ліміт.
+  app.use(publicConfigRouter(env, limits.general));
   // Поза /api: без сесії, CSRF-cookie та загального rate limiter (лише GET — тіло не потрібне).
   app.use(seoRootRouter(deps));
   // Публічний ICS-фід: без cookie/CSRF/сесії (секрет — у посиланні), під власними лімітами.

@@ -34,3 +34,4 @@ export * from './contracts/calendar-import.js';
 export * from './contracts/calendar-feed.js';
 export * from './contracts/image-url.js';
 export * from './contracts/tester-reports.js';
+export * from './contracts/public-config.js';

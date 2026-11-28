@@ -240,6 +240,42 @@ describe('beta (DEPLOY_ENV=dev) dev login by code', () => {
   });
 });
 
+describe('dev login status probe', () => {
+  const STATUS = '/api/auth/dev-login/code/status';
+  const probe = (app: App, ip: string) => request(app).get(STATUS).set('X-Forwarded-For', ip);
+
+  it('beta enabled: 204 without a body, no session needed', async () => {
+    const res = await probe(await appWith(BETA), nextIp());
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
+  });
+
+  it('does not count against the failed-code limiter', async () => {
+    const app = await appWith(BETA);
+    const ip = nextIp();
+    for (let i = 0; i < DEV_LOGIN_CODE_ATTEMPTS + 2; i++) {
+      expect((await probe(app, ip)).status).toBe(204);
+    }
+    const ok = await codeLogin(app, { code: CODE_ALICE, nickname: 'Tester' }, ip);
+    expect(ok.status).toBe(200);
+  });
+
+  it('DEV_LOGIN_ENABLED=false on beta -> 404', async () => {
+    const res = await probe(await appWith({ ...BETA, DEV_LOGIN_ENABLED: 'false' }), nextIp());
+    expect(res.status).toBe(404);
+  });
+
+  it('prod and local: 404', async () => {
+    expect((await probe(await appWith(PROD), nextIp())).status).toBe(404);
+    const local = await appWith({
+      NODE_ENV: 'development',
+      DEV_LOGIN_ENABLED: 'true',
+      DEV_LOGIN_CODES: `alice:${CODE_ALICE}`,
+    });
+    expect((await probe(local, nextIp())).status).toBe(404);
+  });
+});
+
 describe('dev login off outside beta', () => {
   it('prod: both routes 404', async () => {
     const app = await appWith(PROD);
