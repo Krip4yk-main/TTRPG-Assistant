@@ -1,5 +1,5 @@
 import type { ImageUrlInvalidReason } from '@nri/shared';
-import { Semaphore } from '../scheduling/ical/slots.js';
+import { Semaphore } from '../lib/semaphore.js';
 import { AppError } from './errors.js';
 import {
   createSafeGet,
