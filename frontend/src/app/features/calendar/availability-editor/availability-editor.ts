@@ -320,6 +320,15 @@ export class AvailabilityEditor {
     this.paintAction.set(null);
   }
 
+  /**
+   * «Зберегти» (кнопка режиму, поки він увімкнений): завершує фарбування; у `save` ще й
+   * зберігає календар, якщо є зміни. У `custom` клітинки лишаються в редакторі до «Застосувати».
+   */
+  protected finishPainting(): void {
+    this.togglePaintMode();
+    if (this.mode() === 'save' && this.dirty()) void this.save();
+  }
+
   /** «Готово»: наступний тап знову визначить дію. */
   protected paintDone(): void {
     this.paintAction.set(null);

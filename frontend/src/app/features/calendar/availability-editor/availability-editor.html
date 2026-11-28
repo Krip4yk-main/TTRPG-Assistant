@@ -46,11 +46,10 @@
             type="button"
             class="paint-toggle"
             [class.active]="paintMode()"
-            [attr.aria-pressed]="paintMode()"
-            (click)="togglePaintMode()"
+            (click)="paintMode() ? finishPainting() : togglePaintMode()"
           >
-            <mat-icon aria-hidden="true">brush</mat-icon>
-            {{ 'calendar.paint.toggle' | translate }}
+            <mat-icon aria-hidden="true">{{ paintMode() ? 'check' : 'brush' }}</mat-icon>
+            {{ (paintMode() ? 'calendar.paint.save' : 'calendar.paint.toggle') | translate }}
           </button>
           <div class="paint-live" aria-live="polite">
             @if (paintMode() && paintAction() !== null) {
