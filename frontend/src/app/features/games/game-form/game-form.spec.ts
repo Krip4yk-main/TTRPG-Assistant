@@ -708,6 +708,31 @@ describe('GameForm', () => {
       await settle();
     };
 
+    it('text left in a custom line input is added on blur, without Enter or the button', async () => {
+      await setup();
+      await type(`${kind('lines')} input.custom-input`, 'Павуки'); // type() fires blur
+      expect(el.querySelector(`${kind('lines')} .custom-chip`)?.textContent).toContain('Павуки');
+      expect(q<HTMLInputElement>(`${kind('lines')} input.custom-input`).value).toBe('');
+      // Порожнє поле при виході нічого не додає.
+      q<HTMLInputElement>(`${kind('lines')} input.custom-input`).dispatchEvent(new Event('blur'));
+      await settle();
+      expect(el.querySelectorAll(`${kind('lines')} .custom-chip`)).toHaveLength(1);
+    });
+
+    it('a duplicate left in the veil input on blur is not added twice', async () => {
+      await setup();
+      await type(`${kind('veils')} input.custom-input`, 'Павуки');
+      await type(`${kind('veils')} input.custom-input`, ' павуки ');
+      expect(el.querySelectorAll(`${kind('veils')} .custom-chip`)).toHaveLength(1);
+    });
+
+    it('text left in the custom content warning input is added on blur', async () => {
+      await setup();
+      await type('input.custom-warning-input', 'Клоуни');
+      expect(el.querySelector('.chips.custom .custom-chip')?.textContent).toContain('Клоуни');
+      expect(q<HTMLInputElement>('input.custom-warning-input').value).toBe('');
+    });
+
     it('a new game: the section is collapsed and nothing is required', async () => {
       await setup();
       expect(details().open).toBe(false);

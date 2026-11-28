@@ -115,6 +115,18 @@ describe('ApplyDialog', () => {
     expect(el.textContent).toContain('Який у вас досвід?');
   });
 
+  it('renders each question as a plain label tied to its field, not a floating mat-label', async () => {
+    await create({ ...data, questions: ['Перше питання?', 'Друге питання?'] });
+    const labels = el.querySelectorAll<HTMLLabelElement>('label.question');
+    expect(labels).toHaveLength(2);
+    expect(labels[1].textContent).toContain('Друге питання?');
+    const area = el.querySelectorAll<HTMLTextAreaElement>('textarea.answer')[1];
+    expect(labels[1].htmlFor).toBe(area.id);
+    expect(el.querySelector('mat-form-field mat-label')?.textContent ?? '').not.toContain(
+      'Перше питання?',
+    );
+  });
+
   it('no game safety info: no safety section', async () => {
     await create();
     expect(el.querySelector('section.safety')).toBeNull();

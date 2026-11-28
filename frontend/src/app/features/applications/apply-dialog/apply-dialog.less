@@ -20,6 +20,19 @@
   }
 }
 
+.question-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nri-space-xs);
+}
+
+// Питання майстра — звичайний текст над полем: переноситься, не обрізається.
+.question {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .section-title {
   margin: 0;
   font-size: 1rem;

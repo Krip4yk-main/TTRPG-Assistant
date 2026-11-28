@@ -50,20 +50,23 @@
           </p>
         }
         @for (q of data.questions; track $index; let i = $index) {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>{{ q }}</mat-label>
-            <textarea
-              matInput
-              class="answer"
-              rows="2"
-              required
-              [formControlName]="i"
-              [attr.maxlength]="limits.answer"
-            ></textarea>
-            @if (errorKey(answers.at(i), 'games.applications.apply.answerRequired'); as key) {
-              <mat-error>{{ key | translate: { max: limits.answer } }}</mat-error>
-            }
-          </mat-form-field>
+          <div class="question-block">
+            <label class="question" [attr.for]="'apply-answer-' + i">{{ q }}</label>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <textarea
+                matInput
+                class="answer"
+                [id]="'apply-answer-' + i"
+                rows="2"
+                required
+                [formControlName]="i"
+                [attr.maxlength]="limits.answer"
+              ></textarea>
+              @if (errorKey(answers.at(i), 'games.applications.apply.answerRequired'); as key) {
+                <mat-error>{{ key | translate: { max: limits.answer } }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
         }
       </fieldset>
     }

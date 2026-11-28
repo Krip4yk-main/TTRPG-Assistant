@@ -84,6 +84,7 @@
               [formControl]="newCustom[kind]"
               [attr.maxlength]="maxLength"
               (keydown.enter)="$event.preventDefault(); addCustom(kind)"
+              (blur)="addCustom(kind)"
             />
           </mat-form-field>
           <button

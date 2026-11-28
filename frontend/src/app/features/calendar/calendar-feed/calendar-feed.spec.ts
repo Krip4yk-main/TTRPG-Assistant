@@ -110,6 +110,10 @@ describe('CalendarFeed', () => {
     expect(el.querySelector('.connected-since')!.textContent).toContain('calendar.feed.since');
     expect(el.querySelector('input.feed-url')).toBeNull();
     expect(btn('copy')).toBeNull();
+    const help = el.querySelector('.instructions')!.textContent!;
+    for (const k of ['google', 'apple', 'outlook']) {
+      expect(help).toContain(`calendar.feed.help.${k}`);
+    }
     expect(btn('enable')).toBeNull();
 
     confirm = false;

@@ -494,9 +494,11 @@
             <mat-label>{{ 'games.form.customWarning' | translate }}</mat-label>
             <input
               matInput
+              class="custom-warning-input"
               [formControl]="newCustomWarning"
               maxlength="60"
               (keydown.enter)="$event.preventDefault(); addCustomWarning()"
+              (blur)="addCustomWarning()"
             />
           </mat-form-field>
           <button

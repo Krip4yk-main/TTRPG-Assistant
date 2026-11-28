@@ -41,15 +41,6 @@
             <p class="nri-muted" id="calendar-feed-secret">
               {{ 'calendar.feed.secret' | translate }}
             </p>
-            <div class="instructions">
-              <p class="instructions-title">{{ 'calendar.feed.help.title' | translate }}</p>
-              <ul>
-                <li>{{ 'calendar.feed.help.google' | translate }}</li>
-                <li>{{ 'calendar.feed.help.apple' | translate }}</li>
-                <li>{{ 'calendar.feed.help.outlook' | translate }}</li>
-              </ul>
-              <p class="nri-muted">{{ 'calendar.feed.help.googleDelay' | translate }}</p>
-            </div>
           </div>
         } @else {
           <p class="connected-since">
@@ -58,6 +49,15 @@
           </p>
           <p class="nri-muted">{{ 'calendar.feed.hiddenLink' | translate }}</p>
         }
+        <div class="instructions">
+          <p class="instructions-title">{{ 'calendar.feed.help.title' | translate }}</p>
+          <ul>
+            <li>{{ 'calendar.feed.help.google' | translate }}</li>
+            <li>{{ 'calendar.feed.help.apple' | translate }}</li>
+            <li>{{ 'calendar.feed.help.outlook' | translate }}</li>
+          </ul>
+          <p class="nri-muted">{{ 'calendar.feed.help.googleDelay' | translate }}</p>
+        </div>
         <div class="buttons">
           <button
             mat-stroked-button
