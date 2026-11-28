@@ -24,11 +24,16 @@ export class ShellController {
 
   /**
    * Перемикач виду: на сторінці іншого виду — перехід на відповідник або головну. Якщо перехід
-   * скасовано (незбережені зміни), `toggle` повертаємо до справжнього виду — інакше перемикач
+   * скасовано (незбережені зміни) або він не вдався, `toggle` повертаємо до справжнього виду — інакше перемикач
    * показував би вид, якого немає.
    */
   async setMode(mode: ViewMode, toggle?: { value: unknown }): Promise<void> {
-    const switched = await this.viewRouting.switchTo(mode);
+    let switched = false;
+    try {
+      switched = await this.viewRouting.switchTo(mode);
+    } catch {
+      // Помилка навігації (наприклад, не завантажився чанк) — як скасований перехід.
+    }
     if (!switched && toggle) toggle.value = this.viewMode.mode();
   }
 

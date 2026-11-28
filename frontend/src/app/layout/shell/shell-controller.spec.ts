@@ -20,6 +20,16 @@ let leave = true;
 
 const routes: Routes = [
   { path: '', children: [] },
+  {
+    path: 'broken',
+    children: [],
+    resolve: {
+      boom: () => {
+        throw new Error('chunk load failed');
+      },
+    },
+  },
+  { path: 'games/edit', children: [], data: gmPage('/broken') },
   { path: 'games/new', children: [], data: gmPage(), canDeactivate: [() => leave] },
 ];
 
@@ -51,5 +61,14 @@ describe('ShellController.setMode', () => {
     await shell.setMode('player', toggle);
     expect(shell.viewMode.mode()).toBe('player');
     expect(toggle.value).toBe('player');
+  });
+
+  it('збій навігації (NavigationError) не лишає перемикач хибним і не кидає виняток', async () => {
+    const shell = TestBed.inject(ShellController);
+    await TestBed.inject(Router).navigateByUrl('/games/edit');
+    const toggle = { value: 'player' as unknown };
+    await expect(shell.setMode('player', toggle)).resolves.toBeUndefined();
+    expect(shell.viewMode.mode()).toBe('gm');
+    expect(toggle.value).toBe('gm');
   });
 });

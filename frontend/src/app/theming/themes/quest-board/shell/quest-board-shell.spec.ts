@@ -94,6 +94,11 @@ describe('QuestBoardShell (slot «shell»)', () => {
     expect(menu.querySelector('a[href="/games/new"]')).not.toBeNull();
   });
 
+  it('brand shows the shared d20 mark', async () => {
+    await settle();
+    expect(el.querySelector('.brand nri-brand-mark')).not.toBeNull();
+  });
+
   it('player view shows «My applications»', async () => {
     TestBed.inject(ViewModeStore).setMode('player');
     await settle();
