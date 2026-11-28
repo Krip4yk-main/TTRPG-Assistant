@@ -71,6 +71,9 @@
 //     сталь / 11.2 оверлей.
 //   Реліквіар (Коли / Де / Місця, тло #121115): текст #ECE2CC — 14.6; підписи-золото #D4AC55 —
 //     8.8; порожні ромби місць #8A7D68 — 4.7 (≥ 3:1).
+//   Статус «Моїх ігор» (тло #121115): золото #F1D58A — 13.1, рожеве золото #E0A58A — 8.9, кістка
+//     #B3A78C — 7.9, червоне золото #FF9A8C — 9.2; «Нових: N» #FFF4DC на воску #B5302A … #7A1616 —
+//     5.6 … 9.8.
 //   Зелений акцент (лічильники) — #04140A на #7DFFA0 — 15.0.
 //   Віск #D2463A (обрані прапорці) — 4.3 на полі (іконка ≥ 3); галочка #FFF4DC на воску — 4.1
 //     (іконка). Небезпечні кнопки #B5302A, текст #FFF6F2 — 5.8; червоний текст #FF9A8C — 8.2
@@ -783,10 +786,57 @@
     font: 600 0.6875rem/1 var(--sc-font-mono);
   }
 
+  // «Мої ігри»: статус — табличка реліквіара (темна сталь, золота внутрішня лінія, капітелі
+  // Cormorant SC), колір — за станом: набір — золото, триває — рожеве золото, пауза — пунктир,
+  // завершена — кістка, скасована — червоне золото.
   nri-sc-my-game-item .status {
+    padding: 3px 8px 2px;
+    border: 1px solid currentcolor;
     border-radius: 0;
-    font-family: var(--sc-font-mono);
-    font-weight: 600;
+    background: #121115;
+    box-shadow:
+      inset 0 0 0 2px #121115,
+      inset 0 0 0 3px rgba(201, 161, 74, 0.3);
+    font: 700 0.8125rem/1.2 var(--sc-font-display);
+    letter-spacing: 0.04em;
+
+    &[data-status='recruiting'] {
+      color: #f1d58a;
+    }
+
+    &[data-status='started'] {
+      color: #e0a58a;
+    }
+
+    &[data-status='paused'],
+    &[data-status='finished'] {
+      color: #b3a78c;
+    }
+
+    &[data-status='cancelled'] {
+      color: #ff9a8c;
+    }
+  }
+
+  // «Нових: N» — червона воскова печатка з написом капітелями; позначка «давно не проводилась»
+  // — капітелями дизайну замість моноширинного.
+  nri-sc-my-game-item .pending-count {
+    padding: 2px 9px 1px;
+    border: 1px solid #5d0c0c;
+    border-radius: 999px;
+    background: radial-gradient(circle at 40% 35%, #b5302a, #7a1616);
+    box-shadow:
+      0 1px 0 #000,
+      inset 0 1px 0 rgba(255, 170, 150, 0.25);
+    color: #fff4dc;
+    font: 700 0.8125rem/1.2 var(--sc-font-display);
+    letter-spacing: 0.03em;
+  }
+
+  nri-sc-my-game-item .flag-badge {
+    font: 700 0.8125rem/1.3 var(--sc-font-display);
+    letter-spacing: 0.04em;
+    text-transform: none;
   }
 
   .nri-seen-badge {
