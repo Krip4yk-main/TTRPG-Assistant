@@ -82,6 +82,11 @@
     </header>
 
     <div class="panel-body" [attr.aria-busy]="store.loading()" (scroll)="playVisibleAccepted()">
+      @if (confirmLoadFailed()) {
+        <p class="nri-alert load-error confirm-load-error" role="alert">
+          {{ 'shell.connectionError' | translate }}
+        </p>
+      }
       <div class="progress">
         @if (store.loading()) {
           <mat-progress-bar

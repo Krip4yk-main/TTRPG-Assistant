@@ -215,6 +215,7 @@ export class NotificationBell {
     if (!this.open()) return;
     this.open.set(false);
     this.store.setPanelOpen(false);
+    this.confirmLoadFailed.set(false);
     if (restoreFocus) this.trigger().nativeElement.focus();
   }
 
@@ -283,18 +284,30 @@ export class NotificationBell {
 
   /** Чанк діалогу підтвердження ще вантажиться (див. `removeRead`). */
   private loadingConfirm = false;
+  /** Чанк діалогу підтвердження не завантажився (мережа, новий деплой) — показуємо помилку. */
+  protected readonly confirmLoadFailed = signal(false);
+
+  /** Окремо від `removeRead`, щоб тест міг підмінити завантаження чанка. */
+  protected loadConfirmDialog() {
+    return import('../../../shared/confirm-dialog/confirm-dialog');
+  }
 
   /**
    * Видалити прочитані — лише після підтвердження (діалог відкривається над панеллю). Діалог —
    * окремим чанком, вантажиться при першому натисканні; повторне натискання, поки він
-   * вантажиться, другого діалогу не відкриває.
+   * вантажиться, другого діалогу не відкриває; якщо чанк не завантажився — повідомлення
+   * про збій зв’язку в панелі, нічого не видаляється.
    */
   protected async removeRead(): Promise<void> {
     if (this.loadingConfirm) return;
     this.loadingConfirm = true;
+    this.confirmLoadFailed.set(false);
     let ConfirmDialog;
     try {
-      ({ ConfirmDialog } = await import('../../../shared/confirm-dialog/confirm-dialog'));
+      ({ ConfirmDialog } = await this.loadConfirmDialog());
+    } catch {
+      this.confirmLoadFailed.set(true);
+      return;
     } finally {
       this.loadingConfirm = false;
     }

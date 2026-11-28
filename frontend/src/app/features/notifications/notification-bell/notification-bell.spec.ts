@@ -382,6 +382,34 @@ describe('NotificationBell', () => {
     expect(panel()!.querySelectorAll('a.item').length).toBe(1);
   });
 
+  it('«Видалити прочитані»: if the dialog chunk fails to load, shows an error and deletes nothing', async () => {
+    const load = vi
+      .spyOn(
+        NotificationBell.prototype as unknown as { loadConfirmDialog: () => Promise<unknown> },
+        'loadConfirmDialog',
+      )
+      .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'));
+    await start(1);
+    await open([notification(3), notification(2, { readAt: '2026-11-25T11:00:00.000Z' })], 1);
+    const btn = () => panel()!.querySelector<HTMLButtonElement>('button.remove-read')!;
+    const alert = () => panel()!.querySelector<HTMLElement>('.confirm-load-error');
+    expect(alert()).toBeNull();
+    btn().click();
+    await flushAsync();
+    await settle();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(alert()?.getAttribute('role')).toBe('alert');
+    expect(alert()!.textContent).toContain(uk.shell.connectionError);
+    expect(document.querySelector('mat-dialog-container')).toBeNull();
+    http.expectNone('/api/me/notifications/read');
+    // Повторна спроба (чанк уже вантажиться) — помилка зникає, відкривається діалог.
+    btn().click();
+    await vi.waitFor(() => expect(document.querySelector('mat-dialog-actions')).not.toBeNull());
+    await settle();
+    expect(alert()).toBeNull();
+    load.mockRestore();
+  });
+
   it('empty state and Escape closes', async () => {
     await start(0);
     await open([]);
