@@ -23,21 +23,17 @@
     @if (signedIn()) {
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>{{ 'search.filters.calendar.mode' | translate }}</mat-label>
-        <select matNativeControl name="calendar" (change)="onCalendar($event)">
-          <option value="off" [selected]="calendarMode() === 'off'">
-            {{ 'search.filters.calendar.off' | translate }}
-          </option>
-          <option
-            value="mine"
-            [disabled]="hasSlots() === false"
-            [selected]="calendarMode() === 'mine'"
-          >
+        <mat-select
+          name="calendar"
+          [value]="calendarMode()"
+          (selectionChange)="onCalendar($event.value)"
+        >
+          <mat-option value="off">{{ 'search.filters.calendar.off' | translate }}</mat-option>
+          <mat-option value="mine" [disabled]="hasSlots() === false">
             {{ 'search.filters.calendar.mine' | translate }}
-          </option>
-          <option value="custom" [selected]="calendarMode() === 'custom'">
-            {{ 'search.filters.calendar.custom' | translate }}
-          </option>
-        </select>
+          </mat-option>
+          <mat-option value="custom">{{ 'search.filters.calendar.custom' | translate }}</mat-option>
+        </mat-select>
       </mat-form-field>
       @if (hasSlots() === false && calendarMode() !== 'custom') {
         <p class="nri-muted hint">
@@ -107,36 +103,44 @@
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>{{ 'search.filters.kind' | translate }}</mat-label>
-      <select matNativeControl name="kind" (change)="onSelect('kind', $event)">
-        <option value="">{{ 'search.filters.anyKind' | translate }}</option>
+      <mat-select
+        name="kind"
+        [value]="f.kind ?? ''"
+        (selectionChange)="onPick('kind', $event.value)"
+      >
+        <mat-option value="">{{ 'search.filters.anyKind' | translate }}</mat-option>
         @for (k of kinds; track k) {
-          <option [value]="k" [selected]="f.kind === k">{{ 'games.kind.' + k | translate }}</option>
+          <mat-option [value]="k">{{ 'games.kind.' + k | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
     </mat-form-field>
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>{{ 'search.filters.experience' | translate }}</mat-label>
-      <select matNativeControl name="experience" (change)="onSelect('experience', $event)">
-        <option value="">{{ 'search.filters.anyExperience' | translate }}</option>
+      <mat-select
+        name="experience"
+        [value]="f.experience ?? ''"
+        (selectionChange)="onPick('experience', $event.value)"
+      >
+        <mat-option value="">{{ 'search.filters.anyExperience' | translate }}</mat-option>
         @for (e of experiences; track e) {
-          <option [value]="e" [selected]="f.experience === e">
-            {{ 'games.experience.' + e | translate }}
-          </option>
+          <mat-option [value]="e">{{ 'games.experience.' + e | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
     </mat-form-field>
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>{{ 'search.filters.language' | translate }}</mat-label>
-      <select matNativeControl name="language" (change)="onSelect('language', $event)">
-        <option value="">{{ 'search.filters.anyLanguage' | translate }}</option>
+      <mat-select
+        name="language"
+        [value]="f.language ?? ''"
+        (selectionChange)="onPick('language', $event.value)"
+      >
+        <mat-option value="">{{ 'search.filters.anyLanguage' | translate }}</mat-option>
         @for (l of languages; track l) {
-          <option [value]="l" [selected]="f.language === l">
-            {{ 'games.language.' + l | translate }}
-          </option>
+          <mat-option [value]="l">{{ 'games.language.' + l | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
     </mat-form-field>
   </fieldset>
 
@@ -145,14 +149,16 @@
     <legend>{{ 'search.filters.place' | translate }}</legend>
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>{{ 'search.filters.format' | translate }}</mat-label>
-      <select matNativeControl name="format" (change)="onSelect('format', $event)">
-        <option value="">{{ 'search.filters.anyFormat' | translate }}</option>
+      <mat-select
+        name="format"
+        [value]="f.format ?? ''"
+        (selectionChange)="onPick('format', $event.value)"
+      >
+        <mat-option value="">{{ 'search.filters.anyFormat' | translate }}</mat-option>
         @for (fm of formats; track fm) {
-          <option [value]="fm" [selected]="f.format === fm">
-            {{ 'games.format.' + fm | translate }}
-          </option>
+          <mat-option [value]="fm">{{ 'games.format.' + fm | translate }}</mat-option>
         }
-      </select>
+      </mat-select>
     </mat-form-field>
 
     @if (f.format !== 'online') {
@@ -224,17 +230,15 @@
     <div class="row">
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>{{ 'search.filters.price' | translate }}</mat-label>
-        <select
-          matNativeControl
+        <mat-select
           name="priceMode"
-          (change)="patch({ priceMode: $any(value($event) ?? 'any') })"
+          [value]="f.priceMode"
+          (selectionChange)="patch({ priceMode: $event.value })"
         >
           @for (p of priceModes; track p) {
-            <option [value]="p" [selected]="f.priceMode === p">
-              {{ 'search.filters.priceMode.' + p | translate }}
-            </option>
+            <mat-option [value]="p">{{ 'search.filters.priceMode.' + p | translate }}</mat-option>
           }
-        </select>
+        </mat-select>
       </mat-form-field>
       @if (f.priceMode !== 'free') {
         <mat-form-field appearance="outline" subscriptSizing="dynamic">

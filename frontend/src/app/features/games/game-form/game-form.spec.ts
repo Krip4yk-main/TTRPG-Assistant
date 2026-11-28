@@ -10,6 +10,15 @@ import { GameForm } from './game-form';
 import uk from '../../../../assets/i18n/uk.json';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { SocketService } from '../../../core/realtime/socket.service';
+import {
+  isOptionDisabled,
+  isSelectDisabled,
+  openOptions,
+  optionText,
+  pickIndex,
+  pickText,
+  selectedText as matSelectedText,
+} from '../../../../testing/mat-select';
 
 const me: MeDto = {
   id: 1,
@@ -110,19 +119,15 @@ describe('GameForm', () => {
   let el: HTMLElement;
 
   const q = <T extends Element>(sel: string) => el.querySelector<T>(sel)!;
-  const selectOf = (name: string) => q<HTMLSelectElement>(`select[formcontrolname="${name}"]`);
+  const selectOf = (name: string) => q<HTMLElement>(`mat-select[formcontrolname="${name}"]`);
+  const winSelect = (cls: 'window-from' | 'window-to') => q<HTMLElement>(`mat-select.${cls}`);
   const settle = async () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
   };
   const choose = async (name: string, text: string) => {
-    const s = selectOf(name);
-    const i = Array.from(s.options).findIndex((o) => o.textContent!.includes(text));
-    expect(i).toBeGreaterThanOrEqual(0);
-    s.selectedIndex = i;
-    s.dispatchEvent(new Event('change'));
-    await settle();
+    await pickText(selectOf(name), text, settle);
   };
   const type = async (selector: string, value: string) => {
     const input = q<HTMLInputElement>(selector);
@@ -131,7 +136,7 @@ describe('GameForm', () => {
     input.dispatchEvent(new Event('blur'));
     await settle();
   };
-  const selectedText = (name: string) => selectOf(name).selectedOptions[0]?.textContent ?? '';
+  const selectedText = (name: string) => matSelectedText(selectOf(name));
   const publishButton = () => q<HTMLButtonElement>('button.publish');
   const submit = async () => {
     q<HTMLFormElement>('form.game-form').dispatchEvent(new Event('submit'));
@@ -393,7 +398,7 @@ describe('GameForm', () => {
 
   it('editing a recruiting game: system and kind are disabled with a hint', async () => {
     await setup(5, game({ status: 'recruiting' }));
-    expect(selectOf('system').disabled).toBe(true);
+    expect(isSelectDisabled(selectOf('system'))).toBe(true);
     expect(el.textContent).toContain('games.form.lockedHint');
     expect(q<HTMLInputElement>('input[formcontrolname="title"]').disabled).toBe(false);
   });
@@ -401,7 +406,7 @@ describe('GameForm', () => {
   it('recruiting game: the schedule rule stays editable', async () => {
     await setup(5, game({ status: 'recruiting' }));
     expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(false);
-    expect(selectOf('durationMinutes').disabled).toBe(false);
+    expect(isSelectDisabled(selectOf('durationMinutes'))).toBe(false);
     expect(el.querySelector('.schedule-locked')).toBeNull();
   });
 
@@ -409,8 +414,8 @@ describe('GameForm', () => {
     await setup(5, game({ status: 'started' }));
     expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(true);
     expect(q<HTMLInputElement>('nri-start-time-field input.time').disabled).toBe(true);
-    expect(selectOf('durationMinutes').disabled).toBe(true);
-    expect(selectOf('recurrence').disabled).toBe(true);
+    expect(isSelectDisabled(selectOf('durationMinutes'))).toBe(true);
+    expect(isSelectDisabled(selectOf('recurrence'))).toBe(true);
     const hint = q<HTMLElement>('.schedule-locked');
     expect(hint.textContent).toContain('games.form.scheduleLocked.');
     expect(hint.querySelector('a')!.getAttribute('href')).toBe('/games/5');
@@ -438,9 +443,9 @@ describe('GameForm', () => {
     await setup(5, game({ status: 'paused', kind: 'campaign' }));
     expect(q<HTMLInputElement>('input[formcontrolname="startDate"]').disabled).toBe(true);
     expect(q<HTMLInputElement>('nri-start-time-field input.time').disabled).toBe(true);
-    expect(selectOf('durationMinutes').disabled).toBe(true);
-    expect(selectOf('recurrence').disabled).toBe(true);
-    expect(selectOf('system').disabled).toBe(true);
+    expect(isSelectDisabled(selectOf('durationMinutes'))).toBe(true);
+    expect(isSelectDisabled(selectOf('recurrence'))).toBe(true);
+    expect(isSelectDisabled(selectOf('system'))).toBe(true);
     const hint = q<HTMLElement>('.schedule-locked');
     expect(hint.textContent).toContain('games.form.scheduleLocked.paused');
     expect(hint.querySelector('a')!.getAttribute('href')).toBe('/games/5');
@@ -544,12 +549,10 @@ describe('GameForm', () => {
       q<HTMLElement>('.mode-approx button').click();
       await settle();
       // 19:00 за Києвом; типове вікно — 3 год.
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+      expect(matSelectedText(winSelect('window-from'))).toBe('19:00');
       expect(el.querySelector('nri-start-time-field input.time')).toBeNull();
-      const to = q<HTMLSelectElement>('select.window-to');
-      to.selectedIndex = 3; // 2 год
-      to.dispatchEvent(new Event('change'));
-      await settle();
+      const to = winSelect('window-to');
+      await pickIndex(to, 3, settle); // 2 год
       await submit();
       const req = http.expectOne('/api/games/5');
       expect(req.request.body).toMatchObject({
@@ -562,7 +565,8 @@ describe('GameForm', () => {
 
     it('a windowed game prefills the window; «exact time» clears it', async () => {
       await setup(5, game({ status: 'draft', startWindowMinutes: 90 }));
-      expect(q<HTMLSelectElement>('select.window-to').selectedIndex).toBe(2);
+      await settle();
+      expect(matSelectedText(winSelect('window-to'))).toContain('sessions.window.end');
       q<HTMLElement>('.mode-exact button').click();
       await settle();
       expect(q<HTMLInputElement>('nri-start-time-field input.time').value).toBe('19:00');
@@ -585,7 +589,7 @@ describe('GameForm', () => {
       );
       await settle();
       // «До» без дати — підписи за годинником, без помилок.
-      expect(el.querySelectorAll('select.window-to option').length).toBe(24);
+      expect(await openOptions(winSelect('window-to'), settle)).toHaveLength(24);
     });
 
     it('an off-grid start of a windowed game is snapped, so no hidden value is sent', async () => {
@@ -593,7 +597,8 @@ describe('GameForm', () => {
         5,
         game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z', startWindowMinutes: 60 }),
       );
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+      await settle();
+      expect(matSelectedText(winSelect('window-from'))).toBe('19:00');
       await submit();
       const req = http.expectOne('/api/games/5');
       expect(req.request.body).toMatchObject({ startsAt: '2027-03-02T17:00:00.000Z' });
@@ -605,43 +610,39 @@ describe('GameForm', () => {
       await setup(5, game({ status: 'draft', startsAt: null, nextSessionAt: null }));
       q<HTMLElement>('.mode-approx button').click();
       await settle();
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
-      const to = q<HTMLSelectElement>('select.window-to');
+      expect(matSelectedText(winSelect('window-from'))).toBe('18:00');
+      const to = matSelectedText(winSelect('window-to'));
       // Типове вікно 3 год: «до» — година завершення (ключ `end`), а не «через 3 год» (`length`).
-      expect(to.selectedOptions[0].textContent).toContain('sessions.window.end');
-      expect(to.selectedOptions[0].textContent).not.toContain('sessions.window.length');
+      expect(to).toContain('sessions.window.end');
+      expect(to).not.toContain('sessions.window.length');
     });
 
     it('a new game: «approximately» shows «from» 18:00 and «to» as clock times', async () => {
       await setup();
       q<HTMLElement>('.mode-approx button').click();
       await settle();
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
-      const text = q<HTMLSelectElement>('select.window-to').selectedOptions[0].textContent;
+      expect(matSelectedText(winSelect('window-from'))).toBe('18:00');
+      const text = matSelectedText(winSelect('window-to'));
       expect(text).toContain('sessions.window.end');
     });
 
     it('a dateless draft with a window but no time (restored draft) gets «from» 18:00', async () => {
       await setup(5, game({ status: 'draft', startsAt: null, startWindowMinutes: 60 }));
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('18:00');
-      expect(q<HTMLSelectElement>('select.window-to').selectedOptions[0].textContent).toContain(
-        'sessions.window.end',
-      );
+      await settle();
+      expect(matSelectedText(winSelect('window-from'))).toBe('18:00');
+      expect(matSelectedText(winSelect('window-to'))).toContain('sessions.window.end');
     });
 
     it('switching to «approximately» snaps an off-grid start down to 30 minutes', async () => {
       await setup(5, game({ status: 'draft', startsAt: '2027-03-02T17:15:00.000Z' }));
       q<HTMLElement>('.mode-approx button').click();
       await settle();
-      expect(q<HTMLSelectElement>('select.window-from').value).toBe('19:00');
+      expect(matSelectedText(winSelect('window-from'))).toBe('19:00');
     });
 
     it('a published game whose first session passed: changing only the window explains why it fails', async () => {
       await setup(5, game({ status: 'recruiting', startWindowMinutes: 60 }));
-      const to = q<HTMLSelectElement>('select.window-to');
-      to.selectedIndex = 3;
-      to.dispatchEvent(new Event('change'));
-      await settle();
+      await pickIndex(winSelect('window-to'), 3, settle);
       await submit();
       http
         .expectOne('/api/games/5')
@@ -676,15 +677,15 @@ describe('GameForm', () => {
     await settle();
     expect(q<HTMLInputElement>('input[formcontrolname="title"]').value).toBe('Друга гра');
     // Блокування попередньої (recruiting) гри не лишилося.
-    expect(selectOf('system').disabled).toBe(false);
+    expect(isSelectDisabled(selectOf('system'))).toBe(false);
   });
 
   it('a 16-year-old can pick 16+ but not 18+/21+', async () => {
     const today = new Date();
     const teen = { ...me, birthDate: `${today.getFullYear() - 16}-01-01` };
     await setup(undefined, undefined, teen);
-    const options = Array.from(selectOf('ageRating').options);
-    const disabled = options.filter((o) => o.disabled).map((o) => o.textContent!.trim());
+    const options = await openOptions(selectOf('ageRating'), settle);
+    const disabled = options.filter(isOptionDisabled).map(optionText);
     expect(disabled).toEqual(['games.ageRating.18+', 'games.ageRating.21+']);
   });
 
@@ -692,8 +693,8 @@ describe('GameForm', () => {
     const today = new Date();
     const teen = { ...me, birthDate: `${today.getFullYear() - 15}-01-01` };
     await setup(undefined, undefined, teen);
-    const options = Array.from(selectOf('ageRating').options);
-    const disabled = options.filter((o) => o.disabled).map((o) => o.textContent!.trim());
+    const options = await openOptions(selectOf('ageRating'), settle);
+    const disabled = options.filter(isOptionDisabled).map(optionText);
     expect(disabled).toEqual(['games.ageRating.16+', 'games.ageRating.18+', 'games.ageRating.21+']);
   });
 

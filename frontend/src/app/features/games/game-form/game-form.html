@@ -56,15 +56,18 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.system' | translate }}</mat-label>
-              <select matNativeControl formControlName="system" required>
-                <option [ngValue]="null" disabled>
-                  {{ 'games.form.systemPlaceholder' | translate }}
-                </option>
+              <mat-select
+                formControlName="system"
+                required
+                [placeholder]="'games.form.systemPlaceholder' | translate"
+              >
                 @for (s of systemOptions(); track s.id) {
-                  <option [ngValue]="s.id">{{ s.name }}</option>
+                  <mat-option [value]="s.id">{{ s.name }}</mat-option>
                 }
-                <option [ngValue]="'other'">{{ 'games.form.systemOther' | translate }}</option>
-              </select>
+                <mat-option [value]="'other'">{{
+                  'games.form.systemOther' | translate
+                }}</mat-option>
+              </mat-select>
               @if (locked()) {
                 <mat-hint>{{ 'games.form.lockedHint' | translate }}</mat-hint>
               }
@@ -95,14 +98,15 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.genre' | translate }}</mat-label>
-              <select matNativeControl formControlName="genreId" required>
-                <option [ngValue]="null" disabled>
-                  {{ 'games.form.genrePlaceholder' | translate }}
-                </option>
+              <mat-select
+                formControlName="genreId"
+                required
+                [placeholder]="'games.form.genrePlaceholder' | translate"
+              >
                 @for (g of catalog()?.genres ?? []; track g.id) {
-                  <option [ngValue]="g.id">{{ 'genres.' + g.slug | translate }}</option>
+                  <mat-option [value]="g.id">{{ 'genres.' + g.slug | translate }}</mat-option>
                 }
-              </select>
+              </mat-select>
               <mat-hint>{{ 'games.form.genreHint' | translate }}</mat-hint>
               @if (errorKey('genreId'); as key) {
                 <mat-error>{{ key | translate }}</mat-error>
@@ -205,11 +209,11 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.language' | translate }}</mat-label>
-              <select matNativeControl formControlName="language">
+              <mat-select formControlName="language">
                 @for (l of languages; track l) {
-                  <option [ngValue]="l">{{ 'games.language.' + l | translate }}</option>
+                  <mat-option [value]="l">{{ 'games.language.' + l | translate }}</mat-option>
                 }
-              </select>
+              </mat-select>
             </mat-form-field>
           </div>
         </div>
@@ -293,13 +297,13 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
-              <select matNativeControl formControlName="durationMinutes">
+              <mat-select formControlName="durationMinutes">
                 @for (m of durations; track m) {
-                  <option [ngValue]="m">
+                  <mat-option [value]="m">
                     {{ 'games.form.hours' | translate: { h: hours(m) } }}
-                  </option>
+                  </mat-option>
                 }
-              </select>
+              </mat-select>
             </mat-form-field>
           </div>
         </div>
@@ -319,11 +323,11 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.recurrence' | translate }}</mat-label>
-              <select matNativeControl formControlName="recurrence">
+              <mat-select formControlName="recurrence">
                 @for (r of recurrences; track r) {
-                  <option [ngValue]="r">{{ 'games.recurrence.' + r | translate }}</option>
+                  <mat-option [value]="r">{{ 'games.recurrence.' + r | translate }}</mat-option>
                 }
-              </select>
+              </mat-select>
               @if (errorKey('recurrence'); as key) {
                 <mat-error>{{ key | translate }}</mat-error>
               }
@@ -415,13 +419,13 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.ageRating' | translate }}</mat-label>
-              <select matNativeControl formControlName="ageRating">
+              <mat-select formControlName="ageRating">
                 @for (r of ageRatings; track r) {
-                  <option [ngValue]="r" [disabled]="!ageAllowed(r)">
+                  <mat-option [value]="r" [disabled]="!ageAllowed(r)">
                     {{ 'games.ageRating.' + r | translate }}
-                  </option>
+                  </mat-option>
                 }
-              </select>
+              </mat-select>
               @if (!ageAllowed('21+')) {
                 <mat-hint>{{ 'games.form.ageRatingHint' | translate }}</mat-hint>
               }
@@ -433,11 +437,11 @@
           <div class="field">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ 'games.form.experience' | translate }}</mat-label>
-              <select matNativeControl formControlName="experience">
+              <mat-select formControlName="experience">
                 @for (x of experiences; track x) {
-                  <option [ngValue]="x">{{ 'games.experience.' + x | translate }}</option>
+                  <mat-option [value]="x">{{ 'games.experience.' + x | translate }}</mat-option>
                 }
-              </select>
+              </mat-select>
             </mat-form-field>
           </div>
         </div>

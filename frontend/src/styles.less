@@ -258,6 +258,13 @@ html .cdk-overlay-dark-backdrop {
   outline-offset: -1px;
 }
 
+// Одиночний вибір у mat-select: галочка вибраного варіанта за типовою схемою — світла
+// (on-secondary-container), тобто майже невидима на підсвіченому рядку; беремо колір акценту.
+// Мультиселект малює повні чекбокси — його не торкається.
+.mat-mdc-select-panel.mat-mdc-select-panel .mat-pseudo-checkbox-minimal {
+  --mat-pseudo-checkbox-minimal-selected-checkmark-color: var(--mat-sys-primary);
+}
+
 /* Програмний фокус (tabindex="-1") на заголовках і областях повідомлень — без рамки. */
 [tabindex='-1']:focus:not(:focus-visible) {
   outline: none;

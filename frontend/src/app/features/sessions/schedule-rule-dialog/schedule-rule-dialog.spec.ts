@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideTranslateService } from '@ngx-translate/core';
 import type { GameDto } from '@nri/shared';
 import { ScheduleRuleDialog, type ScheduleRuleDialogData } from './schedule-rule-dialog';
+import { openOptions, optionText, selectedText } from '../../../../testing/mat-select';
 
 const game = {
   id: 7,
@@ -140,9 +141,9 @@ describe('ScheduleRuleDialog', () => {
       game: { ...game, kind: 'oneshot', recurrence: 'none', weekdays: [] },
       mode: 'convert',
     });
-    const options = [...el.querySelectorAll<HTMLOptionElement>('select.recurrence option')].map(
-      (o) => o.textContent!.trim(),
-    );
+    const options = (
+      await openOptions(el.querySelector<HTMLElement>('mat-select.recurrence')!, settle)
+    ).map(optionText);
     expect(options).toEqual([
       'games.recurrence.weekly',
       'games.recurrence.biweekly',
@@ -171,11 +172,11 @@ describe('ScheduleRuleDialog', () => {
     el.querySelector<HTMLElement>('.mode-approx button')!.click();
     await settle();
     expect(form().getRawValue().startWindowMinutes).toBe(180);
-    const from = el.querySelector<HTMLSelectElement>('select.window-from')!;
-    expect(from.value).toBe('19:00');
-    const to = [...el.querySelectorAll<HTMLOptionElement>('select.window-to option')].map((o) =>
-      o.textContent!.trim(),
-    );
+    const from = el.querySelector<HTMLElement>('mat-select.window-from')!;
+    expect(selectedText(from)).toBe('19:00');
+    const to = (
+      await openOptions(el.querySelector<HTMLElement>('mat-select.window-to')!, settle)
+    ).map(optionText);
     // 30 хв … 12 год; після півночі — «наступного дня».
     expect(to.length).toBe(24);
     expect(to[0]).toBe('sessions.window.end');
@@ -193,10 +194,10 @@ describe('ScheduleRuleDialog', () => {
 
   it('a windowed rule opens in «approximate» mode; «exact» clears the window', async () => {
     await create({ game: { ...game, startWindowMinutes: 90 }, mode: 'schedule' });
-    expect(el.querySelector('select.window-to')).not.toBeNull();
+    expect(el.querySelector('mat-select.window-to')).not.toBeNull();
     el.querySelector<HTMLElement>('.mode-exact button')!.click();
     await settle();
-    expect(el.querySelector('select.window-to')).toBeNull();
+    expect(el.querySelector('mat-select.window-to')).toBeNull();
     expect(el.querySelector('input.time')).not.toBeNull();
     await submit();
     const req = http.expectOne('/api/games/7/schedule');

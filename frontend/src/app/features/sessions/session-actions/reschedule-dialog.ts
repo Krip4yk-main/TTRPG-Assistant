@@ -14,6 +14,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import { localDate, windowEnd, type RescheduleSessionInput, type SessionDto } from '@nri/shared';
 import { firstValueFrom } from 'rxjs';
@@ -55,6 +56,7 @@ export interface RescheduleDialogData {
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     TranslatePipe,
     StartTimeField,
   ],

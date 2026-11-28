@@ -3,6 +3,7 @@ import { ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import { merge } from 'rxjs';
 import {
@@ -29,6 +30,7 @@ let nextId = 0;
     MatButtonToggleModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     TranslatePipe,
   ],
   templateUrl: './start-time-field.html',

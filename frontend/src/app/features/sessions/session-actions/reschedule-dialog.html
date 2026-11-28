@@ -28,11 +28,13 @@
       </mat-form-field>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>{{ 'games.form.duration' | translate }}</mat-label>
-        <select matNativeControl formControlName="durationMinutes">
+        <mat-select formControlName="durationMinutes">
           @for (m of durations; track m) {
-            <option [ngValue]="m">{{ 'games.form.hours' | translate: { h: hours(m) } }}</option>
+            <mat-option [value]="m">{{
+              'games.form.hours' | translate: { h: hours(m) }
+            }}</mat-option>
           }
-        </select>
+        </mat-select>
       </mat-form-field>
     </div>
     <nri-start-time-field

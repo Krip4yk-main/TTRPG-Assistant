@@ -621,6 +621,12 @@
     border-color: var(--nri-border);
   }
 
+  // Список mat-select — завжди аркуш пергаменту з чорнилом, навіть коли поле стоїть на темному
+  // дереві (сортування над дошкою): інакше світлий текст «дерева» зливається з пергаментним фоном.
+  .mat-mdc-select-panel.mat-mdc-select-panel {
+    .qb-paper-tokens();
+  }
+
   // Межа відділяє спливні поверхні (пергамент) від затемненого фону.
   .mat-mdc-dialog-surface.mdc-dialog__surface,
   .mat-mdc-menu-panel.mat-mdc-menu-panel,

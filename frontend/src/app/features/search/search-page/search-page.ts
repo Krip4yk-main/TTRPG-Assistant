@@ -17,6 +17,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   SEARCH_SORTS,
@@ -75,6 +76,7 @@ function isInvalidCursor(err: unknown): boolean {
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     TranslatePipe,
     AvailabilityEditor,
     GameCard,
@@ -235,8 +237,7 @@ export class SearchPage {
     });
   }
 
-  protected onSort(event: Event): void {
-    const sort = (event.target as HTMLSelectElement).value as SearchSort;
+  protected onSort(sort: SearchSort): void {
     void this.navigate({ ...this.filters(), sort });
   }
 
