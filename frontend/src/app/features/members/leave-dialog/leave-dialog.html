@@ -44,7 +44,7 @@
     <button mat-stroked-button type="button" cdkFocusInitial (click)="cancel()">
       {{ 'common.cancel' | translate }}
     </button>
-    <button mat-button type="submit" class="nri-danger" [disabled]="submitting()">
+    <button mat-flat-button type="submit" class="nri-danger-filled" [disabled]="submitting()">
       {{ (submitting() ? 'members.leave.submitting' : 'members.leave.submit') | translate }}
     </button>
   </mat-dialog-actions>

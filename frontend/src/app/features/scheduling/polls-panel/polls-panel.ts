@@ -221,6 +221,8 @@ export class PollsPanel implements PollsPanelHandle {
         CommonTimesDialogResult
       >(CommonTimesDialog, {
         ...DIALOG,
+        // Як «Інший час»: поки вміст вантажиться, перша фокусована — «Закрити» (тінт фокуса).
+        autoFocus: 'dialog',
         width: '720px',
         data: {
           gameId: g.id,

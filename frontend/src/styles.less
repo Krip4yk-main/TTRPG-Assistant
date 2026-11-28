@@ -153,18 +153,32 @@ a,
   }
 }
 
-// Текстова кнопка Material у ряду інших кнопок: внутрішній відступ компенсовано, щоб значок
-// стояв на краю ряду (перенесена — під сусідами, у ряду — на звичайному проміжку).
 // Ієрархія кнопок дій (спільна для всіх дизайнів, див. shared/action-rank.ts): головна — залита,
-// другорядні — обведені, небезпечні — текстова кнопка кольору небезпеки дизайну. Колір — токен
-// `--nri-danger-text` дизайну (на темних і світлих ділянках він свій); вимкнена кнопка лишається
-// вимкненою — токени disabled Material не перевизначаються.
+// другорядні — обведені, небезпечні в рядках дій — текстова кнопка кольору небезпеки дизайну
+// (`--nri-danger-text`); підтвердження небезпечної дії в діалозі — залита кнопка кольору
+// небезпеки (`--nri-danger` / `--nri-on-danger`). Кольори — токени дизайну (на темних і світлих
+// ділянках свої); вимкнена кнопка лишається вимкненою — disabled-токени Material не чіпаємо.
 .mat-mdc-button-base.nri-danger {
   --mat-button-text-label-text-color: var(--nri-danger-text);
   --mat-button-text-state-layer-color: var(--nri-danger-text);
   --mat-button-text-ripple-color: color-mix(in srgb, var(--nri-danger-text) 12%, transparent);
 }
 
+.mat-mdc-button-base.nri-danger-filled {
+  --mat-button-filled-container-color: var(--nri-danger);
+  --mat-button-filled-label-text-color: var(--nri-on-danger);
+  --mat-button-filled-state-layer-color: var(--nri-on-danger);
+  --mat-button-filled-ripple-color: color-mix(in srgb, var(--nri-on-danger) 12%, transparent);
+}
+
+// Дії діалогу на вузькому екрані переносяться в рядки: проміжок між рядками, щоб рамка обведеної
+// кнопки не торкалася сусідньої (по горизонталі відступ дає сам Material).
+.mat-mdc-dialog-actions {
+  row-gap: var(--nri-space-sm);
+}
+
+// Текстова кнопка Material у ряду інших кнопок: внутрішній відступ компенсовано, щоб значок
+// стояв на краю ряду (перенесена — під сусідами, у ряду — на звичайному проміжку).
 .nri-text-button-flush {
   margin-inline-start: calc(-1 * var(--mat-button-text-with-icon-horizontal-padding, 12px));
 }

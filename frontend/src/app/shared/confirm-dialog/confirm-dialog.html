@@ -9,11 +9,12 @@
   <button mat-stroked-button type="button" [mat-dialog-close]="false" cdkFocusInitial>
     {{ 'common.cancel' | translate }}
   </button>
-  <!-- Небезпечне підтвердження — текстова кнопка кольору небезпеки (спільне правило рангів). -->
+  <!-- Підтвердження — залите, праворуч; небезпечне — кольору небезпеки дизайну. Правило рангів:
+       небезпечна дія в рядках — текстом, підтвердження небезпечної дії в діалозі — залите. -->
   <button
-    [matButton]="data.danger ? 'text' : 'filled'"
+    mat-flat-button
     type="button"
-    [class.nri-danger]="data.danger"
+    [class.nri-danger-filled]="data.danger"
     [mat-dialog-close]="true"
   >
     {{ data.confirm | translate }}

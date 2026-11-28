@@ -12,7 +12,7 @@ export interface ConfirmDialogData {
   params?: Record<string, unknown>;
   /** Додаткове попередження (ключ i18n) окремим абзацом під текстом. */
   note?: string;
-  /** Небезпечна дія — кнопка підтвердження червона. */
+  /** Небезпечна дія — підтвердження залите кольором небезпеки дизайну (`nri-danger-filled`). */
   danger?: boolean;
 }
 

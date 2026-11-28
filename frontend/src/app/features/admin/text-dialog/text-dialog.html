@@ -35,10 +35,10 @@
       {{ 'common.cancel' | translate }}
     </button>
     <button
-      [matButton]="data.danger ? 'text' : 'filled'"
+      mat-flat-button
       type="submit"
       class="confirm"
-      [class.nri-danger]="data.danger"
+      [class.nri-danger-filled]="data.danger"
       [disabled]="submitting()"
     >
       {{ data.confirm | translate }}
